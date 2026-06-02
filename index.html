@@ -1790,7 +1790,7 @@ body {
   transition: background .12s;
 }
 .feat-close:active { background: var(--border); }
-.feat-body { overflow-y: auto; flex: 1; padding: 16px 0 calc(24px + var(--safe-b)); }
+.feat-body { overflow-y: auto; flex: 1; padding: 16px 0 8px; }
 .feat-section { padding: 0 18px; margin-bottom: 20px; }
 .feat-section-title {
   font-size: 11px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase;
@@ -2110,6 +2110,7 @@ async function saveProfileToFirestore() {
       styleAvatar: S.styleAvatar || null,
       signatureScent: S.signatureScent, scentHistory: S.scentHistory,
       hairstyle: S.hairstyle, hairstyleHistory: S.hairstyleHistory,
+      signatureNailColor: S.signatureNailColor, braSize: S.braSize,
       shopBudget: S.shopBudget,
       shopBlocked: [...S.shopBlocked],
       purchased: [...S.purchasedQueries],
@@ -2146,6 +2147,8 @@ async function loadProfileFromFirestore() {
     applyStr('profileStyleWords', 'closet-profile-style-words');
     applyStr('signatureScent',    'closet-signature-scent');
     applyStr('hairstyle',         'closet-hairstyle');
+    applyStr('signatureNailColor','closet-nail-color');
+    applyStr('braSize',           'closet-bra-size');
     if (p.cycleEnabled  != null) { S.cycleEnabled    = !!p.cycleEnabled;                    localStorage.setItem('closet-cycle-on',   S.cycleEnabled); }
     if (p.cycleStartDay != null) { S.cycleStartDay   = p.cycleStartDay;                     localStorage.setItem('closet-cycle-day',  p.cycleStartDay); }
     if (p.cycleLength   != null) { S.cycleLength     = p.cycleLength;                       localStorage.setItem('closet-cycle-len',  p.cycleLength); }
@@ -2259,6 +2262,9 @@ const S = {
   scentHistory:       JSON.parse(localStorage.getItem('closet-scent-history') || '[]'),
   hairstyle:          localStorage.getItem('closet-hairstyle') || '',
   hairstyleHistory:   JSON.parse(localStorage.getItem('closet-hairstyle-history') || '[]'),
+  signatureNailColor: localStorage.getItem('closet-nail-color') || '',
+  braSize:            localStorage.getItem('closet-bra-size') || '',
+  _auraEdit:          null,
   // Cloud Sync
   syncUrl:            localStorage.getItem('closet-sync-url')  || '',
   syncCode:           localStorage.getItem('closet-sync-code') || '',
@@ -2883,6 +2889,11 @@ function saveSignatureScent(val) {
 function saveHairstyle(val) {
   S.hairstyle = val.trim();
   localStorage.setItem('closet-hairstyle', S.hairstyle); fsSet('hairstyle', S.hairstyle);
+}
+function saveAuraField(field, localKey, val) {
+  S[field] = val.trim();
+  localStorage.setItem(localKey, S[field]); fsSet(field, S[field]);
+  S._auraEdit = null; render();
 }
 function startRetireScent() {
   S._aboutMeRetiring = 'scent'; render();
@@ -4594,7 +4605,6 @@ function featuresMenuHTML() {
           <div class="feat-subtitle">Everything built into your style journal</div>
         </div>
         <button class="feat-close" onclick="S.featureMenuOpen=false;render()">✕</button>
-        <button onclick="S.featureMenuOpen=false;signOut();" style="position:absolute;left:16px;top:16px;background:none;border:none;font-size:12px;color:var(--text-3);font-weight:600;cursor:pointer;font-family:inherit;padding:4px 8px;border-radius:6px;border:1px solid var(--border);">Sign out</button>
       </div>
       <div style="display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap;">
         <button onclick="S.featureMenuOpen=false;switchTab('dashboard');" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);display:flex;align-items:center;gap:7px;justify-content:center;">
@@ -4606,6 +4616,9 @@ function featuresMenuHTML() {
       </div>
       <div class="feat-body">
         ${sectionsHTML}
+      </div>
+      <div style="padding:12px 16px calc(12px + var(--safe-b));border-top:1px solid var(--border);flex-shrink:0;">
+        <button onclick="S.featureMenuOpen=false;signOut();" style="width:100%;background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Sign out</button>
       </div>
     </div>`;
 }
@@ -5104,6 +5117,10 @@ function viewShop() {
 
     // Compact link rows
     const q = encodeURIComponent(item.query + budgetSearchSuffix(S.shopBudget));
+    const searchButtonsHTML = `<div style="border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;">
+          <a href="https://www.google.com/search?tbm=shop&q=${q}" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:8px 4px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-weight:600;color:var(--text-2);text-decoration:none;">🛍 Google</a>
+          <a href="https://www.amazon.com/s?k=${q}" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:8px 4px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-weight:600;color:var(--text-2);text-decoration:none;">📦 Amazon</a>
+        </div>`;
     const linksHTML = item.results?.length
       ? item.results.slice(0,3).map(it => `
           <a class="shop-list-link" href="${esc(it.link)}" target="_blank" rel="noopener">
@@ -5112,11 +5129,8 @@ function viewShop() {
               <div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(it.domain)}</div>
             </div>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--text-3);"><path d="M9 18l6-6-6-6"/></svg>
-          </a>`).join('')
-      : `<div style="border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;">
-          <a href="https://www.google.com/search?tbm=shop&q=${q}" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:8px 4px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-weight:600;color:var(--text-2);text-decoration:none;">🛍 Google</a>
-          <a href="https://www.amazon.com/s?k=${q}" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:8px 4px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-weight:600;color:var(--text-2);text-decoration:none;">📦 Amazon</a>
-        </div>`;
+          </a>`).join('') + searchButtonsHTML
+      : searchButtonsHTML;
 
     // Outfit thumbnails — compact horizontal strip
     const outfitEntries = (item.outfitIds || [])
@@ -5183,15 +5197,15 @@ function viewShop() {
       <div style="display:flex;gap:8px;">
         ${[1,2,3].map(t => {
           const active = S.shopBudget === t;
-          return `<button onclick="setShopBudget(${t})" style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${active?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${active?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;transition:all .15s;text-align:center;">
+          return `<button onclick="setShopBudget(${t})" style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${active?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${active?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;transition:all .15s;text-align:center;touch-action:manipulation;">
             <div style="font-size:16px;margin-bottom:2px;">${budgetIcons[t]}</div>
             <div style="font-size:12px;font-weight:${active?'800':'600'};color:${active?'var(--gold-dk)':'var(--text-2)'};">${budgetTiers[t]}</div>
             <div style="font-size:10px;color:${active?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;opacity:.8;">${budgetDescs[t]}</div>
           </button>`;
         }).join('')}
       </div>
-      <div style="margin-top:9px;font-size:11px;color:var(--gold-dk);text-align:center;opacity:${S.shopBudget===2?'0':'1'};transition:opacity .2s;">
-        ✓ ${budgetTiers[S.shopBudget]} filter applied to search results
+      <div style="margin-top:9px;font-size:11px;color:var(--gold-dk);text-align:center;">
+        ✓ ${budgetTiers[S.shopBudget]} · ${budgetDescs[S.shopBudget]} filter active
       </div>
     </div>
     <div style="height:1px;background:var(--border);margin:0 16px;"></div>
@@ -5422,62 +5436,69 @@ function viewPlan() {
     </div>`;
   })();
 
+  const planMode = S.planMode || 'solo';
+
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">Plan</span>
       <span></span>
     </div>
-    <div class="tab-headline">Dress for what's next.</div>
 
-    <div style="padding:14px 16px 2px;">${squadSectionHTML}</div>
-    <div style="height:1px;background:var(--border);margin:4px 16px 0;"></div>
-
-    <div style="padding:14px 16px 4px;display:flex;align-items:center;gap:10px;">
-      <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-2);">🪞 Solo Fit</div>
-      <div style="flex:1;height:1px;background:var(--border);"></div>
-    </div>
-
-    <div class="plan-hero" style="padding-top:4px;">
+    <div class="plan-hero">
       <div class="plan-hero-title">What's the occasion?</div>
-      <div class="plan-hero-sub">Describe your upcoming event and Claude will suggest outfits from your closet — tailored to the weather.</div>
+      <div class="plan-hero-sub">Plan what's next — solo or with your crew.</div>
     </div>
 
-    <div class="plan-card">
-      <div class="plan-card-title">Describe your event</div>
-      <textarea class="plan-textarea" id="planEventDesc" rows="3"
-        placeholder="e.g. rooftop birthday dinner next Saturday, or job interview at a creative agency…"
-        oninput="S.plan.eventDesc=this.value">${esc(p.eventDesc)}</textarea>
-    </div>
-
-    <div class="plan-card">
-      <div class="plan-card-title">Weather forecast (optional)</div>
-      <div class="plan-date-row">
-        <input class="plan-date-input" type="date" id="planDate" value="${p.date || today}"
-          min="${today}" oninput="S.plan.date=this.value">
-        <button class="btn btn-secondary" style="margin:0;padding:10px 16px;font-size:13px;white-space:nowrap;"
-          onclick="doGetForecast()" ${p.loadingForecast?'disabled':''}>
-          ${p.loadingForecast ? '…' : '📍 Get Forecast'}
-        </button>
-      </div>
-      ${forecastSection}
-      <div style="font-size:12px;color:var(--text-3);margin-top:8px;">Requires location permission · Uses Open-Meteo (free)</div>
-    </div>
-
-    <div style="padding:0 20px 20px;">
-      <button class="btn btn-primary" onclick="doSuggestOutfits()" style="margin:0;"
-        ${p.loadingSuggest||!p.eventDesc.trim()?'disabled opacity:.55':''}>
-        ${p.loadingSuggest ? '✨ Claude is thinking…' : '✨ Suggest Outfits'}
+    <!-- Mode toggle -->
+    <div style="display:flex;gap:8px;padding:0 16px 16px;">
+      <button onclick="S.planMode='solo';render()" style="flex:1;padding:10px 0;border-radius:var(--r-sm);border:2px solid ${planMode==='solo'?'var(--gold)':'var(--border)'};background:${planMode==='solo'?'var(--gold-bg)':'var(--surface)'};color:${planMode==='solo'?'var(--gold-dk)':'var(--text-2)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;">
+        🪞 Solo Fit
+      </button>
+      <button onclick="S.planMode='group';render()" style="flex:1;padding:10px 0;border-radius:var(--r-sm);border:2px solid ${planMode==='group'?'var(--gold)':'var(--border)'};background:${planMode==='group'?'var(--gold-bg)':'var(--surface)'};color:${planMode==='group'?'var(--gold-dk)':'var(--text-2)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;">
+        👯 Group Fit
       </button>
     </div>
 
-    ${carouselHTML}
+    ${planMode === 'group' ? `
+      <div style="padding:0 16px 16px;">${squadSectionHTML}</div>
+    ` : `
+      <div class="plan-card">
+        <div class="plan-card-title">Describe your event</div>
+        <textarea class="plan-textarea" id="planEventDesc" rows="3"
+          placeholder="e.g. rooftop birthday dinner next Saturday, or job interview at a creative agency…"
+          oninput="S.plan.eventDesc=this.value">${esc(p.eventDesc)}</textarea>
+      </div>
 
-    ${S.entries.length === 0 && S.wardrobe.length === 0 ? `
-      <div class="empty" style="padding-top:20px;">
-        <div class="empty-icon">👗</div>
-        <h2>Add outfits first</h2>
-        <p>Log a few outfits to your Closet and Claude will have something to work with!</p>
-      </div>` : ''}
+      <div class="plan-card">
+        <div class="plan-card-title">Weather forecast (optional)</div>
+        <div class="plan-date-row">
+          <input class="plan-date-input" type="date" id="planDate" value="${p.date || today}"
+            min="${today}" oninput="S.plan.date=this.value">
+          <button class="btn btn-secondary" style="margin:0;padding:10px 16px;font-size:13px;white-space:nowrap;"
+            onclick="doGetForecast()" ${p.loadingForecast?'disabled':''}>
+            ${p.loadingForecast ? '…' : '📍 Get Forecast'}
+          </button>
+        </div>
+        ${forecastSection}
+        <div style="font-size:12px;color:var(--text-3);margin-top:8px;">Requires location permission · Uses Open-Meteo (free)</div>
+      </div>
+
+      <div style="padding:0 20px 20px;">
+        <button class="btn btn-primary" onclick="doSuggestOutfits()" style="margin:0;"
+          ${p.loadingSuggest||!p.eventDesc.trim()?'disabled opacity:.55':''}>
+          ${p.loadingSuggest ? '✨ Claude is thinking…' : '✨ Suggest Outfits'}
+        </button>
+      </div>
+
+      ${carouselHTML}
+
+      ${S.entries.length === 0 && S.wardrobe.length === 0 ? `
+        <div class="empty" style="padding-top:20px;">
+          <div class="empty-icon">👗</div>
+          <h2>Add outfits first</h2>
+          <p>Log a few outfits to your Closet and Claude will have something to work with!</p>
+        </div>` : ''}
+    `}
 
     <div style="height:30px"></div>
   </div>`;
@@ -5707,6 +5728,91 @@ function viewProfile() {
       <button onclick="saveHairstyle(document.getElementById('newHairInput').value);render();" style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:0 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Add</button>
     </div>`;
 
+  // ── Liked recommendations carousel ────────────────────────
+  const likedRecs = [];
+  S.entries.forEach(e => {
+    if (!e.recReactions) return;
+    (e.recommendations||[]).forEach(r => {
+      if (e.recReactions[r] === 'liked') likedRecs.push({ rec: r, entry: e });
+    });
+  });
+  const likedRecsHTML = likedRecs.length ? `
+    <div style="padding:0 16px 6px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">♥ Saved Style Tips</div>
+    </div>
+    <div style="display:flex;gap:10px;overflow-x:auto;padding:0 16px 16px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+      ${likedRecs.map(({rec, entry}) => `
+        <div onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:210px;cursor:pointer;
+          border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
+          ${entry.photo
+            ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
+            : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
+          <div style="padding:10px 12px 12px;flex:1;">
+            <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Style tip</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.45;">${esc(rec)}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:6px;">⭐ ${entry.rating}/10 · ${entry.occasionTag ? esc(entry.occasionTag) : fmtDateLong(entry.createdAt)}</div>
+          </div>
+        </div>`).join('')}
+    </div>` : '';
+
+  // ── Top-rated looks carousel ───────────────────────────────
+  const topLooks = [...S.entries]
+    .filter(e => e.photo && !e.doNotRepeat)
+    .sort((a,b) => (b.rating||0) - (a.rating||0) || new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 12);
+  const topLooksHTML = topLooks.length ? `
+    <div style="padding:0 16px 6px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Top Looks</div>
+    </div>
+    <div style="display:flex;gap:8px;overflow-x:auto;padding:0 16px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+      ${topLooks.map(e => `
+        <div onclick="openEntry('${e.id}')" style="flex-shrink:0;width:90px;cursor:pointer;">
+          <div style="width:90px;height:120px;border-radius:10px;overflow:hidden;border:2px solid ${(e.rating||0)>=9?'var(--gold)':'var(--border)'};position:relative;">
+            <img src="${e.photo}" loading="lazy" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">
+            <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.6));padding:4px 6px;">
+              <div style="font-size:11px;font-weight:800;color:#fff;">${e.rating||'?'}<span style="font-size:9px;opacity:.8;">/10</span></div>
+            </div>
+          </div>
+          ${e.occasionTag ? `<div style="font-size:9px;color:var(--text-3);margin-top:3px;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${esc(e.occasionTag)}</div>` : ''}
+        </div>`).join('')}
+    </div>` : '';
+
+  // ── Your Aura grid ────────────────────────────────────────
+  const auraFieldHTML = (fieldKey, localKey, icon, label, placeholder, stateVal) => {
+    const isEditing = S._auraEdit === fieldKey;
+    const id = `aura-${fieldKey}`;
+    if (isEditing) {
+      return `<div style="background:var(--surface);border:2px solid var(--gold);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);">${icon} ${label}</div>
+        <input id="${id}" class="form-input" type="text" value="${esc(stateVal)}" placeholder="${esc(placeholder)}"
+          style="font-size:15px;padding:8px 10px;margin:0;border-radius:8px;"
+          onkeydown="if(event.key==='Enter'){saveAuraField('${fieldKey}','${localKey}',document.getElementById('${id}').value)}">
+        <div style="display:flex;gap:6px;">
+          <button onclick="saveAuraField('${fieldKey}','${localKey}',document.getElementById('${id}').value)"
+            style="flex:1;padding:7px 0;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">Save</button>
+          <button onclick="S._auraEdit=null;render()"
+            style="padding:7px 12px;background:none;border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);touch-action:manipulation;">✕</button>
+        </div>
+      </div>`;
+    }
+    return `<div onclick="S._auraEdit='${fieldKey}';render()" style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;min-height:64px;display:flex;flex-direction:column;justify-content:space-between;">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);">${icon} ${label}</div>
+      ${stateVal
+        ? `<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;line-height:1.3;">${esc(stateVal)}</div>`
+        : `<div style="font-size:12px;color:var(--text-3);font-style:italic;margin-top:4px;">Tap to add…</div>`}
+    </div>`;
+  };
+
+  // Simple aura grid - 2 cols
+  const auraGrid = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    ${auraFieldHTML('profileZodiac',     'closet-profile-zodiac',  '⭐', 'Star Sign',      'e.g. Scorpio, Libra…',           S.profileZodiac)}
+    ${auraFieldHTML('profileMBTI',       'closet-profile-mbti',    '🧠', 'Personality',    'e.g. ENFP, INTJ…',               S.profileMBTI)}
+    ${auraFieldHTML('profileHeight',     'closet-profile-height',  '📏', 'Height',         'e.g. 5\'7", 170cm…',             S.profileHeight)}
+    ${auraFieldHTML('braSize',           'closet-bra-size',        '🩱', 'Bra Size',       'e.g. 32C, 34B…',                 S.braSize)}
+    ${auraFieldHTML('profileWeight',     'closet-profile-weight',  '⚖️', 'Weight',         'e.g. 130 lbs, 58kg…',            S.profileWeight)}
+    ${auraFieldHTML('signatureNailColor','closet-nail-color',      '💅', 'Signature Nail', 'e.g. Bordeaux, OPI Bubble Bath…', S.signatureNailColor)}
+  </div>`;
+
   function profileSection(title, content) {
     return `<div style="padding:0 16px;margin-bottom:20px;">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">${title}</div>
@@ -5721,15 +5827,27 @@ function viewProfile() {
     </div>
 
     <!-- Header: avatar + name + chips -->
-    <div style="padding:16px 16px 20px;display:flex;gap:16px;align-items:flex-start;">
+    <div style="padding:16px 16px 14px;display:flex;gap:16px;align-items:flex-start;">
       ${avatarHTML}
       <div style="flex:1;min-width:0;">
         <div style="font-size:22px;font-weight:900;letter-spacing:-.3px;margin-bottom:3px;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
         ${S.profileStyleWords ? `<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:8px;">${esc(S.profileStyleWords.length>80?S.profileStyleWords.slice(0,80)+'…':S.profileStyleWords)}</div>` : ''}
         ${chipsHTML}
       </div>
-      <button onclick="signOut()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;flex-shrink:0;white-space:nowrap;">Sign out</button>
     </div>
+
+    <!-- Style Portrait — top of page -->
+    <div style="padding:0 16px 16px;">${portraitHTML}</div>
+
+    <div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>
+
+    <!-- Top Rated Looks carousel -->
+    ${topLooksHTML}
+    ${topLooksHTML ? `<div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
+
+    <!-- Liked recommendations carousel -->
+    ${likedRecsHTML}
+    ${likedRecsHTML ? `<div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
 
     <!-- Stats row: style score + streak -->
     <div style="display:flex;gap:10px;padding:0 16px 20px;">
@@ -5742,28 +5860,21 @@ function viewProfile() {
       </div>
     </div>
 
-    <div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>
-
-    ${profileSection('✦ Style Portrait', portraitHTML)}
-
-    <div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>
-
-    ${mostWornHTML ? profileSection('Most Worn', mostWornHTML) : ''}
-    ${mostWornHTML ? `<div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
+    ${mostWornHTML ? `<div style="padding:0 16px 20px;">${mostWornHTML}</div><div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
 
     ${profileSection('Brand Affinity', brandsHTML)}
-
     <div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>
-
     ${profileSection('Top Activities', activitiesHTML)}
-
     <div style="height:1px;background:var(--border);margin:0 16px 24px;"></div>
 
-    <!-- FLOURISHES -->
+    <!-- YOUR AURA -->
     <div style="padding:0 16px;margin-bottom:6px;">
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:var(--gold-dk);margin-bottom:4px;">✦ Flourishes</div>
-      <div style="font-size:11px;color:var(--text-3);margin-bottom:16px;font-style:italic;">The finishing touches that complete your look.</div>
+      <div style="font-size:18px;font-weight:900;letter-spacing:-.3px;color:var(--text);margin-bottom:3px;">✦ Your Aura</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;line-height:1.5;">The details that make you, <em>you</em> — beyond just the clothes.</div>
+      ${auraGrid}
     </div>
+
+    <div style="height:16px;"></div>
     ${profileSection('🌸 Signature Scent', scentBlock)}
     ${profileSection('💇 Current Hairstyle', hairBlock)}
 
@@ -7849,7 +7960,7 @@ function viewReview() {
       <textarea class="form-textarea" id="notesInput" placeholder="How did you feel? Where did you wear this?">${esc(d.notes||'')}</textarea>
       <p style="font-size:12px;color:var(--text-3);margin-top:8px;">✨ Mention where you wore it and Claude will auto-tag the occasion (e.g. "Date Night", "Work Offsite")</p>
     </div>
-    <button class="btn btn-primary" onclick="doSaveNew()">💾 Save to Closet</button>
+    <button class="btn btn-primary" onclick="doSaveNew()">✨ Save This Fit</button>
     <div style="height:11px"></div>
     <button class="btn btn-secondary" onclick="navigate(S.activeTab);clearPending()">Discard</button>
     <div style="height:36px"></div>
@@ -7864,10 +7975,15 @@ function viewMatchReview() {
   const confirmedMatches = mr.matches.filter(m => m.on);
   const itemsToAdd = mr.unmatched.filter(u => u.addOn);
 
+  const addCount = itemsToAdd.length;
+  const btnLabel = addCount > 0
+    ? `Add ${addCount} piece${addCount===1?'':'s'} to My Closet ✦`
+    : confirmedMatches.length > 0 ? 'Save & Log Wears' : 'Done';
+
   return `<div class="view view-notab">
     <div class="nav">
       <span style="width:72px"></span>
-      <span class="nav-title">Update Wardrobe</span>
+      <span class="nav-title">Add to My Closet</span>
       <button class="nav-btn" onclick="skipMatchReview()" title="Skip">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -7875,7 +7991,7 @@ function viewMatchReview() {
 
     <div class="match-header">
       <h2>✨ Outfit Saved!</h2>
-      <p>Claude compared your outfit items against your wardrobe. Confirm any matches or add new items below.</p>
+      <p>Add these pieces to your closet to track what you wear, what it costs, and what it's worth over time.</p>
     </div>
 
     ${mr.matches.length ? `
@@ -7900,8 +8016,8 @@ function viewMatchReview() {
       <div style="height:16px"></div>` : ''}
 
     ${mr.unmatched.length ? `
-      <div class="match-section-label">${mr.matches.length ? 'Not yet in your wardrobe' : 'Add items to your wardrobe?'}</div>
-      <p style="font-size:12px;color:var(--text-3);padding:0 16px;margin-bottom:10px;">Toggle on to add as a new wardrobe item, or tap an existing item below to log a wear instead.</p>
+      <div class="match-section-label">${mr.matches.length ? 'New pieces to add' : 'Add these to your closet'}</div>
+      <p style="font-size:12px;color:var(--text-3);padding:0 16px;margin-bottom:10px;">Toggle on to add a piece — a few details now unlock cost-per-wear tracking over time.</p>
       ${mr.unmatched.map((u, i) => {
         const itemCat = u.selectedCat || categoryFromIcon(u.item.icon, u.item.name);
         // Broader similar item detection: category match OR any non-trivial word overlap
@@ -7961,23 +8077,45 @@ function viewMatchReview() {
               <input class="form-input" type="text" placeholder="Edit name"
                 value="${esc(u.editedName !== undefined ? u.editedName : u.item.name)}"
                 oninput="S.matchReview.unmatched[${i}].editedName=this.value"
-                style="font-size:14px;padding:11px 14px;">
+                style="font-size:16px;padding:11px 14px;">
               <input class="form-input" type="text" placeholder="Brand (optional — e.g. Zara, Madewell)"
                 value="${esc(u.brand||'')}" oninput="S.matchReview.unmatched[${i}].brand=this.value"
-                style="font-size:14px;padding:11px 14px;">
-              <select class="form-input" style="font-size:14px;padding:11px 14px;"
+                style="font-size:16px;padding:11px 14px;">
+              <select class="form-input" style="font-size:16px;padding:11px 14px;"
                 onchange="S.matchReview.unmatched[${i}].selectedCat=this.value;render()">
                 ${['Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Other','Accessories'].map(c =>
                   `<option value="${c}" ${itemCat===c?'selected':''}>${c}</option>`
                 ).join('')}
               </select>
+              <input class="form-input" type="text" placeholder="Description — color, cut, material (optional)"
+                value="${esc(u.description !== undefined ? u.description : (u.item.description||''))}"
+                oninput="S.matchReview.unmatched[${i}].description=this.value"
+                style="font-size:16px;padding:11px 14px;">
+
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:2px;">Did you just get this?</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
                 <button onclick="S.matchReview.unmatched[${i}].isNew=true;render()"
-                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${u.isNew===true?'var(--gold)':'var(--border)'};background:${u.isNew===true?'var(--gold-bg)':'var(--surface)'};color:${u.isNew===true?'var(--gold-dk)':'var(--text-2)'};">✨ It's new!</button>
+                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${u.isNew===true?'var(--gold)':'var(--border)'};background:${u.isNew===true?'var(--gold-bg)':'var(--surface)'};color:${u.isNew===true?'var(--gold-dk)':'var(--text-2)'};">✨ Just got it</button>
                 <button onclick="S.matchReview.unmatched[${i}].isNew=false;render()"
-                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${u.isNew!==true?'var(--gold)':'var(--border)'};background:${u.isNew!==true?'var(--gold-bg)':'var(--surface)'};color:${u.isNew!==true?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
+                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${u.isNew!==true?'var(--gold)':'var(--border)'};background:${u.isNew!==true?'var(--gold-bg)':'var(--surface)'};color:${u.isNew!==true?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
               </div>
-              ${u.isNew===true ? '' : `<input class="form-input" type="month" value="${esc(u.purchasedDate||'')}" oninput="S.matchReview.unmatched[${i}].purchasedDate=this.value" placeholder="Approx. month you got it" style="font-size:14px;padding:11px 14px;">`}
+
+              ${u.isNew===true ? `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                  <div style="position:relative;">
+                    <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-3);pointer-events:none;">$</span>
+                    <input class="form-input" type="number" min="0" step="0.01"
+                      placeholder="Price paid"
+                      value="${esc(u.price||'')}" oninput="S.matchReview.unmatched[${i}].price=this.value"
+                      style="font-size:16px;padding:11px 14px 11px 26px;">
+                  </div>
+                  <input class="form-input" type="text" placeholder="Size (e.g. S, 28, 8)"
+                    value="${esc(u.size||'')}" oninput="S.matchReview.unmatched[${i}].size=this.value"
+                    style="font-size:16px;padding:11px 14px;">
+                </div>` : `
+                <input class="form-input" type="month" value="${esc(u.purchasedDate||'')}"
+                  oninput="S.matchReview.unmatched[${i}].purchasedDate=this.value"
+                  placeholder="Approx. month you got it" style="font-size:16px;padding:11px 14px;">`}
             </div>` : ''}
         </div>`;
       }).join('')}
@@ -7988,9 +8126,9 @@ function viewMatchReview() {
         No items to review. Your wardrobe is up to date!
       </div>` : ''}
 
-    <button class="btn btn-primary" onclick="doConfirmMatchReview()">Update Wardrobe</button>
+    <button class="btn btn-primary" onclick="doConfirmMatchReview()">${btnLabel}</button>
     <div style="height:10px"></div>
-    <button class="btn btn-secondary" onclick="skipMatchReview()">Skip</button>
+    <button class="btn btn-secondary" onclick="skipMatchReview()">Skip for now</button>
     <div style="height:36px"></div>
   </div>`;
 }
@@ -8189,7 +8327,6 @@ function viewDetail() {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:3px;"><path d="M9 18l6-6-6-6"/></svg>
                   </div>
                   ${wm.brand ? `<div style="font-size:12px;color:var(--text-3);margin-bottom:2px;">${esc(wm.brand)}</div>` : ''}
-                  ${wm.description ? `<div class="item-desc">${esc(wm.description)}</div>` : ''}
                   <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;align-items:center;">
                     ${wmPrice > 0 ? `<span style="font-size:12px;color:var(--text-2);font-weight:600;">$${wmPrice.toFixed(2)}</span>` : ''}
                     ${wmWears > 0 ? `<span style="font-size:12px;color:var(--text-3);">Worn ${wmWears}×</span>` : ''}
@@ -8205,7 +8342,6 @@ function viewDetail() {
               <div class="item-icon">${it.icon||'👕'}</div>
               <div class="item-info">
                 <div class="item-name">${esc(it.name)}</div>
-                ${it.description ? `<div class="item-desc">${esc(it.description)}</div>` : ''}
                 <div class="item-no-price" style="cursor:pointer;" onclick="openOutfitLinker('${entry.id}')">Not linked to wardrobe — tap Edit links</div>
               </div>
             </div>`;
@@ -9251,9 +9387,10 @@ async function doConfirmMatchReview() {
     const itemCat  = u.selectedCat || categoryFromIcon(u.item.icon, itemName);
     const newItem = {
       id: uid(), name: itemName,
-      description: u.item.description,
+      description: u.description !== undefined ? u.description : (u.item.description || null),
       icon: u.item.icon||'👕', price: parseFloat(u.price)||null,
       brand: u.brand?.trim() || null,
+      size: u.size?.trim() || null,
       category: itemCat,
       subCategory: subCategoryFromName(itemName, itemCat),
       paidOff: false, retiring: false, gifted: false,
