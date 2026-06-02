@@ -4634,29 +4634,16 @@ function viewSignIn(loading) {
 }
 
 async function signInWithGoogle() {
-  const provider = new firebase.auth.GoogleAuthProvider();
   try {
     S.view = 'signin-loading'; render();
-    // Try popup first — works on https and most browsers
-    await auth.signInWithPopup(provider);
-    // onAuthStateChanged handles the rest
+    const provider = new firebase.auth.GoogleAuthProvider();
+    // Use redirect (works on GitHub Pages, PWA standalone, and all mobile browsers)
+    await auth.signInWithRedirect(provider);
+    // Page will redirect to Google — onAuthStateChanged handles the return
   } catch(e) {
-    // If popup is blocked or not supported, fall back to redirect
-    if (e.code === 'auth/popup-blocked' ||
-        e.code === 'auth/popup-cancelled-by-user' ||
-        e.code === 'auth/operation-not-supported-in-this-environment') {
-      try {
-        await auth.signInWithRedirect(provider);
-      } catch(e2) {
-        console.error('Sign-in failed:', e2);
-        S.view = 'signin'; render();
-        toast('Sign-in failed: ' + (e2.message || 'Unknown error'));
-      }
-    } else {
-      console.error('Sign-in failed:', e);
-      S.view = 'signin'; render();
-      toast('Sign-in failed: ' + (e.message || 'Unknown error'));
-    }
+    console.error('Sign-in failed:', e);
+    S.view = 'signin'; render();
+    toast('Sign-in failed: ' + (e.message || 'Unknown error'));
   }
 }
 
@@ -4762,9 +4749,9 @@ function tabBarHTML() {
 function viewSetup() {
   return `<div class="view view-notab">
     <div class="splash">
-      <div class="splash-icon">🪞</div>
+      <div class="splash-icon">👗</div>
       <h1>Closet</h1>
-      <p class="sub">Your wardrobe, your story. Dress with intention.</p>
+      <p class="sub">Your AI-powered style journal. Log outfits, build your wardrobe, and track price per wear.</p>
       <div class="setup-card">
         <div class="setup-title">Get your free API key:</div>
         <div class="setup-steps">
@@ -9506,6 +9493,15 @@ function iconSparkle() { return `<svg width="22" height="22" viewBox="0 0 24 24"
 /* ================================================================
    INIT
    ================================================================ */
+// Handle redirect result from Google Sign-In (fires after returning from Google's page)
+auth.getRedirectResult().catch(e => {
+  if (e.code !== 'auth/no-auth-event') {
+    console.error('Redirect sign-in error:', e);
+    toast('Sign-in failed: ' + (e.message || 'Unknown error'));
+    S.view = 'signin'; render();
+  }
+});
+
 // Firebase Auth state drives the entire app boot sequence
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
@@ -9530,8 +9526,6 @@ auth.onAuthStateChanged(async (user) => {
     S.activeTab = S.apiKey ? 'home' : S.activeTab;
   } catch(e) {
     console.error('Data load failed:', e);
-    // Show error toast but still enter the app — don't route back to signin
-    toast('Some data failed to load — check your connection and try refreshing.');
     S.view = S.apiKey ? 'home' : 'setup';
   }
   render();
