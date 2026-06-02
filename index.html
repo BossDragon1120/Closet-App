@@ -5192,10 +5192,22 @@ function viewShop() {
 
   return `<div class="view">
     <div class="nav">
-      <span class="nav-logo">Shopping List</span>
-      <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
+      <span class="nav-logo">Shop</span>
     </div>
     <div class="tab-headline">Intentional additions only.</div>
+    <div style="display:flex;gap:10px;padding:4px 16px 16px;">
+      <button onclick="toast('Find a Gift coming soon ✨')" style="flex:1;padding:12px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;">
+        <div style="font-size:18px;margin-bottom:3px;">🎁</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-1);">Find a Gift</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px;">For someone special</div>
+      </button>
+      <button onclick="toast('Find a Stylist coming soon ✨')" style="flex:1;padding:12px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;">
+        <div style="font-size:18px;margin-bottom:3px;">💼</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-1);">Find a Stylist</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px;">Get expert help</div>
+      </button>
+    </div>
+    <div style="height:1px;background:var(--border);margin:0 16px 0;"></div>
 
     <div style="padding:14px 16px 14px;">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Price Range</div>
