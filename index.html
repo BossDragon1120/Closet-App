@@ -2891,6 +2891,8 @@ function saveHairstyle(val) {
   localStorage.setItem('closet-hairstyle', S.hairstyle); fsSet('hairstyle', S.hairstyle);
 }
 function saveAuraField(field, localKey, val) {
+  if (field === 'signatureScent') { saveSignatureScent(val); S._auraEdit = null; render(); return; }
+  if (field === 'hairstyle')      { saveHairstyle(val);      S._auraEdit = null; render(); return; }
   S[field] = val.trim();
   localStorage.setItem(localKey, S[field]); fsSet(field, S[field]);
   S._auraEdit = null; render();
@@ -4416,8 +4418,12 @@ function cleanShopQuery(q) {
 }
 
 function setShopBudget(v) {
+  if (S.shopBudget === v) return;
   S.shopBudget = v;
   localStorage.setItem('closet-shop-budget', String(v)); fsSet('shopBudget', v);
+  // Clear cached results so cards immediately show budget-correct search links
+  S.shopCache = {};
+  localStorage.setItem('closet-shop-cache', '{}'); fsSet('shopCache', {});
   render();
 }
 
@@ -4740,7 +4746,7 @@ function tabBarHTML() {
   const t = S.activeTab;
   return `<div class="tab-bar">
     <button class="tab-btn ${t==='profile'?'active':''}" onclick="switchTab('profile')" title="Profile">
-      ${iconPerson()} <span>Profile</span>
+      ${iconPerson()} <span>Me</span>
     </button>
     <button class="tab-btn ${t==='closet'?'active':''}" onclick="switchTab('closet')">
       ${iconHanger()} <span>Fits</span>
@@ -4951,7 +4957,6 @@ function viewCloset() {
       <span class="nav-logo">${S.profileName.trim() ? `${S.profileName.trim()}'s Fits` : 'My Fits'}</span>
       <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
     </div>
-    <div class="tab-headline">Every look tells a story.</div>
     ${newsFlashHTML()}
     ${S.weatherPin ? `
     <div onclick="switchTab('plan')" style="margin:10px 16px 0;display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--surface);border-radius:var(--r-sm);border:1px solid var(--border);cursor:pointer;touch-action:manipulation;" >
@@ -5204,8 +5209,8 @@ function viewShop() {
           </button>`;
         }).join('')}
       </div>
-      <div style="margin-top:9px;font-size:11px;color:var(--gold-dk);text-align:center;">
-        ✓ ${budgetTiers[S.shopBudget]} · ${budgetDescs[S.shopBudget]} filter active
+      <div style="margin-top:9px;font-size:11px;color:var(--gold-dk);text-align:center;font-weight:600;">
+        ✓ Showing ${budgetTiers[S.shopBudget]} picks · ${budgetDescs[S.shopBudget]}
       </div>
     </div>
     <div style="height:1px;background:var(--border);margin:0 16px;"></div>
@@ -5805,12 +5810,14 @@ function viewProfile() {
 
   // Simple aura grid - 2 cols
   const auraGrid = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-    ${auraFieldHTML('profileZodiac',     'closet-profile-zodiac',  '⭐', 'Star Sign',      'e.g. Scorpio, Libra…',           S.profileZodiac)}
-    ${auraFieldHTML('profileMBTI',       'closet-profile-mbti',    '🧠', 'Personality',    'e.g. ENFP, INTJ…',               S.profileMBTI)}
-    ${auraFieldHTML('profileHeight',     'closet-profile-height',  '📏', 'Height',         'e.g. 5\'7", 170cm…',             S.profileHeight)}
-    ${auraFieldHTML('braSize',           'closet-bra-size',        '🩱', 'Bra Size',       'e.g. 32C, 34B…',                 S.braSize)}
-    ${auraFieldHTML('profileWeight',     'closet-profile-weight',  '⚖️', 'Weight',         'e.g. 130 lbs, 58kg…',            S.profileWeight)}
-    ${auraFieldHTML('signatureNailColor','closet-nail-color',      '💅', 'Signature Nail', 'e.g. Bordeaux, OPI Bubble Bath…', S.signatureNailColor)}
+    ${auraFieldHTML('profileZodiac',     'closet-profile-zodiac',   '⭐', 'Star Sign',      'e.g. Scorpio, Libra…',            S.profileZodiac)}
+    ${auraFieldHTML('profileMBTI',       'closet-profile-mbti',     '🧠', 'Personality',    'e.g. ENFP, INTJ…',                S.profileMBTI)}
+    ${auraFieldHTML('profileHeight',     'closet-profile-height',   '📏', 'Height',         'e.g. 5\'7", 170cm…',              S.profileHeight)}
+    ${auraFieldHTML('braSize',           'closet-bra-size',         '🩱', 'Bra Size',       'e.g. 32C, 34B…',                  S.braSize)}
+    ${auraFieldHTML('profileWeight',     'closet-profile-weight',   '⚖️', 'Weight',         'e.g. 130 lbs, 58kg…',             S.profileWeight)}
+    ${auraFieldHTML('signatureNailColor','closet-nail-color',       '💅', 'Signature Nail', 'e.g. Bordeaux, OPI Bubble Bath…',  S.signatureNailColor)}
+    ${auraFieldHTML('signatureScent',    'closet-signature-scent',  '🌸', 'Signature Scent','e.g. Chanel No. 5, Replica…',     S.signatureScent)}
+    ${auraFieldHTML('hairstyle',         'closet-hairstyle',        '💇', 'Hairstyle',      'e.g. Long waves, blunt bob…',     S.hairstyle)}
   </div>`;
 
   function profileSection(title, content) {
@@ -5822,7 +5829,7 @@ function viewProfile() {
 
   return `<div class="view">
     <div class="nav">
-      <span class="nav-logo">Profile</span>
+      <span class="nav-logo">Me</span>
       <button onclick="switchTab('settings')" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:5px 13px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;">Settings</button>
     </div>
 
@@ -5873,10 +5880,6 @@ function viewProfile() {
       <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;line-height:1.5;">The details that make you, <em>you</em> — beyond just the clothes.</div>
       ${auraGrid}
     </div>
-
-    <div style="height:16px;"></div>
-    ${profileSection('🌸 Signature Scent', scentBlock)}
-    ${profileSection('💇 Current Hairstyle', hairBlock)}
 
     <div style="height:40px;"></div>
   </div>`;
@@ -6695,7 +6698,25 @@ function viewWardrobe() {
         <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
       </span>
     </div>
-    <div class="tab-headline">Know what you own. Love what you wear.</div>
+    <div class="tab-headline">Know what you own. Always organized.</div>
+
+    <div style="display:flex;gap:10px;padding:4px 16px 16px;">
+      <button onclick="toast('Closet Assistant coming soon ✨')" style="flex:1;display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 14px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;">
+        <span style="font-size:22px;flex-shrink:0;">🤝</span>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.2;">Closet Assistant</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Get organized</div>
+        </div>
+      </button>
+      <button onclick="toast('Compare Closets coming soon ✨')" style="flex:1;display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 14px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;">
+        <span style="font-size:22px;flex-shrink:0;">👯</span>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.2;">Compare Closets</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">With a friend</div>
+        </div>
+      </button>
+    </div>
+
     ${activeWardrobe.length > 0 ? `<div style="padding:10px 16px 0;display:flex;align-items:baseline;gap:6px;">
       <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${activeWardrobe.length}</span>
       <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">piece${activeWardrobe.length===1?'':'s'} in your closet</span>
@@ -6764,9 +6785,7 @@ function hangerHTML(w) {
   const stripeEl = stripeColor
     ? `<div class="hanger-color-strip" style="background:${stripeColor};"></div>`
     : '';
-  const topArea = w.sketch
-    ? `<img src="${esc(w.sketch)}" class="hanger-img" alt="${esc(w.name)}" onerror="this.style.display='none'">`
-    : `<div class="hanger-icon">${w.icon || '👕'}</div>`;
+  const topArea = `<div class="hanger-icon">${w.icon || '👕'}</div>`;
   return `<div class="hanger" onclick="openWardrobeItem('${w.id}')">
     <div class="hanger-peg"></div>
     <div class="hanger-card">
@@ -8033,7 +8052,6 @@ function viewMatchReview() {
             <div class="match-icon" style="font-size:22px;">${u.item.icon||'👕'}</div>
             <div class="match-info" style="flex:1;min-width:0;">
               <div class="match-name">${esc(u.item.name)}</div>
-              <div class="match-sub">${esc((u.item.description||'').slice(0,70))}${(u.item.description||'').length>70?'…':''}</div>
               ${recoveredNote}
             </div>
             <button class="toggle ${u.addOn?'on':''}" onclick="toggleUnmatched(${i})" title="${u.addOn?'Don\'t add':'Add to wardrobe'}"></button>
