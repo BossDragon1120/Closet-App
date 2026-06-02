@@ -4661,13 +4661,17 @@ async function signInWithGoogle() {
   try {
     S.view = 'signin-loading'; render();
     const provider = new firebase.auth.GoogleAuthProvider();
-    // Use redirect (works on GitHub Pages, PWA standalone, and all mobile browsers)
-    await auth.signInWithRedirect(provider);
-    // Page will redirect to Google — onAuthStateChanged handles the return
+    // Use popup — more reliable than redirect in modern Chrome (avoids cookie/loop issues)
+    await auth.signInWithPopup(provider);
+    // onAuthStateChanged handles the rest
   } catch(e) {
     console.error('Sign-in failed:', e);
     S.view = 'signin'; render();
-    toast('Sign-in failed: ' + (e.message || 'Unknown error'));
+    if (e.code === 'auth/popup-blocked') {
+      toast('Popup blocked — please allow popups for this site and try again.');
+    } else if (e.code !== 'auth/popup-closed-by-user') {
+      toast('Sign-in failed: ' + (e.message || 'Unknown error'));
+    }
   }
 }
 
@@ -10071,15 +10075,6 @@ function iconSparkle() { return `<svg width="22" height="22" viewBox="0 0 24 24"
 /* ================================================================
    INIT
    ================================================================ */
-// Handle redirect result from Google Sign-In (fires after returning from Google's page)
-auth.getRedirectResult().catch(e => {
-  if (e.code !== 'auth/no-auth-event') {
-    console.error('Redirect sign-in error:', e);
-    toast('Sign-in failed: ' + (e.message || 'Unknown error'));
-    S.view = 'signin'; render();
-  }
-});
-
 // Firebase Auth state drives the entire app boot sequence
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
