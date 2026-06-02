@@ -4634,16 +4634,29 @@ function viewSignIn(loading) {
 }
 
 async function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
   try {
     S.view = 'signin-loading'; render();
-    const provider = new firebase.auth.GoogleAuthProvider();
-    // Use redirect (works on GitHub Pages, PWA standalone, and all mobile browsers)
-    await auth.signInWithRedirect(provider);
-    // Page will redirect to Google — onAuthStateChanged handles the return
+    // Try popup first — works on https and most browsers
+    await auth.signInWithPopup(provider);
+    // onAuthStateChanged handles the rest
   } catch(e) {
-    console.error('Sign-in failed:', e);
-    S.view = 'signin'; render();
-    toast('Sign-in failed: ' + (e.message || 'Unknown error'));
+    // If popup is blocked or not supported, fall back to redirect
+    if (e.code === 'auth/popup-blocked' ||
+        e.code === 'auth/popup-cancelled-by-user' ||
+        e.code === 'auth/operation-not-supported-in-this-environment') {
+      try {
+        await auth.signInWithRedirect(provider);
+      } catch(e2) {
+        console.error('Sign-in failed:', e2);
+        S.view = 'signin'; render();
+        toast('Sign-in failed: ' + (e2.message || 'Unknown error'));
+      }
+    } else {
+      console.error('Sign-in failed:', e);
+      S.view = 'signin'; render();
+      toast('Sign-in failed: ' + (e.message || 'Unknown error'));
+    }
   }
 }
 
