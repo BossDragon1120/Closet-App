@@ -107,7 +107,7 @@ body {
   gap: 1px; padding: 6px 0 7px; background: none; border: none; cursor: pointer;
   font-size: 8px; font-weight: 700; color: var(--text-3);
   font-family: inherit; text-transform: uppercase; letter-spacing: .3px;
-  transition: color .15s; min-width: 0;
+  transition: color .15s; min-width: 0; touch-action: manipulation;
 }
 .tab-btn.active { color: var(--gold); }
 .tab-btn svg { width: 20px; height: 20px; }
@@ -473,6 +473,7 @@ body {
   padding: 16px; border: none; border-radius: var(--r);
   font-size: 16px; font-weight: 600; cursor: pointer;
   text-align: center; transition: transform .12s, opacity .12s; font-family: inherit;
+  touch-action: manipulation;
 }
 .btn:active { transform: scale(0.97); opacity: .88; }
 .btn + .btn { margin-top: 11px; }
@@ -650,7 +651,7 @@ body {
 .form-input, .form-textarea {
   width: 100%; padding: 13px 14px; border: 1px solid var(--border);
   border-radius: var(--r-sm); background: var(--surface); font-family: inherit;
-  font-size: 15px; color: var(--text); outline: none;
+  font-size: 16px; color: var(--text); outline: none;
   transition: border-color .15s, box-shadow .15s;
   -webkit-appearance: none; appearance: none;
 }
@@ -2190,7 +2191,7 @@ const DB = {
    ================================================================ */
 const S = {
   view:       'loading',
-  activeTab:  'home',
+  activeTab:  'closet',
   entries:    [],
   wardrobe:   [],
   apiKey:     localStorage.getItem('closet-api-key') || '',
@@ -2872,7 +2873,7 @@ function closeShareCard() { S.showShareCard = false; render(); }
 /* ================================================================
    ABOUT ME PANEL
    ================================================================ */
-function openAboutMe()  { S.showAboutMe = true;  S._aboutMeRetiring = null; render(); }
+function openAboutMe()  { switchTab('profile'); }
 function closeAboutMe() { S.showAboutMe = false; S._aboutMeRetiring = null; render(); }
 
 function saveSignatureScent(val) {
@@ -4471,7 +4472,11 @@ function toast(msg) {
   _toastTimer = setTimeout(() => { S.toast = null; render(); }, 2600);
 }
 function navigate(view) { S.view = view; S.error = null; render(); window.scrollTo(0,0); }
-function switchTab(tab)  { S.activeTab = tab; navigate(tab); }
+function switchTab(tab)  {
+  // Remap legacy 'home' tab to 'closet' (Fits) for existing users
+  if (tab === 'home') tab = 'closet';
+  S.activeTab = tab; navigate(tab);
+}
 
 /* ================================================================
    FEATURE MENU
@@ -4658,7 +4663,7 @@ async function signOut() {
 /* ================================================================
    RENDER ROUTER
    ================================================================ */
-const TAB_VIEWS = new Set(['home','closet','wardrobe','shop','plan','dashboard','settings']);
+const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings']);
 
 function render() {
   const root = document.getElementById('root');
@@ -4673,6 +4678,7 @@ function render() {
     case 'shop':         html = viewShop();         break;
     case 'plan':         html = viewPlan();         break;
     case 'home':         html = viewHome();         break;
+    case 'profile':      html = viewProfile();      break;
     case 'dashboard':    html = viewDashboard();    break;
     case 'settings':     html = viewSettings();     break;
     case 'upload':       html = viewUpload();       break;
@@ -4697,7 +4703,8 @@ function render() {
     html += `<div class="loading-overlay"><div class="spinner"></div><h3>${esc(S.loadingMsg)}</h3><p>Sit tight — Claude is on it</p></div>`;
   }
   if (S.featureMenuOpen) html += featuresMenuHTML();
-  if (S.showAboutMe)   html += aboutMeSheetHTML();
+  // About Me flyout retired — Profile is now its own tab. Kept for safety but never shown.
+  // if (S.showAboutMe) html += aboutMeSheetHTML();
   if (S.showShareCard) html += shareCardModalHTML();
   if (S.toast) html += `<div class="toast">${esc(S.toast)}</div>`;
   root.innerHTML = html;
@@ -4719,11 +4726,8 @@ function iconPerson() {
 function tabBarHTML() {
   const t = S.activeTab;
   return `<div class="tab-bar">
-    <button class="tab-btn-icon" onclick="S.featureMenuOpen=true;render()" title="Features &amp; Help">
-      ${iconBurger()}
-    </button>
-    <button class="tab-btn ${t==='home'?'active':''}" onclick="switchTab('home')">
-      ${iconHome()} <span>Home</span>
+    <button class="tab-btn ${t==='profile'?'active':''}" onclick="switchTab('profile')" title="Profile">
+      ${iconPerson()} <span>Profile</span>
     </button>
     <button class="tab-btn ${t==='closet'?'active':''}" onclick="switchTab('closet')">
       ${iconHanger()} <span>Fits</span>
@@ -4737,8 +4741,8 @@ function tabBarHTML() {
     <button class="tab-btn ${t==='shop'?'active':''}" onclick="switchTab('shop')">
       ${iconBag()} <span>Shop</span>
     </button>
-    <button class="tab-btn-icon ${S.showAboutMe?'active':''}" onclick="openAboutMe()" title="Profile">
-      ${iconPerson()}
+    <button class="tab-btn-icon" onclick="S.featureMenuOpen=true;render()" title="Features &amp; Help">
+      ${iconBurger()}
     </button>
   </div>`;
 }
@@ -4897,13 +4901,6 @@ function buildJourneyHTML() {
 
 function viewCloset() {
   const entries = filteredEntries();
-  const avgRating = styleScore(S.entries);
-
-  const statsHTML = avgRating ? `
-    <div class="stats-bar" style="justify-content:center;">
-      <div class="stat-chip"><div class="stat-value">${avgRating}</div><div class="stat-label">Style Score</div></div>
-    </div>` : '';
-
   const allTags = [...new Set(S.entries.map(e => e.occasionTag).filter(Boolean))];
   const tagChips = allTags.map(tag =>
     `<div class="filter-chip ${S.filter==='tag:'+tag?'active':''}" onclick="setFilter('tag:${tag.replace(/'/g,'&#39;')}')">🏷 ${esc(tag)}</div>`
@@ -4922,6 +4919,12 @@ function viewCloset() {
     ? `<button class="show-more-btn" onclick="S.closetExpanded=true;render()">Show ${moreCount} more outfit${moreCount===1?'':'s'} ↓</button>`
     : '';
 
+  const outfitCountHTML = S.entries.length > 0 ? `
+    <div style="padding:10px 16px 0;display:flex;align-items:baseline;gap:6px;">
+      <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${S.entries.length}</span>
+      <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">outfit${S.entries.length===1?'':'s'} logged</span>
+    </div>` : '';
+
   const gridHTML = entries.length
     ? `<div class="outfit-grid">${displayEntries.map(outfitCardHTML).join('')}</div>${showMoreBtn}`
     : `<div class="empty">
@@ -4936,8 +4939,34 @@ function viewCloset() {
       <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
     </div>
     <div class="tab-headline">Every look tells a story.</div>
-    ${buildPersonaHTML()}
-    ${statsHTML}${filterHTML}${gridHTML}
+    ${newsFlashHTML()}
+    ${S.weatherPin ? `
+    <div onclick="switchTab('plan')" style="margin:10px 16px 0;display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--surface);border-radius:var(--r-sm);border:1px solid var(--border);cursor:pointer;touch-action:manipulation;" >
+      <span style="font-size:18px;line-height:1;flex-shrink:0;">${S.weatherPin.icon}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+          <span>📍</span><span>${esc(S.weatherPin.city)}</span>
+          <span style="opacity:.5;">·</span><span>${S.weatherPin.tempF}°F</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-2);font-style:italic;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(S.weatherPin.quip)}</div>
+      </div>
+      <span style="font-size:11px;color:var(--gold);font-weight:700;flex-shrink:0;">Plan →</span>
+    </div>` : ''}
+    ${(() => {
+      const todayKey = new Date().toISOString().slice(0,10);
+      const loggedToday = S.entries.some(e => e.createdAt && e.createdAt.slice(0,10) === todayKey);
+      return (!loggedToday && S.entries.length > 0) ? `
+        <div onclick="navigate('upload')" style="margin:10px 16px 0;display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,var(--gold-bg),var(--surface));border-radius:var(--r-sm);border:1px solid var(--gold);cursor:pointer;touch-action:manipulation;">
+          <span style="font-size:20px;">📸</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:var(--text);">Log today's fit</div>
+            <div style="font-size:11px;color:var(--text-3);">Keep your streak alive — what are you wearing?</div>
+          </div>
+          <span style="font-size:18px;color:var(--gold);">+</span>
+        </div>` : '';
+    })()}
+    ${outfitCountHTML}
+    ${filterHTML}${gridHTML}
     <div style="height:8px"></div>
   </div>`;
 }
@@ -5403,7 +5432,12 @@ function viewPlan() {
     <div style="padding:14px 16px 2px;">${squadSectionHTML}</div>
     <div style="height:1px;background:var(--border);margin:4px 16px 0;"></div>
 
-    <div class="plan-hero">
+    <div style="padding:14px 16px 4px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-2);">🪞 Solo Fit</div>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+
+    <div class="plan-hero" style="padding-top:4px;">
       <div class="plan-hero-title">What's the occasion?</div>
       <div class="plan-hero-sub">Describe your upcoming event and Claude will suggest outfits from your closet — tailored to the weather.</div>
     </div>
@@ -5466,7 +5500,7 @@ async function doSuggestOutfits() {
   S.plan.loadingSuggest = true; S.plan.suggestions = null; render();
   try {
     const results = await suggestOutfits(S.plan.eventDesc, S.plan.forecast);
-    S.plan.suggestions = results;
+    S.plan.suggestions = results ? results.slice(0, 3) : null;
     if (!results) toast('Something went wrong — try again');
   } catch(e) { console.error(e); toast('Something went wrong — try again'); }
   S.plan.loadingSuggest = false; render();
@@ -5501,6 +5535,241 @@ const CYCLE_PHASES = {
   ovulation:   { label: 'Ovulation',   cls: 'cp-ovulation',  sw: 'csw-ovulation',  tip: 'Peak confidence — dress boldly, fitted silhouettes, stand-out pieces.' },
   luteal:      { label: 'Luteal',      cls: 'cp-luteal',     sw: 'csw-luteal',     tip: 'Cozy & comfortable — flowy fits, neutral palettes, ease over structure.' },
 };
+
+/* ================================================================
+   VIEW: PROFILE
+   ================================================================ */
+function viewProfile() {
+  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
+  const persona = S.stylePersona;
+  const avatar  = S.styleAvatar;
+  const colors  = persona ? getPersonaColors(persona) : { accent: 'var(--gold)', bg1: '#f7f4f0', bg2: '#ede8e1', text: 'var(--text)' };
+
+  // ── Streak ────────────────────────────────────────────────
+  const today = new Date(); today.setHours(0,0,0,0);
+  const toKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const todayKey = toKey(today);
+  const byDay = {};
+  S.entries.forEach(e => { const k = toKey(new Date(e.createdAt)); if (!byDay[k]) byDay[k] = true; });
+  let streak = 0;
+  const si = byDay[todayKey] ? 0 : 1;
+  for (let i = si; i < 365; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    if (byDay[toKey(d)]) streak++; else break;
+  }
+  const currentPhase = cyclePhaseForDate(today);
+  const phaseInfo = currentPhase ? CYCLE_PHASES[currentPhase] : null;
+  const streakHTML = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:baseline;gap:5px;">
+      <span style="font-size:26px;font-weight:900;color:var(--text);">${streak}</span>
+      <span style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">day streak ${streak>0?'🔥':'📅'}</span>
+    </div>
+    ${phaseInfo ? `<div style="background:var(--surface);border-radius:100px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--text-2);">${phaseInfo.label} phase</div>` : ''}
+  </div>`;
+
+  // ── Style score ────────────────────────────────────────────
+  const avgRating = styleScore(S.entries) || '—';
+
+  // ── Avatar ────────────────────────────────────────────────
+  const avatarHTML = (() => {
+    const wrap = `width:76px;height:100px;border-radius:12px;overflow:hidden;position:relative;flex-shrink:0;background:linear-gradient(160deg,${colors.accent}28,${colors.accent}10);border:2px solid ${colors.accent}44;display:flex;align-items:center;justify-content:center;cursor:pointer;`;
+    const placeholder = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;"><span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--gold);opacity:.6;text-align:center;line-height:1.3;">No<br>Portrait</span></div>`;
+    if (avatar?.url)
+      return `<div onclick="openShareCard()" style="${wrap}">${placeholder}<img src="${esc(avatar.url)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:2;" onerror="this.style.opacity='0'"></div>`;
+    const initial = S.profileName ? S.profileName[0].toUpperCase() : '✦';
+    return `<div onclick="generateStylePersona()" style="${wrap}font-size:30px;font-weight:900;color:${colors.accent};">${initial}</div>`;
+  })();
+
+  // ── Profile chips ─────────────────────────────────────────
+  const chips = [
+    S.profileLocation   ? { icon:'📍', label: S.profileLocation }   : null,
+    S.profileGeneration ? { icon:'🎂', label: S.profileGeneration.split(' ').slice(0,2).join(' ') } : null,
+    S.profileZodiac     ? { icon:'⭐', label: S.profileZodiac }      : null,
+    S.profileMBTI       ? { icon:'🧠', label: S.profileMBTI }       : null,
+  ].filter(Boolean);
+  const chipsHTML = chips.length
+    ? `<div class="about-me-chip-row">${chips.map(c=>`<div class="about-me-chip">${c.icon} ${esc(c.label)}</div>`).join('')}</div>`
+    : '';
+
+  // ── Portrait card ─────────────────────────────────────────
+  const portraitHTML = persona ? `
+    <div style="background:linear-gradient(135deg,${colors.bg1},${colors.bg2});border-radius:14px;padding:14px 16px;border:1px solid ${colors.accent}33;margin-bottom:10px;">
+      <div style="font-size:9px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:${colors.accent};margin-bottom:6px;">✦ Style Portrait</div>
+      <div style="font-family:Georgia,serif;font-size:16px;font-weight:800;line-height:1.25;color:${colors.text};margin-bottom:8px;">${esc(persona.headline)}</div>
+      <div style="font-size:12px;line-height:1.65;color:${colors.text};opacity:.75;">${esc(persona.body)}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+      <button onclick="heartPersona()" style="flex:1;min-width:80px;background:none;border:1.5px solid var(--border);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);">
+        ${S.personaHistory.find(h=>h.ts===persona.ts) ? '❤️ Saved' : '♡ Save'}
+      </button>
+      <button onclick="openShareCard()" style="flex:1;min-width:80px;background:none;border:1.5px solid var(--border);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);">📤 Share</button>
+      <button onclick="generateStylePersona()" style="flex:1;min-width:80px;background:none;border:1.5px solid var(--gold);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--gold-dk);">⟳ Refresh</button>
+    </div>
+    ${(() => { const jh = buildJourneyHTML(); return jh ? `<div style="margin-top:14px;">${jh}</div>` : ''; })()}` : `
+    <div style="text-align:center;padding:18px 16px;background:var(--surface);border-radius:14px;border:1px dashed var(--border);">
+      <div style="font-size:24px;margin-bottom:8px;">✨</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:12px;">Generate your Style Portrait to see yourself through the lens of your wardrobe.</div>
+      <button onclick="generateStylePersona()" style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">✦ Generate Now</button>
+    </div>`;
+
+  // ── Top brands ────────────────────────────────────────────
+  const brandCounts = {};
+  S.wardrobe.forEach(w => { if (w.brand) brandCounts[w.brand] = (brandCounts[w.brand]||0) + (w.wears?.length||1); });
+  const topBrands = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const brandsHTML = topBrands.length ? `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      ${topBrands.map(([brand, wears]) => `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--text-2);">
+          ${esc(brand)} <span style="color:var(--text-3);font-weight:400;">${wears}×</span>
+        </div>`).join('')}
+    </div>` : `<div style="font-size:13px;color:var(--text-3);font-style:italic;">Add brands to your wardrobe items to see affinity here.</div>`;
+
+  // ── Top activities ────────────────────────────────────────
+  const tagCounts = {};
+  S.entries.forEach(e => { if (e.occasionTag) tagCounts[e.occasionTag] = (tagCounts[e.occasionTag]||0)+1; });
+  const topTags = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxTagCount = topTags[0]?.[1] || 1;
+  const activitiesHTML = topTags.length ? `
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      ${topTags.map(([tag, count]) => `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:12px;font-weight:600;color:var(--text-2);width:100px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(tag)}</div>
+          <div style="flex:1;height:6px;background:var(--surface-2);border-radius:100px;overflow:hidden;">
+            <div style="height:100%;border-radius:100px;background:var(--gold);width:${Math.round((count/maxTagCount)*100)}%;"></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-3);width:24px;text-align:right;">${count}</div>
+        </div>`).join('')}
+    </div>` : `<div style="font-size:13px;color:var(--text-3);font-style:italic;">Log a few outfits with occasion tags to see your activity breakdown.</div>`;
+
+  // ── Most worn ─────────────────────────────────────────────
+  const topWornItem = activeWardrobe.filter(w=>(w.wears?.length||0)>0).sort((a,b)=>b.wears.length-a.wears.length)[0] || null;
+  const mostWornHTML = topWornItem ? (() => {
+    const wc = topWornItem.wears.length;
+    return `<div onclick="openWardrobeItem('${topWornItem.id}')" style="display:flex;align-items:center;gap:14px;background:var(--surface);border-radius:12px;padding:12px 14px;cursor:pointer;border:1px solid var(--border);">
+      <span style="font-size:36px;line-height:1;">${topWornItem.icon||'👕'}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:9px;font-weight:800;letter-spacing:.12em;color:var(--gold);text-transform:uppercase;margin-bottom:2px;">Most Worn</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(topWornItem.name)}</div>
+        ${topWornItem.brand ? `<div style="font-size:11px;color:var(--text-3);">${esc(topWornItem.brand)}</div>` : ''}
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:28px;font-weight:900;color:var(--gold);line-height:1;">${wc}<span style="font-size:13px;font-weight:600;opacity:.6;">×</span></div>
+        <div style="font-size:10px;color:var(--text-3);">wears</div>
+      </div>
+    </div>`;
+  })() : '';
+
+  // ── Flourishes ────────────────────────────────────────────
+  const isRetiringScent = S._aboutMeRetiring === 'scent';
+  const isRetiringHair  = S._aboutMeRetiring === 'hair';
+
+  const scentBlock = isRetiringScent ? `
+    <div style="background:var(--surface);border-radius:12px;padding:14px;border:1px solid var(--border);">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Retiring: <em>${esc(S.signatureScent||'current scent')}</em></div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:10px;">What are you switching to?</div>
+      <input id="retireNewScent" class="form-input" type="text" placeholder="e.g. Maison Margiela Replica, Beach Walk" style="margin-bottom:10px;">
+      <div style="display:flex;gap:8px;">
+        <button onclick="confirmRetireScent()" style="flex:1;background:var(--gold);color:#fff;border:none;border-radius:100px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Save New Scent</button>
+        <button onclick="cancelRetiring()" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);">Cancel</button>
+      </div>
+    </div>` : S.signatureScent ? `
+    <div style="background:var(--surface);border-radius:12px;padding:12px 14px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);">${esc(S.signatureScent)}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Signature scent</div>
+      </div>
+      <button onclick="startRetireScent()" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);white-space:nowrap;">🔄 Retire &amp; Replace</button>
+    </div>` : `
+    <div style="display:flex;gap:8px;">
+      <input id="newScentInput" class="form-input" type="text" placeholder="e.g. Chanel No. 5, a spritz of citrus…" style="flex:1;margin:0;">
+      <button onclick="saveSignatureScent(document.getElementById('newScentInput').value);render();" style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:0 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Add</button>
+    </div>`;
+
+  const hairBlock = isRetiringHair ? `
+    <div style="background:var(--surface);border-radius:12px;padding:14px;border:1px solid var(--border);">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Retiring: <em>${esc(S.hairstyle||'current style')}</em></div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:10px;">What's the new look?</div>
+      <input id="retireNewHair" class="form-input" type="text" placeholder="e.g. Shoulder-length layers, blunt bob…" style="margin-bottom:10px;">
+      <div style="display:flex;gap:8px;">
+        <button onclick="confirmRetireHair()" style="flex:1;background:var(--gold);color:#fff;border:none;border-radius:100px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Save New Style</button>
+        <button onclick="cancelRetiring()" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);">Cancel</button>
+      </div>
+    </div>` : S.hairstyle ? `
+    <div style="background:var(--surface);border-radius:12px;padding:12px 14px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);">${esc(S.hairstyle)}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Current hairstyle</div>
+      </div>
+      <button onclick="startRetireHair()" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);white-space:nowrap;">🔄 Retire &amp; Replace</button>
+    </div>` : `
+    <div style="display:flex;gap:8px;">
+      <input id="newHairInput" class="form-input" type="text" placeholder="e.g. Long waves, textured pixie…" style="flex:1;margin:0;">
+      <button onclick="saveHairstyle(document.getElementById('newHairInput').value);render();" style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:0 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Add</button>
+    </div>`;
+
+  function profileSection(title, content) {
+    return `<div style="padding:0 16px;margin-bottom:20px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">${title}</div>
+      ${content}
+    </div>`;
+  }
+
+  return `<div class="view">
+    <div class="nav">
+      <span class="nav-logo">Profile</span>
+      <button onclick="switchTab('settings')" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:5px 13px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;">Settings</button>
+    </div>
+
+    <!-- Header: avatar + name + chips -->
+    <div style="padding:16px 16px 20px;display:flex;gap:16px;align-items:flex-start;">
+      ${avatarHTML}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:22px;font-weight:900;letter-spacing:-.3px;margin-bottom:3px;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
+        ${S.profileStyleWords ? `<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:8px;">${esc(S.profileStyleWords.length>80?S.profileStyleWords.slice(0,80)+'…':S.profileStyleWords)}</div>` : ''}
+        ${chipsHTML}
+      </div>
+      <button onclick="signOut()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;flex-shrink:0;white-space:nowrap;">Sign out</button>
+    </div>
+
+    <!-- Stats row: style score + streak -->
+    <div style="display:flex;gap:10px;padding:0 16px 20px;">
+      <div style="flex:1;background:var(--surface);border-radius:12px;padding:12px 14px;border:1px solid var(--border);text-align:center;">
+        <div style="font-size:26px;font-weight:900;color:var(--gold);letter-spacing:-.5px;">${avgRating}</div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:2px;">Style Score</div>
+      </div>
+      <div style="flex:2;background:var(--surface);border-radius:12px;padding:12px 14px;border:1px solid var(--border);">
+        ${streakHTML}
+      </div>
+    </div>
+
+    <div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>
+
+    ${profileSection('✦ Style Portrait', portraitHTML)}
+
+    <div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>
+
+    ${mostWornHTML ? profileSection('Most Worn', mostWornHTML) : ''}
+    ${mostWornHTML ? `<div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
+
+    ${profileSection('Brand Affinity', brandsHTML)}
+
+    <div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>
+
+    ${profileSection('Top Activities', activitiesHTML)}
+
+    <div style="height:1px;background:var(--border);margin:0 16px 24px;"></div>
+
+    <!-- FLOURISHES -->
+    <div style="padding:0 16px;margin-bottom:6px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:var(--gold-dk);margin-bottom:4px;">✦ Flourishes</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:16px;font-style:italic;">The finishing touches that complete your look.</div>
+    </div>
+    ${profileSection('🌸 Signature Scent', scentBlock)}
+    ${profileSection('💇 Current Hairstyle', hairBlock)}
+
+    <div style="height:40px;"></div>
+  </div>`;
+}
 
 /* ================================================================
    VIEW: HOME
@@ -5755,14 +6024,6 @@ function viewHome() {
         </div>
         <div style="font-size:12px;color:var(--text-2);font-style:italic;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(S.weatherPin.quip)}</div>
       </div>
-    </div>` : ''}
-
-    ${hasData ? `
-    <div class="home-stats-row">
-      <div class="home-stat"><div class="home-stat-val">${S.entries.length}</div><div class="home-stat-lbl">Outfits</div></div>
-      <div class="home-stat"><div class="home-stat-val">${activeWardrobe.length}</div><div class="home-stat-lbl">Pieces</div></div>
-      <div class="home-stat"><div class="home-stat-val">${avgRating}</div><div class="home-stat-lbl">Style Score</div></div>
-      <div class="home-stat"><div class="home-stat-val">${avgWearsPerItem}</div><div class="home-stat-lbl">Avg Wears</div></div>
     </div>` : ''}
 
     ${newsFlashHTML()}
@@ -6324,6 +6585,10 @@ function viewWardrobe() {
       </span>
     </div>
     <div class="tab-headline">Know what you own. Love what you wear.</div>
+    ${activeWardrobe.length > 0 ? `<div style="padding:10px 16px 0;display:flex;align-items:baseline;gap:6px;">
+      <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${activeWardrobe.length}</span>
+      <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">piece${activeWardrobe.length===1?'':'s'} in your closet</span>
+    </div>` : ''}
     ${catBar}${subCatBar}${sortBar}${gridHTML}
     ${retiredSectionHTML}
     <div style="height:8px"></div>
@@ -7220,6 +7485,9 @@ function viewBattle() {
 
     <button class="btn btn-primary" onclick="doSaveBattle()">⚔️ Save Both Outfits</button>
     <div style="height:10px"></div>
+    <button class="btn btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:7px;"
+      onclick="shareBattleDraft()">📤 Share Result</button>
+    <div style="height:10px"></div>
     <button class="btn btn-secondary" onclick="S.battleDraft=null;navigate('upload')">Discard Battle</button>
     <div style="height:36px"></div>
   </div>`;
@@ -7283,8 +7551,151 @@ function viewBattleReplay() {
       <div class="battle-verdict-label">👩‍⚖️ Claude's Verdict</div>
       <div class="battle-verdict-text">"${esc(entry.battleVerdict || '')}"</div>
     </div>
+    <button class="btn btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:7px;"
+      onclick="shareBattleReplay()">📤 Share Battle</button>
     <div style="height:36px"></div>
   </div>`;
+}
+
+/* ── Fashion Battle: share result ───────────────────────────────────── */
+// Wrapper for replay view — reads from current selected entry
+function shareBattleReplay() {
+  const entry = S.entries.find(e => e.id === S.selectedId);
+  if (!entry?.battleId) return;
+  const partner = S.entries.find(e => e.id === entry.battlePartnerId);
+  if (!partner) return;
+  const isTie = !entry.battleWon && !partner.battleWon;
+  const winner   = entry.battleWon ? entry   : partner;
+  const runnerUp = entry.battleWon ? partner : entry;
+  shareBattleResult({
+    photo:   entry.photo,
+    label1:  winner.battleLabel   || 'Winner',
+    label2:  runnerUp.battleLabel || 'Runner-up',
+    rating1: winner.rating,
+    rating2: runnerUp.rating,
+    winner:  isTie ? 0 : 1,
+    verdict: entry.battleVerdict || '',
+  });
+}
+// Wrapper for live battle draft view
+function shareBattleDraft() {
+  const bd = S.battleDraft; if (!bd) return;
+  shareBattleResult({
+    photo:   bd.photo,
+    label1:  bd.person1.label || 'Person 1',
+    label2:  bd.person2.label || 'Person 2',
+    rating1: bd.person1.rating,
+    rating2: bd.person2.rating,
+    winner:  bd.winner,
+    verdict: bd.verdict || '',
+  });
+}
+async function shareBattleResult({ photo, label1, label2, rating1, rating2, winner, verdict }) {
+  const winnerLabel = winner === 1 ? label1 : winner === 2 ? label2 : null;
+  const winLine = winnerLabel ? `👑 ${winnerLabel} takes the crown` : "🤝 It's a tie!";
+  const scoreText = `${label1} ${rating1}/10  ·  ${label2} ${rating2}/10`;
+  const shareText = `⚔️ Fashion Battle\n${winLine}\n${scoreText}\n\nClaude's verdict: "${verdict}"\n\nvia Closet 🪞`;
+
+  // Build a composite share card on canvas
+  try {
+    const W = 800, PHOTO_H = 520, CARD_H = 320, H = PHOTO_H + CARD_H;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    // Background
+    ctx.fillStyle = '#1C1A18';
+    ctx.fillRect(0, 0, W, H);
+
+    // Photo (top portion, object-fit:cover)
+    await new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        const srcAspect = img.naturalWidth / img.naturalHeight;
+        const dstAspect = W / PHOTO_H;
+        let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+        if (srcAspect > dstAspect) { sw = Math.round(sh * dstAspect); sx = Math.round((img.naturalWidth - sw) / 2); }
+        else                       { sh = Math.round(sw / dstAspect); }
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, PHOTO_H);
+        res();
+      };
+      img.onerror = rej;
+      img.src = photo;
+    });
+
+    // Gradient fade photo → card
+    const grad = ctx.createLinearGradient(0, PHOTO_H - 100, 0, PHOTO_H);
+    grad.addColorStop(0, 'rgba(28,26,24,0)');
+    grad.addColorStop(1, 'rgba(28,26,24,1)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, PHOTO_H - 100, W, 100);
+
+    // ── Text card ────────────────────────────────────────
+    ctx.textAlign = 'center';
+
+    // Gold title
+    let y = PHOTO_H + 30;
+    ctx.fillStyle = '#C9A84C';
+    ctx.font = 'bold 30px -apple-system, system-ui, sans-serif';
+    ctx.fillText('⚔️ Fashion Battle', W / 2, y); y += 46;
+
+    // Winner line
+    ctx.fillStyle = '#F5F0E8';
+    ctx.font = 'bold 22px -apple-system, system-ui, sans-serif';
+    ctx.fillText(winLine, W / 2, y); y += 34;
+
+    // Scores
+    ctx.fillStyle = '#A89880';
+    ctx.font = '17px -apple-system, system-ui, sans-serif';
+    ctx.fillText(scoreText, W / 2, y); y += 30;
+
+    // Divider
+    ctx.strokeStyle = '#3A3530'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(W - 60, y); ctx.stroke(); y += 24;
+
+    // Verdict (word-wrapped)
+    ctx.fillStyle = '#C8B99A';
+    ctx.font = 'italic 15px Georgia, serif';
+    const maxLineW = W - 100;
+    const words = `"${verdict}"`.split(' ');
+    let line = '';
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word;
+      if (ctx.measureText(test).width > maxLineW && line) {
+        ctx.fillText(line, W / 2, y); y += 23; line = word;
+      } else { line = test; }
+    }
+    if (line) { ctx.fillText(line, W / 2, y); y += 23; }
+
+    // Watermark
+    y += 10;
+    ctx.fillStyle = '#4A4540';
+    ctx.font = '12px -apple-system, system-ui, sans-serif';
+    ctx.fillText('🪞 Closet', W / 2, y);
+
+    // Share or download
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    const file = new File([blob], 'fashion-battle.png', { type: 'image/png' });
+
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: '⚔️ Fashion Battle', text: winLine });
+    } else if (navigator.share) {
+      await navigator.share({ title: '⚔️ Fashion Battle', text: shareText });
+    } else {
+      // Fallback: download image
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'fashion-battle.png';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast('Battle card saved — share away! 📤');
+    }
+  } catch (e) {
+    console.error('shareBattleResult:', e);
+    // Last resort: clipboard
+    try { await navigator.clipboard.writeText(shareText); toast('Copied to clipboard!'); }
+    catch { toast('Share not supported on this browser'); }
+  }
 }
 
 async function doSaveBattle() {
@@ -9522,11 +9933,11 @@ auth.onAuthStateChanged(async (user) => {
       DB.entries.getAll(),
       DB.wardrobe.getAll(),
     ]);
-    S.view = S.apiKey ? 'home' : 'setup';
-    S.activeTab = S.apiKey ? 'home' : S.activeTab;
+    S.view = S.apiKey ? 'closet' : 'setup';
+    S.activeTab = S.apiKey ? 'closet' : S.activeTab;
   } catch(e) {
     console.error('Data load failed:', e);
-    S.view = S.apiKey ? 'home' : 'setup';
+    S.view = S.apiKey ? 'closet' : 'setup';
   }
   render();
   if (S.apiKey) initNewsFlash();
