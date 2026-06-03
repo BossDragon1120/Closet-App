@@ -48,7 +48,7 @@ body {
 /* ── VIEW SHELL ──────────────────────────────────────────── */
 .view {
   min-height: 100vh;
-  padding-bottom: calc(24px + var(--safe-b));
+  padding-bottom: calc(80px + var(--safe-b));
   animation: fadeUp .18s ease both;
 }
 .view-notab { padding-bottom: calc(40px + var(--safe-b)); }
@@ -120,6 +120,28 @@ body {
   font-family: inherit; transition: color .15s;
 }
 .tab-btn-icon.active { color: var(--gold); }
+
+/* ── BOTTOM NAV BAR ──────────────────────────────────────── */
+.bottom-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 110;
+  background: rgba(247,244,240,0.97);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: stretch;
+  padding-bottom: var(--safe-b);
+}
+.bottom-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; padding: 10px 0 8px;
+  background: none; border: none; cursor: pointer;
+  font-size: 8px; font-weight: 700; color: var(--text-3);
+  font-family: inherit; text-transform: uppercase; letter-spacing: .3px;
+  transition: color .15s; touch-action: manipulation;
+}
+.bottom-btn:active { opacity: .7; }
+.bottom-btn svg { width: 22px; height: 22px; }
+.bottom-btn-active { color: var(--gold-dk) !important; }
 
 /* ── GOOGLE SIGN-IN SCREEN ───────────────────────────────── */
 .signin-wrap {
@@ -999,9 +1021,16 @@ body {
   background: var(--surface); padding: 14px 20px; cursor: pointer;
   font-family: inherit; font-size: 14px; font-weight: 600; color: var(--text-2);
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  transition: border-color .15s, color .15s;
+  transition: border-color .15s, color .15s; touch-action: manipulation;
 }
+.fr-mode-btn:active { opacity: .75; }
 .fr-mode-btn:hover { border-color: var(--gold); color: var(--gold); }
+.fr-mode-btn.battle {
+  background: linear-gradient(135deg,#1C1A18,#2a2520);
+  border: 1.5px solid rgba(255,255,255,.1); color: rgba(255,255,255,.85);
+  border-style: solid;
+}
+.fr-mode-btn.battle:hover { border-color: var(--gold); color: #fff; }
 .carousel-dots { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 0 0 20px; }
 .carousel-dot {
   height: 6px; border-radius: 3px; background: var(--border);
@@ -1120,7 +1149,7 @@ body {
 
 /* ── TOAST ───────────────────────────────────────────────── */
 .toast {
-  position: fixed; bottom: calc(var(--tab-h) + var(--safe-b) + 12px); left: 50%;
+  position: fixed; bottom: calc(64px + var(--safe-b) + 12px); left: 50%;
   transform: translateX(-50%); background: rgba(28,26,24,0.92); color: #fff;
   padding: 12px 22px; border-radius: 100px; font-size: 14px; font-weight: 500;
   z-index: 300; white-space: nowrap; backdrop-filter: blur(8px); animation: toastIn .2s ease;
@@ -1748,6 +1777,193 @@ body {
 @media (min-width: 431px) {
   body { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
   .tab-bar { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  .bottom-bar { border-left: 1px solid var(--border); border-right: 1px solid var(--border); left: 50%; transform: translateX(-50%); width: 430px; }
+}
+
+/* ── FLIP CARD ───────────────────────────────────────────── */
+.flip-card-wrap { perspective: 1200px; width: 100%; position: relative; }
+.flip-card-inner {
+  position: relative; width: 100%; height: 460px;
+  transform-style: preserve-3d;
+  transition: transform 0.45s cubic-bezier(.4,0,.2,1);
+}
+.flip-card-wrap.flipped .flip-card-inner { transform: rotateY(180deg); }
+.flip-card-face {
+  position: absolute; inset: 0;
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  border-radius: var(--r); overflow: hidden;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+}
+.flip-card-face.back {
+  transform: rotateY(180deg);
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 24px;
+}
+.flip-btn {
+  position: absolute; top: 10px; right: 10px; z-index: 10;
+  background: rgba(0,0,0,.38); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.18); border-radius: 100px;
+  color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .04em;
+  padding: 5px 12px; cursor: pointer; font-family: inherit; touch-action: manipulation;
+  display: flex; align-items: center; gap: 5px;
+}
+.flip-btn svg { width: 13px; height: 13px; }
+
+/* ── WHAT'S HOT VIEW ─────────────────────────────────────── */
+.hot-header {
+  padding: 20px 16px 12px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+}
+.hot-header-left { flex: 1; }
+.hot-title {
+  font-size: 22px; font-weight: 900; color: var(--text-1); letter-spacing: -.3px;
+  display: flex; align-items: center; gap: 8px;
+}
+.hot-subtitle {
+  font-size: 12px; color: var(--text-3); margin-top: 3px; font-weight: 500;
+}
+.hot-refresh-btn {
+  background: none; border: 1.5px solid var(--border); border-radius: 100px;
+  padding: 6px 14px; font-size: 12px; font-weight: 700; color: var(--text-2);
+  cursor: pointer; font-family: inherit; touch-action: manipulation;
+  white-space: nowrap; margin-top: 2px;
+  transition: border-color .15s, color .15s;
+}
+.hot-refresh-btn:active { opacity: .7; }
+.hot-refresh-btn:disabled { opacity: .4; cursor: default; }
+.hot-category-label {
+  font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--text-3);
+  padding: 14px 16px 8px; display: flex; align-items: center; gap: 6px;
+}
+.hot-category-label::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+.hot-trend-card {
+  margin: 0 16px 10px;
+  background: var(--surface); border-radius: var(--r);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.hot-trend-top {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 14px 10px;
+}
+.hot-trend-emoji {
+  font-size: 28px; line-height: 1; flex-shrink: 0;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--gold-bg); border-radius: 10px;
+}
+.hot-trend-content { flex: 1; min-width: 0; }
+.hot-trend-name {
+  font-size: 15px; font-weight: 800; color: var(--text-1);
+  line-height: 1.2; margin-bottom: 4px;
+}
+.hot-trend-desc {
+  font-size: 12.5px; color: var(--text-2); line-height: 1.5;
+}
+.hot-trend-tip {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 0 14px; padding: 9px 11px;
+  background: var(--gold-bg); border-radius: 8px;
+  font-size: 12px; color: var(--gold-dk); line-height: 1.45;
+  font-weight: 500;
+}
+.hot-trend-tip-icon { flex-shrink: 0; font-size: 13px; margin-top: 1px; }
+.hot-trend-footer {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 6px; padding: 10px 14px 12px;
+}
+.hot-vote-btn {
+  background: none; border: 1.5px solid var(--border); border-radius: 100px;
+  padding: 5px 13px; font-size: 13px; cursor: pointer;
+  touch-action: manipulation; transition: all .15s;
+  display: flex; align-items: center; gap: 5px;
+  font-family: inherit; font-weight: 600; color: var(--text-2);
+}
+.hot-vote-btn:active { transform: scale(.93); }
+.hot-vote-btn.voted-up   { background: #e8f5e9; border-color: #66bb6a; color: #388e3c; }
+.hot-vote-btn.voted-down { background: #fce4ec; border-color: #ef9a9a; color: #c62828; }
+.hot-empty {
+  text-align: center; padding: 48px 32px;
+  color: var(--text-3); font-size: 14px; line-height: 1.6;
+}
+.hot-empty-icon { font-size: 40px; margin-bottom: 12px; }
+.hot-empty-title { font-size: 17px; font-weight: 800; color: var(--text-1); margin-bottom: 6px; }
+.hot-gen-btn {
+  margin: 16px auto 0; display: block;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dk));
+  color: #fff; border: none; border-radius: 100px;
+  padding: 12px 28px; font-size: 14px; font-weight: 800;
+  cursor: pointer; font-family: inherit; touch-action: manipulation;
+  transition: opacity .15s; box-shadow: 0 4px 14px rgba(184,125,42,.35);
+}
+.hot-gen-btn:active { opacity: .85; }
+.hot-gen-btn:disabled { opacity: .5; cursor: default; }
+.hot-updated-note {
+  text-align: center; font-size: 11px; color: var(--text-3);
+  padding: 6px 16px 4px; font-weight: 500;
+}
+
+/* ── HERO PIECE ──────────────────────────────────────────── */
+.hero-badge {
+  position: absolute; top: 6px; left: 6px; z-index: 10;
+  background: linear-gradient(135deg,#B8860B,#D4A017);
+  border-radius: 100px; padding: 2px 7px;
+  font-size: 9px; font-weight: 800; color: #fff;
+  letter-spacing: .04em; text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  display: flex; align-items: center; gap: 3px;
+}
+.hero-toggle-box {
+  background: var(--surface); border-radius: var(--r-sm);
+  border: 1.5px solid var(--border); padding: 14px 16px;
+  transition: border-color .2s, background .2s;
+}
+.hero-toggle-box.active {
+  background: linear-gradient(135deg,#FFFAED,#FFF5D0);
+  border-color: var(--gold);
+}
+.hero-share-btn {
+  width: 100%; padding: 14px; border-radius: var(--r);
+  cursor: pointer; font-family: inherit;
+  background: linear-gradient(135deg,#1C1A18,#2a2318);
+  border: 1.5px solid var(--gold);
+  color: var(--gold); font-size: 14px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: opacity .15s; touch-action: manipulation;
+  letter-spacing: .02em;
+}
+.hero-share-btn:active { opacity: .8; }
+/* Hero Pieces hub */
+.hero-hub-card {
+  background: var(--surface); border-radius: var(--r);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  margin: 0 16px 10px;
+  cursor: pointer; touch-action: manipulation;
+  transition: border-color .15s;
+}
+.hero-hub-card:active { opacity: .75; }
+.hero-hub-emoji {
+  font-size: 32px; width: 52px; height: 52px;
+  background: linear-gradient(135deg,#FFFAED,#FFF0B0);
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; border: 1px solid rgba(184,125,42,.2);
+}
+.hero-hub-name { font-size: 15px; font-weight: 800; color: var(--text-1); line-height: 1.2; }
+.hero-hub-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 500; }
+.hero-hub-crown {
+  margin-left: auto; flex-shrink: 0;
+  font-size: 10px; font-weight: 800; color: var(--gold-dk);
+  background: var(--gold-bg); border-radius: 100px;
+  padding: 3px 8px; letter-spacing: .04em; text-transform: uppercase;
 }
 
 /* ── FEATURE MENU ────────────────────────────────────────── */
@@ -2075,11 +2291,16 @@ function userDoc(path) {
   if (!currentUser) throw new Error('Not signed in');
   return firestore.doc(`users/${currentUser.uid}/${path}`);
 }
+/* The profile lives at the user document itself (2-segment path = valid) */
+function profileDoc() {
+  if (!currentUser) throw new Error('Not signed in');
+  return firestore.doc(`users/${currentUser.uid}`);
+}
 
 /* Write a single field to the user profile doc (fire-and-forget) */
 function fsSet(field, value) {
   if (!currentUser) return;
-  userDoc('profile').set({ [field]: value }, { merge: true })
+  profileDoc().set({ [field]: value }, { merge: true })
     .catch(e => console.warn('fsSet:', e));
 }
 
@@ -2092,7 +2313,7 @@ function scheduleSyncPush() {
 async function saveProfileToFirestore() {
   if (!currentUser) return;
   try {
-    await userDoc('profile').set({
+    await profileDoc().set({
       apiKey: S.apiKey, googleKey: S.googleKey, googleCx: S.googleCx,
       profileName: S.profileName, profileAge: S.profileAge,
       profileHeight: S.profileHeight, profileWeight: S.profileWeight,
@@ -2120,7 +2341,7 @@ async function saveProfileToFirestore() {
 /* Load all profile settings from Firestore into S and localStorage */
 async function loadProfileFromFirestore() {
   try {
-    const doc = await userDoc('profile').get();
+    const doc = await profileDoc().get();
     if (!doc.exists) return;
     const p = doc.data();
     function applyStr(sKey, lsKey) {
@@ -2214,7 +2435,7 @@ const S = {
   shopBudget: parseInt(localStorage.getItem('closet-shop-budget') || '2', 10), // 1=Budget 2=Mid 3=Luxury
   // new outfit flow
   pendingPhoto: null, pendingMime: null, pendingOccasion: null, draft: null,
-  friendRatingMode: false, friendRating: null,
+  friendRatingMode: false, friendRating: null, battleMode: false,
   retireFlow: null,  // { id, step: 'reason'|'outcome', reason, outcome, salePrice }
   featureMenuOpen: false,
   outfitLinker: null, // { mode:'from-wardrobe'|'from-outfit', wardrobeId?, entryId?, selected:{[id]:bool} }
@@ -2251,6 +2472,9 @@ const S = {
   styleAvatar:        JSON.parse(localStorage.getItem('closet-style-avatar') || 'null'),
   _avatarLoading:     false,
   showShareCard:      false,
+  // What's Hot trends
+  hotTrends:          JSON.parse(localStorage.getItem('closet-hot-trends') || 'null'),
+  _trendsLoading:     false,
   // About Me panel
   showAboutMe:        false,
   _aboutMeRetiring:   null,   // 'scent' | 'hair' | null
@@ -2337,8 +2561,11 @@ IF EXACTLY ONE PERSON — respond with exactly this JSON shape:
   "items": [{ "id": "i1", "name": "Specific Item Name", "description": "2-3 sentence description.", "icon": "👗" }],
   "rating": 8,
   "ratingNote": "One sentence explaining the score — what works and what could improve. Reference the occasion if provided.",
-  "recommendations": ["Specific recommendation 1", "Specific recommendation 2", "Specific recommendation 3"],
-  "shopQueries": ["specific retail search query 1", "query 2"]
+  "stylingTips": ["Tuck in the shirt for a cleaner silhouette", "Swap the white sneakers for the brown loafers you have logged"],
+  "purchaseRecs": [
+    {"item": "Camel leather belt", "reason": "Would anchor the trousers and add polish", "query": "camel leather belt"},
+    {"item": "Navy linen blazer", "reason": "Would layer perfectly for evening", "query": "navy linen blazer"}
+  ]
 }
 
 IF TWO PEOPLE — respond with exactly this JSON shape:
@@ -2349,16 +2576,16 @@ IF TWO PEOPLE — respond with exactly this JSON shape:
     "items": [{ "id": "i1", "name": "Item Name", "description": "Description.", "icon": "👗" }],
     "rating": 8,
     "ratingNote": "One sentence explaining their score.",
-    "recommendations": ["Rec 1", "Rec 2", "Rec 3"],
-    "shopQueries": ["search query 1", "query 2"]
+    "stylingTips": ["Tip 1", "Tip 2"],
+    "purchaseRecs": [{"item": "Item name", "reason": "Why it helps", "query": "search query"}]
   },
   "person2": {
     "label": "Person on the right",
     "items": [{ "id": "i1", "name": "Item Name", "description": "Description.", "icon": "👗" }],
     "rating": 7,
     "ratingNote": "One sentence explaining their score.",
-    "recommendations": ["Rec 1", "Rec 2", "Rec 3"],
-    "shopQueries": ["search query 1", "query 2"]
+    "stylingTips": ["Tip 1", "Tip 2"],
+    "purchaseRecs": [{"item": "Item name", "reason": "Why it helps", "query": "search query"}]
   },
   "verdict": "2-3 sentences of witty, entertaining fashion-judge commentary declaring a winner and why.",
   "winner": 1
@@ -2371,8 +2598,8 @@ MANDATORY rules — violating any of these makes the response unusable:
 • Item names must be specific: "Ivory Linen Wide-Leg Trouser" not "pants"
 • Pick an accurate emoji icon per item
 • Use the SCORING CRITERIA above — do not fall back to generic fashion scoring when an occasion is provided
-• Give exactly 3 to 5 recommendations — never fewer than 3, and make them occasion-specific
-• shopQueries: 2–4 precise retail-ready search terms for items MISSING from the wardrobe list above — things that would visibly elevate this outfit but the person does not yet own. Never suggest something already in the wardrobe list. Focus on genuine gaps: a versatile layering piece, a shoe that would work better, an accessory that is clearly absent. PRICE TIER: ${{ 1:'under $50 (budget/affordable)', 2:'$50–$200 (mid-range)', 3:'$200+ (luxury/designer)' }[S.shopBudget]} — tailor search terms to this price point (e.g. "affordable linen trousers" vs "designer wide-leg trousers").${S.shopBlocked.size > 0 ? `\n• NEVER suggest any of these item types the user has explicitly rejected: ${[...S.shopBlocked].join(', ')} — avoid these categories entirely, do not suggest close variations.` : ''}
+• "stylingTips": 1–3 actionable tips using items they ALREADY OWN (tucking, swapping a logged wardrobe piece, adjusting proportions, etc.) — never suggest buying something here
+• "purchaseRecs": 1–3 items NOT in their wardrobe that would visibly elevate this outfit. Each entry must have "item" (specific name), "reason" (one sentence), and "query" (retail search term). PRICE TIER: ${{ 1:'under $50 (budget/affordable)', 2:'$50–$200 (mid-range)', 3:'$200+ (luxury/designer)' }[S.shopBudget]} — tailor terms to this price point.${S.shopBlocked.size > 0 ? `\n• NEVER suggest any of these item types the user has explicitly rejected: ${[...S.shopBlocked].join(', ')} — avoid these categories entirely.` : ''}
 • Output ONLY the JSON object — no text before or after, no code fences`;
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -3213,7 +3440,6 @@ async function loadImageOntoCanvas(ctx, src, x, y, w, h) {
 async function exportShareCard() {
   const persona = S.stylePersona; if (!persona) return;
   const colors = getPersonaColors(persona);
-  const avatar = S.styleAvatar;
   const sz = 1080;
 
   toast('Building your share card… ✨');
@@ -3252,40 +3478,8 @@ async function exportShareCard() {
   ctx.textAlign = 'right';
   ctx.fillText('Style Portrait', sz - 72, 68);
 
-  // Avatar — try to draw the AI portrait; fall back to an initial circle
-  const avW = 300, avH = 400, avX = (sz - avW) / 2, avY = 100;
-  let avatarDrawn = false;
-  if (avatar?.url) {
-    avatarDrawn = await loadImageOntoCanvas(ctx, avatar.url, avX, avY, avW, avH);
-  } else if (avatar?.svg) {
-    try {
-      const blob = new Blob([avatar.svg], {type:'image/svg+xml;charset=utf-8'});
-      const blobUrl = URL.createObjectURL(blob);
-      avatarDrawn = await new Promise(res => {
-        const img = new Image();
-        img.onload  = () => { ctx.drawImage(img, avX, avY, avW, avH); URL.revokeObjectURL(blobUrl); res(true); };
-        img.onerror = () => { URL.revokeObjectURL(blobUrl); res(false); };
-        img.src = blobUrl;
-        setTimeout(() => res(false), 4000);
-      });
-    } catch(e) {}
-  }
-  if (!avatarDrawn) {
-    // Placeholder circle with initials
-    ctx.fillStyle = colors.accent + '28';
-    ctx.beginPath(); ctx.arc(sz/2, avY + avH/2, 130, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = colors.accent + '66';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(sz/2, avY + avH/2, 130, 0, Math.PI*2); ctx.stroke();
-    ctx.fillStyle = colors.accent;
-    ctx.font = 'bold 90px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.fillText((S.profileName||'?').slice(0,1).toUpperCase(), sz/2, avY + avH/2 + 32);
-    ctx.textAlign = 'left';
-  }
-
-  // Persona label pill
-  const textTop = avY + avH + 40;
+  // Persona label pill — starts higher since there's no avatar
+  const textTop = 160;
   ctx.textAlign = 'center';
   const labelTxt = '✦  S T Y L E  P O R T R A I T';
   ctx.font = '600 18px Georgia, serif';
@@ -3352,10 +3546,7 @@ async function exportShareCard() {
     toast('Image saved to downloads ✓');
   } catch(e) {
     console.error('exportShareCard error:', e);
-    // Last resort: share just the portrait URL + text
-    if (avatar?.url) {
-      await shareText(persona.headline, `✦ ${persona.headline}\n\n${persona.body}\n\nPortrait: ${avatar.url}\n\n— made with Closet`);
-    } else {
+    {
       toast('Could not export — try again');
     }
   }
@@ -3365,17 +3556,6 @@ async function exportShareCard() {
 function shareCardModalHTML() {
   const persona = S.stylePersona; if (!persona) return '';
   const colors = getPersonaColors(persona);
-  const avatar = S.styleAvatar;
-  const avatarHTML = (() => {
-    const wrap = `position:relative;width:140px;height:190px;margin:0 auto 16px;border-radius:12px;overflow:hidden;background:linear-gradient(160deg,${colors.accent}28,${colors.accent}10);`;
-    const placeholder = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;z-index:1;pointer-events:none;"><div style="font-size:28px;opacity:.5;">✨</div><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${colors.accent};opacity:.7;text-align:center;line-height:1.4;">Generating<br>portrait…</div></div>`;
-    if (avatar?.url)
-      // img sits above placeholder; if it loads it covers it; if it errors we keep placeholder
-      return `<div style="${wrap}">${placeholder}<img src="${esc(avatar.url)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:2;" onerror="this.style.opacity='0'"></div>`;
-    if (avatar?.svg)
-      return `<div style="${wrap}">${avatar.svg}</div>`;
-    return `<div style="${wrap}display:flex;align-items:center;justify-content:center;font-size:56px;border:2px solid ${colors.accent}44;">${S.profileName?S.profileName[0].toUpperCase():'✦'}</div>`;
-  })();
 
   return `
   <div id="share-card-overlay" onclick="if(event.target.id==='share-card-overlay')closeShareCard()" style="position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);">
@@ -3388,8 +3568,7 @@ function shareCardModalHTML() {
           <span style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:${colors.accent};">✦ CLOSET</span>
           <span style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:${colors.accent};opacity:.7;">STYLE PORTRAIT</span>
         </div>
-        <div style="padding:16px 24px 24px;text-align:center;">
-          ${avatarHTML}
+        <div style="padding:24px 24px 24px;text-align:center;">
           <div style="font-size:10px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:${colors.accent};margin-bottom:10px;">✦ Style Portrait</div>
           <div style="font-family:Georgia,serif;font-size:19px;font-weight:800;line-height:1.25;margin-bottom:10px;color:${colors.text};">${esc(persona.headline)}</div>
           <div style="height:1px;background:${colors.accent};opacity:.25;margin:0 20px 12px;"></div>
@@ -3400,7 +3579,6 @@ function shareCardModalHTML() {
 
       <!-- Buttons -->
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">
-        ${!avatar || avatar.personaTs !== persona.ts ? `<button onclick="generateStyleAvatar()" style="width:100%;padding:13px;border-radius:100px;border:none;background:${colors.accent};color:${colors.bg1};font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">✨ Generate Fashion Portrait</button>` : `<button onclick="generateStyleAvatar(true)" style="width:100%;padding:13px;border-radius:100px;border:1.5px solid ${colors.accent}66;background:transparent;color:${colors.accent};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">↺ Regenerate Portrait</button>`}
         <button onclick="exportShareCard()" style="width:100%;padding:13px;border-radius:100px;border:2px solid ${colors.accent};background:transparent;color:${colors.accent};font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">📤 Save &amp; Share Image</button>
         <button onclick="closeShareCard()" style="width:100%;padding:11px;border-radius:100px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.55);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Close</button>
       </div>
@@ -4646,8 +4824,9 @@ function featuresMenuHTML() {
     {
       title: 'Social & Fun',
       items: [
-        { icon: '👯', text: '<strong>Rate a Friend</strong> — Snap a photo of a friend\'s outfit, get an instant rating, and share it on the spot — never saved to your journal.' },
-        { icon: '⚔️', text: '<strong>Style Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best.' },
+        { icon: '👑', text: '<strong>Hero Pieces</strong> — Flag your standout garments and share them with a stylist for expert advice on how to wear them.', action: `S.featureMenuOpen=false;navigate('hero-pieces')` },
+        { icon: '👯', text: '<strong>Friend\'s Fit Check</strong> — Snap a photo of a friend\'s outfit, get an instant rating, and share it on the spot — never saved to your journal.' },
+        { icon: '⚔️', text: '<strong>Fashion Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best.' },
         { icon: '💌', text: '<strong>Share Outfits</strong> — Share any outfit entry as a photo card with your rating and notes.' },
       ],
     },
@@ -4671,9 +4850,10 @@ function featuresMenuHTML() {
     <div class="feat-section">
       <div class="feat-section-title">${s.title}</div>
       ${s.items.map(item => `
-        <div class="feat-item">
+        <div class="feat-item" ${item.action ? `onclick="${item.action}" style="cursor:pointer;"` : ''}>
           <span class="feat-icon">${item.icon}</span>
           <span class="feat-text">${item.text}</span>
+          ${item.action ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;margin-left:auto;"><path d="M9 18l6-6-6-6"/></svg>` : ''}
         </div>`).join('')}
     </div>`).join('');
 
@@ -4753,7 +4933,7 @@ async function signOut() {
 /* ================================================================
    RENDER ROUTER
    ================================================================ */
-const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings']);
+const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','hero-pieces']);
 
 function render() {
   const root = document.getElementById('root');
@@ -4785,6 +4965,8 @@ function render() {
     case 'receipt-add':  html = viewReceiptAdd();   break;
     case 'new-piece':    html = viewNewPiece();     break;
     case 'squad':        html = viewSquadDetail();  break;
+    case 'hot':          html = viewHot();          break;
+    case 'hero-pieces':  html = viewHeroPieces();   break;
   }
   // Inject tab bar right after the .nav block on every tab view
   if (TAB_VIEWS.has(S.view)) {
@@ -4793,6 +4975,7 @@ function render() {
   if (S.loading) {
     html += `<div class="loading-overlay"><div class="spinner"></div><h3>${esc(S.loadingMsg)}</h3><p>Sit tight — Claude is on it</p></div>`;
   }
+  if (TAB_VIEWS.has(S.view)) html += bottomBarHTML();
   if (S.featureMenuOpen) html += featuresMenuHTML();
   // About Me flyout retired — Profile is now its own tab. Kept for safety but never shown.
   // if (S.showAboutMe) html += aboutMeSheetHTML();
@@ -4832,10 +5015,490 @@ function tabBarHTML() {
     <button class="tab-btn ${t==='shop'?'active':''}" onclick="switchTab('shop')">
       ${iconBag()} <span>Shop</span>
     </button>
-    <button class="tab-btn-icon" onclick="S.featureMenuOpen=true;render()" title="Features &amp; Help">
-      ${iconBurger()}
+  </div>`;
+}
+
+function iconFlame() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c4.97 0 9-3.58 9-8 0-3-1.5-5.5-4-7 .5 2-1 4-3 4.5C15.5 9 14 6.5 12 4c0 3-2 5.5-5 6.5C5.5 11.5 4 13.5 4 16c0 3.31 3.13 6 8 6z"/><path d="M12 22c2.21 0 4-1.57 4-3.5 0-1.3-.8-2.5-2-3 .2.87-.5 1.8-1.5 2-.62-1-.5-2.5.5-3.5C11 14.5 9.5 16 9.5 17.5c0 .5.13.97.37 1.4C9.19 19.55 8 20.69 8 22"/></svg>`;
+}
+function iconMapPin() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>`;
+}
+function bottomBarHTML() {
+  const isHot = S.view === 'hot';
+  return `<div class="bottom-bar">
+    <button class="bottom-btn"
+      ontouchend="event.preventDefault();S.featureMenuOpen=true;render()"
+      onclick="S.featureMenuOpen=true;render()" title="Menu">
+      ${iconBurger()} <span>Menu</span>
+    </button>
+    <button class="bottom-btn ${isHot ? 'bottom-btn-active' : ''}"
+      ontouchend="event.preventDefault();switchTab('hot')"
+      onclick="switchTab('hot')" title="What's Hot">
+      ${iconFlame()} <span>What's Hot</span>
+    </button>
+    <button class="bottom-btn"
+      ontouchend="event.preventDefault();toast('Local discovery coming soon 📍')"
+      onclick="toast('Local discovery coming soon 📍')" title="Local">
+      ${iconMapPin()} <span>Local</span>
     </button>
   </div>`;
+}
+
+/* ================================================================
+   VIEW: WHAT'S HOT
+   ================================================================ */
+const HOT_CATEGORIES = [
+  { key: 'tops',      label: 'Tops',      icon: '👕' },
+  { key: 'bottoms',   label: 'Bottoms',   icon: '👖' },
+  { key: 'shoes',     label: 'Shoes',     icon: '👟' },
+  { key: 'outerwear', label: 'Outerwear', icon: '🧥' },
+  { key: 'bags',      label: 'Bags',      icon: '👜' },
+];
+
+function viewHot() {
+  const trends = S.hotTrends;
+  const loading = S._trendsLoading;
+  const reactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
+
+  let updatedNote = '';
+  if (trends?.updated) {
+    const diffMs = Date.now() - new Date(trends.updated).getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+    updatedNote = diffDays === 0 ? 'Updated today' : diffDays === 1 ? 'Updated yesterday' : `Updated ${diffDays} days ago`;
+  }
+
+  let bodyHTML = '';
+
+  if (!trends && !loading) {
+    bodyHTML = `<div class="hot-empty">
+      <div class="hot-empty-icon">🔥</div>
+      <div class="hot-empty-title">No trends loaded yet</div>
+      <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:4px;">Tap below and Claude will curate the top 10 fashion trends for you — a quick cheat sheet, updated weekly.</div>
+      <button class="hot-gen-btn" ontouchend="event.preventDefault();generateHotTrends()" onclick="generateHotTrends()">✦ Generate Trend Report</button>
+    </div>`;
+  } else if (loading) {
+    bodyHTML = `<div class="hot-empty">
+      <div style="margin-bottom:16px;"><div class="spinner"></div></div>
+      <div class="hot-empty-title">Curating trends…</div>
+      <div style="font-size:13px;color:var(--text-3);">Claude is scanning the style scene.</div>
+    </div>`;
+  } else {
+    // Render by category
+    HOT_CATEGORIES.forEach(cat => {
+      const catTrends = (trends.trends || []).filter(t => t.category === cat.key);
+      if (!catTrends.length) return;
+      bodyHTML += `<div class="hot-category-label">${cat.icon} ${cat.label}</div>`;
+      catTrends.forEach(trend => {
+        const rid = trend.id;
+        const r = reactions[rid];
+        bodyHTML += `<div class="hot-trend-card">
+          <div class="hot-trend-top">
+            <div class="hot-trend-emoji">${esc(trend.emoji||cat.icon)}</div>
+            <div class="hot-trend-content">
+              <div class="hot-trend-name">${esc(trend.name)}</div>
+              <div class="hot-trend-desc">${esc(trend.description)}</div>
+            </div>
+          </div>
+          ${trend.tip ? `<div class="hot-trend-tip"><span class="hot-trend-tip-icon">💡</span><span>${esc(trend.tip)}</span></div>` : ''}
+          <div class="hot-trend-footer">
+            <button class="hot-vote-btn ${r==='up'?'voted-up':''}"
+              ontouchend="event.preventDefault();setTrendReaction('${esc(rid)}','up')"
+              onclick="setTrendReaction('${esc(rid)}','up')">👍</button>
+            <button class="hot-vote-btn ${r==='down'?'voted-down':''}"
+              ontouchend="event.preventDefault();setTrendReaction('${esc(rid)}','down')"
+              onclick="setTrendReaction('${esc(rid)}','down')">👎</button>
+          </div>
+        </div>`;
+      });
+    });
+    if (updatedNote) bodyHTML += `<div class="hot-updated-note">${esc(updatedNote)} · AI-curated snapshot</div>`;
+    bodyHTML += `<div style="height:8px;"></div>`;
+  }
+
+  return `<div class="view">
+    <div class="nav">
+      <span class="nav-logo">What's Hot 🔥</span>
+      ${trends && !loading
+        ? `<button class="hot-refresh-btn" ${loading?'disabled':''} ontouchend="event.preventDefault();generateHotTrends()" onclick="generateHotTrends()">↻ Refresh</button>`
+        : ''}
+    </div>
+    ${bodyHTML}
+  </div>`;
+}
+
+async function generateHotTrends() {
+  if (S._trendsLoading) return;
+  if (!S.apiKey.trim()) { switchTab('settings'); toast('Add your API key first!'); return; }
+
+  // Check 7-day cache
+  const cached = S.hotTrends;
+  if (cached?.updated) {
+    const age = Date.now() - new Date(cached.updated).getTime();
+    if (age < 7 * 24 * 3600 * 1000) {
+      toast('Trends are fresh — refreshed within the last 7 days ✦');
+      return;
+    }
+  }
+
+  S._trendsLoading = true;
+  render();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const prompt = `You are a fashion editor. Today is ${today}. Return a JSON object (no markdown, no explanation) with this exact shape:
+{
+  "updated": "${today}",
+  "trends": [
+    {"id":"tops-1","category":"tops","emoji":"👕","name":"...","description":"One sentence, max 18 words.","tip":"One actionable styling tip, max 18 words."},
+    {"id":"tops-2","category":"tops","emoji":"👕","name":"...","description":"...","tip":"..."},
+    {"id":"bottoms-1","category":"bottoms","emoji":"👖","name":"...","description":"...","tip":"..."},
+    {"id":"bottoms-2","category":"bottoms","emoji":"👖","name":"...","description":"...","tip":"..."},
+    {"id":"shoes-1","category":"shoes","emoji":"👟","name":"...","description":"...","tip":"..."},
+    {"id":"shoes-2","category":"shoes","emoji":"👟","name":"...","description":"...","tip":"..."},
+    {"id":"outerwear-1","category":"outerwear","emoji":"🧥","name":"...","description":"...","tip":"..."},
+    {"id":"outerwear-2","category":"outerwear","emoji":"🧥","name":"...","description":"...","tip":"..."},
+    {"id":"bags-1","category":"bags","emoji":"👜","name":"...","description":"...","tip":"..."},
+    {"id":"bags-2","category":"bags","emoji":"👜","name":"...","description":"...","tip":"..."}
+  ]
+}
+Rules: exactly 10 trends (2 per category). Pick real, current trends that feel relevant for ${today}. Keep descriptions and tips punchy and practical. Use a fitting emoji for each trend. Return only the JSON object.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': S.apiKey.trim(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text || '';
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON in response');
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed.trends) || parsed.trends.length < 8) throw new Error('Too few trends');
+    S.hotTrends = parsed;
+    localStorage.setItem('closet-hot-trends', JSON.stringify(parsed));
+    toast('Trend report updated ✦');
+  } catch (err) {
+    console.error('generateHotTrends error', err);
+    toast('Couldn\'t load trends — check your API key');
+  } finally {
+    S._trendsLoading = false;
+    render();
+  }
+}
+
+function setTrendReaction(trendId, reaction) {
+  const key = 'closet-hot-reactions';
+  const reactions = JSON.parse(localStorage.getItem(key) || '{}');
+  if (reactions[trendId] === reaction) {
+    delete reactions[trendId]; // toggle off
+  } else {
+    reactions[trendId] = reaction;
+  }
+  localStorage.setItem(key, JSON.stringify(reactions));
+  render();
+}
+
+/* ================================================================
+   HERO PIECES — TOGGLE, SHARE, VIEW
+   ================================================================ */
+async function toggleHeroPiece(id) {
+  const w = S.wardrobe.find(i => i.id === id);
+  if (!w) return;
+  w.isHero = !w.isHero;
+  await DB.wardrobe.put(w);
+  S.wardrobe = await DB.wardrobe.getAll();
+  toast(w.isHero ? '👑 Marked as a Hero Piece!' : 'Removed from Hero Pieces');
+  render();
+}
+
+function viewHeroPieces() {
+  const heroes = S.wardrobe.filter(w => w.isHero && !w.retiredFromCloset);
+
+  let bodyHTML = '';
+  if (!heroes.length) {
+    bodyHTML = `<div style="text-align:center;padding:56px 32px;color:var(--text-3);">
+      <div style="font-size:44px;margin-bottom:14px;">👑</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text-1);margin-bottom:8px;">No Hero Pieces yet</div>
+      <div style="font-size:13px;line-height:1.65;">A Hero Piece is a standout garment that anchors an outfit — a bold blazer, a great coat, the bag everyone asks about. Open any wardrobe item and toggle it as a Hero Piece.</div>
+      <button onclick="switchTab('wardrobe')" style="margin-top:20px;background:var(--gold);color:#fff;border:none;border-radius:100px;padding:11px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">Go to Closet →</button>
+    </div>`;
+  } else {
+    bodyHTML = `<div style="padding:4px 16px 10px;">
+      <div style="font-size:13px;color:var(--text-3);line-height:1.6;">Your standout pieces — the anchors around which great outfits are built. Share this card with a stylist to get expert advice on how to wear them.</div>
+    </div>`;
+    heroes.forEach(w => {
+      const wears = w.wears?.length || 0;
+      const meta = [w.brand, w.category, wears > 0 ? `${wears} wear${wears===1?'':'s'}` : null].filter(Boolean).join(' · ');
+      bodyHTML += `<div class="hero-hub-card" onclick="openWardrobeItem('${w.id}')">
+        <div class="hero-hub-emoji">${w.icon || '👕'}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="hero-hub-name">${esc(w.name)}</div>
+          ${meta ? `<div class="hero-hub-meta">${esc(meta)}</div>` : ''}
+          ${w.description ? `<div style="font-size:11.5px;color:var(--text-3);margin-top:3px;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.description)}</div>` : ''}
+        </div>
+        <div class="hero-hub-crown">Hero</div>
+      </div>`;
+    });
+    bodyHTML += `<div style="padding:4px 16px 20px;">
+      <button class="hero-share-btn" ontouchend="event.preventDefault();shareAllHeroPieces()" onclick="shareAllHeroPieces()">
+        👑 Share with Stylist
+      </button>
+      <div style="text-align:center;font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5;">Generates a visual card of all your Hero Pieces — screenshot and send to your stylist.</div>
+    </div>`;
+  }
+
+  return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" onclick="switchTab('wardrobe')">${iconBack()} Wardrobe</button>
+      <span class="nav-title">Hero Pieces 👑</span>
+      <div style="width:72px"></div>
+    </div>
+    ${bodyHTML}
+  </div>`;
+}
+
+// ── Share a single hero piece as a visual card ────────────────────
+function shareHeroPiece(id) {
+  const w = S.wardrobe.find(i => i.id === id);
+  if (!w) return;
+  const canvas = document.createElement('canvas');
+  const W = 750, H = 980;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#1C1A18';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid texture
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  // Gold top bar
+  const grd = ctx.createLinearGradient(0, 0, W, 0);
+  grd.addColorStop(0, '#B8860B'); grd.addColorStop(1, '#D4A820');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, 6);
+
+  // Crown + "Hero Piece" label
+  ctx.font = '800 13px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(212,168,32,0.9)';
+  ctx.letterSpacing = '2px';
+  ctx.fillText('✦ HERO PIECE', 40, 58);
+
+  // Big emoji
+  ctx.font = '120px serif';
+  ctx.fillText(w.icon || '👕', W/2 - 68, 230);
+
+  // Item name
+  ctx.font = '800 46px -apple-system,sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'center';
+  const nameLine = w.name.length > 24 ? w.name.slice(0, 24) + '…' : w.name;
+  ctx.fillText(nameLine, W/2, 305);
+
+  // Brand + category
+  const sub = [w.brand, w.category].filter(Boolean).join('  ·  ');
+  if (sub) {
+    ctx.font = '500 20px -apple-system,sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillText(sub, W/2, 340);
+  }
+
+  // Divider
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(60, 375); ctx.lineTo(W-60, 375); ctx.stroke();
+
+  // Description
+  if (w.description) {
+    ctx.font = '400 21px -apple-system,sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    const words = w.description.split(' ');
+    let line = '', y = 420, maxW = W - 120;
+    for (const word of words) {
+      const test = line + (line ? ' ' : '') + word;
+      if (ctx.measureText(test).width > maxW && line) {
+        ctx.fillText(line, W/2, y); line = word; y += 34;
+        if (y > 600) { ctx.fillText(line + '…', W/2, y); line = null; break; }
+      } else { line = test; }
+    }
+    if (line) ctx.fillText(line, W/2, y);
+  }
+
+  // Stats row
+  const statY = 660;
+  const stats = [];
+  const wears = w.wears?.length || 0;
+  if (wears > 0) stats.push({ val: String(wears), lbl: 'Wears' });
+  if (w.brand)   stats.push({ val: w.brand, lbl: 'Brand' });
+  if (w.size)    stats.push({ val: w.size, lbl: 'Size' });
+  if (stats.length) {
+    const colW = W / stats.length;
+    stats.forEach((s, i) => {
+      const cx = colW * i + colW / 2;
+      ctx.font = '700 26px -apple-system,sans-serif';
+      ctx.fillStyle = '#D4A820';
+      ctx.fillText(s.val, cx, statY);
+      ctx.font = '500 14px -apple-system,sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillText(s.lbl.toUpperCase(), cx, statY + 22);
+    });
+  }
+
+  // "Looking for styling help" note
+  ctx.font = 'italic 400 19px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.38)';
+  ctx.fillText('Looking for styling help with this piece ✦', W/2, 750);
+
+  // Bottom branding
+  ctx.font = '600 15px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(184,125,42,0.7)';
+  ctx.fillText('✦ Closet', W/2, H - 36);
+  ctx.font = '400 13px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillText(new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}), W/2, H - 16);
+
+  _downloadOrShareCanvas(canvas, `hero-${w.name.replace(/\s+/g,'-').toLowerCase()}.png`);
+}
+
+// ── Share all hero pieces as a collection card ────────────────────
+function shareAllHeroPieces() {
+  const heroes = S.wardrobe.filter(w => w.isHero && !w.retiredFromCloset);
+  if (!heroes.length) { toast('No Hero Pieces to share yet'); return; }
+
+  const COLS = 2, ROW_H = 170, PAD = 40, CARD_GAP = 16;
+  const rows = Math.ceil(heroes.length / COLS);
+  const W = 750, H = PAD + 120 + rows * (ROW_H + CARD_GAP) + 100;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#1C1A18';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  // Gold top bar
+  const grd = ctx.createLinearGradient(0, 0, W, 0);
+  grd.addColorStop(0, '#B8860B'); grd.addColorStop(1, '#D4A820');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, 6);
+
+  // Title
+  ctx.textAlign = 'center';
+  ctx.font = '800 13px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(212,168,32,0.85)';
+  ctx.fillText('✦ HERO PIECES', W/2, 44);
+
+  ctx.font = '800 38px -apple-system,sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText('My Standout Pieces', W/2, 90);
+
+  ctx.font = '400 16px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.42)';
+  ctx.fillText('Help me style these — they anchor my outfits', W/2, 115);
+
+  // Cards
+  const cardW = (W - PAD * 2 - CARD_GAP) / COLS;
+  heroes.forEach((w, i) => {
+    const col = i % COLS, row = Math.floor(i / COLS);
+    const cx = PAD + col * (cardW + CARD_GAP);
+    const cy = 136 + row * (ROW_H + CARD_GAP);
+
+    // Card bg
+    ctx.fillStyle = 'rgba(255,255,255,0.055)';
+    roundRect(ctx, cx, cy, cardW, ROW_H, 14);
+    ctx.fill();
+
+    // Gold border
+    ctx.strokeStyle = 'rgba(184,125,42,0.35)';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, cx, cy, cardW, ROW_H, 14);
+    ctx.stroke();
+
+    // Emoji
+    ctx.font = '52px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(w.icon || '👕', cx + cardW/2, cy + 64);
+
+    // Name
+    ctx.font = '700 17px -apple-system,sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    const nm = w.name.length > 18 ? w.name.slice(0, 18) + '…' : w.name;
+    ctx.fillText(nm, cx + cardW/2, cy + 92);
+
+    // Brand / category
+    const sub = w.brand || w.category || '';
+    ctx.font = '400 13px -apple-system,sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.fillText(sub.slice(0, 20), cx + cardW/2, cy + 112);
+
+    // Hero badge
+    ctx.font = '700 10px -apple-system,sans-serif';
+    ctx.fillStyle = 'rgba(212,168,32,0.9)';
+    ctx.fillText('HERO', cx + cardW/2, cy + 145);
+  });
+
+  // Bottom branding
+  ctx.textAlign = 'center';
+  ctx.font = '600 15px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(184,125,42,0.7)';
+  ctx.fillText('✦ Closet', W/2, H - 36);
+  ctx.font = '400 13px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillText(new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}), W/2, H - 16);
+
+  _downloadOrShareCanvas(canvas, 'hero-pieces.png');
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+async function _downloadOrShareCanvas(canvas, filename) {
+  canvas.toBlob(async blob => {
+    if (!blob) { toast('Could not generate card'); return; }
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
+      try {
+        await navigator.share({ files: [new File([blob], filename, { type: 'image/png' })], title: 'My Hero Pieces — Closet' });
+      } catch(e) { if (e.name !== 'AbortError') toast('Share failed'); }
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      toast('Card saved — share from your downloads!');
+    }
+  }, 'image/png');
 }
 
 /* ================================================================
@@ -4897,34 +5560,13 @@ function buildPersonaHTML() {
     })();
     const isHearted = S.personaHistory.some(h => h.ts === persona.ts);
     const pColors = getPersonaColors(persona);
-    const avatarThumbHTML = (() => {
-      const av = S.styleAvatar;
-      if (av?.personaTs === persona.ts && (av.url || av.svg)) {
-        if (av.url) {
-          // CSS overlay placeholder so user sees something while Pollinations loads
-          const ph = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;pointer-events:none;"><span style="font-size:18px;opacity:.45;">✨</span></div>`;
-          return `<div onclick="openShareCard()" style="position:relative;width:72px;height:96px;border-radius:10px;overflow:hidden;flex-shrink:0;cursor:pointer;border:1.5px solid ${pColors.accent}55;background:${pColors.accent}22;">${ph}<img src="${esc(av.url)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:2;" onerror="this.style.opacity='0'"></div>`;
-        }
-        return `<div onclick="openShareCard()" style="width:72px;height:96px;border-radius:10px;overflow:hidden;flex-shrink:0;cursor:pointer;border:1.5px solid ${pColors.accent}55;background:${pColors.accent}22;">${av.svg}</div>`;
-      }
-      return `<div onclick="generateStyleAvatar()" title="Generate your AI fashion portrait" style="width:72px;height:96px;border-radius:10px;background:rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;flex-shrink:0;cursor:pointer;border:1.5px dashed rgba(255,255,255,.2);">
-        <span style="font-size:22px;">✨</span>
-        <span style="font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.4);text-align:center;line-height:1.3;">AI<br>Portrait</span>
-      </div>`;
-    })();
     personaInner = `
       <div class="persona-tagline">✦ Style Portrait</div>
-      <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:10px;">
-        ${avatarThumbHTML}
-        <div style="flex:1;min-width:0;">
-          <div class="persona-headline" style="margin-bottom:6px;">${esc(persona.headline)}</div>
-          <div class="persona-body" style="margin-bottom:0;">${esc(persona.body)}</div>
-        </div>
-      </div>
+      <div class="persona-headline" style="margin-bottom:6px;">${esc(persona.headline)}</div>
+      <div class="persona-body" style="margin-bottom:10px;">${esc(persona.body)}</div>
       <div class="persona-actions">
         <button class="persona-refresh-btn" onclick="generateStylePersona()">⟳ Refresh</button>
         <div style="display:flex;align-items:center;gap:4px;">
-          <button onclick="generateStyleAvatar()" title="Share card" style="background:none;border:none;cursor:pointer;padding:4px 6px;line-height:1;font-size:11px;font-weight:700;color:${pColors.accent};opacity:.85;transition:opacity .15s;font-family:inherit;" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.85'">📲 Card</button>
           <button class="persona-heart-btn${isHearted?' hearted':''}" onclick="heartPersona()" title="${isHearted?'Remove from journey':'Save to Style Journey'}">${isHearted?'♥':'♡'}</button>
           <button onclick="sharePersona()" title="Share portrait" style="background:none;border:none;cursor:pointer;padding:4px 5px;line-height:1;color:rgba(255,255,255,0.35);transition:color .15s;" onmouseenter="this.style.color='rgba(255,255,255,0.7)'" onmouseleave="this.style.color='rgba(255,255,255,0.35)'">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
@@ -5087,14 +5729,24 @@ function setFilter(f) { S.filter = f; S.closetExpanded = false; render(); }
 
 async function setRecReaction(entryId, recIdx, reaction) {
   const e = S.entries.find(e => e.id === entryId); if (!e) return;
-  const rec = e.recommendations?.[recIdx]; if (!rec) return;
+  // Support both new stylingTips[] and legacy recommendations[]
+  const tips = e.stylingTips?.length ? e.stylingTips : (e.recommendations||[]);
+  const rec = tips[recIdx]; if (rec === undefined) return;
   if (!e.recReactions) e.recReactions = {};
-  // Toggle: clicking the active reaction removes it
-  if (e.recReactions[rec] === reaction) {
-    delete e.recReactions[rec];
-  } else {
-    e.recReactions[rec] = reaction;
-  }
+  const key = String(recIdx);
+  if (e.recReactions[key] === reaction) { delete e.recReactions[key]; }
+  else { e.recReactions[key] = reaction; }
+  await DB.entries.put(e);
+  S.entries = await DB.entries.getAll();
+  render();
+}
+
+async function setPurchaseReaction(entryId, recIdx, reaction) {
+  const e = S.entries.find(e => e.id === entryId); if (!e) return;
+  if (!e.purchaseReactions) e.purchaseReactions = {};
+  const key = String(recIdx);
+  if (e.purchaseReactions[key] === reaction) { delete e.purchaseReactions[key]; }
+  else { e.purchaseReactions[key] = reaction; }
   await DB.entries.put(e);
   S.entries = await DB.entries.getAll();
   render();
@@ -5283,6 +5935,44 @@ function viewShop() {
       </button>
     </div>
     <div style="height:1px;background:var(--border);margin:0 16px 0;"></div>
+
+    ${(()=>{
+      // Collect all hearted purchase recs across entries
+      const wishItems = [];
+      S.entries.forEach(e => {
+        if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
+        e.purchaseRecs.forEach((r, i) => {
+          if (e.purchaseReactions[String(i)] === 'liked') {
+            wishItems.push({ rec: r, entry: e });
+          }
+        });
+      });
+      if (!wishItems.length) return '';
+      return `<div style="padding:16px 16px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">♥ Wish List</div>
+        ${wishItems.map(({rec, entry}) => {
+          const name = rec.item || rec;
+          const reason = rec.reason || '';
+          const query = encodeURIComponent(rec.query || name);
+          return `<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-sm);margin-bottom:8px;">
+            ${entry.photo ? `<div onclick="openEntry('${entry.id}')" style="width:38px;height:38px;border-radius:7px;overflow:hidden;flex-shrink:0;cursor:pointer;border:1px solid var(--border);">
+              <img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;" loading="lazy">
+            </div>` : ''}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.3;">${esc(name)}</div>
+              ${reason ? `<div style="font-size:12px;color:var(--text-2);margin-top:2px;">${esc(reason)}</div>` : ''}
+              <a href="https://www.google.com/search?tbm=shop&q=${query}" target="_blank" rel="noopener"
+                style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:var(--gold-dk);text-decoration:none;border:1px solid var(--gold);border-radius:100px;padding:3px 10px;">
+                🛍 Shop it
+              </a>
+            </div>
+            <button onclick="setPurchaseReaction('${entry.id}',${entry.purchaseRecs.indexOf(rec)},'liked')"
+              style="background:none;border:none;cursor:pointer;font-size:18px;padding:2px;line-height:1;color:var(--gold);flex-shrink:0;align-self:flex-start;" title="Remove from wish list">♥</button>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="height:1px;background:var(--border);margin:4px 16px 0;"></div>`;
+    })()}
 
     <div style="padding:14px 16px 14px;">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Price Range</div>
@@ -5808,12 +6498,6 @@ function viewProfile() {
   const circumference = 251.3; // 2π × r40
   const ringProgress  = (!isNaN(scoreNum)) ? scoreNum / 10 : 0;
   const ringOffset    = circumference * (1 - ringProgress);
-  const scoreTier = isNaN(scoreNum) ? null
-    : scoreNum >= 9.0 ? { label: 'Iconic',       sub: 'You\'re dressing at your absolute peak.' }
-    : scoreNum >= 8.0 ? { label: 'Exceptional',   sub: 'Your style is refined and intentional.' }
-    : scoreNum >= 7.0 ? { label: 'Polished',       sub: 'Strong presence with room to elevate.' }
-    : scoreNum >= 6.0 ? { label: 'Developing',     sub: 'Your style story is taking shape.' }
-    :                   { label: 'Building',        sub: 'Every outfit logged moves you forward.' };
   const totalRatedOutfits = S.entries.filter(e => e.rating != null).length;
 
 
@@ -5942,17 +6626,25 @@ function viewProfile() {
       <button onclick="saveHairstyle(document.getElementById('newHairInput').value);render();" style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:0 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">Add</button>
     </div>`;
 
-  // ── Liked recommendations carousel ────────────────────────
+  // ── Liked styling tips carousel ────────────────────────────
   const likedRecs = [];
   S.entries.forEach(e => {
     if (!e.recReactions) return;
-    (e.recommendations||[]).forEach(r => {
-      if (e.recReactions[r] === 'liked') likedRecs.push({ rec: r, entry: e });
-    });
+    // New entries: index-keyed stylingTips
+    if (e.stylingTips?.length) {
+      e.stylingTips.forEach((r, i) => {
+        if (e.recReactions[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e });
+      });
+    } else {
+      // Legacy: text-keyed recommendations
+      (e.recommendations||[]).forEach(r => {
+        if (e.recReactions[r] === 'liked') likedRecs.push({ rec: r, entry: e });
+      });
+    }
   });
   const likedRecsHTML = likedRecs.length ? `
     <div style="padding:0 16px 6px;">
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">♥ Saved Style Tips</div>
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">✂️ Saved Style Tips</div>
     </div>
     <div style="display:flex;gap:10px;overflow-x:auto;padding:0 16px 16px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
       ${likedRecs.map(({rec, entry}) => `
@@ -5962,11 +6654,46 @@ function viewProfile() {
             ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
             : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
           <div style="padding:10px 12px 12px;flex:1;">
-            <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Style tip</div>
+            <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Styling tip</div>
             <div style="font-size:13px;color:var(--text);line-height:1.45;">${esc(rec)}</div>
             <div style="font-size:11px;color:var(--text-3);margin-top:6px;">⭐ ${entry.rating}/10 · ${entry.occasionTag ? esc(entry.occasionTag) : fmtDateLong(entry.createdAt)}</div>
           </div>
         </div>`).join('')}
+    </div>` : '';
+
+  // ── Wish list carousel ─────────────────────────────────────
+  const wishRecs = [];
+  S.entries.forEach(e => {
+    if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
+    e.purchaseRecs.forEach((r, i) => {
+      if (e.purchaseReactions[String(i)] === 'liked') wishRecs.push({ rec: r, entry: e });
+    });
+  });
+  const wishListHTML = wishRecs.length ? `
+    <div style="padding:0 16px 6px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">🛒 Wish List</div>
+    </div>
+    <div style="display:flex;gap:10px;overflow-x:auto;padding:0 16px 16px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+      ${wishRecs.map(({rec, entry}) => {
+        const name = rec.item || rec;
+        const reason = rec.reason || '';
+        const query = encodeURIComponent(rec.query || name);
+        return `<div style="scroll-snap-align:start;flex-shrink:0;width:210px;
+          border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
+          ${entry.photo
+            ? `<div onclick="openEntry('${entry.id}')" style="width:100%;height:80px;overflow:hidden;flex-shrink:0;cursor:pointer;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
+            : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">🛍</div>`}
+          <div style="padding:10px 12px 12px;flex:1;display:flex;flex-direction:column;">
+            <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Wish list</div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:3px;">${esc(name)}</div>
+            ${reason ? `<div style="font-size:12px;color:var(--text-2);line-height:1.4;flex:1;">${esc(reason)}</div>` : ''}
+            <a href="https://www.google.com/search?tbm=shop&q=${query}" target="_blank" rel="noopener"
+              style="display:inline-block;margin-top:8px;font-size:11px;font-weight:700;color:var(--gold-dk);text-decoration:none;border:1px solid var(--gold);border-radius:100px;padding:3px 10px;align-self:flex-start;">
+              🛍 Shop it
+            </a>
+          </div>
+        </div>`;
+      }).join('')}
     </div>` : '';
 
   // ── Top-rated looks carousel ───────────────────────────────
@@ -6049,7 +6776,6 @@ function viewProfile() {
       ${avgRating !== '—' ? `
       <div style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,.32);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:12px;padding:8px 12px;text-align:center;border:1px solid rgba(255,255,255,.12);">
         <div style="font-size:22px;font-weight:900;color:#fff;line-height:1;letter-spacing:-.5px;">${avgRating}</div>
-        ${scoreTier ? `<div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.04em;margin-top:2px;white-space:nowrap;">${scoreTier.label}</div>` : ''}
       </div>` : ''}
     </div>` : null;
 
@@ -6083,9 +6809,11 @@ function viewProfile() {
     ${topLooksHTML}
     ${topLooksHTML ? `<div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
 
-    <!-- Liked recommendations carousel -->
+    <!-- Saved style tips carousel -->
     ${likedRecsHTML}
-    ${likedRecsHTML ? `<div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
+    <!-- Wish list carousel -->
+    ${wishListHTML}
+    ${(likedRecsHTML || wishListHTML) ? `<div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
 
     <!-- Dashboard tile -->
     <div onclick="openStatsDash()" style="margin:0 16px 24px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;" ontouchstart="this.style.background='var(--surface-2)'" ontouchend="this.style.background='var(--surface)'">
@@ -6413,32 +7141,57 @@ function viewHome() {
         </div>`).join('')) : ''}
 
     ${(()=>{
-      // Liked recommendations carousel — bottom of home
+      // Liked styling tips + wish list carousels — bottom of home
       const likedRecs = [];
       S.entries.forEach(e => {
         if (!e.recReactions) return;
-        (e.recommendations||[]).forEach(r => {
-          if (e.recReactions[r] === 'liked') likedRecs.push({ rec: r, entry: e });
-        });
+        if (e.stylingTips?.length) {
+          e.stylingTips.forEach((r, i) => { if (e.recReactions[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e }); });
+        } else {
+          (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') likedRecs.push({ rec: r, entry: e }); });
+        }
       });
-      if (!likedRecs.length) return '';
-      return `<div style="margin-top:10px;margin-bottom:6px;">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);padding:0 16px 8px;">♥ Saved Style Tips</div>
+      const wishRecs = [];
+      S.entries.forEach(e => {
+        if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
+        e.purchaseRecs.forEach((r, i) => { if (e.purchaseReactions[String(i)] === 'liked') wishRecs.push({ rec: r, entry: e }); });
+      });
+      if (!likedRecs.length && !wishRecs.length) return '';
+      const tipsHTML = likedRecs.length ? `
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);padding:0 16px 8px;">✂️ Saved Style Tips</div>
         <div style="display:flex;gap:10px;overflow-x:auto;padding:0 16px 12px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
           ${likedRecs.map(({rec, entry}) => `
             <div onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:220px;cursor:pointer;
               border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
-              ${entry.photo ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;">
-                <img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" alt="Outfit">
-              </div>` : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
+              ${entry.photo ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" alt="Outfit"></div>`
+                : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
               <div style="padding:10px 12px 12px;flex:1;">
-                <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Style tip</div>
+                <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Styling tip</div>
                 <div style="font-size:13px;color:var(--text);line-height:1.45;">${esc(rec)}</div>
                 <div style="font-size:11px;color:var(--text-3);margin-top:6px;">⭐ ${entry.rating}/10 · ${entry.occasionTag ? esc(entry.occasionTag) : fmtDateLong(entry.createdAt)}</div>
               </div>
             </div>`).join('')}
-        </div>
-      </div>`;
+        </div>` : '';
+      const wishHTML = wishRecs.length ? `
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);padding:0 16px 8px;">🛒 Wish List</div>
+        <div style="display:flex;gap:10px;overflow-x:auto;padding:0 16px 12px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+          ${wishRecs.map(({rec, entry}) => {
+            const name = rec.item || rec;
+            const query = encodeURIComponent(rec.query || name);
+            return `<div style="scroll-snap-align:start;flex-shrink:0;width:220px;
+              border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
+              ${entry.photo ? `<div onclick="openEntry('${entry.id}')" style="width:100%;height:80px;overflow:hidden;flex-shrink:0;cursor:pointer;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" alt="Outfit"></div>`
+                : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">🛍</div>`}
+              <div style="padding:10px 12px 12px;flex:1;display:flex;flex-direction:column;">
+                <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Wish list</div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.35;flex:1;">${esc(name)}</div>
+                <a href="https://www.google.com/search?tbm=shop&q=${query}" target="_blank" rel="noopener"
+                  style="display:inline-block;margin-top:7px;font-size:11px;font-weight:700;color:var(--gold-dk);text-decoration:none;border:1px solid var(--gold);border-radius:100px;padding:3px 10px;align-self:flex-start;">🛍 Shop it</a>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>` : '';
+      return `<div style="margin-top:10px;margin-bottom:6px;">${tipsHTML}${wishHTML}</div>`;
     })()}
 
     <div style="height:16px"></div>
@@ -6940,6 +7693,20 @@ function viewWardrobe() {
         </div>
       </button>
     </div>
+    ${(()=>{
+      const heroes = S.wardrobe.filter(w => w.isHero && !w.retiredFromCloset);
+      if (!heroes.length) return '';
+      return `<div onclick="navigate('hero-pieces')"
+        style="margin:0 16px 14px;background:linear-gradient(135deg,#1C1A18,#2a2318);border-radius:var(--r);border:1.5px solid var(--gold);padding:13px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;touch-action:manipulation;"
+        ontouchend="event.preventDefault();navigate('hero-pieces')">
+        <span style="font-size:26px;flex-shrink:0;">👑</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:800;color:var(--gold);line-height:1.2;">${heroes.length} Hero Piece${heroes.length===1?'':'s'}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;">${heroes.map(w=>w.name).slice(0,3).join(', ')}${heroes.length>3?'…':''}</div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(184,125,42,0.7)" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>`;
+    })()}
 
     ${activeWardrobe.length > 0 ? `<div style="padding:10px 16px 0;display:flex;align-items:baseline;gap:6px;">
       <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${activeWardrobe.length}</span>
@@ -6967,9 +7734,10 @@ function wardrobeGridCellHTML(w) {
   const stripeColor = colorFromItemName(w.name);
   const stripeEl = `<div class="wgc-stripe" style="background:${stripeColor || 'var(--border)'};opacity:${stripeColor ? '1' : '0'};"></div>`;
   const cellClass = w.retiredFromCloset ? ' wgc-retired' : (w.retiring ? ' retiring' : '');
-  return `<div class="wardrobe-grid-cell${cellClass}" onclick="openWardrobeItem('${w.id}')">
+  return `<div class="wardrobe-grid-cell${cellClass}" onclick="openWardrobeItem('${w.id}')" style="position:relative;">
     ${stripeEl}
-    <div class="wgc-info">
+    ${w.isHero ? `<div class="hero-badge" style="position:absolute;top:5px;left:5px;z-index:5;font-size:8px;padding:2px 5px;">👑 Hero</div>` : ''}
+    <div class="wgc-info" style="${w.isHero ? 'padding-top:6px;' : ''}">
       <div class="wgc-name">${esc(w.name)}</div>
       ${metaParts.length ? `<div class="wgc-meta">${metaParts.join(' · ')}</div>` : ''}
     </div>
@@ -6988,7 +7756,8 @@ function wardrobeCardHTML(w) {
     : ppw
       ? `<span class="ppw-badge">${ppw}</span>`
       : w.price ? `<span class="ppw-badge" style="background:var(--surface-2);color:var(--text-3);">$${parseFloat(w.price).toFixed(2)}</span>` : '';
-  return `<div class="wardrobe-card${w.retiring?' retiring':''}" onclick="openWardrobeItem('${w.id}')">
+  return `<div class="wardrobe-card${w.retiring?' retiring':''}" onclick="openWardrobeItem('${w.id}')" style="position:relative;">
+    ${w.isHero ? `<div class="hero-badge">👑 Hero</div>` : ''}
     <div class="wardrobe-icon">${w.icon||'👕'}</div>
     <div class="wardrobe-info">
       <div class="wardrobe-name">${esc(w.name)}</div>
@@ -7024,8 +7793,9 @@ function hangerHTML(w) {
   </svg>`;
   return `<div class="hanger" onclick="openWardrobeItem('${w.id}')">
     ${hangerSVG}
-    <div class="hanger-card">
+    <div class="hanger-card" style="position:relative;">
       ${stripeEl}
+      ${w.isHero ? `<div class="hero-badge" style="top:4px;left:4px;font-size:8px;padding:2px 5px;">👑</div>` : ''}
       <div class="hanger-icon">${w.icon || '👕'}</div>
       <div class="hanger-name">${esc(w.name)}</div>
       ${w.brand ? `<div class="hanger-brand">${esc(w.brand)}</div>` : ''}
@@ -7054,10 +7824,21 @@ function viewNewPiece() {
 
       <div style="display:flex;flex-direction:column;gap:12px;">
 
+        <!-- From Photo — PRIMARY -->
+        <button onclick="S.receiptFlow={step:'input',mode:'photo',imageData:'',imageMime:'',pasteText:'',preview:null};navigate('receipt-add')"
+          style="display:flex;align-items:center;gap:16px;background:var(--gold-bg);border:2px solid var(--gold);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
+          <div style="width:48px;height:48px;border-radius:12px;background:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">📸</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:var(--gold-dk);margin-bottom:2px;">From a photo</div>
+            <div style="font-size:12px;color:var(--gold-dk);opacity:.7;line-height:1.4;">Snap or upload your item — Claude identifies the name, category &amp; details</div>
+          </div>
+          <div style="font-size:18px;color:var(--gold);">›</div>
+        </button>
+
         <!-- Manual entry -->
         <button onclick="S.receiptFlow={step:'preview',mode:'manual',imageData:'',imageMime:'',pasteText:'',preview:{name:'',brand:'',price:'',category:'Tops',description:'',icon:'👕',isNew:true}};navigate('receipt-add')"
           style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
-          <div style="width:48px;height:48px;border-radius:12px;background:var(--gold-bg);border:1.5px solid var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">✏️</div>
+          <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">✏️</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;">Add manually</div>
             <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Fill in the name, brand, price, and details yourself</div>
@@ -7088,6 +7869,47 @@ function viewReceiptAdd() {
   const rf = S.receiptFlow;
   if (!rf) { navigate('wardrobe'); return ''; }
   const isManual = rf.mode === 'manual';
+  const isPhoto  = rf.mode === 'photo';
+
+  // ── STEP: photo item upload ──────────────────────────────────
+  if (isPhoto && rf.step === 'input') {
+    return `<div class="view view-notab">
+      <div class="nav">
+        <button class="nav-back" onclick="navigate('new-piece')">${iconBack()} Back</button>
+        <span class="nav-title">From a Photo</span>
+        <span style="width:72px"></span>
+      </div>
+      <div style="padding:20px;">
+        <div style="font-size:13px;color:var(--text-3);margin-bottom:18px;line-height:1.5;">Take or upload a photo of the item — Claude will identify the name, category, and details for you.</div>
+
+        <div style="background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px;cursor:pointer;min-height:220px;display:flex;align-items:center;justify-content:center;"
+          onclick="document.getElementById('photoItemInput').click()">
+          ${rf.imageData
+            ? `<img src="data:${rf.imageMime};base64,${rf.imageData}" style="width:100%;max-height:340px;object-fit:cover;display:block;">`
+            : `<div style="text-align:center;padding:40px 20px;">
+                <div style="font-size:52px;margin-bottom:12px;">📷</div>
+                <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">Tap to add a photo</div>
+                <div style="font-size:13px;color:var(--text-3);line-height:1.5;">Your camera or photo library</div>
+              </div>`}
+          <input id="photoItemInput" type="file" accept="image/*" style="display:none;"
+            onchange="photoItemSelected(this)">
+        </div>
+
+        ${rf.imageData ? `
+          <button onclick="document.getElementById('photoItemInput').click()"
+            style="width:100%;background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-size:13px;color:var(--text-2);cursor:pointer;font-family:inherit;margin-bottom:16px;">
+            🔄 Change photo
+          </button>
+          <button class="btn btn-primary" onclick="analyzeItemPhoto()" style="margin-bottom:10px;">
+            ✨ Identify this piece
+          </button>` : ''}
+
+        <div style="font-size:12px;color:var(--text-3);text-align:center;margin-top:8px;line-height:1.6;">
+          Works best with a clear shot of the item on its own or laid flat.
+        </div>
+      </div>
+    </div>`;
+  }
 
   // ── STEP: parsing ────────────────────────────────────────────
   if (rf.step === 'parsing') {
@@ -7098,10 +7920,10 @@ function viewReceiptAdd() {
         <span style="width:72px"></span>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:20px;">
-        <div style="font-size:48px;">🧾</div>
+        <div style="font-size:48px;">${isPhoto ? '📷' : '🧾'}</div>
         <div class="loading-dots" style="font-size:28px;"><span>·</span><span>·</span><span>·</span></div>
-        <div style="font-size:15px;font-weight:600;color:var(--text);">Reading your receipt…</div>
-        <div style="font-size:13px;color:var(--text-3);text-align:center;max-width:260px;">Claude is extracting item details from your order confirmation</div>
+        <div style="font-size:15px;font-weight:600;color:var(--text);">${isPhoto ? 'Identifying your piece…' : 'Reading your receipt…'}</div>
+        <div style="font-size:13px;color:var(--text-3);text-align:center;max-width:260px;">${isPhoto ? 'Claude is analyzing the photo to fill in the details' : 'Claude is extracting item details from your order confirmation'}</div>
       </div>
     </div>`;
   }
@@ -7110,7 +7932,96 @@ function viewReceiptAdd() {
   if (rf.step === 'preview' && rf.preview) {
     const p = rf.preview;
     const cats = ['Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Other','Accessories'];
-    const backAction = isManual ? `navigate('new-piece')` : `S.receiptFlow.step='input';render()`;
+    const backAction = isManual ? `navigate('new-piece')` : isPhoto ? `S.receiptFlow.step='input';render()` : `S.receiptFlow.step='input';render()`;
+
+    // ── PHOTO MODE: flip card ─────────────────────────────────
+    if (isPhoto && rf.imageData) {
+      return `<div class="view view-notab">
+        <div class="nav">
+          <button class="nav-back" onclick="${backAction}">${iconBack()} Back</button>
+          <span class="nav-title">New Piece</span>
+          <span style="width:72px"></span>
+        </div>
+        <div style="padding:16px 16px 0;">
+          <div class="flip-card-wrap" id="flipCardWrap">
+            <div class="flip-card-inner">
+
+              <!-- FRONT: photo -->
+              <div class="flip-card-face">
+                <img src="data:${rf.imageMime};base64,${rf.imageData}"
+                  style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">
+                <!-- Bottom label overlay -->
+                <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.62));padding:28px 16px 16px;color:#fff;">
+                  <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;opacity:.7;margin-bottom:3px;">${esc(p.category||'Item')}</div>
+                  <div style="font-size:18px;font-weight:800;line-height:1.25;">${esc(p.name||'Unnamed piece')}</div>
+                  ${p.brand ? `<div style="font-size:13px;opacity:.8;margin-top:2px;">${esc(p.brand)}</div>` : ''}
+                </div>
+              </div>
+
+              <!-- BACK: editable form -->
+              <div class="flip-card-face back">
+                <div style="font-size:15px;font-weight:800;margin-bottom:14px;color:var(--text);">${esc(p.icon||'👕')} Details</div>
+                <div style="margin-bottom:11px;">
+                  <label class="form-label" style="font-size:10px;">Name</label>
+                  <input class="form-input" type="text" value="${esc(p.name||'')}" oninput="S.receiptFlow.preview.name=this.value" placeholder="e.g. Navy Linen Blazer" style="margin:4px 0 0;">
+                </div>
+                <div style="margin-bottom:11px;">
+                  <label class="form-label" style="font-size:10px;">Brand</label>
+                  <input class="form-input" type="text" value="${esc(p.brand||'')}" oninput="S.receiptFlow.preview.brand=this.value" placeholder="e.g. Zara, ASOS" style="margin:4px 0 0;">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px;">
+                  <div>
+                    <label class="form-label" style="font-size:10px;">Price paid</label>
+                    <input class="form-input" type="number" min="0" step="0.01" value="${p.price||''}" oninput="S.receiptFlow.preview.price=this.value" placeholder="0.00" style="margin:4px 0 0;">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:10px;">Size</label>
+                    <input class="form-input" type="text" value="${esc(p.size||'')}" oninput="S.receiptFlow.preview.size=this.value" placeholder="S, 28, 8.5…" style="margin:4px 0 0;">
+                  </div>
+                </div>
+                <div style="margin-bottom:11px;">
+                  <label class="form-label" style="font-size:10px;">Category</label>
+                  <select class="form-input" onchange="S.receiptFlow.preview.category=this.value" style="margin:4px 0 0;">
+                    ${cats.map(c=>`<option value="${c}" ${p.category===c?'selected':''}>${c}</option>`).join('')}
+                  </select>
+                </div>
+                <div style="margin-bottom:11px;">
+                  <label class="form-label" style="font-size:10px;">Description</label>
+                  <textarea class="form-textarea" style="min-height:54px;margin:4px 0 0;"
+                    oninput="S.receiptFlow.preview.description=this.value"
+                    placeholder="Color, material, style…">${esc(p.description||'')}</textarea>
+                </div>
+                <div style="margin-bottom:4px;">
+                  <label class="form-label" style="font-size:10px;">When did you get this?</label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;">
+                    <button onclick="S.receiptFlow.preview.isNew=true;render()"
+                      style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.isNew!==false?'var(--gold)':'var(--border)'};background:${p.isNew!==false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew!==false?'var(--gold-dk)':'var(--text-2)'};">✨ Just got it</button>
+                    <button onclick="S.receiptFlow.preview.isNew=false;render()"
+                      style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.isNew===false?'var(--gold)':'var(--border)'};background:${p.isNew===false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew===false?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
+                  </div>
+                  ${p.isNew===false ? `<input class="form-input" type="month" value="${esc(p.purchasedDate||'')}" oninput="S.receiptFlow.preview.purchasedDate=this.value" style="margin-top:8px;font-size:14px;">` : ''}
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Flip button — always visible in top-right -->
+            <button class="flip-btn" onclick="document.getElementById('flipCardWrap').classList.toggle('flipped')" id="flipToggleBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+              <span id="flipBtnLabel">Details</span>
+            </button>
+          </div>
+
+          <button class="btn btn-primary" onclick="confirmReceiptItem()" style="margin-top:14px;margin-bottom:10px;">
+            ✦ Add to My Closet
+          </button>
+          <button class="btn btn-secondary" onclick="navigate('wardrobe')">Cancel</button>
+          <div style="height:32px;"></div>
+        </div>
+      </div>`;
+    }
+
+    // ── MANUAL / RECEIPT MODE: standard form ─────────────────
     return `<div class="view view-notab">
       <div class="nav">
         <button class="nav-back" onclick="${backAction}">${iconBack()} Back</button>
@@ -7281,6 +8192,7 @@ function viewWardrobeItem() {
       <div class="witem-name">${esc(w.name)}</div>
       ${w.brand ? `<div style="font-size:14px;color:var(--text-3);margin-top:-6px;font-weight:500;">${esc(w.brand)}</div>` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px;">
+        ${w.isHero ? `<div style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#FFFAED,#FFF5D0);color:#8B6010;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;border:1px solid rgba(184,125,42,.35);letter-spacing:.03em;">👑 Hero Piece</div>` : ''}
         ${w.retiredFromCloset ? `<div class="retired-chip">📦 Retired</div>` : ''}
         ${w.tailoringNeeded && !w.retiredFromCloset ? `<div class="tailoring-chip">🧵 Needs tailoring</div>` : ''}
         ${w.retiring && !w.retiredFromCloset ? `<div class="retiring-chip">🪡 Flagged for replacement</div>` : ''}
@@ -7396,6 +8308,39 @@ function viewWardrobeItem() {
         <div style="font-size:13px;color:#7B35A8;font-weight:600;">💝 Log an outfit wearing this gift to share a rating with ${w.giftedBy ? esc(w.giftedBy) : 'the gifter'}!</div>
       </div>
     </div>` : ''}
+
+    <!-- Hero Piece toggle -->
+    <div style="padding:0 20px;margin-bottom:16px;">
+      <div class="hero-toggle-box ${w.isHero ? 'active' : ''}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">
+              👑 Hero Piece
+            </div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
+              ${w.isHero
+                ? 'This is a standout piece that anchors your outfits. Share it with a stylist for advice on how to wear it.'
+                : 'A standout garment your whole outfit is built around — a great coat, a bold blazer, the bag everyone asks about.'}
+            </div>
+          </div>
+          <button class="toggle ${w.isHero ? 'on' : ''}" style="${w.isHero ? 'background:#B8860B;flex-shrink:0;' : 'flex-shrink:0;'}"
+            ontouchend="event.preventDefault();toggleHeroPiece('${w.id}')"
+            onclick="toggleHeroPiece('${w.id}')"></button>
+        </div>
+        ${w.isHero ? `
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="hero-share-btn" style="flex:1;padding:11px;"
+            ontouchend="event.preventDefault();shareHeroPiece('${w.id}')"
+            onclick="shareHeroPiece('${w.id}')">
+            📤 Share with Stylist
+          </button>
+          <button onclick="navigate('hero-pieces')"
+            style="flex-shrink:0;padding:11px 14px;border-radius:var(--r);border:1.5px solid var(--gold);background:none;color:var(--gold-dk);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            View All
+          </button>
+        </div>` : ''}
+      </div>
+    </div>
 
     <div style="padding:0 20px;margin-bottom:16px;">
       <label class="form-label">Name</label>
@@ -7673,20 +8618,22 @@ function viewWardrobeItem() {
 function viewUpload() {
   const hasPhoto = !!S.pendingPhoto;
   const isFriend = S.friendRatingMode;
-  const navTitle = isFriend ? 'Rate a Friend' : 'New Outfit';
+  const isBattle = S.battleMode;
+  const navTitle = isFriend ? "Friend's Fit Check" : isBattle ? '⚔️ Fashion Battle' : 'New Outfit';
+  const backAction = `navigate(S.activeTab);clearPending();S.friendRatingMode=false;S.battleMode=false;`;
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate(S.activeTab);clearPending();S.friendRatingMode=false;">${iconBack()} Back</button>
+      <button class="nav-back" onclick="${backAction}">${iconBack()} Back</button>
       <span class="nav-title">${navTitle}</span>
       <div style="width:72px"></div>
     </div>
     ${S.error ? `<div class="error-banner" style="margin-top:12px;">${esc(S.error)}</div>` : ''}
     ${hasPhoto ? `
       <div class="photo-preview-wrap">
-        <img class="photo-preview" src="${S.pendingPhoto}" alt="${isFriend ? "Friend's outfit" : 'Your outfit'}">
+        <img class="photo-preview" src="${S.pendingPhoto}" alt="${isFriend ? "Friend's outfit" : isBattle ? 'Battle photo' : 'Your outfit'}">
         <button class="change-photo-btn" onclick="triggerPicker()">Change Photo</button>
       </div>
-      ${!isFriend ? `
+      ${!isFriend && !isBattle ? `
       <div style="padding:14px 20px 0;">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:9px;">Where are you wearing this?</div>
         <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
@@ -7697,37 +8644,49 @@ function viewUpload() {
         </div>
         ${S.pendingOccasion ? `<div style="margin-top:6px;font-size:11px;color:var(--gold-dk);font-weight:600;">✓ Claude will score this as a <em>${S.pendingOccasion}</em> look</div>` : `<div style="margin-top:6px;font-size:11px;color:var(--text-3);">Optional — Claude will infer context from the photo if skipped</div>`}
       </div>` : ''}
+      ${isBattle ? `
+      <div style="padding:12px 20px 0;">
+        <div style="background:linear-gradient(135deg,#1C1A18,#2a2520);border-radius:var(--r-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;">⚔️</span>
+          <div style="font-size:12px;color:rgba(255,255,255,0.75);line-height:1.4;">Claude will detect both people and deliver a head-to-head style verdict.</div>
+        </div>
+      </div>` : ''}
       <div style="height:16px"></div>
       <button class="btn btn-primary" onclick="${isFriend ? 'doAnalyzeFriend()' : 'doAnalyze()'}">
-        ✨ ${isFriend ? "Rate This Look" : "Analyze Outfit"}
+        ${isBattle ? '⚔️ Start Battle' : isFriend ? '✨ Rate This Look' : '✨ Analyze Outfit'}
       </button>
       <div style="height:10px"></div>
       <button class="btn btn-secondary" onclick="navigate('crop')">✂️ Crop Photo</button>
       <div style="height:10px"></div>
-      <button class="btn btn-secondary" onclick="navigate(S.activeTab);clearPending();S.friendRatingMode=false;">Cancel</button>
+      <button class="btn btn-secondary" onclick="${backAction}">Cancel</button>
     ` : `
       <div style="padding:0 20px 0;margin-top:4px;">
-        <p style="font-size:14px;color:var(--text-2);line-height:1.65;">${isFriend
-          ? "Take or upload a photo of your friend's outfit — Claude will rate it and you can share the result instantly."
+        <p style="font-size:14px;color:var(--text-2);line-height:1.65;">${
+          isFriend ? "Take or upload a photo of your friend's outfit — Claude will rate it and you can share the result instantly."
+          : isBattle ? 'Upload a photo of two people together. Claude will judge the fits head-to-head and declare a winner.'
           : 'Upload a full-length mirror selfie of your outfit. Portrait photos work best!'}</p>
       </div>
       <div class="upload-zone" id="uploadZone" onclick="triggerPicker()">
-        <div class="upload-zone-icon">${isFriend ? '👯' : '📸'}</div>
-        <h3>${isFriend ? "Add Friend's Photo" : 'Add Outfit Photo'}</h3>
-        <p>Tap to pick from your camera roll or take a new photo</p>
+        <div class="upload-zone-icon">${isFriend ? '👯' : isBattle ? '⚔️' : '📸'}</div>
+        <h3>${isFriend ? "Add Friend's Photo" : isBattle ? 'Add Group Photo' : 'Add Outfit Photo'}</h3>
+        <p>${isBattle ? 'Both people should be fully visible' : 'Tap to pick from your camera roll or take a new photo'}</p>
       </div>
-      ${!isFriend ? `
-      <div style="padding:0 20px;margin-top:12px;">
-        <button class="fr-mode-btn" onclick="S.friendRatingMode=true;render()">
-          👯 Rate a Friend's Outfit
+      ${!isFriend && !isBattle ? `
+      <div style="padding:0 20px;margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+        <button class="fr-mode-btn battle" ontouchend="event.preventDefault();S.battleMode=true;render()" onclick="S.battleMode=true;render()">
+          ⚔️ Fashion Battle
+        </button>
+        <button class="fr-mode-btn" ontouchend="event.preventDefault();S.friendRatingMode=true;render()" onclick="S.friendRatingMode=true;render()">
+          👯 Friend's Fit Check
         </button>
       </div>` : ''}
     `}
     <div style="padding:0 20px;margin-top:16px;">
       <div class="info-box">
         <div class="info-box-icon">💡</div>
-        <div class="info-box-text">${isFriend
-          ? "A full-length photo works best. The rating won't be saved to your Closet — just share and go!"
+        <div class="info-box-text">${
+          isFriend ? "A full-length photo works best. The rating won't be saved to your Closet — just share and go!"
+          : isBattle ? 'Works best with a full-length photo where both outfits are clearly visible. Both looks are saved to your Closet after the verdict.'
           : 'For the best analysis, use a well-lit, full-length mirror selfie with your complete outfit visible.'}</div>
       </div>
     </div>
@@ -8130,8 +9089,9 @@ async function doSaveBattle() {
       id, createdAt: now, photo: bd.photo,
       items: (p.items||[]).map(it=>({ id:uid(), name:it.name||'', description:it.description||'', icon:it.icon||'👕', price:null })),
       rating: p.rating||7, ratingNote: p.ratingNote||'',
-      recommendations: p.recommendations||[],
-      shopQueries: p.shopQueries||[],
+      stylingTips: p.stylingTips||[],
+      purchaseRecs: (p.purchaseRecs||[]).map(r => typeof r === 'string' ? {item:r,reason:'',query:r} : r),
+      shopQueries: (p.purchaseRecs||[]).map(r => (r.query||r.item||r)).filter(Boolean),
       notes:'', timesWorn:0,
       battleId, battlePartnerId: partnerId,
       battleLabel: p.label||'', battleWon: won,
@@ -8175,7 +9135,7 @@ function viewFriendRating() {
   return `<div class="view view-notab">
     <div class="nav">
       <button class="nav-back" onclick="S.friendRating=null;S.friendRatingMode=false;clearPending();navigate(S.activeTab);">${iconBack()} Back</button>
-      <span class="nav-title">Friend Rating</span>
+      <span class="nav-title">Friend's Fit Check</span>
       <div style="width:72px"></div>
     </div>
 
@@ -8260,14 +9220,30 @@ function viewReview() {
       <div id="itemsList">${d.items.map((it,i)=>editItemHTML(it,i)).join('')}</div>
       <button class="add-item-btn" onclick="addItem()">${iconPlus()} Add Item</button>
     </div>
-    <div class="form-section">
-      <label class="form-label">Style Recommendations</label>
-      ${d.recommendations.slice(0,3).map((r,i)=>`
-        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">
-          <div class="rec-bullet">${i+1}</div>
-          <textarea class="form-textarea" style="min-height:64px;" oninput="S.draft.recommendations[${i}]=this.value">${esc(r)}</textarea>
+    ${(()=>{
+      const tips = d.stylingTips||[];
+      const buys = d.purchaseRecs||[];
+      let html = '';
+      if (tips.length) html += `<div class="form-section">
+        <label class="form-label">✂️ Styling Tips</label>
+        ${tips.map((r,i)=>`<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
+          <div class="rec-bullet" style="margin-top:2px;">${i+1}</div>
+          <div style="flex:1;font-size:13px;color:var(--text-2);line-height:1.5;">${esc(r)}</div>
         </div>`).join('')}
-    </div>
+      </div>`;
+      if (buys.length) html += `<div class="form-section">
+        <label class="form-label">🛒 Wish List Picks</label>
+        <p style="font-size:11px;color:var(--text-3);margin-bottom:8px;">Heart these after saving to add them to your Shop wish list.</p>
+        ${buys.map((r,i)=>`<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
+          <div class="rec-bullet" style="margin-top:2px;">${i+1}</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(r.item||r)}</div>
+            ${r.reason?`<div style="font-size:12px;color:var(--text-2);margin-top:1px;">${esc(r.reason)}</div>`:''}
+          </div>
+        </div>`).join('')}
+      </div>`;
+      return html;
+    })()}
     <div class="form-section">
       <label class="form-label">Personal Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
       <textarea class="form-textarea" id="notesInput" placeholder="How did you feel? Where did you wear this?">${esc(d.notes||'')}</textarea>
@@ -8664,25 +9640,55 @@ function viewDetail() {
         </div>`;
       })()}
 
-      ${entry.recommendations?.length?`
-        <div class="section">
-          <div class="section-title">Style Recommendations</div>
-          <div class="rec-list">${entry.recommendations.map((r,i)=>{
-            const reaction = entry.recReactions?.[r];
-            const isLiked = reaction === 'liked';
-            const isDismissed = reaction === 'dismissed';
-            return `<div class="rec-item" style="${isDismissed?'opacity:0.38;':''}">
-              <div class="rec-bullet">${i+1}</div>
-              <div class="rec-text" style="${isDismissed?'text-decoration:line-through;':''}">${esc(r)}</div>
-              <div style="display:flex;gap:4px;flex-shrink:0;margin-left:6px;">
-                <button onclick="event.stopPropagation();setRecReaction('${entry.id}',${i},'liked')"
-                  title="Save tip" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px;line-height:1;opacity:${isLiked?'1':'0.35'};transition:opacity .15s;">${isLiked?'♥':'♡'}</button>
-                <button onclick="event.stopPropagation();setRecReaction('${entry.id}',${i},'dismissed')"
-                  title="Dismiss" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;opacity:${isDismissed?'1':'0.35'};transition:opacity .15s;color:var(--text-3);">✕</button>
-              </div>
-            </div>`;
-          }).join('')}</div>
-        </div>`:''}
+      ${(()=>{
+        // Support both new stylingTips[] and legacy recommendations[]
+        const tips = entry.stylingTips?.length ? entry.stylingTips : (entry.recommendations||[]);
+        const buys = entry.purchaseRecs||[];
+        let html = '';
+        if (tips.length) {
+          html += `<div class="section">
+            <div class="section-title">✂️ Styling Tips</div>
+            <div class="rec-list">${tips.map((r,i)=>{
+              const reaction = entry.recReactions?.[String(i)];
+              const isLiked = reaction === 'liked';
+              const isDismissed = reaction === 'dismissed';
+              return `<div class="rec-item" style="${isDismissed?'opacity:0.38;':''}">
+                <div class="rec-text" style="${isDismissed?'text-decoration:line-through;':''};flex:1;">${esc(r)}</div>
+                <div style="display:flex;gap:4px;flex-shrink:0;margin-left:6px;">
+                  <button onclick="event.stopPropagation();setRecReaction('${entry.id}',${i},'liked')"
+                    title="Save tip" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px;line-height:1;opacity:${isLiked?'1':'0.35'};transition:opacity .15s;">${isLiked?'♥':'♡'}</button>
+                  <button onclick="event.stopPropagation();setRecReaction('${entry.id}',${i},'dismissed')"
+                    title="Dismiss" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;opacity:${isDismissed?'1':'0.35'};transition:opacity .15s;color:var(--text-3);">✕</button>
+                </div>
+              </div>`;
+            }).join('')}</div>
+          </div>`;
+        }
+        if (buys.length) {
+          html += `<div class="section">
+            <div class="section-title">🛒 Wish List Picks</div>
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Heart a pick to save it to your wish list in the Shop tab.</div>
+            <div class="rec-list">${buys.map((r,i)=>{
+              const pr = entry.purchaseReactions?.[String(i)];
+              const isLiked = pr === 'liked';
+              const isDismissed = pr === 'dismissed';
+              return `<div class="rec-item" style="${isDismissed?'opacity:0.38;':''}">
+                <div style="flex:1;${isDismissed?'text-decoration:line-through;':''}">
+                  <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(r.item||r)}</div>
+                  ${r.reason?`<div style="font-size:12px;color:var(--text-2);margin-top:2px;">${esc(r.reason)}</div>`:''}
+                </div>
+                <div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px;">
+                  <button onclick="event.stopPropagation();setPurchaseReaction('${entry.id}',${i},'liked')"
+                    title="Add to wish list" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px;line-height:1;opacity:${isLiked?'1':'0.35'};transition:opacity .15s;">${isLiked?'♥':'♡'}</button>
+                  <button onclick="event.stopPropagation();setPurchaseReaction('${entry.id}',${i},'dismissed')"
+                    title="Dismiss" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;opacity:${isDismissed?'1':'0.35'};transition:opacity .15s;color:var(--text-3);">✕</button>
+                </div>
+              </div>`;
+            }).join('')}</div>
+          </div>`;
+        }
+        return html;
+      })()}
 
       ${entry.shopResults?.length ? `
         <div class="section">
@@ -8770,14 +9776,29 @@ function viewEdit() {
       <div id="itemsList">${d.items.map((it,i)=>editItemHTML(it,i)).join('')}</div>
       <button class="add-item-btn" onclick="addItem()">${iconPlus()} Add Item</button>
     </div>
-    <div class="form-section">
-      <label class="form-label">Recommendations</label>
-      ${d.recommendations.map((r,i)=>`
-        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">
-          <div class="rec-bullet">${i+1}</div>
-          <textarea class="form-textarea" style="min-height:64px;" oninput="S.draft.recommendations[${i}]=this.value">${esc(r)}</textarea>
+    ${(()=>{
+      const tips = d.stylingTips||d.recommendations||[];
+      const buys = d.purchaseRecs||[];
+      let html = '';
+      if (tips.length) html += `<div class="form-section">
+        <label class="form-label">✂️ Styling Tips</label>
+        ${tips.map((r,i)=>`<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
+          <div class="rec-bullet" style="margin-top:2px;">${i+1}</div>
+          <div style="flex:1;font-size:13px;color:var(--text-2);line-height:1.5;">${esc(r)}</div>
         </div>`).join('')}
-    </div>
+      </div>`;
+      if (buys.length) html += `<div class="form-section">
+        <label class="form-label">🛒 Wish List Picks</label>
+        ${buys.map((r,i)=>`<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
+          <div class="rec-bullet" style="margin-top:2px;">${i+1}</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;">${esc(r.item||r)}</div>
+            ${r.reason?`<div style="font-size:12px;color:var(--text-2);margin-top:1px;">${esc(r.reason)}</div>`:''}
+          </div>
+        </div>`).join('')}
+      </div>`;
+      return html;
+    })()}
     <div class="form-section">
       <label class="form-label">Notes</label>
       <textarea class="form-textarea" id="notesInput" placeholder="How did you feel? Where did you wear this?">${esc(d.notes||'')}</textarea>
@@ -9344,6 +10365,74 @@ function receiptImageSelected(input) {
   reader.readAsDataURL(file);
 }
 
+// Called when user picks a photo of a wardrobe item
+function photoItemSelected(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    const comma = dataUrl.indexOf(',');
+    S.receiptFlow.imageData = dataUrl.slice(comma + 1);
+    S.receiptFlow.imageMime = file.type || 'image/jpeg';
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+
+// Analyze a photo of a clothing item with Claude — fills in wardrobe details
+async function analyzeItemPhoto() {
+  const rf = S.receiptFlow;
+  if (!rf?.imageData) { toast('Please add a photo first.'); return; }
+  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+
+  rf.step = 'parsing'; render();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: rf.imageMime, data: rf.imageData } },
+          { type: 'text', text: `You are a fashion expert. Look at this clothing item and return ONLY valid JSON — no markdown, no code fences, no commentary.
+
+{
+  "name": "Specific descriptive name, e.g. 'Navy Wool Blazer' or 'Ivory Linen Wide-Leg Trousers'",
+  "brand": "Brand name if visible on label, tag, or logo — otherwise empty string",
+  "category": "exactly one of: Tops, Jackets, Pants, Dresses, Shoes, Bags, Jewelry, Accessories, Other",
+  "icon": "single most fitting clothing emoji",
+  "description": "Color, material, fit, and notable details in 1-2 sentences"
+}` }
+        ]}]
+      }),
+    });
+
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('No JSON found');
+    const preview = JSON.parse(m[0]);
+
+    S.receiptFlow.preview = { ...preview, price: '', size: '', isNew: true, purchasedDate: '' };
+    S.receiptFlow.step = 'preview';
+    render();
+  } catch(e) {
+    console.error('analyzeItemPhoto error:', e);
+    S.receiptFlow.step = 'input';
+    render();
+    toast('Couldn\'t identify the item — try a clearer photo.');
+  }
+}
+
 // Parse the receipt screenshot (or pasted text) with Claude haiku
 async function parseReceipt() {
   const rf = S.receiptFlow;
@@ -9555,8 +10644,10 @@ async function doAnalyze() {
         items: (analysis.items||[]).map(it=>({ id:uid(), name:it.name||'', description:it.description||'', icon:it.icon||'👕', price:null })),
         rating: analysis.rating, ratingNote: analysis.ratingNote||'',
         confidence: null,
-        recommendations: analysis.recommendations||[],
-        shopQueries: analysis.shopQueries||[],
+        stylingTips: analysis.stylingTips||[],
+        purchaseRecs: (analysis.purchaseRecs||[]).map(r => typeof r === 'string' ? {item:r,reason:'',query:r} : r),
+        // Derive shopQueries from purchaseRecs for backward compat shopping fetch
+        shopQueries: (analysis.purchaseRecs||[]).map(r => (r.query||r.item||r)).filter(Boolean),
         notes:'', timesWorn:0,
         // Pre-set occasion from user's selection — skips tagOccasion() on save
         occasionTag: S.pendingOccasion || null,
