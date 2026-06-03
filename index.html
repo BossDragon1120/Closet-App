@@ -685,19 +685,19 @@ body {
 .add-item-btn:active { background: var(--gold-bg); }
 
 /* ── RATING PICKER ───────────────────────────────────────── */
-.rating-edit { display: flex; gap: 6px; flex-wrap: wrap; }
+.rating-edit { display: flex; gap: 3px; flex-wrap: nowrap; }
 .rating-btn {
-  width: 40px; height: 40px; border: 2px solid var(--border); border-radius: 10px;
-  background: var(--surface); font-size: 15px; font-weight: 700; color: var(--text-2);
+  flex: 1; min-width: 0; height: 34px; border: 1.5px solid var(--border); border-radius: 7px;
+  background: var(--surface); font-size: 12px; font-weight: 700; color: var(--text-2);
   cursor: pointer; transition: all .15s; display: flex; align-items: center;
-  justify-content: center; font-family: inherit;
+  justify-content: center; font-family: inherit; padding: 0;
 }
 .rating-btn.sel { background: var(--gold); border-color: var(--gold); color: #fff; }
 .conf-btn {
-  width: 40px; height: 40px; border: 2px solid var(--border); border-radius: 10px;
-  background: var(--surface); font-size: 15px; font-weight: 700; color: var(--text-2);
+  flex: 1; min-width: 0; height: 34px; border: 1.5px solid var(--border); border-radius: 7px;
+  background: var(--surface); font-size: 12px; font-weight: 700; color: var(--text-2);
   cursor: pointer; transition: all .15s; display: flex; align-items: center;
-  justify-content: center; font-family: inherit;
+  justify-content: center; font-family: inherit; padding: 0;
 }
 .conf-btn.sel { background: #4A8FA8; border-color: #4A8FA8; color: #fff; }
 
@@ -2205,7 +2205,7 @@ const S = {
   cycleLength:     parseInt(localStorage.getItem('closet-cycle-len') || '28'),
   cyclePeriodDays: parseInt(localStorage.getItem('closet-cycle-pdur') || '5'),
   battleDraft: null, // { photo, person1, person2, verdict, winner }
-  plan: { eventDesc: '', date: '', forecast: null, suggestions: null, loadingForecast: false, loadingSuggest: false },
+  plan: { soloMode: 'event', eventDesc: '', date: '', forecastLocation: '', forecast: null, suggestions: null, loadingForecast: false, loadingSuggest: false, tripDestination: '', tripDateStart: '', tripDateEnd: '', tripNotes: '', tripSuggestions: null, loadingTrip: false },
   newsFlash: null, // { headline, summary, url, source, fetchedAt }
   _newsFlashDismissed: false, // session-only dismiss flag
   purchasedQueries: new Set(JSON.parse(localStorage.getItem('closet-purchased') || '[]')),
@@ -3821,26 +3821,33 @@ function removeSquadMemberSlot(i) {
 }
 
 function confirmCreateSquad() {
-  const flow = S.squadFlow; if (!flow || flow.step !== 'create') return;
-  if (!flow.name.trim()) { toast('Give your event a name ✏️'); return; }
-  if (!flow.myName.trim()) { toast('What\'s your name?'); return; }
-  const myId = 'mem-' + Date.now();
-  const otherMembers = flow.memberNames.map(n=>n.trim()).filter(Boolean)
-    .map(n => blankMember('mem-'+Math.random().toString(36).slice(2,9), n, false));
-  const days = generateSquadDays(flow.dateStart, flow.dateEnd);
-  const plan = {
-    id: 'sq-'+Date.now(), name:flow.name.trim(), type:flow.type,
-    dateStart:flow.dateStart, dateEnd:flow.dateEnd,
-    vibe:flow.vibe.trim(), dressCode:flow.dressCode.trim(),
-    days,
-    members:[blankMember(myId, flow.myName.trim(), true), ...otherMembers],
-    myMemberId:myId, squadVibeChecks:{}, createdAt:new Date().toISOString(),
-  };
-  S.squadPlans.unshift(plan); saveSquadPlans();
-  S.squadFlow = null; S.selectedSquadId = plan.id;
-  S.squadActiveEventId = days[0]?.date || SQUAD_DEFAULT_EVT;
-  navigate('squad');
-  toast(`${getSquadType(plan.type).icon} "${plan.name}" created! Share with your squad.`);
+  // Dismiss keyboard on iOS before doing anything
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  try {
+    const flow = S.squadFlow; if (!flow || flow.step !== 'create') return;
+    if (!flow.name.trim()) { toast('Give your event a name ✏️'); return; }
+    if (!flow.myName.trim()) { toast('What\'s your name?'); return; }
+    const myId = 'mem-' + Date.now();
+    const otherMembers = flow.memberNames.map(n=>n.trim()).filter(Boolean)
+      .map(n => blankMember('mem-'+Math.random().toString(36).slice(2,9), n, false));
+    const days = generateSquadDays(flow.dateStart, flow.dateEnd);
+    const plan = {
+      id: 'sq-'+Date.now(), name:flow.name.trim(), type:flow.type,
+      dateStart:flow.dateStart, dateEnd:flow.dateEnd,
+      vibe:flow.vibe.trim(), dressCode:flow.dressCode.trim(),
+      days,
+      members:[blankMember(myId, flow.myName.trim(), true), ...otherMembers],
+      myMemberId:myId, squadVibeChecks:{}, createdAt:new Date().toISOString(),
+    };
+    S.squadPlans.unshift(plan); saveSquadPlans();
+    S.squadFlow = null; S.selectedSquadId = plan.id;
+    S.squadActiveEventId = days[0]?.date || SQUAD_DEFAULT_EVT;
+    navigate('squad');
+    toast(`${getSquadType(plan.type).icon} "${plan.name}" created! Share with your squad.`);
+  } catch(e) {
+    console.error('confirmCreateSquad error:', e);
+    toast('Something went wrong: ' + (e.message || 'unknown error'));
+  }
 }
 
 function confirmJoinSquad() {
@@ -4680,14 +4687,6 @@ function featuresMenuHTML() {
         </div>
         <button class="feat-close" onclick="S.featureMenuOpen=false;render()">✕</button>
       </div>
-      <div style="display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap;">
-        <button onclick="S.featureMenuOpen=false;switchTab('dashboard');" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);display:flex;align-items:center;gap:7px;justify-content:center;">
-          📊 Dashboard
-        </button>
-        <button onclick="S.featureMenuOpen=false;switchTab('settings');" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);display:flex;align-items:center;gap:7px;justify-content:center;">
-          ⚙️ Settings
-        </button>
-      </div>
       <div class="feat-body">
         ${sectionsHTML}
       </div>
@@ -5434,7 +5433,7 @@ function viewPlan() {
           ${(flow.dateStart && flow.dateEnd && flow.dateStart <= flow.dateEnd) ? `<div style="font-size:11px;color:var(--gold-dk);margin-top:4px;">✦ ${generateSquadDays(flow.dateStart,flow.dateEnd).length} day${generateSquadDays(flow.dateStart,flow.dateEnd).length===1?'':'s'} — each becomes a slot</div>` : ''}
         </div>
         <div class="form-group"><label class="form-label">Vibe / Theme</label>
-          <input class="form-input" placeholder='e.g. "White & Gold · Resort Luxe"' value="${esc(flow.vibe)}" oninput="S.squadFlow.vibe=this.value"></div>
+          <input class="form-input" placeholder='e.g. what are we --maxxing?' value="${esc(flow.vibe)}" oninput="S.squadFlow.vibe=this.value"></div>
         <div class="form-group"><label class="form-label">Dress Code <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
           <input class="form-input" placeholder='e.g. "All white, no exceptions"' value="${esc(flow.dressCode)}" oninput="S.squadFlow.dressCode=this.value"></div>
         <div class="form-group"><label class="form-label">Your Name</label>
@@ -5443,7 +5442,7 @@ function viewPlan() {
           ${memberInputs}
           <button onclick="addSquadMemberSlot()" style="width:100%;padding:8px;border:1.5px dashed var(--border);border-radius:var(--r-sm);background:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:2px;">+ Add Member</button>
         </div>
-        <button onclick="confirmCreateSquad()" class="btn btn-primary" style="margin:4px 0 0;width:100%;">Create Squad Plan</button>
+        <button onclick="confirmCreateSquad()" ontouchend="event.preventDefault();confirmCreateSquad()" class="btn btn-primary" style="margin:4px 0 0;width:100%;touch-action:manipulation;">Create Squad Plan</button>
       </div>`;
     }
 
@@ -5534,7 +5533,9 @@ function viewPlan() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">Plan</span>
-      <span></span>
+      <button onclick="toast('Find a Stylist coming soon ✨')" style="display:flex;align-items:center;gap:5px;background:none;border:1.5px solid var(--border);border-radius:100px;padding:5px 13px;font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;white-space:nowrap;">
+        + Find Stylist
+      </button>
     </div>
 
     <div class="plan-hero">
@@ -5555,57 +5556,177 @@ function viewPlan() {
     ${planMode === 'group' ? `
       <div style="padding:0 16px 16px;">${squadSectionHTML}</div>
     ` : `
-      <div class="plan-card">
-        <div class="plan-card-title">Describe your event</div>
-        <textarea class="plan-textarea" id="planEventDesc" rows="3"
-          placeholder="e.g. rooftop birthday dinner next Saturday, or job interview at a creative agency…"
-          oninput="S.plan.eventDesc=this.value">${esc(p.eventDesc)}</textarea>
-      </div>
-
-      <div class="plan-card">
-        <div class="plan-card-title">Weather forecast (optional)</div>
-        <div class="plan-date-row">
-          <input class="plan-date-input" type="date" id="planDate" value="${p.date || today}"
-            min="${today}" oninput="S.plan.date=this.value">
-          <button class="btn btn-secondary" style="margin:0;padding:10px 16px;font-size:13px;white-space:nowrap;"
-            onclick="doGetForecast()" ${p.loadingForecast?'disabled':''}>
-            ${p.loadingForecast ? '…' : '📍 Get Forecast'}
-          </button>
-        </div>
-        ${forecastSection}
-        <div style="font-size:12px;color:var(--text-3);margin-top:8px;">Requires location permission · Uses Open-Meteo (free)</div>
-      </div>
-
-      <div style="padding:0 20px 20px;">
-        <button class="btn btn-primary" onclick="doSuggestOutfits()" style="margin:0;"
-          ${p.loadingSuggest||!p.eventDesc.trim()?'disabled opacity:.55':''}>
-          ${p.loadingSuggest ? '✨ Claude is thinking…' : '✨ Suggest Outfits'}
+      <!-- Solo sub-toggle: Event | Trip -->
+      <div style="display:flex;gap:8px;padding:0 16px 16px;">
+        <button onclick="S.plan.soloMode='event';render()" style="flex:1;padding:9px 0;border-radius:var(--r-sm);border:2px solid ${p.soloMode!=='trip'?'var(--gold)':'var(--border)'};background:${p.soloMode!=='trip'?'var(--gold-bg)':'var(--surface)'};color:${p.soloMode!=='trip'?'var(--gold-dk)':'var(--text-2)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;">
+          🗓️ Event
+        </button>
+        <button onclick="S.plan.soloMode='trip';render()" style="flex:1;padding:9px 0;border-radius:var(--r-sm);border:2px solid ${p.soloMode==='trip'?'var(--gold)':'var(--border)'};background:${p.soloMode==='trip'?'var(--gold-bg)':'var(--surface)'};color:${p.soloMode==='trip'?'var(--gold-dk)':'var(--text-2)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;">
+          ✈️ Trip
         </button>
       </div>
 
-      ${carouselHTML}
+      ${p.soloMode === 'trip' ? `
+        <!-- TRIP MODE -->
+        <div class="plan-card">
+          <div class="plan-card-title">Where are you going?</div>
+          <input class="form-input" style="margin-bottom:12px;" placeholder="e.g. Paris, Tokyo, New York…"
+            value="${esc(p.tripDestination)}" oninput="S.plan.tripDestination=this.value">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Dates (optional)</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+            <input class="form-input" type="date" style="margin:0;flex:1;" value="${esc(p.tripDateStart)}" oninput="S.plan.tripDateStart=this.value">
+            <span style="font-size:12px;color:var(--text-3);flex-shrink:0;">to</span>
+            <input class="form-input" type="date" style="margin:0;flex:1;" value="${esc(p.tripDateEnd)}" oninput="S.plan.tripDateEnd=this.value">
+          </div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">What's on the agenda? <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
+          <textarea class="plan-textarea" rows="2" placeholder="e.g. museum visits, rooftop dinners, beach day…"
+            oninput="S.plan.tripNotes=this.value">${esc(p.tripNotes)}</textarea>
+        </div>
+        <div style="padding:0 20px 20px;">
+          <button class="btn btn-primary" style="margin:0;" onclick="doSuggestTripOutfits()"
+            ${p.loadingTrip||!p.tripDestination.trim()?'disabled opacity:.55':''}>
+            ${p.loadingTrip ? '✨ Planning your trip…' : '✈️ Plan My Trip Outfits'}
+          </button>
+        </div>
+        ${p.tripSuggestions ? `
+          <div style="padding:0 20px 6px;display:flex;align-items:baseline;justify-content:space-between;">
+            <div style="font-size:13px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em;">Day-by-Day Plan</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;padding:0 16px 20px;">
+            ${p.tripSuggestions.map((s,i) => `
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+                <div style="background:var(--gold-bg);padding:10px 14px;border-bottom:1px solid var(--border);">
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);">${esc(s.day||('Day '+(i+1)))}${s.date?' · '+new Date(s.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):''}</div>
+                  ${s.occasion?`<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:2px;">${esc(s.occasion)}</div>`:''}
+                </div>
+                <div style="padding:12px 14px;">
+                  <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+                    ${(s.items||[]).map(it=>`<span style="background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--text-2);">${esc(it)}</span>`).join('')}
+                  </div>
+                  ${s.reasoning?`<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:6px;">${esc(s.reasoning)}</div>`:''}
+                  ${s.packingTip?`<div style="font-size:11px;color:var(--gold-dk);font-weight:600;">💡 ${esc(s.packingTip)}</div>`:''}
+                </div>
+              </div>`).join('')}
+          </div>` : ''}
+      ` : `
+        <!-- EVENT MODE -->
+        <div class="plan-card">
+          <div class="plan-card-title">Describe your event</div>
+          <textarea class="plan-textarea" id="planEventDesc" rows="3"
+            placeholder="e.g. rooftop birthday dinner next Saturday, or job interview at a creative agency…"
+            oninput="S.plan.eventDesc=this.value">${esc(p.eventDesc)}</textarea>
+        </div>
 
-      ${S.entries.length === 0 && S.wardrobe.length === 0 ? `
-        <div class="empty" style="padding-top:20px;">
-          <div class="empty-icon">👗</div>
-          <h2>Add outfits first</h2>
-          <p>Log a few outfits to your Closet and Claude will have something to work with!</p>
-        </div>` : ''}
+        <div class="plan-card">
+          <div class="plan-card-title">Weather forecast <span style="font-size:11px;font-weight:400;color:var(--text-3);">(optional)</span></div>
+          <input class="form-input" style="margin-bottom:10px;"
+            placeholder="City or location"
+            value="${esc(p.forecastLocation || S.profileLocation || '')}"
+            oninput="S.plan.forecastLocation=this.value">
+          <div class="plan-date-row">
+            <input class="plan-date-input" type="date" id="planDate" value="${p.date || today}"
+              min="${today}" oninput="S.plan.date=this.value">
+            <button class="btn btn-secondary" style="margin:0;padding:10px 16px;font-size:13px;white-space:nowrap;touch-action:manipulation;"
+              onclick="doGetForecast()" ${p.loadingForecast?'disabled':''}>
+              ${p.loadingForecast ? '…' : '🌤 Get Forecast'}
+            </button>
+          </div>
+          ${forecastSection}
+        </div>
+
+        <div style="padding:0 20px 20px;">
+          <button class="btn btn-primary" onclick="doSuggestOutfits()" style="margin:0;touch-action:manipulation;"
+            ${p.loadingSuggest||!p.eventDesc.trim()?'disabled opacity:.55':''}>
+            ${p.loadingSuggest ? '✨ Claude is thinking…' : '✨ Suggest Outfits'}
+          </button>
+        </div>
+
+        ${carouselHTML}
+
+        ${S.entries.length === 0 && S.wardrobe.length === 0 ? `
+          <div class="empty" style="padding-top:20px;">
+            <div class="empty-icon">👗</div>
+            <h2>Add outfits first</h2>
+            <p>Log a few outfits to your Closet and Claude will have something to work with!</p>
+          </div>` : ''}
+      `}
     `}
 
     <div style="height:30px"></div>
   </div>`;
 }
 
+async function geocodeLocation(name) {
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`;
+    const r = await fetch(url); if (!r.ok) return null;
+    const data = await r.json();
+    if (!data.results?.length) return null;
+    const { latitude: lat, longitude: lon, name: place, country_code } = data.results[0];
+    return { lat, lon, label: place };
+  } catch { return null; }
+}
+
 async function doGetForecast() {
   const dateStr = S.plan.date || new Date().toISOString().slice(0,10);
+  const locName = (S.plan.forecastLocation || S.profileLocation || '').trim();
   S.plan.loadingForecast = true; S.plan.forecast = null; render();
   try {
-    const result = await fetchForecastWeather(dateStr);
-    S.plan.forecast = result;
-    if (!result) toast('📍 Could not fetch forecast — check location permission');
-  } catch { toast('📍 Location access needed for forecast'); }
+    let lat, lon;
+    if (locName) {
+      const geo = await geocodeLocation(locName);
+      if (!geo) { toast('City not found — try a different name'); S.plan.loadingForecast = false; render(); return; }
+      lat = geo.lat; lon = geo.lon;
+    } else {
+      // Fallback to GPS if no location text
+      const pos = await getLocation();
+      lat = pos.coords.latitude; lon = pos.coords.longitude;
+    }
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&daily=temperature_2m_max,temperature_2m_min,weather_code&temperature_unit=fahrenheit&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`;
+    const r = await fetch(url);
+    if (!r.ok) { toast('Forecast unavailable — try again'); S.plan.loadingForecast = false; render(); return; }
+    const data = await r.json();
+    const hi   = Math.round(data.daily?.temperature_2m_max?.[0] ?? 999);
+    const lo   = Math.round(data.daily?.temperature_2m_min?.[0] ?? 999);
+    const code = data.daily?.weather_code?.[0] ?? 0;
+    S.plan.forecast = hi === 999 ? null : { hi, lo, condition: weatherCodeToLabel(code), icon: weatherCodeToIcon(code) };
+    if (!S.plan.forecast) toast('No forecast data for that date');
+  } catch(e) { toast('Forecast error — check your connection'); }
   S.plan.loadingForecast = false; render();
+}
+
+async function doSuggestTripOutfits() {
+  const dest = S.plan.tripDestination.trim();
+  if (!dest) { toast('Enter a destination ✈️'); return; }
+  if (!S.apiKey.trim()) { navigate('settings'); toast('Add your API key first!'); return; }
+  const ds = S.plan.tripDateStart; const de = S.plan.tripDateEnd;
+  const days = (ds && de && ds <= de) ? generateSquadDays(ds, de) : [];
+  const numDays = days.length || 3;
+  S.plan.loadingTrip = true; S.plan.tripSuggestions = null; render();
+  try {
+    const wItems = S.wardrobe.filter(w=>!w.retiredFromCloset).slice(0,40)
+      .map(w=>`${w.icon||''}${w.name}${w.brand?' ('+w.brand+')':''}`).join(', ');
+    const dayList = days.length ? days.map((d,i)=>`Day ${i+1}: ${d.date}`).join(', ') : `${numDays} days`;
+    const prompt = `You are a personal stylist planning a trip wardrobe.
+Destination: ${dest}${ds?' | Dates: '+ds+(de&&de!==ds?' to '+de:''):''}
+${S.plan.tripNotes ? 'Agenda/activities: '+S.plan.tripNotes : ''}
+${days.length ? 'Day breakdown: '+dayList : 'Trip length: ~'+numDays+' days'}
+Wardrobe available: ${wItems||'not specified — suggest versatile pieces'}
+
+Plan ${Math.min(numDays,7)} outfit${numDays>1?'s':''}, one per day. Maximise re-use of pieces across days.
+Return ONLY a JSON array: [{"day":"Day 1","date":"${ds||''}","occasion":"Arrival / exploring","items":["White linen shirt","Dark jeans","White sneakers"],"reasoning":"Comfortable for travel, versatile for dinner","packingTip":"This shirt doubles as beachwear tomorrow"}]`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'x-api-key':S.apiKey,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:2000, messages:[{role:'user',content:prompt}] })
+    });
+    const data = await resp.json();
+    const txt = data.content?.[0]?.text || '';
+    const match = txt.match(/\[[\s\S]*\]/);
+    S.plan.tripSuggestions = match ? JSON.parse(match[0]).slice(0,7) : null;
+    if (!S.plan.tripSuggestions) toast('Could not parse trip plan — try again');
+  } catch(e) { console.error(e); toast('Trip planning failed — try again'); }
+  S.plan.loadingTrip = false; render();
 }
 
 async function doSuggestOutfits() {
@@ -5683,14 +5804,23 @@ function viewProfile() {
 
   // ── Style score ────────────────────────────────────────────
   const avgRating = styleScore(S.entries) || '—';
+  const scoreNum  = parseFloat(avgRating);
+  const circumference = 251.3; // 2π × r40
+  const ringProgress  = (!isNaN(scoreNum)) ? scoreNum / 10 : 0;
+  const ringOffset    = circumference * (1 - ringProgress);
+  const scoreTier = isNaN(scoreNum) ? null
+    : scoreNum >= 9.0 ? { label: 'Iconic',       sub: 'You\'re dressing at your absolute peak.' }
+    : scoreNum >= 8.0 ? { label: 'Exceptional',   sub: 'Your style is refined and intentional.' }
+    : scoreNum >= 7.0 ? { label: 'Polished',       sub: 'Strong presence with room to elevate.' }
+    : scoreNum >= 6.0 ? { label: 'Developing',     sub: 'Your style story is taking shape.' }
+    :                   { label: 'Building',        sub: 'Every outfit logged moves you forward.' };
+  const totalRatedOutfits = S.entries.filter(e => e.rating != null).length;
 
 
-  // ── Profile chips ─────────────────────────────────────────
+  // ── Profile chips (location + generation only — no aura fields) ──
   const chips = [
     S.profileLocation   ? { icon:'📍', label: S.profileLocation }   : null,
     S.profileGeneration ? { icon:'🎂', label: S.profileGeneration.split(' ').slice(0,2).join(' ') } : null,
-    S.profileZodiac     ? { icon:'⭐', label: S.profileZodiac }      : null,
-    S.profileMBTI       ? { icon:'🧠', label: S.profileMBTI }       : null,
   ].filter(Boolean);
   const chipsHTML = chips.length
     ? `<div class="about-me-chip-row">${chips.map(c=>`<div class="about-me-chip">${c.icon} ${esc(c.label)}</div>`).join('')}</div>`
@@ -5906,17 +6036,21 @@ function viewProfile() {
         style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;"
         loading="eager"
         onerror="this.style.display='none'">
-      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.04) 0%,rgba(0,0,0,0.6) 100%);"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.04) 0%,rgba(0,0,0,0.65) 100%);"></div>
+      <!-- Name + location pin bottom-left -->
       <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 16px 16px;">
         <div style="min-width:0;padding-bottom:2px;">
           <div style="font-size:22px;font-weight:900;letter-spacing:-.3px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5);margin-bottom:2px;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
-          ${S.profileStyleWords ? `<div style="font-size:11px;color:rgba(255,255,255,.8);line-height:1.4;margin-bottom:5px;">${esc(S.profileStyleWords.length>60?S.profileStyleWords.slice(0,60)+'…':S.profileStyleWords)}</div>` : ''}
-          ${chips.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;">${chips.map(c=>`<div style="background:rgba(255,255,255,.18);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:100px;padding:3px 9px;font-size:10px;font-weight:600;color:#fff;">${c.icon} ${esc(c.label)}</div>`).join('')}</div>` : ''}
+          ${S.profileStyleWords ? `<div style="font-size:11px;color:rgba(255,255,255,.75);line-height:1.4;margin-bottom:5px;">${esc(S.profileStyleWords.length>60?S.profileStyleWords.slice(0,60)+'…':S.profileStyleWords)}</div>` : ''}
+          <div style="font-size:10px;font-weight:600;color:rgba(255,255,255,.6);">📍 ${esc(S.profileLocation)}</div>
         </div>
       </div>
-      <div style="position:absolute;top:10px;right:10px;">
-        <div style="background:rgba(0,0,0,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:100px;padding:4px 10px;font-size:10px;font-weight:700;color:rgba(255,255,255,.9);">📍 ${esc(S.profileLocation)}</div>
-      </div>
+      <!-- Style score overlay top-right -->
+      ${avgRating !== '—' ? `
+      <div style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,.32);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:12px;padding:8px 12px;text-align:center;border:1px solid rgba(255,255,255,.12);">
+        <div style="font-size:22px;font-weight:900;color:#fff;line-height:1;letter-spacing:-.5px;">${avgRating}</div>
+        ${scoreTier ? `<div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.04em;margin-top:2px;white-space:nowrap;">${scoreTier.label}</div>` : ''}
+      </div>` : ''}
     </div>` : null;
 
   function profileSection(title, content) {
@@ -5926,7 +6060,7 @@ function viewProfile() {
     </div>`;
   }
 
-  return `<div class="view">
+  const html = `<div class="view">
     <div class="nav">
       <span class="nav-logo">Me</span>
       <button onclick="switchTab('settings')" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:5px 13px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;">Settings</button>
@@ -5953,33 +6087,29 @@ function viewProfile() {
     ${likedRecsHTML}
     ${likedRecsHTML ? `<div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
 
-    <!-- Stats row: style score + streak -->
-    <div style="display:flex;gap:10px;padding:0 16px 20px;">
-      <div style="flex:1;background:var(--surface);border-radius:12px;padding:12px 14px;border:1px solid var(--border);text-align:center;">
-        <div style="font-size:26px;font-weight:900;color:var(--gold);letter-spacing:-.5px;">${avgRating}</div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:2px;">Style Score</div>
+    <!-- Dashboard tile -->
+    <div onclick="openStatsDash()" style="margin:0 16px 24px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;" ontouchstart="this.style.background='var(--surface-2)'" ontouchend="this.style.background='var(--surface)'">
+      <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,${colors.bg1},${colors.bg2});border:1px solid ${colors.accent}33;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="15" width="4" height="7" rx="1.5" fill="${colors.accent}" opacity=".4"/>
+          <rect x="8" y="10" width="4" height="12" rx="1.5" fill="${colors.accent}" opacity=".7"/>
+          <rect x="14" y="5" width="4" height="17" rx="1.5" fill="${colors.accent}"/>
+          <path d="M21 2.5l.4 1.1 1.1.4-1.1.4L21 5.7l-.4-1.1-1.1-.4 1.1-.4z" fill="${colors.accent}"/>
+        </svg>
       </div>
-      <div style="flex:2;background:var(--surface);border-radius:12px;padding:12px 14px;border:1px solid var(--border);">
-        ${streakHTML}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">Your Stats</div>
+        <div style="font-size:12px;color:var(--text-3);">Brands · Streak · Most worn · Activities</div>
       </div>
-    </div>
-
-    ${mostWornHTML ? `<div style="padding:0 16px 20px;">${mostWornHTML}</div><div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
-
-    ${profileSection('Brand Affinity', brandsHTML)}
-    <div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>
-    ${profileSection('Top Activities', activitiesHTML)}
-    <div style="height:1px;background:var(--border);margin:0 16px 24px;"></div>
-
-    <!-- YOUR AURA -->
-    <div style="padding:0 16px;margin-bottom:6px;">
-      <div style="font-size:18px;font-weight:900;letter-spacing:-.3px;color:var(--text);margin-bottom:3px;">✦ Your Aura</div>
-      <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;line-height:1.5;">The details that make you, <em>you</em> — beyond just the clothes.</div>
-      ${auraGrid}
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;opacity:.3;"><path d="M6 3l5 5-5 5" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
 
     <div style="height:40px;"></div>
   </div>`;
+
+  // Attach bottom sheet data for openStatsDash() to reference
+  viewProfile._dashData = { streak, brandsHTML, mostWornHTML, activitiesHTML };
+  return html;
 }
 
 /* ================================================================
@@ -8107,27 +8237,32 @@ function viewReview() {
       <img style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;border-radius:var(--r);display:block;" src="${d.photo}" alt="Outfit">
     </div>
     <div class="form-section">
-      <label class="form-label">Style Rating</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label class="form-label" style="margin:0;">Style Rating</label>
+        ${d.rating ? `<span style="font-size:17px;font-weight:900;color:var(--gold);letter-spacing:-.3px;">${d.rating}<span style="font-size:11px;font-weight:600;opacity:.55;"> / 10</span></span>` : ''}
+      </div>
       <div class="rating-edit" id="ratingPicker">
         ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="rating-btn${d.rating===n?' sel':''}" onclick="setRating(${n})">${n}</button>`).join('')}
       </div>
       ${d.ratingNote?`<p style="font-size:13px;color:var(--text-2);margin-top:10px;font-style:italic;line-height:1.5;">"${esc(d.ratingNote)}"</p>`:''}
     </div>
     <div class="form-section">
-      <label class="form-label">Confidence Score</label>
-      <p style="font-size:12px;color:var(--text-3);margin-bottom:10px;">How did you feel wearing this? 1 = uncomfortable, 10 = absolutely yourself</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label class="form-label" style="margin:0;">Confidence</label>
+        ${d.confidence ? `<span style="font-size:17px;font-weight:900;color:#4A8FA8;letter-spacing:-.3px;">${d.confidence}<span style="font-size:11px;font-weight:600;opacity:.55;"> / 10</span></span>` : ''}
+      </div>
       <div class="rating-edit" id="confPicker">
         ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="conf-btn${(d.confidence||null)===n?' sel':''}" onclick="setConfidence(${n})">${n}</button>`).join('')}
       </div>
     </div>
     <div class="form-section">
-      <label class="form-label">Items in This Outfit</label>
+      <label class="form-label">Items</label>
       <div id="itemsList">${d.items.map((it,i)=>editItemHTML(it,i)).join('')}</div>
       <button class="add-item-btn" onclick="addItem()">${iconPlus()} Add Item</button>
     </div>
     <div class="form-section">
       <label class="form-label">Style Recommendations</label>
-      ${d.recommendations.map((r,i)=>`
+      ${d.recommendations.slice(0,3).map((r,i)=>`
         <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">
           <div class="rec-bullet">${i+1}</div>
           <textarea class="form-textarea" style="min-height:64px;" oninput="S.draft.recommendations[${i}]=this.value">${esc(r)}</textarea>
@@ -8896,18 +9031,14 @@ function viewSettings() {
    SHARED: EDIT ITEM CARD
    ================================================================ */
 function editItemHTML(it, i) {
-  return `<div class="edit-item-card" id="item-card-${i}">
-    <div class="edit-item-header">
-      <span class="edit-item-emoji">${it.icon||'👕'}</span>
-      <span class="edit-item-num">Item ${i+1}</span>
-      <button class="edit-item-del" onclick="removeItem(${i})">✕</button>
+  return `<div class="edit-item-card" id="item-card-${i}" style="padding:10px 12px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:22px;line-height:1;flex-shrink:0;">${it.icon||'👕'}</span>
+      <input class="form-input" placeholder="Item name…" value="${esc(it.name)}" oninput="S.draft.items[${i}].name=this.value" style="flex:1;margin:0;font-size:14px;font-weight:600;">
+      <button class="edit-item-del" onclick="removeItem(${i})" style="flex-shrink:0;">✕</button>
     </div>
-    <div class="form-group"><label class="form-label">Name</label>
-      <input class="form-input" placeholder="e.g. White Linen Button-Down" value="${esc(it.name)}" oninput="S.draft.items[${i}].name=this.value">
-    </div>
-    <div class="form-group"><label class="form-label">Description</label>
-      <textarea class="form-textarea" placeholder="Color, cut, style details..." oninput="S.draft.items[${i}].description=this.value">${esc(it.description||'')}</textarea>
-    </div>
+    <!-- description preserved for Claude context, hidden from view -->
+    <textarea style="display:none;" oninput="S.draft.items[${i}].description=this.value">${esc(it.description||'')}</textarea>
   </div>`;
 }
 
@@ -10048,6 +10179,55 @@ function doExport() {
   const blob = new Blob([JSON.stringify({ exportDate:new Date().toISOString(), entries:S.entries, wardrobe:S.wardrobe }, null, 2)], { type:'application/json' });
   const a = Object.assign(document.createElement('a'), { href:URL.createObjectURL(blob), download:`closet-backup-${new Date().toISOString().slice(0,10)}.json` });
   a.click(); URL.revokeObjectURL(a.href);
+}
+
+function openStatsDash() {
+  const d = viewProfile._dashData || {};
+  const { streak = 0, brandsHTML = '', mostWornHTML = '', activitiesHTML = '' } = d;
+  const el = document.createElement('div');
+  el.id = 'stats-dash-overlay';
+  el.style.cssText = 'position:fixed;inset:0;z-index:300;';
+  el.innerHTML = `
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);" onclick="document.getElementById('stats-dash-overlay')?.remove()"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;background:var(--bg);border-radius:22px 22px 0 0;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(28px + var(--safe-b));">
+      <div style="width:36px;height:4px;background:var(--border);border-radius:100px;margin:14px auto 0;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;">
+        <div style="font-size:18px;font-weight:900;color:var(--text);">Your Stats</div>
+        <button onclick="document.getElementById('stats-dash-overlay')?.remove()" style="background:var(--surface);border:1px solid var(--border);border-radius:100px;width:30px;height:30px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-2);touch-action:manipulation;">✕</button>
+      </div>
+
+      <!-- Streak -->
+      <div style="padding:0 20px 16px;">
+        <div style="background:var(--surface);border-radius:14px;padding:14px 16px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:4px;">Day Streak</div>
+            <div style="font-size:28px;font-weight:900;color:var(--text);line-height:1;">${streak}<span style="font-size:14px;font-weight:600;opacity:.5;margin-left:3px;">${streak===1?'day':'days'}</span></div>
+          </div>
+          <div style="font-size:36px;line-height:1;">${streak>=7?'🔥':streak>=3?'✨':'📅'}</div>
+        </div>
+      </div>
+
+      <!-- Top Brands -->
+      <div style="padding:0 20px 20px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Top Brands</div>
+        ${brandsHTML}
+      </div>
+      <div style="height:1px;background:var(--border);margin:0 20px 20px;"></div>
+
+      <!-- Most Worn -->
+      ${mostWornHTML ? `<div style="padding:0 20px 20px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Most Worn</div>
+        ${mostWornHTML}
+      </div>
+      <div style="height:1px;background:var(--border);margin:0 20px 20px;"></div>` : ''}
+
+      <!-- Top Activities -->
+      <div style="padding:0 20px 20px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Top Activities</div>
+        ${activitiesHTML}
+      </div>
+    </div>`;
+  document.body.appendChild(el);
 }
 
 function showDeleteConfirm(id) {
