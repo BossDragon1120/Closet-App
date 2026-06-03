@@ -345,18 +345,14 @@ body {
 .rod-track::-webkit-scrollbar { display: none; }
 .rod-items-inner {
   display: inline-flex; align-items: flex-start; gap: 6px;
-  min-width: max-content; padding-top: 10px;
+  min-width: max-content; padding-top: 2px;
 }
 .hanger {
   display: flex; flex-direction: column; align-items: center;
   cursor: pointer; width: 76px; flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
 }
-.hanger-peg {
-  width: 2.5px; height: 18px;
-  background: linear-gradient(180deg, #C8A050 0%, #7A5018 100%);
-  border-radius: 0 0 2px 2px;
-}
+.hanger-peg { display: none; } /* replaced by inline SVG hanger */
 .hanger-card {
   width: 100%; background: var(--surface);
   border: 1px solid var(--border); border-radius: 10px;
@@ -2627,21 +2623,47 @@ Respond with ONLY a JSON object — no markdown, no preamble:
         messages: [{ role: 'user', content: prompt }],
       }),
     });
-    if (!resp.ok) throw new Error(`API ${resp.status}`);
-    const data = await resp.json();
+    // If haiku-4-5 isn't available, retry with the known-stable haiku-3-5
+    let resp2 = resp;
+    if (resp.status === 400 || resp.status === 404) {
+      const errBody = await resp.json().catch(() => ({}));
+      if (/model/i.test(errBody?.error?.message || '')) {
+        resp2 = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': key,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-3-5-20241022', max_tokens: 300,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+      } else {
+        throw new Error(errBody?.error?.message || `API error ${resp.status}`);
+      }
+    }
+    if (!resp2.ok) {
+      const errBody = await resp2.json().catch(() => ({}));
+      const msg = errBody?.error?.message || `API error ${resp2.status}`;
+      throw new Error(msg);
+    }
+    const data = await resp2.json();
     let text = (data.content?.[0]?.text || '').trim()
       .replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/i,'').trim();
     const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('Bad response');
+    if (!m) throw new Error('Bad response format');
     const parsed = JSON.parse(m[0]);
-    if (!parsed.headline || !parsed.body) throw new Error('Missing fields');
+    if (!parsed.headline || !parsed.body) throw new Error('Missing fields in response');
 
     S.stylePersona = { headline: parsed.headline, body: parsed.body, ts: Date.now() };
     localStorage.setItem('closet-persona', JSON.stringify(S.stylePersona));
     toast('Style portrait updated ✨');
   } catch(e) {
-    console.error('generateStylePersona', e);
-    toast('Could not generate portrait — try again.');
+    console.error('generateStylePersona error:', e);
+    toast('Portrait failed: ' + (e.message || 'Unknown error'));
   }
   S.personaLoading = false;
   render();
@@ -2836,6 +2858,11 @@ function hashStr(str) {
   return Math.abs(h) % 99991;
 }
 
+function pollinationsLocationBannerUrl(location) {
+  const prompt = `Cinematic wide-angle landscape photograph of ${location}, golden hour warm light, beautiful city architecture and skyline, travel photography style, ultra detailed, vibrant colors, no people, no text`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=320&model=flux&nologo=true&seed=${hashStr(location)}`;
+}
+
 function pollinationsFashionPortraitUrl(persona, seed) {
   // Use persona text directly so the portrait reflects the actual style description
   const headline = (persona.headline || '').trim();
@@ -2890,12 +2917,46 @@ function saveHairstyle(val) {
   S.hairstyle = val.trim();
   localStorage.setItem('closet-hairstyle', S.hairstyle); fsSet('hairstyle', S.hairstyle);
 }
+
+// Order of aura fields for auto-advance after save
+const AURA_FIELD_ORDER = [
+  { field: 'profileZodiac',      val: () => S.profileZodiac },
+  { field: 'profileMBTI',        val: () => S.profileMBTI },
+  { field: 'profileHeight',      val: () => S.profileHeight },
+  { field: 'braSize',            val: () => S.braSize },
+  { field: 'profileWeight',      val: () => S.profileWeight },
+  { field: 'signatureNailColor', val: () => S.signatureNailColor },
+  { field: 'signatureScent',     val: () => S.signatureScent },
+  { field: 'hairstyle',          val: () => S.hairstyle },
+];
+// Ghost-click guard: prevent display card from re-opening immediately after save
+let _auraClickLockUntil = 0;
+
+function nextUnfilledAuraField(currentField) {
+  const idx = AURA_FIELD_ORDER.findIndex(f => f.field === currentField);
+  for (let i = 1; i < AURA_FIELD_ORDER.length; i++) {
+    const next = AURA_FIELD_ORDER[(idx + i) % AURA_FIELD_ORDER.length];
+    if (!next.val()?.trim()) return next.field;
+  }
+  return null; // all filled
+}
+
 function saveAuraField(field, localKey, val) {
-  if (field === 'signatureScent') { saveSignatureScent(val); S._auraEdit = null; render(); return; }
-  if (field === 'hairstyle')      { saveHairstyle(val);      S._auraEdit = null; render(); return; }
-  S[field] = val.trim();
-  localStorage.setItem(localKey, S[field]); fsSet(field, S[field]);
-  S._auraEdit = null; render();
+  if (field === 'signatureScent') saveSignatureScent(val);
+  else if (field === 'hairstyle') saveHairstyle(val);
+  else { S[field] = val.trim(); localStorage.setItem(localKey, S[field]); fsSet(field, S[field]); }
+  // Lock display cards against ghost taps for 400ms after save
+  _auraClickLockUntil = Date.now() + 400;
+  // Auto-advance to next unfilled field
+  S._auraEdit = nextUnfilledAuraField(field);
+  render();
+  // Focus the next field's input if there is one
+  if (S._auraEdit) {
+    setTimeout(() => {
+      const el = document.getElementById(`aura-${S._auraEdit}`);
+      if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    }, 60);
+  }
 }
 function startRetireScent() {
   S._aboutMeRetiring = 'scent'; render();
@@ -4137,13 +4198,18 @@ function viewSquadDetail() {
 }
 
 const FASHION_RSS_FEEDS = [
-  { url: 'https://www.vogue.com/feed/rss',            source: 'Vogue' },
-  { url: 'https://www.harpersbazaar.com/rss/all.xml', source: "Harper's Bazaar" },
-  { url: 'https://wwd.com/feed/',                     source: 'WWD' },
-  { url: 'https://www.whowhatwear.com/rss',           source: 'Who What Wear' },
-  { url: 'https://www.elle.com/rss/all.xml',          source: 'Elle' },
-  { url: 'https://fashionista.com/rss',               source: 'Fashionista' },
-  { url: 'https://www.refinery29.com/rss.xml',        source: 'Refinery29' },
+  { url: 'https://www.vogue.com/feed/rss',                    source: 'Vogue' },
+  { url: 'https://www.harpersbazaar.com/rss/all.xml',         source: "Harper's Bazaar" },
+  { url: 'https://wwd.com/feed/',                             source: 'WWD' },
+  { url: 'https://www.whowhatwear.com/rss',                   source: 'Who What Wear' },
+  { url: 'https://www.elle.com/rss/all.xml',                  source: 'Elle' },
+  { url: 'https://fashionista.com/rss',                       source: 'Fashionista' },
+  { url: 'https://www.refinery29.com/rss.xml',                source: 'Refinery29' },
+  { url: 'https://www.thecut.com/feeds/all.rss',              source: 'The Cut' },
+  { url: 'https://www.glamour.com/feed/rss',                  source: 'Glamour' },
+  { url: 'https://nymag.com/feeds/main.rss',                  source: 'New York Mag' },
+  { url: 'https://feeds.feedburner.com/InStyle',              source: 'InStyle' },
+  { url: 'https://www.instyle.com/feeds/all.rss',             source: 'InStyle' },
 ];
 
 async function fetchNewsFlash() {
@@ -4157,8 +4223,10 @@ async function fetchNewsFlash() {
       if (!r.ok) continue;
       const data = await r.json();
       if (data.status !== 'ok' || !data.items?.length) continue;
-      // Pick from the first 5 recent items randomly so it feels fresh
-      const pool = data.items.slice(0, 5).filter(i => i.title && i.link);
+      // Filter to fashion-relevant items and pick randomly for freshness
+      const fashionKeywords = /style|fashion|trend|outfit|wear|dress|look|season|collection|designer|beauty|accessory|accessories|wardrobe|chic|vogue|glamour|color|print|silhouette|runway|brand|luxury|capsule/i;
+      const all = data.items.slice(0, 10).filter(i => i.title && i.link);
+      const pool = all.filter(i => fashionKeywords.test(i.title) || fashionKeywords.test(i.description || '')) || all.slice(0, 5);
       if (!pool.length) continue;
       const item = pool[Math.floor(Math.random() * pool.length)];
       // Strip HTML tags from description
@@ -4716,6 +4784,7 @@ function render() {
     case 'wardrobe-item':html = viewWardrobeItem(); break;
     case 'rip':          html = viewRIP();          break;
     case 'receipt-add':  html = viewReceiptAdd();   break;
+    case 'new-piece':    html = viewNewPiece();     break;
     case 'squad':        html = viewSquadDetail();  break;
   }
   // Inject tab bar right after the .nav block on every tab view
@@ -4789,8 +4858,11 @@ function viewSetup() {
         </div>
       </div>
       <div style="width:100%">
-        <label class="form-label" style="text-align:left;display:block;margin-bottom:8px;">Your API Key</label>
-        <input class="form-input" id="setupKey" type="password" placeholder="sk-ant-..." value="${esc(S.apiKey)}" style="margin-bottom:14px;">
+        <label class="form-label" style="text-align:left;display:block;margin-bottom:8px;">Your City / Location <span style="color:var(--gold);font-weight:800;">*</span></label>
+        <input class="form-input" id="setupLocation" type="text" placeholder="e.g. San Francisco, London, Tokyo…" value="${esc(S.profileLocation)}" style="margin-bottom:14px;">
+        <label class="form-label" style="text-align:left;display:block;margin-bottom:8px;">Your Anthropic API Key <span style="color:var(--gold);font-weight:800;">*</span></label>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;line-height:1.5;">Free to start at <a href="https://console.anthropic.com" target="_blank" class="settings-link">console.anthropic.com</a> → API Keys → Create Key</div>
+        <input class="form-input" id="setupKey" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="sk-ant-..." value="${esc(S.apiKey)}" style="margin-bottom:14px;font-family:monospace;font-size:13px;">
         <button class="btn btn-primary" onclick="doSetupSave()" style="margin:0;width:100%;">Get Started →</button>
       </div>
     </div>
@@ -5198,7 +5270,7 @@ function viewShop() {
     <div class="nav">
       <span class="nav-logo">Shop</span>
     </div>
-    <div class="tab-headline">Intentional additions only.</div>
+    <div style="font-size:22px;font-weight:800;color:var(--text-1);padding:12px 16px 6px;">Intentional additions only.</div>
     <div style="display:flex;gap:10px;padding:4px 16px 16px;">
       <button onclick="toast('Find a Gift coming soon ✨')" style="flex:1;padding:12px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;">
         <div style="font-size:18px;margin-bottom:3px;">🎁</div>
@@ -5612,15 +5684,6 @@ function viewProfile() {
   // ── Style score ────────────────────────────────────────────
   const avgRating = styleScore(S.entries) || '—';
 
-  // ── Avatar ────────────────────────────────────────────────
-  const avatarHTML = (() => {
-    const wrap = `width:76px;height:100px;border-radius:12px;overflow:hidden;position:relative;flex-shrink:0;background:linear-gradient(160deg,${colors.accent}28,${colors.accent}10);border:2px solid ${colors.accent}44;display:flex;align-items:center;justify-content:center;cursor:pointer;`;
-    const placeholder = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;"><span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--gold);opacity:.6;text-align:center;line-height:1.3;">No<br>Portrait</span></div>`;
-    if (avatar?.url)
-      return `<div onclick="openShareCard()" style="${wrap}">${placeholder}<img src="${esc(avatar.url)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:2;" onerror="this.style.opacity='0'"></div>`;
-    const initial = S.profileName ? S.profileName[0].toUpperCase() : '✦';
-    return `<div onclick="generateStylePersona()" style="${wrap}font-size:30px;font-weight:900;color:${colors.accent};">${initial}</div>`;
-  })();
 
   // ── Profile chips ─────────────────────────────────────────
   const chips = [
@@ -5816,7 +5879,7 @@ function viewProfile() {
         </div>
       </div>`;
     }
-    return `<div onclick="S._auraEdit='${fieldKey}';render()" style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;min-height:64px;display:flex;flex-direction:column;justify-content:space-between;">
+    return `<div onclick="if(Date.now()<_auraClickLockUntil)return;S._auraEdit='${fieldKey}';render()" style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;min-height:64px;display:flex;flex-direction:column;justify-content:space-between;">
       <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);">${icon} ${label}</div>
       ${stateVal
         ? `<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;line-height:1.3;">${esc(stateVal)}</div>`
@@ -5836,6 +5899,26 @@ function viewProfile() {
     ${auraFieldHTML('hairstyle',         'closet-hairstyle',        '💇', 'Hairstyle',      'e.g. Long waves, blunt bob…',     S.hairstyle)}
   </div>`;
 
+  // ── Location banner ───────────────────────────────────────
+  const locationBanner = S.profileLocation ? `
+    <div style="position:relative;width:100%;height:200px;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,${colors.bg1},${colors.bg2});">
+      <img src="${esc(pollinationsLocationBannerUrl(S.profileLocation))}"
+        style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;"
+        loading="eager"
+        onerror="this.style.display='none'">
+      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.04) 0%,rgba(0,0,0,0.6) 100%);"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 16px 16px;">
+        <div style="min-width:0;padding-bottom:2px;">
+          <div style="font-size:22px;font-weight:900;letter-spacing:-.3px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5);margin-bottom:2px;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
+          ${S.profileStyleWords ? `<div style="font-size:11px;color:rgba(255,255,255,.8);line-height:1.4;margin-bottom:5px;">${esc(S.profileStyleWords.length>60?S.profileStyleWords.slice(0,60)+'…':S.profileStyleWords)}</div>` : ''}
+          ${chips.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;">${chips.map(c=>`<div style="background:rgba(255,255,255,.18);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:100px;padding:3px 9px;font-size:10px;font-weight:600;color:#fff;">${c.icon} ${esc(c.label)}</div>`).join('')}</div>` : ''}
+        </div>
+      </div>
+      <div style="position:absolute;top:10px;right:10px;">
+        <div style="background:rgba(0,0,0,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:100px;padding:4px 10px;font-size:10px;font-weight:700;color:rgba(255,255,255,.9);">📍 ${esc(S.profileLocation)}</div>
+      </div>
+    </div>` : null;
+
   function profileSection(title, content) {
     return `<div style="padding:0 16px;margin-bottom:20px;">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">${title}</div>
@@ -5849,18 +5932,16 @@ function viewProfile() {
       <button onclick="switchTab('settings')" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:5px 13px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;">Settings</button>
     </div>
 
-    <!-- Header: avatar + name + chips -->
-    <div style="padding:16px 16px 14px;display:flex;gap:16px;align-items:flex-start;">
-      ${avatarHTML}
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:22px;font-weight:900;letter-spacing:-.3px;margin-bottom:3px;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
-        ${S.profileStyleWords ? `<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:8px;">${esc(S.profileStyleWords.length>80?S.profileStyleWords.slice(0,80)+'…':S.profileStyleWords)}</div>` : ''}
-        ${chipsHTML}
-      </div>
-    </div>
+    ${locationBanner || `
+    <!-- Header: name + chips (no location set) -->
+    <div style="padding:16px 16px 14px;">
+      <div style="font-size:22px;font-weight:900;letter-spacing:-.3px;margin-bottom:3px;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
+      ${S.profileStyleWords ? `<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:8px;">${esc(S.profileStyleWords.length>80?S.profileStyleWords.slice(0,80)+'…':S.profileStyleWords)}</div>` : ''}
+      ${chipsHTML}
+    </div>`}
 
-    <!-- Style Portrait — top of page -->
-    <div style="padding:0 16px 16px;">${portraitHTML}</div>
+    <!-- Style Portrait -->
+    <div style="padding:14px 16px 16px;">${portraitHTML}</div>
 
     <div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>
 
@@ -6709,12 +6790,9 @@ function viewWardrobe() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">${S.profileName.trim() ? `${S.profileName.trim()}'s Closet` : 'My Closet'}</span>
-      <span style="display:inline-flex;gap:6px;align-items:center;">
-        <button onclick="S.receiptFlow={step:'input',imageData:'',imageMime:'',pasteText:'',preview:null};navigate('receipt-add')" title="Add from receipt" style="background:none;border:1.5px solid var(--border);border-radius:9px;padding:6px 10px;font-size:15px;cursor:pointer;line-height:1;color:var(--text-2);">📧</button>
-        <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
-      </span>
+      <button class="nav-add" onclick="navigate('new-piece')">${iconPlus()} New Piece</button>
     </div>
-    <div class="tab-headline">Know what you own. Always organized.</div>
+    <div style="font-size:22px;font-weight:800;color:var(--text-1);padding:12px 16px 6px;">Know what you own.</div>
 
     <div style="display:flex;gap:10px;padding:4px 16px 16px;">
       <button onclick="toast('Closet Assistant coming soon ✨')" style="flex:1;display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 14px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;">
@@ -6801,12 +6879,24 @@ function hangerHTML(w) {
   const stripeEl = stripeColor
     ? `<div class="hanger-color-strip" style="background:${stripeColor};"></div>`
     : '';
-  const topArea = `<div class="hanger-icon">${w.icon || '👕'}</div>`;
+  // SVG hanger: hook + two arms, matching rod color palette
+  const hangerSVG = `<svg width="76" height="30" viewBox="0 0 76 30" fill="none"
+      style="display:block;overflow:visible;flex-shrink:0;">
+    <!-- hook neck -->
+    <path d="M38 20 L38 11 Q38 2 43.5 2 Q49 2 49 8 Q49 13 44 14"
+          stroke="#B07828" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- left shoulder arm -->
+    <path d="M38 20 Q22 24 5 30"
+          stroke="#B07828" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <!-- right shoulder arm -->
+    <path d="M38 20 Q54 24 71 30"
+          stroke="#B07828" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  </svg>`;
   return `<div class="hanger" onclick="openWardrobeItem('${w.id}')">
-    <div class="hanger-peg"></div>
+    ${hangerSVG}
     <div class="hanger-card">
       ${stripeEl}
-      ${topArea}
+      <div class="hanger-icon">${w.icon || '👕'}</div>
       <div class="hanger-name">${esc(w.name)}</div>
       ${w.brand ? `<div class="hanger-brand">${esc(w.brand)}</div>` : ''}
       ${w.size ? `<div class="hanger-brand" style="color:var(--text-2);font-weight:600;">${esc(w.size)}</div>` : ''}
@@ -6818,25 +6908,70 @@ function hangerHTML(w) {
 /* ================================================================
    VIEW: RECEIPT ADD (📧 → Claude parse → wardrobe item)
    ================================================================ */
+/* ================================================================
+   VIEW: NEW PIECE — entry screen (manual or receipt)
+   ================================================================ */
+function viewNewPiece() {
+  return `<div class="view view-notab">
+    <div class="nav">
+      <button class="nav-back" onclick="navigate('wardrobe')">${iconBack()} Closet</button>
+      <span class="nav-title">New Piece</span>
+      <span style="width:72px"></span>
+    </div>
+    <div style="padding:24px 16px;">
+      <div style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px;">Add to your wardrobe</div>
+      <div style="font-size:14px;color:var(--text-3);margin-bottom:28px;line-height:1.5;">How would you like to add this piece?</div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+
+        <!-- Manual entry -->
+        <button onclick="S.receiptFlow={step:'preview',mode:'manual',imageData:'',imageMime:'',pasteText:'',preview:{name:'',brand:'',price:'',category:'Tops',description:'',icon:'👕',isNew:true}};navigate('receipt-add')"
+          style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
+          <div style="width:48px;height:48px;border-radius:12px;background:var(--gold-bg);border:1.5px solid var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">✏️</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;">Add manually</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Fill in the name, brand, price, and details yourself</div>
+          </div>
+          <div style="font-size:18px;color:var(--text-3);">›</div>
+        </button>
+
+        <!-- Receipt scan -->
+        <button onclick="S.receiptFlow={step:'input',mode:'receipt',imageData:'',imageMime:'',pasteText:'',preview:null};navigate('receipt-add')"
+          style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
+          <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">🧾</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;">Scan a receipt</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Upload or paste your order confirmation — Claude fills in the details</div>
+          </div>
+          <div style="font-size:18px;color:var(--text-3);">›</div>
+        </button>
+
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   VIEW: RECEIPT ADD (also handles manual entry)
+   ================================================================ */
 function viewReceiptAdd() {
   const rf = S.receiptFlow;
   if (!rf) { navigate('wardrobe'); return ''; }
+  const isManual = rf.mode === 'manual';
 
   // ── STEP: parsing ────────────────────────────────────────────
   if (rf.step === 'parsing') {
     return `<div class="view view-notab">
       <div class="nav">
-        <button class="nav-back" onclick="navigate('wardrobe')">${iconBack()} Wardrobe</button>
+        <button class="nav-back" onclick="navigate('new-piece')">${iconBack()} Back</button>
         <span class="nav-title">Reading Receipt…</span>
         <span style="width:72px"></span>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:20px;">
-        <div style="font-size:48px;">📧</div>
-        <div class="loading-dots" style="font-size:28px;">
-          <span>·</span><span>·</span><span>·</span>
-        </div>
+        <div style="font-size:48px;">🧾</div>
+        <div class="loading-dots" style="font-size:28px;"><span>·</span><span>·</span><span>·</span></div>
         <div style="font-size:15px;font-weight:600;color:var(--text);">Reading your receipt…</div>
-        <div style="font-size:13px;color:var(--text-3);text-align:center;max-width:260px;">Claude is extracting item details from your screenshot</div>
+        <div style="font-size:13px;color:var(--text-3);text-align:center;max-width:260px;">Claude is extracting item details from your order confirmation</div>
       </div>
     </div>`;
   }
@@ -6845,24 +6980,27 @@ function viewReceiptAdd() {
   if (rf.step === 'preview' && rf.preview) {
     const p = rf.preview;
     const cats = ['Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Other','Accessories'];
+    const backAction = isManual ? `navigate('new-piece')` : `S.receiptFlow.step='input';render()`;
     return `<div class="view view-notab">
       <div class="nav">
-        <button class="nav-back" onclick="S.receiptFlow.step='input';render()">${iconBack()} Back</button>
-        <span class="nav-title">Confirm Item</span>
+        <button class="nav-back" onclick="${backAction}">${iconBack()} Back</button>
+        <span class="nav-title">${isManual ? 'New Piece' : 'Confirm Item'}</span>
         <span style="width:72px"></span>
       </div>
       <div style="padding:20px;">
 
-        <div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r);padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:14px;">
-          <div style="font-size:40px;line-height:1;">${esc(p.icon||'👕')}</div>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">Claude found this item</div>
-            <div style="font-size:15px;font-weight:700;color:var(--text);">${esc(p.name||'Unknown item')}</div>
-            ${p.brand ? `<div style="font-size:13px;color:var(--text-3);">${esc(p.brand)}</div>` : ''}
-          </div>
-        </div>
-
-        ${rf.imageData ? `<img src="data:${rf.imageMime};base64,${rf.imageData}" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--r-sm);margin-bottom:20px;border:1px solid var(--border);">` : ''}
+        ${isManual
+          ? `<div style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px;">Tell us about this piece</div>
+             <div style="font-size:13px;color:var(--text-3);margin-bottom:20px;">Fill in as much or as little as you know.</div>`
+          : `<div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r);padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:14px;">
+               <div style="font-size:40px;line-height:1;">${esc(p.icon||'👕')}</div>
+               <div>
+                 <div style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">Claude found this item</div>
+                 <div style="font-size:15px;font-weight:700;color:var(--text);">${esc(p.name||'Unknown item')}</div>
+                 ${p.brand ? `<div style="font-size:13px;color:var(--text-3);">${esc(p.brand)}</div>` : ''}
+               </div>
+             </div>
+             ${rf.imageData ? `<img src="data:${rf.imageMime};base64,${rf.imageData}" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--r-sm);margin-bottom:20px;border:1px solid var(--border);">` : ''}`}
 
         <div class="form-group" style="margin-bottom:14px;">
           <label class="form-label">Item Name</label>
@@ -6880,6 +7018,11 @@ function viewReceiptAdd() {
             <input class="form-input" type="number" min="0" step="0.01"
               value="${p.price||''}" oninput="S.receiptFlow.preview.price=this.value" placeholder="0.00">
           </div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Size</label>
+          <input class="form-input" type="text" value="${esc(p.size||'')}"
+            oninput="S.receiptFlow.preview.size=this.value" placeholder="e.g. S, 28, 8.5…">
         </div>
         <div class="form-group" style="margin-bottom:14px;">
           <label class="form-label">Category</label>
@@ -6903,7 +7046,7 @@ function viewReceiptAdd() {
           <label class="form-label">When did you get this?</label>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;${p.isNew===false?'margin-bottom:10px;':''}">
             <button onclick="S.receiptFlow.preview.isNew=true;render()"
-              style="padding:10px 0;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.isNew!==false?'var(--gold)':'var(--border)'};background:${p.isNew!==false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew!==false?'var(--gold-dk)':'var(--text-2)'};">✨ It's new!</button>
+              style="padding:10px 0;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.isNew!==false?'var(--gold)':'var(--border)'};background:${p.isNew!==false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew!==false?'var(--gold-dk)':'var(--text-2)'};">✨ Just got it</button>
             <button onclick="S.receiptFlow.preview.isNew=false;render()"
               style="padding:10px 0;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.isNew===false?'var(--gold)':'var(--border)'};background:${p.isNew===false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew===false?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
           </div>
@@ -6911,7 +7054,7 @@ function viewReceiptAdd() {
         </div>
 
         <button class="btn btn-primary" onclick="confirmReceiptItem()" style="margin-bottom:10px;">
-          ✨ Add to Wardrobe
+          ✦ Add to My Closet
         </button>
         <button class="btn btn-secondary" onclick="navigate('wardrobe')">Cancel</button>
         <div style="height:32px;"></div>
@@ -6919,11 +7062,11 @@ function viewReceiptAdd() {
     </div>`;
   }
 
-  // ── STEP: input (default) ─────────────────────────────────────
+  // ── STEP: input — receipt scan ────────────────────────────────
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate('wardrobe')">${iconBack()} Wardrobe</button>
-      <span class="nav-title">Add from Receipt</span>
+      <button class="nav-back" onclick="navigate('new-piece')">${iconBack()} Back</button>
+      <span class="nav-title">Scan Receipt</span>
       <span style="width:72px"></span>
     </div>
     <div style="padding:20px;">
@@ -6933,8 +7076,8 @@ function viewReceiptAdd() {
         ${rf.imageData
           ? `<img src="data:${rf.imageMime};base64,${rf.imageData}" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;">`
           : `<div style="font-size:48px;margin-bottom:10px;">📸</div>
-             <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">Screenshot your receipt</div>
-             <div style="font-size:13px;color:var(--text-3);line-height:1.5;">Open the order confirmation email, take a screenshot, then upload it here. Claude will read the item name, brand, and price automatically.</div>`}
+             <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">Upload your receipt screenshot</div>
+             <div style="font-size:13px;color:var(--text-3);line-height:1.5;">Screenshot your order confirmation email, then upload it here. Claude will read the item name, brand, and price automatically.</div>`}
         <input id="receiptImgInput" type="file" accept="image/*" style="display:none;"
           onchange="receiptImageSelected(this)">
       </div>
@@ -6947,7 +7090,7 @@ function viewReceiptAdd() {
       <div style="position:relative;margin-bottom:20px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
           <div style="flex:1;height:1px;background:var(--border);"></div>
-          <span style="font-size:12px;color:var(--text-3);font-weight:600;">OR PASTE RECEIPT TEXT</span>
+          <span style="font-size:12px;color:var(--text-3);font-weight:600;">OR PASTE ORDER TEXT</span>
           <div style="flex:1;height:1px;background:var(--border);"></div>
         </div>
         <textarea class="form-textarea" id="receiptPasteArea" placeholder="Paste the text from your order confirmation email here…" style="min-height:90px;font-size:13px;"
@@ -6960,7 +7103,7 @@ function viewReceiptAdd() {
       </button>
       <div style="height:12px;"></div>
       <div style="font-size:12px;color:var(--text-3);text-align:center;line-height:1.6;">
-        Works with order confirmations from any retailer.<br>Your receipt stays private — it's only sent to Claude for parsing.
+        Works with order confirmations from any retailer.<br>Your receipt stays private — only sent to Claude for parsing.
       </div>
       <div style="height:32px;"></div>
     </div>
@@ -8514,105 +8657,86 @@ function viewEdit() {
    ================================================================ */
 function viewSettings() {
   const best = S.entries.length ? S.entries.reduce((b,e)=>e.rating>b.rating?e:b) : null;
+  const apiReady = !!S.apiKey.trim();
+  const googleReady = !!(S.googleKey.trim() && S.googleCx.trim());
+
+  // ── Section helpers ───────────────────────────────────────────
+  const sectionLabel = (text, badge) => `
+    <div class="settings-group-label" style="display:flex;align-items:center;gap:8px;">
+      ${text}
+      ${badge ? `<span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:100px;background:${badge==='required'?'#FEF3C7':'var(--surface-2)'};color:${badge==='required'?'#92400E':'var(--text-3)'};">${badge==='required'?'Required':'Optional'}</span>` : ''}
+    </div>`;
+
+  const statusChip = (ok) => `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px;background:${ok?'#D1FAE5':'#FEF3C7'};color:${ok?'#065F46':'#92400E'};">${ok?'✓ Connected':'Not set'}</span>`;
+
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">Settings</span>
-      <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
     </div>
 
-    <div class="settings-group-label">☁️ Sync &amp; Backup</div>
+    <!-- ── ACCOUNT ───────────────────────────────── -->
+    <div class="settings-group-label">Account</div>
     <div class="settings-section">
-      ${(() => {
-        const hasCfg = S.syncUrl && S.syncCode;
-        const lastPush = S._syncLastPush ? new Date(S._syncLastPush).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : null;
-        const lastPull = S._syncLastPull ? new Date(S._syncLastPull).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : null;
-        return `
-        <div class="settings-row">
-          <div class="settings-label">Worker URL</div>
-          <div class="settings-hint">Paste your Cloudflare Worker URL here (e.g. https://closet-sync.yourname.workers.dev)</div>
-          <input id="syncUrlInput" class="form-input" type="url" style="margin-top:8px;" placeholder="https://closet-sync.yourname.workers.dev"
-            value="${esc(S.syncUrl)}">
+      <div class="settings-row" style="display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:50%;background:var(--gold-bg);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">
+          ${S.profileName ? esc(S.profileName[0].toUpperCase()) : '✦'}
         </div>
-        <div class="settings-row">
-          <div class="settings-label">Sync Code <span style="font-weight:400;font-size:11px;color:var(--text-3);">(your private key — same on every device)</span></div>
-          <div style="display:flex;gap:8px;margin-top:8px;">
-            <input id="syncCodeInput" class="form-input" type="text" style="margin:0;flex:1;font-family:monospace;font-size:12px;" placeholder="Click Generate to create one"
-              value="${esc(S.syncCode)}">
-            <button onclick="generateSyncCode()" style="flex-shrink:0;padding:0 14px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface-2);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;white-space:nowrap;">Generate</button>
-          </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:1px;">${currentUser?.email ? esc(currentUser.email) : 'Signed in with Google'}</div>
         </div>
-        <button onclick="saveSyncSettings()" class="btn btn-secondary" style="margin:6px 0 4px;width:100%;">Save Sync Settings</button>
-        ${hasCfg ? `
-        <div style="display:flex;gap:8px;margin-top:4px;">
-          <button onclick="syncPush()" class="btn btn-secondary" style="margin:0;flex:1;padding:9px;font-size:13px;"${S._syncPushing?' disabled':''}>
-            ${S._syncPushing ? '⟳ Pushing…' : '↑ Push to Cloud'}
-          </button>
-          <button onclick="syncPull()" class="btn btn-secondary" style="margin:0;flex:1;padding:9px;font-size:13px;"${S._syncPulling?' disabled':''}>
-            ${S._syncPulling ? '⟳ Pulling…' : '↓ Pull from Cloud'}
-          </button>
-        </div>
-        <div style="font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.7;">
-          ${lastPush ? `↑ Last pushed: <strong>${lastPush}</strong>` : ''}
-          ${lastPush && lastPull ? ' &nbsp;·&nbsp; ' : ''}
-          ${lastPull ? `↓ Last pulled: <strong>${lastPull}</strong>` : ''}
-          ${!lastPush && !lastPull ? 'Not synced yet — tap Push after setup.' : ''}
-        </div>
-        <div class="settings-hint" style="margin-top:6px;">Photos stay on-device for privacy. All other data (outfits, wardrobe, squad plans, style portrait) syncs automatically 20 s after any change.</div>
-        ` : `<div class="settings-hint" style="margin-top:6px;">Set a Worker URL + Sync Code above to enable sync between your iPhone and Mac. See the closet-sync-worker folder for setup instructions.</div>`}`;
-      })()}
+        <button onclick="signOut()" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">Sign out</button>
+      </div>
+      <div class="settings-hint" style="margin-top:10px;">Your data syncs automatically across devices when signed in with the same Google account.</div>
     </div>
 
+    <!-- ── CLAUDE AI (REQUIRED) ──────────────────── -->
+    ${sectionLabel('Claude AI', 'required')}
+    <div class="settings-section">
+      <div class="settings-row">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div class="settings-label" style="margin:0;">Anthropic API Key</div>
+          ${statusChip(apiReady)}
+        </div>
+        <div class="settings-hint" style="margin-bottom:8px;">Powers every AI feature — outfit analysis, Style Portrait, receipt parsing, and more. Free to start at <a href="https://console.anthropic.com" target="_blank" class="settings-link">console.anthropic.com</a> → API Keys → Create Key.</div>
+        <input class="form-input" id="apiKeyInput" type="password" placeholder="sk-ant-…" value="${esc(S.apiKey)}" style="margin-bottom:8px;">
+        <button class="btn btn-primary" onclick="doSaveApiKey()" style="margin:0;width:100%;">Save Key</button>
+      </div>
+    </div>
+
+    <!-- ── PROFILE ───────────────────────────────── -->
     <div class="settings-group-label">Profile</div>
     <div class="settings-section">
       <div class="settings-row">
         <div class="settings-label">Name</div>
-        <div class="settings-hint">Personalizes your app header — e.g. "Dana's Closet"</div>
-        <input class="form-input" id="profileNameInput" type="text" placeholder="Your first name"
-          value="${esc(S.profileName)}" style="margin-top:8px;"
+        <div class="settings-hint" style="margin-bottom:8px;">Shows as "[Name]'s Closet" in your app header.</div>
+        <input class="form-input" type="text" placeholder="Your first name"
+          value="${esc(S.profileName)}"
           oninput="S.profileName=this.value.trim();localStorage.setItem('closet-profile-name',S.profileName);fsSet('profileName',S.profileName);render()">
       </div>
-      <div class="settings-row" style="display:flex;gap:14px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:80px;">
-          <div class="settings-label" style="margin-bottom:6px;">Age <span style="font-weight:400;font-size:11px;color:var(--text-3);">(optional)</span></div>
-          <input class="form-input" type="number" min="1" max="120" placeholder="e.g. 28"
-            value="${esc(S.profileAge)}" style="margin:0;"
-            onchange="S.profileAge=this.value;localStorage.setItem('closet-profile-age',S.profileAge);fsSet('profileAge',S.profileAge);">
-        </div>
-        <div style="flex:1;min-width:80px;">
-          <div class="settings-label" style="margin-bottom:6px;">Height <span style="font-weight:400;font-size:11px;color:var(--text-3);">(optional)</span></div>
-          <input class="form-input" type="text" placeholder='e.g. 5\'7" or 170cm'
-            value="${esc(S.profileHeight)}" style="margin:0;"
-            onchange="S.profileHeight=this.value;localStorage.setItem('closet-profile-height',S.profileHeight);fsSet('profileHeight',S.profileHeight);">
-        </div>
-        <div style="flex:1;min-width:80px;">
-          <div class="settings-label" style="margin-bottom:6px;">Weight <span style="font-weight:400;font-size:11px;color:var(--text-3);">(optional)</span></div>
-          <input class="form-input" type="text" placeholder="e.g. 130 lbs"
-            value="${esc(S.profileWeight)}" style="margin:0;"
-            onchange="S.profileWeight=this.value;localStorage.setItem('closet-profile-weight',S.profileWeight);fsSet('profileWeight',S.profileWeight);">
-        </div>
-      </div>
-      <div class="settings-hint" style="margin-top:10px;">These details help Claude give more personalized fit and style advice — all stored privately in your browser.</div>
-    </div>
-
-    <div class="settings-group-label">Style Persona</div>
-    <div class="settings-section">
       <div class="settings-row">
-        <div class="settings-label">Generation</div>
-        <div class="settings-hint" style="margin-bottom:8px;">Helps Claude tune cultural and trend references in your portrait.</div>
+        <div class="settings-label">City / Location</div>
+        <div class="settings-hint" style="margin-bottom:8px;">Generates your Me page banner and shapes seasonal style suggestions.</div>
+        <input class="form-input" type="text" placeholder="e.g. San Francisco"
+          value="${esc(S.profileLocation)}"
+          onchange="S.profileLocation=this.value.trim();localStorage.setItem('closet-profile-location',S.profileLocation);fsSet('profileLocation',S.profileLocation);">
+      </div>
+      <div class="settings-row">
+        <div class="settings-label" style="margin-bottom:6px;">Generation</div>
         <select class="form-input" style="margin:0;" onchange="S.profileGeneration=this.value;localStorage.setItem('closet-profile-gen',this.value);fsSet('profileGeneration',this.value);">
           <option value="">Select…</option>
           ${['Gen Z (1997–2012)','Millennial (1981–1996)','Gen X (1965–1980)','Boomer (1946–1964)'].map(g=>`<option value="${g}" ${S.profileGeneration===g?'selected':''}>${g}</option>`).join('')}
         </select>
       </div>
-      <div class="settings-row" style="display:flex;gap:14px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:110px;">
+      <div class="settings-row" style="display:flex;gap:12px;">
+        <div style="flex:1;">
           <div class="settings-label" style="margin-bottom:6px;">MBTI Type</div>
           <select class="form-input" style="margin:0;" onchange="S.profileMBTI=this.value;localStorage.setItem('closet-profile-mbti',this.value);fsSet('profileMBTI',this.value);">
             <option value="">Select…</option>
             ${['INTJ','INTP','ENTJ','ENTP','INFJ','INFP','ENFJ','ENFP','ISTJ','ISFJ','ESTJ','ESFJ','ISTP','ISFP','ESTP','ESFP'].map(t=>`<option value="${t}" ${S.profileMBTI===t?'selected':''}>${t}</option>`).join('')}
           </select>
         </div>
-        <div style="flex:1;min-width:110px;">
+        <div style="flex:1;">
           <div class="settings-label" style="margin-bottom:6px;">Zodiac Sign</div>
           <select class="form-input" style="margin:0;" onchange="S.profileZodiac=this.value;localStorage.setItem('closet-profile-zodiac',this.value);fsSet('profileZodiac',this.value);">
             <option value="">Select…</option>
@@ -8621,84 +8745,57 @@ function viewSettings() {
         </div>
       </div>
       <div class="settings-row">
-        <div class="settings-label">Location / Climate</div>
-        <div class="settings-hint" style="margin-bottom:8px;">Shapes seasonal and weather-appropriate suggestions — e.g. "NYC, cold winters" or "LA, year-round warm".</div>
-        <input class="form-input" type="text" placeholder="e.g. New York, 4 seasons"
-          value="${esc(S.profileLocation)}" style="margin:0;"
-          onchange="S.profileLocation=this.value.trim();localStorage.setItem('closet-profile-location',S.profileLocation);fsSet('profileLocation',S.profileLocation);">
-      </div>
-      <div class="settings-row">
-        <div class="settings-label">Style in your own words</div>
-        <div class="settings-hint" style="margin-bottom:8px;">How would you describe your style? Claude uses this to build your portrait — be as specific or playful as you like.</div>
-        <textarea class="form-textarea" rows="3" placeholder="e.g. professional, a little creative, athletic, clean lines, not too trendy…"
+        <div class="settings-label" style="margin-bottom:6px;">Style in your own words</div>
+        <textarea class="form-textarea" rows="3" placeholder="e.g. clean lines, a little creative, not too trendy…"
           onchange="S.profileStyleWords=this.value.trim();localStorage.setItem('closet-profile-style-words',S.profileStyleWords);fsSet('profileStyleWords',S.profileStyleWords);">${esc(S.profileStyleWords)}</textarea>
+        <div class="settings-hint" style="margin-top:6px;">The more you share, the more personal your Style Portrait becomes.</div>
       </div>
-      <div class="settings-row">
-        <div class="settings-hint">These feed into your <strong>Style Portrait</strong> on the Home tab. The more you share, the more personal Claude's read will be.</div>
-        <button class="btn btn-primary" onclick="switchTab('home');generateStylePersona();" style="margin:10px 0 0;width:100%;">✦ Generate Style Portrait Now</button>
-      </div>
+      <button class="btn btn-primary" onclick="switchTab('home');generateStylePersona();" style="margin:4px 0 0;width:100%;">✦ Regenerate Style Portrait</button>
     </div>
 
-    <div class="settings-group-label">Activities &amp; Occasions</div>
+    <!-- ── OCCASIONS ─────────────────────────────── -->
+    <div class="settings-group-label">Occasions</div>
     <div class="settings-section">
       <div class="settings-row">
-        <div class="settings-hint" style="margin-bottom:12px;">These are your occasion types — they appear on the camera screen before each outfit is analysed, and shape how Claude scores each look.</div>
+        <div class="settings-hint" style="margin-bottom:12px;">Your occasion types — selected before each outfit is analysed, and used to score each look in context.</div>
         <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;">
           ${getOccasionTags().map((tag, i) => `
-            <div style="display:flex;align-items:center;gap:0;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:5px 4px 5px 11px;">
+            <div style="display:flex;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:5px 4px 5px 11px;">
               <span style="font-size:13px;font-weight:500;color:var(--text);">${esc(tag)}</span>
               <button onclick="removeOccasionTag(${i})" style="background:none;border:none;cursor:pointer;padding:0 5px 0 6px;color:var(--text-3);font-size:15px;line-height:1;font-family:inherit;" title="Remove">×</button>
             </div>`).join('')}
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input class="form-input" id="newOccasionInput" type="text" placeholder="Add an activity…" style="flex:1;margin:0;" onkeydown="if(event.key==='Enter'){addOccasionTag();event.preventDefault();}">
+        <div style="display:flex;gap:8px;">
+          <input class="form-input" id="newOccasionInput" type="text" placeholder="Add an occasion…" style="flex:1;margin:0;" onkeydown="if(event.key==='Enter'){addOccasionTag();event.preventDefault();}">
           <button onclick="addOccasionTag()" style="padding:10px 14px;border-radius:var(--r-sm);background:var(--gold);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;">Add</button>
         </div>
         <button onclick="resetOccasionTags()" style="margin-top:10px;background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;padding:4px 0;font-family:inherit;">↺ Reset to defaults</button>
       </div>
     </div>
 
-    <div class="settings-group-label">Shopping (Google Custom Search)</div>
+    <!-- ── SHOPPING (OPTIONAL) ───────────────────── -->
+    ${sectionLabel('Shopping — Real Products', 'optional')}
     <div class="settings-section">
       <div class="settings-row">
-        <div class="settings-label">Google API Key</div>
-        <div class="settings-hint">Powers "Shop the Look" — finds real products for each outfit. Free up to 100 searches/day.<br>Get yours at <a href="https://console.cloud.google.com/apis/library/customsearch.googleapis.com" target="_blank" class="settings-link">Google Cloud Console</a> → Enable Custom Search API → Create API Key.</div>
-        <input class="form-input" id="googleKeyInput" type="password" placeholder="AIza..." value="${esc(S.googleKey)}" style="margin-top:8px;">
-      </div>
-      <div class="settings-row">
-        <div class="settings-label">Search Engine ID (cx)</div>
-        <div class="settings-hint">Create a free Programmable Search Engine at <a href="https://programmablesearchengine.google.com" target="_blank" class="settings-link">programmablesearchengine.google.com</a>. Tip: add sites like nordstrom.com, net-a-porter.com, shopbop.com, asos.com, revolve.com for the best results.</div>
-        <input class="form-input" id="googleCxInput" type="text" placeholder="e.g. 017576662512468239146:omuauf..." value="${esc(S.googleCx)}" style="margin-top:8px;">
-        <button class="btn btn-primary" onclick="doSaveGoogleKey()" style="margin:10px 0 0;width:100%;">Save Google Settings</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div class="settings-label" style="margin:0;">Google Custom Search</div>
+          ${statusChip(googleReady)}
+        </div>
+        <div class="settings-hint" style="margin-bottom:12px;">Unlocks actual product images on the Shop page. Free up to 100 searches/day. Set up at <a href="https://console.cloud.google.com/apis/library/customsearch.googleapis.com" target="_blank" class="settings-link">Google Cloud Console</a>, then create a search engine at <a href="https://programmablesearchengine.google.com" target="_blank" class="settings-link">programmablesearchengine.google.com</a> (add nordstrom.com, net-a-porter.com, asos.com, revolve.com for best results).</div>
+        <input class="form-input" id="googleKeyInput" type="password" placeholder="Google API Key (AIza…)" value="${esc(S.googleKey)}" style="margin-bottom:8px;">
+        <input class="form-input" id="googleCxInput" type="text" placeholder="Search Engine ID (cx)" value="${esc(S.googleCx)}" style="margin-bottom:8px;">
+        <button class="btn btn-secondary" onclick="doSaveGoogleKey()" style="margin:0;width:100%;">Save Google Settings</button>
       </div>
     </div>
 
-    <div class="settings-group-label">Anthropic API</div>
-    <div class="settings-section">
-      <div class="settings-row">
-        <div class="settings-label">API Key</div>
-        <div class="settings-hint">Required for outfit analysis and wardrobe matching. Get yours free at <a href="https://console.anthropic.com" target="_blank" class="settings-link">console.anthropic.com</a> → API Keys → Create Key.</div>
-        <input class="form-input" id="apiKeyInput" type="password" placeholder="sk-ant-..." value="${esc(S.apiKey)}" style="margin-top:4px;">
-        <button class="btn btn-primary" onclick="doSaveApiKey()" style="margin:10px 0 0;width:100%;">Save Key</button>
-      </div>
-    </div>
-
-    ${S.entries.length?`
-      <div class="settings-group-label">Your Stats</div>
-      <div class="settings-section">
-        <div class="settings-row row-h"><div class="settings-label">Total Outfits</div><div style="font-size:20px;font-weight:800;color:var(--gold);">${S.entries.length}</div></div>
-        <div class="settings-row row-h"><div class="settings-label">Wardrobe Items</div><div style="font-size:20px;font-weight:800;color:var(--gold);">${S.wardrobe.length}</div></div>
-        <div class="settings-row row-h"><div class="settings-label">Style Score</div><div style="font-size:20px;font-weight:800;color:var(--gold);">${styleScore(S.entries)||'—'}/10</div></div>
-        ${best?`<div class="settings-row"><div class="settings-label">Best Outfit</div><div style="display:flex;align-items:center;gap:12px;margin-top:8px;"><img src="${best.photo}" style="width:46px;height:61px;object-fit:cover;object-position:top;border-radius:8px;"><div><div style="font-weight:700;color:var(--gold);">⭐ ${best.rating}/10</div><div style="font-size:13px;color:var(--text-2);">${fmtDate(best.createdAt)}</div></div></div></div>`:''}
-      </div>`:``}
-
-    <div class="settings-group-label">🌸 Cycle Tracking</div>
+    <!-- ── CYCLE TRACKING (OPTIONAL) ────────────── -->
+    ${sectionLabel('Cycle Tracking', 'optional')}
     <div class="settings-section">
       <div class="settings-row">
         <div class="settings-row-toggle">
           <div class="settings-row-info">
             <div class="settings-row-label">Track menstrual cycle</div>
-            <div class="settings-row-sub">Adds phase color bars to your logging calendar and shows daily outfit tips based on your cycle.</div>
+            <div class="settings-row-sub">Adds phase color bars to your calendar and tailors daily outfit tips to your cycle.</div>
           </div>
           <label class="sw-toggle">
             <input type="checkbox" ${S.cycleEnabled?'checked':''} onchange="S.cycleEnabled=this.checked;localStorage.setItem('closet-cycle-on',S.cycleEnabled);fsSet('cycleEnabled',S.cycleEnabled);render()">
@@ -8708,11 +8805,9 @@ function viewSettings() {
       </div>
       ${S.cycleEnabled ? `
       <div class="settings-row">
-        <div class="settings-label">Period usually starts on day</div>
-        <div class="settings-hint" style="margin-bottom:8px;">Day of the month your cycle typically begins (1–31).</div>
+        <div class="settings-label" style="margin-bottom:6px;">Period usually starts on day</div>
         <div style="display:flex;align-items:center;gap:10px;">
-          <input type="number" class="settings-num-input" min="1" max="31"
-            value="${S.cycleStartDay||5}"
+          <input type="number" class="settings-num-input" min="1" max="31" value="${S.cycleStartDay||5}"
             onchange="S.cycleStartDay=Math.min(31,Math.max(1,parseInt(this.value)||5));localStorage.setItem('closet-cycle-day',S.cycleStartDay);fsSet('cycleStartDay',S.cycleStartDay);render()">
           <span style="font-size:13px;color:var(--text-3);">of each month</span>
         </div>
@@ -8721,8 +8816,7 @@ function viewSettings() {
         <div style="flex:1;">
           <div class="settings-label" style="margin-bottom:6px;">Cycle length</div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <input type="number" class="settings-num-input" min="21" max="40"
-              value="${S.cycleLength||28}"
+            <input type="number" class="settings-num-input" min="21" max="40" value="${S.cycleLength||28}"
               onchange="S.cycleLength=Math.min(40,Math.max(21,parseInt(this.value)||28));localStorage.setItem('closet-cycle-len',S.cycleLength);fsSet('cycleLength',S.cycleLength);">
             <span style="font-size:12px;color:var(--text-3);">days</span>
           </div>
@@ -8730,8 +8824,7 @@ function viewSettings() {
         <div style="flex:1;">
           <div class="settings-label" style="margin-bottom:6px;">Period length</div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <input type="number" class="settings-num-input" min="1" max="10"
-              value="${S.cyclePeriodDays||5}"
+            <input type="number" class="settings-num-input" min="1" max="10" value="${S.cyclePeriodDays||5}"
               onchange="S.cyclePeriodDays=Math.min(10,Math.max(1,parseInt(this.value)||5));localStorage.setItem('closet-cycle-pdur',S.cyclePeriodDays);fsSet('cyclePeriodDays',S.cyclePeriodDays);">
             <span style="font-size:12px;color:var(--text-3);">days</span>
           </div>
@@ -8742,46 +8835,58 @@ function viewSettings() {
         ${Object.entries(CYCLE_PHASES).map(([,p])=>`
           <div class="cycle-phase-chip">
             <span class="cycle-phase-swatch ${p.sw}"></span>
-            <div>
-              <div class="cycle-phase-name">${p.label}</div>
-              <div class="cycle-phase-tip">${p.tip}</div>
-            </div>
+            <div><div class="cycle-phase-name">${p.label}</div><div class="cycle-phase-tip">${p.tip}</div></div>
           </div>`).join('')}
       </div>` : ''}
     </div>
 
-    <div class="settings-group-label">Data</div>
+    <!-- ── YOUR DATA ──────────────────────────────── -->
+    <div class="settings-group-label">Your Data</div>
     <div class="settings-section">
+      ${S.entries.length ? `
       <div class="settings-row">
-        <div class="settings-label">Export Backup</div>
-        <div class="settings-hint">Download all your closet entries, wardrobe items, and photos as a JSON file.</div>
-        <button class="btn btn-secondary" onclick="doExport()" style="margin:10px 0 0;width:100%;">Export Data</button>
+        <div style="display:flex;gap:10px;margin-bottom:12px;">
+          <div style="flex:1;text-align:center;background:var(--surface-2);border-radius:10px;padding:10px 6px;">
+            <div style="font-size:22px;font-weight:900;color:var(--gold);">${S.entries.length}</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);">Outfits</div>
+          </div>
+          <div style="flex:1;text-align:center;background:var(--surface-2);border-radius:10px;padding:10px 6px;">
+            <div style="font-size:22px;font-weight:900;color:var(--gold);">${S.wardrobe.length}</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);">Pieces</div>
+          </div>
+          <div style="flex:1;text-align:center;background:var(--surface-2);border-radius:10px;padding:10px 6px;">
+            <div style="font-size:22px;font-weight:900;color:var(--gold);">${styleScore(S.entries)||'—'}</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);">Avg Score</div>
+          </div>
+        </div>
+        ${best ? `<div style="display:flex;align-items:center;gap:12px;background:var(--surface-2);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+          <img src="${best.photo}" style="width:40px;height:53px;object-fit:cover;object-position:top;border-radius:7px;flex-shrink:0;">
+          <div>
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin-bottom:2px;">Best Outfit</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);">⭐ ${best.rating}/10</div>
+            <div style="font-size:12px;color:var(--text-3);">${fmtDate(best.createdAt)}</div>
+          </div>
+        </div>` : ''}
+      </div>` : ''}
+      <div class="settings-row">
+        <div class="settings-hint" style="margin-bottom:8px;">Download everything — outfits, wardrobe, and photos — as a JSON backup.</div>
+        <button class="btn btn-secondary" onclick="doExport()" style="margin:0;width:100%;">Export Data</button>
       </div>
+      ${S.shopBlocked.size > 0 ? `
+      <div class="settings-row">
+        <div class="settings-label" style="margin-bottom:8px;">Hidden from Shop</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${[...S.shopBlocked].map(q => `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:var(--surface-2);border-radius:var(--r-sm);">
+              <span style="font-size:13px;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(q)}</span>
+              <button onclick="unblockShopItem(${esc(JSON.stringify(q))})" style="background:none;border:none;font-size:12px;color:var(--gold);font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;padding:2px 0;">Restore</button>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
     </div>
 
-    <div class="settings-group-label">Shopping · Not For Me</div>
-    <div class="settings-section">
-      <div class="settings-row">
-        <div class="settings-label">Blocked items</div>
-        <div class="settings-hint">Items you've dismissed from your shopping list. Claude will avoid suggesting these styles in future outfit analyses.</div>
-        ${S.shopBlocked.size === 0
-          ? `<div style="margin-top:10px;font-size:13px;color:var(--text-3);font-style:italic;">Nothing blocked yet — swipe left or tap "not for me" on any shopping item.</div>`
-          : `<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
-              ${[...S.shopBlocked].map(q => `
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:var(--surface-2);border-radius:var(--r-sm);">
-                  <span style="font-size:13px;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(q)}</span>
-                  <button onclick="unblockShopItem(${esc(JSON.stringify(q))})" style="background:none;border:none;font-size:12px;color:var(--gold);font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;padding:2px 0;">Restore</button>
-                </div>`).join('')}
-            </div>`}
-      </div>
-    </div>
-
-    <div class="settings-group-label">About</div>
-    <div class="settings-section">
-      <div class="settings-row">
-        <div class="settings-label">Closet · Style Journal</div>
-        <div class="settings-hint">Powered by Claude AI. Your data is stored privately in this browser. Your API key is only ever sent to Anthropic's API.</div>
-      </div>
+    <div style="padding:16px;text-align:center;">
+      <div style="font-size:12px;color:var(--text-3);line-height:1.6;">Closet · Powered by Claude AI<br>Your API key is only ever sent to Anthropic.</div>
     </div>
     <div style="height:8px"></div>
   </div>`;
@@ -9203,13 +9308,14 @@ async function confirmReceiptItem() {
     brand: p.brand?.trim() || null,
     description: p.description?.trim() || null,
     price: parseFloat(p.price) || null,
+    size: p.size?.trim() || null,
     icon: p.icon || '👕',
     category: cat,
     subCategory: subCategoryFromName(itemName, cat),
     paidOff: false, retiring: false, gifted: false,
     addedAt: new Date().toISOString(),
     wears: [],
-    addedVia: 'receipt',
+    addedVia: rf.mode === 'manual' ? 'manual' : 'receipt',
     isNew: p.isNew !== false,
     purchasedDate: p.isNew !== false ? _todayMonth : (p.purchasedDate || null),
   };
@@ -9907,9 +10013,21 @@ function removeItem(i) {
 }
 
 function doSetupSave() {
-  const el = document.getElementById('setupKey'); if (!el?.value.trim()) return;
-  const key = el.value.trim();
-  localStorage.setItem('closet-api-key', key); S.apiKey = key; fsSet('apiKey', key); navigate('closet');
+  const locEl = document.getElementById('setupLocation');
+  const keyEl = document.getElementById('setupKey');
+  const loc = locEl?.value.trim();
+  const key = keyEl?.value.trim();
+  if (!loc) { toast('Please enter your city or location ✦'); locEl?.focus(); return; }
+  if (!key || !key.startsWith('sk-')) { toast('Please enter a valid Anthropic API key (starts with sk-)'); keyEl?.focus(); return; }
+  // Save everything to localStorage first — reload will read these on startup
+  localStorage.setItem('closet-profile-location', loc);
+  localStorage.setItem('closet-api-key', key);
+  S.profileLocation = loc;
+  S.apiKey = key;
+  // Fire-and-forget Firestore saves, then reload the page cleanly
+  // (reload is the most reliable cross-device navigation, same as a manual refresh)
+  try { fsSet('profileLocation', loc); fsSet('apiKey', key); } catch(e) {}
+  window.location.reload();
 }
 function doSaveApiKey() {
   const el = document.getElementById('apiKeyInput'); if (!el) return;
