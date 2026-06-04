@@ -1979,11 +1979,12 @@ body {
 }
 .flip-btn {
   position: absolute; top: 10px; right: 10px; z-index: 10;
-  background: rgba(0,0,0,.38); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,.18); border-radius: 100px;
-  color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .04em;
-  padding: 5px 12px; cursor: pointer; font-family: inherit; touch-action: manipulation;
+  background: rgba(184,125,42,.82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255,220,100,.45); border-radius: 100px;
+  color: #fff; font-size: 12.5px; font-weight: 800; letter-spacing: .04em;
+  padding: 7px 14px; cursor: pointer; font-family: inherit; touch-action: manipulation;
   display: flex; align-items: center; gap: 5px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.22);
 }
 .flip-btn svg { width: 13px; height: 13px; }
 
@@ -2137,10 +2138,84 @@ body {
 .hero-hub-name { font-size: 15px; font-weight: 800; color: var(--text-1); line-height: 1.2; }
 .hero-hub-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 500; }
 .hero-hub-crown {
-  margin-left: auto; flex-shrink: 0;
   font-size: 10px; font-weight: 800; color: var(--gold-dk);
   background: var(--gold-bg); border-radius: 100px;
   padding: 3px 8px; letter-spacing: .04em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.hero-hub-actions {
+  margin-left: auto; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 7px;
+}
+.hero-hub-share {
+  font-size: 11px; font-weight: 700; color: var(--gold-dk);
+  background: none; border: 1.5px solid var(--gold-dk);
+  border-radius: 100px; padding: 3px 8px;
+  cursor: pointer; touch-action: manipulation;
+  letter-spacing: .02em; white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.hero-hub-share:active { background: var(--gold-bg); }
+
+/* ── SIGNATURE PIECES ───────────────────────────────────── */
+:root {
+  --sig: #9D174D;
+  --sig-dk: #831241;
+  --sig-bg: #FFF1F6;
+  --sig-border: #F5B3CB;
+}
+.sig-toggle-box {
+  background: var(--surface); border-radius: var(--r-sm);
+  border: 1.5px solid var(--border); padding: 14px 16px;
+  transition: border-color .2s, background .2s;
+}
+.sig-toggle-box.active {
+  background: linear-gradient(135deg, #FFF1F6, #FFE4EE);
+  border-color: var(--sig-border);
+}
+.sig-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--sig-bg); color: var(--sig-dk);
+  border-radius: 100px; padding: 2px 9px;
+  font-size: 11px; font-weight: 800; border: 1px solid var(--sig-border);
+  letter-spacing: .03em;
+}
+.sig-hub-card {
+  background: var(--surface); border-radius: var(--r);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+  padding: 14px 16px; margin: 0 16px 12px;
+  cursor: pointer; touch-action: manipulation;
+}
+.sig-hub-card.filled { border-color: var(--sig-border); background: linear-gradient(135deg,#FFF8FA,#FFF1F6); }
+.sig-hub-card-header { display: flex; align-items: center; gap: 12px; }
+.sig-hub-emoji {
+  font-size: 28px; width: 46px; height: 46px;
+  background: linear-gradient(135deg,#FFE4EE,#FFD0E4);
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; border: 1px solid rgba(157,23,77,.15);
+}
+.sig-hub-name { font-size: 15px; font-weight: 800; color: var(--text-1); line-height: 1.2; }
+.sig-hub-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 500; }
+.sig-hub-why {
+  font-size: 13px; color: var(--sig-dk); font-style: italic; font-weight: 500;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sig-border);
+  line-height: 1.5;
+}
+.sig-share-btn {
+  width: 100%; padding: 14px; border-radius: var(--r);
+  background: var(--sig); color: #fff; border: none;
+  font-size: 15px; font-weight: 800; cursor: pointer;
+  font-family: inherit; letter-spacing: .02em;
+  transition: opacity .15s; touch-action: manipulation;
+}
+.sig-share-btn:active { opacity: .82; }
+.sig-slot-empty {
+  border: 1.5px dashed var(--sig-border); border-radius: var(--r);
+  padding: 16px; margin: 0 16px 12px;
+  text-align: center; color: var(--sig-border);
+  font-size: 13px; font-weight: 600;
 }
 
 /* ── FEATURE MENU ────────────────────────────────────────── */
@@ -2603,7 +2678,7 @@ const S = {
   cycleLength:     parseInt(localStorage.getItem('closet-cycle-len') || '28'),
   cyclePeriodDays: parseInt(localStorage.getItem('closet-cycle-pdur') || '5'),
   battleDraft: null, // { photo, person1, person2, verdict, winner }
-  plan: { eventDesc: '', suggestion: null, loadingSuggest: false },
+  plan: { eventDesc: '', suggestion: null, loadingSuggest: false, tripPickerOpen: false, activeTripId: null, savedSuccess: false },
   eventBoard: JSON.parse(localStorage.getItem('closet-event-board') || '[]'), // [{id, desc, suggestion, tripId, addedAt}]
   eventTrips: JSON.parse(localStorage.getItem('closet-event-trips') || '[]'), // [{id, name, createdAt}]
   _tripFlow: null, // { step:'naming', name:'' } — inline trip creation
@@ -2623,6 +2698,8 @@ const S = {
   receiptFlow: null, // { step:'input'|'parsing'|'preview', imageData, imageMime, pasteText, preview:{name,brand,price,description,category,icon} }
   styleWith: null, // { entryId, need:'', loading:false, result:{recommendation,reasoning,searchQuery,altQuery} }
   imageSearch: null,  // { wardrobeId, loading, results:[{thumb,full,title}] } — photo picker
+  giftNudge: null, // { entryId, items:[wardrobeItems] } — set after first wear of a gifted piece
+  wardrobeTailoringFilter: false, // when true, closet tab shows only items needing tailoring
   // match review (shown after saving an outfit)
   matchReview: null, // { entryId, matches: [{newIdx,wardrobeId,reason,on}], unmatched: [{item,addOn,price}] }
   // detail
@@ -2630,8 +2707,8 @@ const S = {
   selectedWardrobeId: null,
   // ui
   loading: false, loadingMsg: '', error: null,
-  filter: 'all', wardrobeSort: 'most-worn', wardrobeCategory: 'All', wardrobeSubCategory: 'All',
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: 2, wardrobeExpanded: false, wardrobeRetiredExpanded: false,
+  filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All',
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: 2, bagRackLevels: 2, accessoryRackLevels: 2, wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
   // Style Persona
@@ -4946,8 +5023,9 @@ function switchTab(tab)  {
 /* ================================================================
    FEATURE MENU
    ================================================================ */
+function closeMenu() { S.featureMenuOpen=false; S.menuSection=null; render(); }
+
 function featuresMenuHTML() {
-  function closeMenu() { S.featureMenuOpen=false; S.menuSection=null; render(); }
 
   // ── ABOUT CLOSET sub-page ─────────────────────────────────
   const aboutSections = [
@@ -5059,7 +5137,7 @@ function featuresMenuHTML() {
           </div>`).join('')}
       </div>`).join('');
     return `
-      <div class="feat-backdrop" onclick="closeMenu()"></div>
+      <div class="feat-backdrop" ontouchend="event.preventDefault();closeMenu();" onclick="closeMenu()"></div>
       <div class="feat-panel">
         <div class="feat-header">
           <button onclick="S.menuSection=null;render()" style="background:none;border:none;display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;padding:0;">
@@ -5068,7 +5146,7 @@ function featuresMenuHTML() {
           <div style="flex:1;text-align:center;">
             <div class="feat-title" style="margin:0;">About Closet</div>
           </div>
-          <button class="feat-close" onclick="closeMenu()">✕</button>
+          <button class="feat-close" ontouchend="event.preventDefault();closeMenu();" onclick="closeMenu()">✕</button>
         </div>
         <div class="feat-body">${sectionsHTML}</div>
       </div>`;
@@ -5086,7 +5164,7 @@ function featuresMenuHTML() {
         ${chevron}
       </div>`;
     return `
-      <div class="feat-backdrop" onclick="closeMenu()"></div>
+      <div class="feat-backdrop" ontouchend="event.preventDefault();closeMenu();" onclick="closeMenu()"></div>
       <div class="feat-panel">
         <div class="feat-header">
           <button onclick="S.menuSection=null;render()" style="background:none;border:none;display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;padding:0;">
@@ -5095,7 +5173,7 @@ function featuresMenuHTML() {
           <div style="flex:1;text-align:center;">
             <div class="feat-title" style="margin:0;">Services</div>
           </div>
-          <button class="feat-close" onclick="closeMenu()">✕</button>
+          <button class="feat-close" ontouchend="event.preventDefault();closeMenu();" onclick="closeMenu()">✕</button>
         </div>
         <div class="feat-body" style="padding:0;">
           <div style="padding:16px 16px 8px;font-size:12px;color:var(--text-3);line-height:1.6;">Expert help, when you want it — book directly and we'll be in touch.</div>
@@ -5193,7 +5271,7 @@ async function signOut() {
 /* ================================================================
    RENDER ROUTER
    ================================================================ */
-const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','hero-pieces']);
+const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','hero-pieces','signature-pieces']);
 
 function render() {
   const root = document.getElementById('root');
@@ -5226,7 +5304,8 @@ function render() {
     case 'new-piece':    html = viewNewPiece();     break;
     case 'squad':        html = viewSquadDetail();  break;
     case 'hot':          html = viewHot();          break;
-    case 'hero-pieces':  html = viewHeroPieces();   break;
+    case 'hero-pieces':       html = viewHeroPieces();        break;
+    case 'signature-pieces':  html = viewSignaturePieces();   break;
   }
   // Inject tab bar right after the .nav block on every tab view
   if (TAB_VIEWS.has(S.view)) {
@@ -5508,12 +5587,17 @@ function viewHeroPieces() {
           ${meta ? `<div class="hero-hub-meta">${esc(meta)}</div>` : ''}
           ${w.description ? `<div style="font-size:11.5px;color:var(--text-3);margin-top:3px;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.description)}</div>` : ''}
         </div>
-        <div class="hero-hub-crown">Hero</div>
+        <div class="hero-hub-actions">
+          <div class="hero-hub-crown">Hero</div>
+          <button class="hero-hub-share"
+            ontouchend="event.preventDefault();event.stopPropagation();shareHeroPiece('${w.id}')"
+            onclick="event.stopPropagation();shareHeroPiece('${w.id}')">↗ Share</button>
+        </div>
       </div>`;
     });
     bodyHTML += `<div style="padding:4px 16px 20px;">
       <button class="hero-share-btn" ontouchend="event.preventDefault();shareAllHeroPieces()" onclick="shareAllHeroPieces()">
-        💎 Share with Stylist
+        💎 Share All with Stylist
       </button>
       <div style="text-align:center;font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5;">Generates a visual card of all your Hero Pieces — screenshot and send to your stylist.</div>
     </div>`;
@@ -5902,10 +5986,15 @@ function viewCloset() {
   const tagChips = allTags.map(tag =>
     `<div class="filter-chip ${S.filter==='tag:'+tag?'active':''}" onclick="setFilter('tag:${tag.replace(/'/g,'&#39;')}')">🏷 ${esc(tag)}</div>`
   ).join('');
+  const battleEntries = S.entries.filter(e => e.battleId);
+  const battleChip = battleEntries.length > 0
+    ? `<div class="filter-chip ${S.filter==='battle'?'active':''}" ontouchend="event.preventDefault();setFilter(S.filter==='battle'?'all':'battle')" onclick="setFilter(S.filter==='battle'?'all':'battle')">⚔️ Battles${battleEntries.length > 0 ? ` (${Math.ceil(battleEntries.length/2)})` : ''}</div>`
+    : '';
   const filterHTML = S.entries.length > 1 ? `
     <div class="filter-bar-wrap at-start" id="fbw-closet">
     <div class="filter-bar">
       <div class="filter-chip ${S.filter==='best'?'active':''}" onclick="setFilter(S.filter==='best'?'all':'best')">Best Rated</div>
+      ${battleChip}
       ${tagChips}
     </div></div>` : '';
 
@@ -6016,6 +6105,23 @@ async function setPurchaseReaction(entryId, recIdx, reaction) {
   render();
 }
 
+function setDraftTipReaction(idx, reaction) {
+  if (!S.draft) return;
+  if (!S.draft.tipReactions) S.draft.tipReactions = {};
+  const key = String(idx);
+  if (S.draft.tipReactions[key] === reaction) delete S.draft.tipReactions[key];
+  else S.draft.tipReactions[key] = reaction;
+  render();
+}
+function setDraftPurchaseReaction(idx, reaction) {
+  if (!S.draft) return;
+  if (!S.draft.purchaseReactions) S.draft.purchaseReactions = {};
+  const key = String(idx);
+  if (S.draft.purchaseReactions[key] === reaction) delete S.draft.purchaseReactions[key];
+  else S.draft.purchaseReactions[key] = reaction;
+  render();
+}
+
 async function toggleDoNotRepeat(id) {
   const e = S.entries.find(e => e.id === id); if (!e) return;
   e.doNotRepeat = !e.doNotRepeat;
@@ -6027,6 +6133,7 @@ function filteredEntries() {
   let arr = [...S.entries];
   if (S.filter === 'best')   arr.sort((a,b) => b.rating - a.rating);
   if (S.filter === 'recent') arr.sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
+  if (S.filter === 'battle') arr = arr.filter(e => !!e.battleId);
   if (S.filter.startsWith('tag:')) {
     const tag = S.filter.slice(4);
     arr = arr.filter(e => e.occasionTag === tag);
@@ -6087,20 +6194,7 @@ function viewShop() {
     return palettes[Math.abs(h) % palettes.length];
   }
 
-  function shopItemEmoji2(query) { return shopItemEmoji(query); } // alias
-
-  function shopItemBg(query) {
-    const palettes = [
-      { bg:'#FDF5E4', border:'#ECD99A' },
-      { bg:'#F0EBE4', border:'#D9C9BB' },
-      { bg:'#F7EEFA', border:'#DBBFE8' },
-      { bg:'#EAF4EE', border:'#AECFBC' },
-      { bg:'#FEF0EE', border:'#F0BCAF' },
-      { bg:'#EEF3FA', border:'#AEBFDC' },
-    ];
-    let h = 0; for (const c of query) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
-    return palettes[Math.abs(h) % palettes.length];
-  }
+  // (duplicate shopItemBg removed)
 
   // Gift-mode filter
   function isGiftable(query) {
@@ -6133,8 +6227,8 @@ function viewShop() {
 
   const src = S.shopSource || 'recs';
   const activeItems = src === 'wishlist'
-    ? wishItems.map(w => ({ label: w.label, query: w.query, sub: w.reason, entry: w.entry, recIdx: w.recIdx }))
-    : recsRaw.map(i => ({ label: i.query, query: i.query, sub: i.count > 1 ? `×${i.count} outfits` : '×1 outfit', priority: i.count > 1 }));
+    ? wishItems.map(w => ({ label: w.label, query: w.query, sub: w.reason, entry: w.entry, recIdx: w.recIdx, outfitIds: [w.entry?.id].filter(Boolean) }))
+    : recsRaw.map(i => ({ label: i.query, query: i.query, sub: i.count > 1 ? `×${i.count} outfits` : '×1 outfit', priority: i.count > 1, outfitIds: i.outfitIds || [] }));
 
   const SHOP_LIMIT = 5;
   const showItems = S.shopExpanded ? activeItems : activeItems.slice(0, SHOP_LIMIT);
@@ -6229,11 +6323,38 @@ function viewShop() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </a>
         <div style="text-align:center;margin-top:8px;font-size:11px;color:var(--text-3);">Searching for: <em>${esc(selItem.label)}${S.shopBudget ? ' · ' + budgetTiers[S.shopBudget] : ''}</em></div>
+
+        ${(()=>{
+          // Outfits that generated this recommendation
+          const assocOutfits = (selItem.outfitIds || [])
+            .map(id => S.entries.find(e => e.id === id))
+            .filter(Boolean);
+          if (!assocOutfits.length) return '';
+          return `<div style="margin-top:18px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Outfits that inspired this rec</div>
+            <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;">
+              ${assocOutfits.map(e => {
+                const d = new Date(e.createdAt);
+                const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+                const ratingLabel = e.rating ? `${e.rating}/10` : '';
+                return `<div
+                  ontouchend="event.preventDefault();openEntry('${e.id}')"
+                  onclick="openEntry('${e.id}')"
+                  style="flex-shrink:0;width:80px;cursor:pointer;touch-action:manipulation;">
+                  ${e.photo
+                    ? `<img src="${e.photo}" style="width:80px;height:100px;object-fit:cover;object-position:top;border-radius:10px;border:1.5px solid var(--border);display:block;">`
+                    : `<div style="width:80px;height:100px;border-radius:10px;background:var(--surface);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;">📸</div>`}
+                  <div style="font-size:10px;color:var(--text-3);text-align:center;margin-top:5px;line-height:1.3;">${dateLabel}${ratingLabel ? `<br><span style="color:var(--gold-dk);font-weight:700;">${ratingLabel}</span>` : ''}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+        })()}
       </div>` : ''}
 
     </div>
 
-    <div style="height:16px"></div>
+    <div style="height:80px"></div>
   </div>`;
 }
 
@@ -6410,8 +6531,8 @@ function viewPlan() {
       </div>
 
       <div style="padding:0 20px 16px;">
-        <button class="btn btn-primary" ontouchend="event.preventDefault();doSuggestOutfits();" onclick="doSuggestOutfits()" style="margin:0;touch-action:manipulation;${p.loadingSuggest||!p.eventDesc.trim()?'opacity:.55;':''}"
-          ${p.loadingSuggest||!p.eventDesc.trim()?'disabled':''}>
+        <button class="btn btn-primary" ontouchend="event.preventDefault();doSuggestOutfits();" onclick="doSuggestOutfits()" style="margin:0;touch-action:manipulation;${p.loadingSuggest?'opacity:.65;':''}"
+          ${p.loadingSuggest?'disabled':''}>
           ${p.loadingSuggest ? '✨ Claude is thinking…' : '✨ Get Recommendation'}
         </button>
       </div>
@@ -6421,6 +6542,7 @@ function viewPlan() {
         <div class="plan-rec-card">
           <div class="plan-rec-header">
             <span class="plan-rec-label">✨ Recommendation</span>
+            <span style="font-size:11px;color:var(--text-3);font-style:italic;">${esc(autoTitle(p.eventDesc))}</span>
           </div>
           <div class="plan-rec-body">
             <div class="plan-rec-items">
@@ -6429,43 +6551,119 @@ function viewPlan() {
             ${p.suggestion.reasoning ? `<div class="plan-rec-reasoning">${esc(p.suggestion.reasoning)}</div>` : ''}
             ${p.suggestion.weatherNote ? `<div style="font-size:12px;color:var(--gold-dk);font-weight:600;margin-top:6px;">🌤 ${esc(p.suggestion.weatherNote)}</div>` : ''}
           </div>
-          <div class="plan-rec-actions">
-            <div class="plan-rec-trip-row">
-              <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;flex-shrink:0;">Save to:</span>
-              <button class="plan-rec-trip-btn" ontouchend="event.preventDefault();addToEventBoard(null);" onclick="addToEventBoard(null)" style="touch-action:manipulation;">Board</button>
+
+          <!-- Action buttons -->
+          ${!p.tripPickerOpen ? `
+          <div style="display:flex;gap:8px;padding:12px 16px 14px;">
+            <button ontouchend="event.preventDefault();saveEventStandalone();" onclick="saveEventStandalone()"
+              style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              💾 Save Event
+            </button>
+            <button ontouchend="event.preventDefault();S.plan.tripPickerOpen=true;render();" onclick="S.plan.tripPickerOpen=true;render()"
+              style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:none;background:var(--gold);font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              ✈️ Add to Trip
+            </button>
+          </div>
+          ` : `
+          <!-- Trip picker -->
+          <div style="padding:12px 16px 16px;border-top:1px solid var(--border);">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin-bottom:10px;">Add to which trip?</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;">
+              ${p.activeTripId ? `<div style="font-size:12px;color:var(--gold-dk);font-weight:600;width:100%;margin-bottom:2px;">↩ Continuing: ${esc((S.eventTrips.find(t=>t.id===p.activeTripId)||{}).name||'')}</div>` : ''}
               ${S.eventTrips.map(t=>`
-                <button class="plan-rec-trip-btn" ontouchend="event.preventDefault();addToEventBoard('${esc(t.id)}');" onclick="addToEventBoard('${esc(t.id)}')" style="touch-action:manipulation;">${esc(t.name)}</button>
-              `).join('')}
-              <button class="plan-rec-trip-btn" style="border-style:dashed;touch-action:manipulation;" ontouchend="event.preventDefault();startNewTrip();" onclick="startNewTrip()">+ New Trip</button>
+                <button ontouchend="event.preventDefault();saveEventToTrip('${esc(t.id)}');" onclick="saveEventToTrip('${esc(t.id)}')"
+                  style="padding:8px 16px;border-radius:100px;border:${p.activeTripId===t.id?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${p.activeTripId===t.id?'var(--gold-bg)':'var(--surface)'};font-size:13px;font-weight:700;color:${p.activeTripId===t.id?'var(--gold-dk)':'var(--text-2)'};cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                  ✈️ ${esc(t.name)}
+                </button>`).join('')}
+              <button ontouchend="event.preventDefault();startNewTrip();" onclick="startNewTrip()"
+                style="padding:8px 16px;border-radius:100px;border:1.5px dashed var(--border);background:var(--surface);font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                ＋ New Trip
+              </button>
             </div>
+            <button ontouchend="event.preventDefault();S.plan.tripPickerOpen=false;render();" onclick="S.plan.tripPickerOpen=false;render()"
+              style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;">← Back</button>
+          </div>
+          `}
+        </div>
+      ` : ''}
+
+      <!-- Post-trip-save success nudge -->
+      ${p.savedSuccess && !p.suggestion ? `
+        <div style="margin:0 16px 16px;padding:16px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r-sm);text-align:center;">
+          <div style="font-size:14px;font-weight:800;color:var(--gold-dk);margin-bottom:4px;">✓ Added to ${esc((S.eventTrips.find(t=>t.id===p.activeTripId)||{}).name||'trip')}</div>
+          <div style="font-size:12px;color:var(--gold-dk);opacity:.8;margin-bottom:14px;">Keep building this trip out.</div>
+          <div style="display:flex;gap:8px;">
+            <button ontouchend="event.preventDefault();addAnotherTripEvent();" onclick="addAnotherTripEvent()"
+              style="flex:1;padding:10px 0;border-radius:var(--r-sm);border:none;background:var(--gold);font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              ＋ Add Another Event
+            </button>
+            <button ontouchend="event.preventDefault();S.plan.savedSuccess=false;S.plan.activeTripId=null;render();" onclick="S.plan.savedSuccess=false;S.plan.activeTripId=null;render()"
+              style="flex:1;padding:10px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              Done
+            </button>
           </div>
         </div>
       ` : ''}
 
       ${S.eventBoard.length > 0 ? `
-        <!-- EVENT BOARD -->
+        <!-- EVENT BOARD — trips grouped, then standalone events -->
         <div class="event-board-section">
           <div class="event-board-header">
             <span>Event Board</span>
             <span style="font-size:12px;font-weight:500;color:var(--text-3);">${S.eventBoard.length} event${S.eventBoard.length===1?'':'s'}</span>
           </div>
-          ${S.eventBoard.map(ev => {
-            const trip = ev.tripId ? S.eventTrips.find(t=>t.id===ev.tripId) : null;
-            return `
-            <div class="event-card">
-              <div class="event-card-header">
-                <div class="event-card-desc">${esc(ev.desc)}</div>
-                <button class="event-card-delete" ontouchend="event.preventDefault();deleteEventBoardItem('${ev.id}');" onclick="deleteEventBoardItem('${ev.id}')" style="touch-action:manipulation;" title="Remove">✕</button>
-              </div>
-              ${trip ? `<div class="event-card-trip-badge">✈️ ${esc(trip.name)}</div>` : ''}
-              <div class="event-card-body">
-                <div class="event-card-items">
-                  ${(ev.suggestion?.items||[]).map(it=>`<span class="event-card-chip">${esc(it)}</span>`).join('')}
+
+          ${(()=>{
+            let html = '';
+            // Trips first — grouped
+            S.eventTrips.forEach(trip => {
+              const tripEvents = S.eventBoard.filter(ev => ev.tripId === trip.id);
+              if (!tripEvents.length) return;
+              html += `<div style="margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:8px;padding:0 16px;margin-bottom:8px;">
+                  <span style="font-size:12px;font-weight:800;color:var(--gold-dk);">✈️ ${esc(trip.name)}</span>
+                  <span style="font-size:11px;color:var(--text-3);">${tripEvents.length} event${tripEvents.length===1?'':'s'}</span>
                 </div>
-                ${ev.suggestion?.reasoning ? `<div class="event-card-reasoning">${esc(ev.suggestion.reasoning)}</div>` : ''}
-              </div>
-            </div>`;
-          }).join('')}
+                ${tripEvents.map(ev => `
+                <div class="event-card" style="margin-left:12px;border-left:3px solid var(--gold);">
+                  <div class="event-card-header">
+                    <div>
+                      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px;">${esc(ev.title||autoTitle(ev.desc))}</div>
+                      <div style="font-size:11px;color:var(--text-3);line-height:1.4;">${esc(ev.desc)}</div>
+                    </div>
+                    <button class="event-card-delete" ontouchend="event.preventDefault();deleteEventBoardItem('${ev.id}');" onclick="deleteEventBoardItem('${ev.id}')" title="Remove">✕</button>
+                  </div>
+                  <div class="event-card-body">
+                    <div class="event-card-items">${(ev.suggestion?.items||[]).map(it=>`<span class="event-card-chip">${esc(it)}</span>`).join('')}</div>
+                    ${ev.suggestion?.reasoning ? `<div class="event-card-reasoning">${esc(ev.suggestion.reasoning)}</div>` : ''}
+                  </div>
+                </div>`).join('')}
+              </div>`;
+            });
+            // Standalone events
+            const solo = S.eventBoard.filter(ev => !ev.tripId);
+            if (solo.length) {
+              if (S.eventTrips.some(t => S.eventBoard.find(ev => ev.tripId === t.id))) {
+                html += `<div style="font-size:12px;font-weight:800;color:var(--text-3);padding:0 16px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Solo Events</div>`;
+              }
+              solo.forEach(ev => {
+                html += `<div class="event-card">
+                  <div class="event-card-header">
+                    <div>
+                      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px;">${esc(ev.title||autoTitle(ev.desc))}</div>
+                      <div style="font-size:11px;color:var(--text-3);line-height:1.4;">${esc(ev.desc)}</div>
+                    </div>
+                    <button class="event-card-delete" ontouchend="event.preventDefault();deleteEventBoardItem('${ev.id}');" onclick="deleteEventBoardItem('${ev.id}')" title="Remove">✕</button>
+                  </div>
+                  <div class="event-card-body">
+                    <div class="event-card-items">${(ev.suggestion?.items||[]).map(it=>`<span class="event-card-chip">${esc(it)}</span>`).join('')}</div>
+                    ${ev.suggestion?.reasoning ? `<div class="event-card-reasoning">${esc(ev.suggestion.reasoning)}</div>` : ''}
+                  </div>
+                </div>`;
+              });
+            }
+            return html;
+          })()}
         </div>
       ` : ''}
 
@@ -6565,7 +6763,7 @@ Return ONLY a JSON array: [{"day":"Day 1","date":"${ds||''}","occasion":"Arrival
 }
 
 async function doSuggestOutfits() {
-  if (!S.plan.eventDesc.trim()) return;
+  if (!S.plan.eventDesc.trim()) { toast('Describe your event first!'); return; }
   if (!S.apiKey.trim()) { navigate('settings'); toast('Add your API key first!'); return; }
   S.plan.loadingSuggest = true; S.plan.suggestion = null; render();
   try {
@@ -6574,6 +6772,65 @@ async function doSuggestOutfits() {
     if (!result) toast('Something went wrong — try again');
   } catch(e) { console.error(e); toast('Something went wrong — try again'); }
   S.plan.loadingSuggest = false; render();
+}
+
+function autoTitle(desc) {
+  // Strip common filler words, take first 4–5 meaningful words, title-case
+  const filler = /\b(a|an|the|in|at|on|for|to|my|i|is|it|was|will|be|with|and|or|but|just|some|really|very|so|im|i'm|going)\b/gi;
+  const words = desc.replace(filler, ' ').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  return words.slice(0, 5).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') || desc.slice(0, 40);
+}
+
+function saveEventStandalone() {
+  const p = S.plan;
+  if (!p.suggestion) return;
+  const item = {
+    id: Date.now().toString(),
+    title: autoTitle(p.eventDesc),
+    desc: p.eventDesc,
+    suggestion: p.suggestion,
+    tripId: null,
+    addedAt: new Date().toISOString()
+  };
+  S.eventBoard = [item, ...S.eventBoard];
+  saveEventBoard();
+  S.plan.suggestion = null;
+  S.plan.eventDesc = '';
+  S.plan.tripPickerOpen = false;
+  S.plan.savedSuccess = false;
+  S.plan.activeTripId = null;
+  toast('Event saved 🗓️');
+  render();
+}
+
+function saveEventToTrip(tripId) {
+  const p = S.plan;
+  if (!p.suggestion) return;
+  const item = {
+    id: Date.now().toString(),
+    title: autoTitle(p.eventDesc),
+    desc: p.eventDesc,
+    suggestion: p.suggestion,
+    tripId: tripId,
+    addedAt: new Date().toISOString()
+  };
+  S.eventBoard = [item, ...S.eventBoard];
+  saveEventBoard();
+  S.plan.suggestion = null;
+  S.plan.eventDesc = '';
+  S.plan.tripPickerOpen = false;
+  S.plan.savedSuccess = true;
+  S.plan.activeTripId = tripId;
+  render();
+}
+
+function addAnotherTripEvent() {
+  // Clear form but keep activeTripId so the next event goes to same trip
+  S.plan.suggestion = null;
+  S.plan.eventDesc = '';
+  S.plan.savedSuccess = false;
+  S.plan.tripPickerOpen = false;
+  render();
 }
 
 function addToEventBoard(tripId) {
@@ -6607,8 +6864,7 @@ function confirmNewTrip() {
   S.eventTrips = [...S.eventTrips, trip];
   localStorage.setItem('closet-event-trips', JSON.stringify(S.eventTrips));
   S._tripFlow = null;
-  // Immediately add the pending recommendation under this new trip
-  addToEventBoard(trip.id);
+  saveEventToTrip(trip.id);
 }
 
 function deleteEventBoardItem(id) {
@@ -6950,9 +7206,9 @@ function viewProfile() {
   const locationBanner = S.profileLocation ? `
     <div style="position:relative;width:100%;height:200px;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,${colors.bg1},${colors.bg2});">
       <!-- Shimmer shown while image loads -->
-      <div id="locBannerShimmer" style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0) 100%);background-size:200% 100%;animation:shimmer 1.6s infinite;"></div>
+      <div id="locBannerShimmer" style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0) 100%);background-size:200% 100%;animation:shimmer 1.6s infinite;${S._bannerLoaded?'display:none;':''}"></div>
       <!-- Loading label -->
-      <div id="locBannerLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+      <div id="locBannerLoading" style="position:absolute;inset:0;display:${S._bannerLoaded?'none':'flex'};align-items:center;justify-content:center;">
         <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.45);letter-spacing:.05em;">Generating city view…</span>
       </div>
       <!-- Retry button shown on error -->
@@ -6960,10 +7216,10 @@ function viewProfile() {
         <button onclick="reloadLocationBanner()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:100px;padding:7px 16px;font-size:12px;font-weight:700;color:rgba(255,255,255,.8);cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);">↺ Retry</button>
       </div>
       <img id="locBannerImg" src="${esc(pollinationsLocationBannerUrl(S.profileLocation))}"
-        style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .6s ease;"
+        style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:${S._bannerLoaded?'1':'0'};transition:opacity .6s ease;"
         loading="eager"
-        onload="this.style.opacity='1';document.getElementById('locBannerShimmer').style.display='none';document.getElementById('locBannerLoading').style.display='none';"
-        onerror="this.style.display='none';var s=document.getElementById('locBannerShimmer');if(s)s.style.display='none';var l=document.getElementById('locBannerLoading');if(l)l.style.display='none';var e=document.getElementById('locBannerError');if(e)e.style.display='flex';">
+        onload="S._bannerLoaded=true;this.style.opacity='1';var s=document.getElementById('locBannerShimmer');if(s)s.style.display='none';var l=document.getElementById('locBannerLoading');if(l)l.style.display='none';"
+        onerror="S._bannerLoaded=false;this.style.display='none';var s=document.getElementById('locBannerShimmer');if(s)s.style.display='none';var l=document.getElementById('locBannerLoading');if(l)l.style.display='none';var e=document.getElementById('locBannerError');if(e)e.style.display='flex';">
       <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.04) 0%,rgba(0,0,0,0.65) 100%);"></div>
       <!-- Name + location pin bottom-left -->
       <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 16px 16px;">
@@ -7015,6 +7271,97 @@ function viewProfile() {
     <!-- Wish list carousel -->
     ${wishListHTML}
     ${(likedRecsHTML || wishListHTML) ? `<div style="height:1px;background:var(--border);margin:0 16px 20px;"></div>` : ''}
+
+    <!-- Confidence Score box -->
+    ${(()=>{
+      const scored = S.entries.filter(e => e.confidence != null);
+      if (scored.length < 2) return '';
+      const sorted = [...scored].sort((a,b) => new Date(a.createdAt||0) - new Date(b.createdAt||0));
+      const overall = scored.reduce((s,e) => s + e.confidence, 0) / scored.length;
+      const recent = sorted.slice(-5);
+      const recentAvg = recent.reduce((s,e) => s + e.confidence, 0) / recent.length;
+      const diff = recentAvg - overall;
+      const trendUp = diff > 0.4;
+      const trendDown = diff < -0.4;
+      const arrow = trendUp ? '↑' : trendDown ? '↓' : '→';
+      const arrowColor = trendUp ? '#2E9E6B' : trendDown ? '#C0392B' : 'var(--text-3)';
+      const trendLabel = trendUp ? 'trending up' : trendDown ? 'trending down' : 'holding steady';
+      return `<div style="margin:0 16px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;">
+        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#EAF4F9,#C8E4F0);border:1px solid #AECFDC33;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">🎯</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:3px;">Style Confidence</div>
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <span style="font-size:26px;font-weight:900;color:#4A8FA8;letter-spacing:-.5px;line-height:1;">${recentAvg.toFixed(1)}</span>
+            <span style="font-size:11px;color:var(--text-3);font-weight:500;">/ 10</span>
+            <span style="font-size:20px;font-weight:900;color:${arrowColor};line-height:1;margin-left:2px;">${arrow}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">${trendLabel} · last ${recent.length} outfits</div>
+        </div>
+      </div>`;
+    })()}
+
+    <!-- Signature Pieces entry card -->
+    ${(()=>{
+      const sigs = S.wardrobe.filter(w => w.isSignature && !w.retiredFromCloset);
+      const full = sigs.length === SIG_MAX;
+      return `<div
+        onclick="navigate('signature-pieces')"
+        ontouchend="event.preventDefault();navigate('signature-pieces')"
+        style="margin:0 16px 16px;background:${full ? 'linear-gradient(135deg,#FFF8FA,#FFF1F6)' : 'var(--surface)'};border:1.5px solid ${full ? 'var(--sig-border)' : 'var(--border)'};border-radius:16px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;touch-action:manipulation;">
+        <div style="width:44px;height:44px;border-radius:12px;background:${full ? 'linear-gradient(135deg,var(--sig),#C2185B)' : 'linear-gradient(135deg,#FFE4EE,#FFD0E4)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;font-weight:900;color:${full ? '#fff' : 'var(--sig-dk)'};">
+          ✦
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:800;color:${full ? 'var(--sig-dk)' : 'var(--text)'};margin-bottom:2px;">Signature Pieces</div>
+          <div style="font-size:12px;color:var(--text-3);">${full ? `All ${SIG_MAX} chosen · tap to view or share` : sigs.length > 0 ? `${sigs.length} of ${SIG_MAX} chosen — add more` : 'The pieces that are unmistakably you'}</div>
+        </div>
+        ${full ? `<div class="sig-badge" style="flex-shrink:0;">✦ ${SIG_MAX}</div>` : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>`}
+      </div>`;
+    })()}
+
+    <!-- Fashion Battles W/L card -->
+    ${(()=>{
+      const battleEntries = S.entries.filter(e => e.battleId);
+      if (battleEntries.length === 0) return '';
+      // Each battle saves 2 entries; count unique battles by battleId
+      const uniqueIds = new Set(battleEntries.map(e => e.battleId));
+      const totalBattles = uniqueIds.size;
+      // A "win" means the user's perspective entry has battleWon:true
+      // We only count one entry per battleId (avoid double-counting)
+      const seen = new Set();
+      let wins = 0, losses = 0, ties = 0;
+      battleEntries.forEach(e => {
+        if (seen.has(e.battleId)) return;
+        seen.add(e.battleId);
+        // Find the partner to detect a tie (both battleWon === false)
+        const partner = S.entries.find(p => p.battleId === e.battleId && p.id !== e.id);
+        const isTie = partner && !e.battleWon && !partner.battleWon;
+        if (isTie) ties++;
+        else if (e.battleWon) wins++;
+        else losses++;
+      });
+      const winPct = totalBattles > 0 ? Math.round((wins / totalBattles) * 100) : 0;
+      const barW = Math.round((wins / Math.max(totalBattles, 1)) * 100);
+      return `<div
+        ontouchend="event.preventDefault();setFilter('battle');switchTab('closet')"
+        onclick="setFilter('battle');switchTab('closet')"
+        style="margin:0 16px 16px;background:linear-gradient(135deg,#1C1A18,#23201A);border:1.5px solid #3A3228;border-radius:16px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;touch-action:manipulation;">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">⚔️</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:800;color:var(--gold);margin-bottom:4px;">My Fashion Battles</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:700;color:#6BBF8E;">🏆 ${wins}W</span>
+            <span style="font-size:12px;font-weight:700;color:#C07070;">🥈 ${losses}L</span>
+            ${ties > 0 ? `<span style="font-size:12px;font-weight:700;color:var(--text-3);">🤝 ${ties}T</span>` : ''}
+            <span style="font-size:11px;color:var(--text-3);margin-left:auto;">${totalBattles} ${totalBattles === 1 ? 'battle' : 'battles'}</span>
+          </div>
+          <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:100px;overflow:hidden;">
+            <div style="height:100%;width:${barW}%;background:linear-gradient(90deg,#6BBF8E,var(--gold));border-radius:100px;transition:width .4s;"></div>
+          </div>
+          <div style="font-size:10px;color:var(--text-3);margin-top:3px;">${winPct}% win rate · tap to see all</div>
+        </div>
+      </div>`;
+    })()}
 
     <!-- Dashboard tile -->
     <div onclick="openStatsDash()" style="margin:0 16px 24px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;" ontouchstart="this.style.background='var(--surface-2)'" ontouchend="this.style.background='var(--surface)'">
@@ -7545,7 +7892,7 @@ function viewDashboard() {
   const retiring = S.wardrobe.filter(w=>w.retiring && !w.retiredFromCloset).slice(0,5);
 
   // ── Needs Tailoring ───────────────────────────────────────
-  const needsTailoring = S.wardrobe.filter(w=>w.tailoringNeeded && !w.retiredFromCloset).slice(0,5);
+  const needsTailoring = S.wardrobe.filter(w=>w.tailoringNeeded && !w.retiredFromCloset);
 
   // ── Wasted Spend (retired because "didn't suit me") ───────
   const wastedItems = S.wardrobe.filter(w=>w.retiredFromCloset && w.retireReason==='didnt-suit-me' && w.price);
@@ -7633,8 +7980,8 @@ function viewDashboard() {
         </div>`).join(''),
       'border-color:#E8C060;background:repeating-linear-gradient(135deg,#FFFDF5,#FFFDF5 10px,#FEF9EC 10px,#FEF9EC 12px);') : ''}
 
-    ${needsTailoring.length ? dashSection('tailoring', '🧵 Needs Tailoring',
-      needsTailoring.map(w=>`
+    ${needsTailoring.length ? dashSection('tailoring', `🧵 Needs Tailoring <span style="font-size:11px;font-weight:600;color:#9B60C8;background:#F0E6FF;border-radius:100px;padding:1px 7px;margin-left:4px;">${needsTailoring.length}</span>`,
+      needsTailoring.slice(0,5).map(w=>`
         <div class="dash-item-row" onclick="openWardrobeItem('${w.id}')">
           <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;">${w.icon||'👕'}</div>
           <div class="dash-item-info">
@@ -7642,7 +7989,14 @@ function viewDashboard() {
             <div class="dash-item-sub">${w.tailoringNote ? esc(w.tailoringNote) : (w.brand?esc(w.brand)+' · ':'')+'needs alteration'}</div>
           </div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </div>`).join(''),
+        </div>`).join('') +
+      (needsTailoring.length > 5 ? `
+        <button
+          ontouchend="event.preventDefault();S.wardrobeTailoringFilter=true;switchTab('closet');render()"
+          onclick="S.wardrobeTailoringFilter=true;switchTab('closet');render()"
+          style="width:100%;padding:10px 14px;background:none;border:none;border-top:1px solid var(--border);font-size:13px;font-weight:700;color:#7B35A8;cursor:pointer;font-family:inherit;text-align:center;touch-action:manipulation;">
+          See all ${needsTailoring.length} items needing tailoring →
+        </button>` : ''),
       'border-color:#C8A8E0;') : ''}
 
     ${wastedItems.length ? dashSection('wasted', `💸 Didn't Suit Me — $${wastedTotal % 1 === 0 ? wastedTotal : wastedTotal.toFixed(0)} Spent`,
@@ -7663,6 +8017,210 @@ function viewDashboard() {
 }
 
 /* ================================================================
+   SIGNATURE PIECES — TOGGLE, VIEW, SHARE
+   ================================================================ */
+const SIG_MAX = 3;
+
+async function toggleSignaturePiece(id) {
+  const w = S.wardrobe.find(i => i.id === id);
+  if (!w) return;
+  const sigs = S.wardrobe.filter(i => i.isSignature);
+  if (!w.isSignature && sigs.length >= SIG_MAX) {
+    toast(`You've already chosen your ${SIG_MAX} signature pieces. Remove one to swap.`);
+    return;
+  }
+  w.isSignature = !w.isSignature;
+  if (!w.isSignature) delete w.signatureNote;
+  await DB.wardrobe.put(w);
+  S.wardrobe = await DB.wardrobe.getAll();
+  toast(w.isSignature ? '✦ Added as a Signature Piece!' : 'Removed from Signature Pieces');
+  render();
+}
+
+async function saveSignatureNote(id, note) {
+  const w = S.wardrobe.find(i => i.id === id);
+  if (!w) return;
+  w.signatureNote = note.trim();
+  await DB.wardrobe.put(w);
+  S.wardrobe = await DB.wardrobe.getAll();
+}
+
+function viewSignaturePieces() {
+  const sigs = S.wardrobe.filter(w => w.isSignature && !w.retiredFromCloset);
+  const userName = S.profileName ? esc(S.profileName) : 'You';
+  const slots = [0,1,2];
+
+  let bodyHTML = `<div style="padding:4px 16px 14px;">
+    <div style="font-size:13px;color:var(--text-3);line-height:1.65;">The pieces people remember you by — the ones that make someone say "that's so ${userName}." Choose up to three. They don't have to be your most expensive or most worn. They just have to be unmistakably you.</div>
+  </div>`;
+
+  if (sigs.length < SIG_MAX) {
+    bodyHTML += `<div style="margin:0 16px 14px;background:var(--sig-bg);border:1.5px dashed var(--sig-border);border-radius:var(--r);padding:11px 14px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:16px;flex-shrink:0;">✦</span>
+      <div style="font-size:12.5px;color:var(--sig-dk);font-weight:600;line-height:1.4;">
+        ${sigs.length === 0 ? 'No signature pieces yet.' : `${sigs.length} of ${SIG_MAX} chosen.`}
+        Open any wardrobe piece and mark it as a Signature Piece.
+      </div>
+    </div>`;
+  }
+
+  slots.forEach(i => {
+    const w = sigs[i];
+    if (!w) {
+      bodyHTML += `<div style="margin:0 16px 12px;border:1.5px dashed var(--sig-border);border-radius:var(--r);padding:18px;text-align:center;">
+        <div style="font-size:22px;margin-bottom:6px;opacity:.35;">✦</div>
+        <div style="font-size:12px;color:var(--sig-border);font-weight:600;">Slot ${i+1} · Open any wardrobe item to add</div>
+      </div>`;
+      return;
+    }
+    const wears = w.wears?.length || 0;
+    const meta = [w.brand, w.category, wears > 0 ? `${wears} wear${wears===1?'':'s'}` : null].filter(Boolean).join(' · ');
+    bodyHTML += `<div class="sig-hub-card filled" onclick="openWardrobeItem('${w.id}')">
+      <div class="sig-hub-card-header">
+        <div class="sig-hub-emoji">${w.icon || '👕'}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="sig-hub-name">${esc(w.name)}</div>
+          ${meta ? `<div class="sig-hub-meta">${esc(meta)}</div>` : ''}
+        </div>
+        <div class="sig-badge">✦ ${i+1}</div>
+      </div>
+      ${w.signatureNote ? `<div class="sig-hub-why">"${esc(w.signatureNote)}"</div>` : `<div style="font-size:12px;color:var(--sig-border);margin-top:10px;padding-top:10px;border-top:1px dashed var(--sig-border);font-style:italic;">Tap to add why this piece is yours →</div>`}
+    </div>`;
+  });
+
+  if (sigs.length === SIG_MAX) {
+    bodyHTML += `<div style="padding:4px 16px 16px;">
+      <button class="sig-share-btn"
+        ontouchend="event.preventDefault();shareSignaturePieces()"
+        onclick="shareSignaturePieces()">
+        ✦ Share My Signature Style
+      </button>
+      <div style="text-align:center;font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5;">Creates a visual card you can send to your stylist or save as a keepsake.</div>
+    </div>`;
+  }
+
+  return `<div class="view view-notab">
+    <div class="nav">
+      <button class="nav-back" onclick="navigate('profile')">${iconBack()} Me</button>
+      <span class="nav-title" style="color:var(--sig-dk);">✦ Signature Pieces</span>
+      <span style="width:72px"></span>
+    </div>
+    <div style="background:linear-gradient(135deg,var(--sig),#C2185B);padding:18px 20px 20px;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.7);margin-bottom:5px;">Your Style Identity</div>
+      <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.3px;line-height:1.2;">${sigs.length === SIG_MAX ? `All ${SIG_MAX} pieces chosen` : `${sigs.length} of ${SIG_MAX} pieces`}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:4px;">The pieces that are unmistakably ${userName}.</div>
+    </div>
+    ${bodyHTML}
+  </div>`;
+}
+
+async function shareSignaturePieces() {
+  const sigs = S.wardrobe.filter(w => w.isSignature && !w.retiredFromCloset).slice(0, SIG_MAX);
+  if (!sigs.length) { toast('Mark some Signature Pieces first!'); return; }
+
+  const W = 800, H = 520 + sigs.length * 120;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#FFF8FA';
+  ctx.fillRect(0, 0, W, H);
+
+  // Header gradient
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0, '#9D174D'); grad.addColorStop(1, '#C2185B');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, 180);
+
+  // Header text
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '700 24px -apple-system, sans-serif';
+  ctx.fillText('MY SIGNATURE STYLE', 48, 62);
+
+  const displayName = S.profileName?.trim() || 'My';
+  ctx.fillStyle = '#fff';
+  ctx.font = '800 52px -apple-system, sans-serif';
+  ctx.fillText(`${displayName}'s Pieces`, 48, 128);
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '500 22px -apple-system, sans-serif';
+  ctx.fillText('The ones that are unmistakably me.', 48, 162);
+
+  // Cards
+  let y = 210;
+  for (let i = 0; i < sigs.length; i++) {
+    const w = sigs[i];
+    // Card bg
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.roundRect(36, y, W - 72, 110, 16);
+    ctx.fill();
+    // Rose left accent
+    ctx.fillStyle = '#9D174D';
+    ctx.beginPath();
+    ctx.roundRect(36, y, 6, 110, [16, 0, 0, 16]);
+    ctx.fill();
+    // Number badge
+    ctx.fillStyle = '#FFF1F6';
+    ctx.beginPath();
+    ctx.arc(80, y + 36, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#9D174D';
+    ctx.font = '800 20px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`✦${i+1}`, 80, y + 43);
+    ctx.textAlign = 'left';
+    // Icon
+    ctx.font = '36px sans-serif';
+    ctx.fillText(w.icon || '👕', 116, y + 50);
+    // Name
+    ctx.fillStyle = '#111';
+    ctx.font = '800 26px -apple-system, sans-serif';
+    ctx.fillText(w.name.length > 32 ? w.name.slice(0,32)+'…' : w.name, 172, y + 38);
+    // Why note
+    if (w.signatureNote) {
+      ctx.fillStyle = '#9D174D';
+      ctx.font = 'italic 500 18px -apple-system, sans-serif';
+      const note = `"${w.signatureNote}"`;
+      ctx.fillText(note.length > 58 ? note.slice(0,58)+'…"' : note, 172, y + 70);
+    } else if (w.brand) {
+      ctx.fillStyle = '#888';
+      ctx.font = '500 18px -apple-system, sans-serif';
+      ctx.fillText(w.brand, 172, y + 70);
+    }
+    // Wears
+    const wears = w.wears?.length || 0;
+    if (wears > 0) {
+      ctx.fillStyle = '#bbb';
+      ctx.font = '500 16px -apple-system, sans-serif';
+      ctx.fillText(`${wears} wear${wears===1?'':'s'}`, 172, y + 95);
+    }
+    y += 128;
+  }
+
+  // Footer
+  ctx.fillStyle = '#F5B3CB';
+  ctx.fillRect(0, H - 54, W, 1);
+  ctx.fillStyle = '#9D174D';
+  ctx.font = '600 18px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('closet.app  ·  Your AI-Powered Style Journal', W/2, H - 18);
+
+  const dataUrl = canvas.toDataURL('image/png');
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], 'signature-style.png', { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ title: 'My Signature Style', files: [file] });
+      return;
+    }
+  } catch(e) {}
+  const a = document.createElement('a');
+  a.href = dataUrl; a.download = 'signature-style.png'; a.click();
+  toast('Signature style card saved! ✦');
+}
+
+/* ================================================================
    VIEW: WARDROBE
    ================================================================ */
 function viewWardrobe() {
@@ -7680,8 +8238,13 @@ function viewWardrobe() {
     if (catCounts[cat] !== undefined) catCounts[cat]++;
   });
 
-  // Apply category filter
-  if (S.wardrobeCategory !== 'All') {
+  // Apply tailoring quick-filter (set from dashboard "See all" link)
+  if (S.wardrobeTailoringFilter) {
+    items = items.filter(w => w.tailoringNeeded);
+  }
+
+  // Apply category filter (skip if tailoring filter is active)
+  if (!S.wardrobeTailoringFilter && S.wardrobeCategory !== 'All') {
     items = items.filter(w => normalizeCat(w.category || categoryFromIcon(w.icon, w.name)) === S.wardrobeCategory);
   }
 
@@ -7695,6 +8258,7 @@ function viewWardrobe() {
   }
 
   // Sort
+  if (S.wardrobeSort === 'newest')    items.sort((a,b) => new Date(b.addedAt||0) - new Date(a.addedAt||0));
   if (S.wardrobeSort === 'most-worn') items.sort((a,b) => b.wears.length - a.wears.length);
   if (S.wardrobeSort === 'best-val')  items.sort((a,b) => {
     const ppwA = a.price && a.wears.length ? a.price/a.wears.length : Infinity;
@@ -7728,6 +8292,7 @@ function viewWardrobe() {
   const sortBar = S.wardrobe.length > 1 ? `
     <div class="filter-bar-wrap at-start at-end" id="fbw-wsort">
     <div class="filter-bar" style="padding-top:4px;">
+      <div class="filter-chip ${S.wardrobeSort==='newest'?'active':''}"    onclick="S.wardrobeSort='newest';render()">Newest</div>
       <div class="filter-chip ${S.wardrobeSort==='most-worn'?'active':''}" onclick="S.wardrobeSort='most-worn';render()">Most Worn</div>
       <div class="filter-chip ${S.wardrobeSort==='best-val'?'active':''}"  onclick="S.wardrobeSort='best-val';render()">Best Value</div>
       <div class="filter-chip ${S.wardrobeSort==='az'?'active':''}"        onclick="S.wardrobeSort='az';render()">A–Z</div>
@@ -7802,12 +8367,13 @@ function viewWardrobe() {
     }
 
     // ── Shoe rack renderer ────────────────────────────────────
-    function shoeCardHTML(w) {
+    // ── Generic shelf card + section (Shoes, Bags, Accessories) ─
+    function shelfCardHTML(w, fallbackIcon) {
       const wears = w.wears?.length || 0;
       const isHero = !!w.isHero;
       const imgHTML = w.photo
         ? `<img src="${esc(w.photo)}" class="shoe-card-img" alt="${esc(w.name)}">`
-        : `<span class="shoe-card-emoji">${w.icon || '👠'}</span>`;
+        : `<span class="shoe-card-emoji">${w.icon || fallbackIcon}</span>`;
       return `<div class="shoe-card" onclick="openWardrobeItem('${w.id}')">
         <div class="shoe-card-img-wrap${isHero?' hero':''}">
           ${imgHTML}
@@ -7818,29 +8384,27 @@ function viewWardrobe() {
       </div>`;
     }
 
-    function shoeRackHTML(shoeItems) {
-      const levels = Math.max(1, Math.min(4, S.shoeRackLevels || 2));
-      const perShelf = Math.ceil(shoeItems.length / levels);
-      const cost = catCost(shoeItems);
+    function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackIcon) {
+      const levels = Math.max(1, Math.min(4, S[stateKey] || 2));
+      const perShelf = Math.ceil(catItems.length / levels);
+      const cost = catCost(catItems);
       const costStr = fmtCost(cost);
-
       let shelves = '';
       for (let i = 0; i < levels; i++) {
-        const batch = shoeItems.slice(i * perShelf, (i + 1) * perShelf);
+        const batch = catItems.slice(i * perShelf, (i + 1) * perShelf);
         if (!batch.length) continue;
-        shelves += `<div class="shoe-shelf">${batch.map(shoeCardHTML).join('')}</div>`;
+        shelves += `<div class="shoe-shelf">${batch.map(w => shelfCardHTML(w, fallbackIcon)).join('')}</div>`;
       }
-
       return `<div class="shoe-rack-section">
         <div class="shoe-rack-header">
           <div class="shoe-rack-title">
-            <span class="shoe-rack-cat">👠 Shoes</span>
-            <span class="shoe-rack-meta">${shoeItems.length} pair${shoeItems.length===1?'':'s'}${costStr?' · '+costStr:''}</span>
+            <span class="shoe-rack-cat">${icon} ${label}</span>
+            <span class="shoe-rack-meta">${catItems.length} ${countLabel}${costStr?' · '+costStr:''}</span>
           </div>
           <div class="shoe-rack-controls">
-            <span class="shoe-rack-level-label">${levels} shelf${levels===1?'':'ves'}</span>
-            <button class="shoe-rack-btn" ontouchend="event.preventDefault();S.shoeRackLevels=Math.max(1,S.shoeRackLevels-1);render();" onclick="S.shoeRackLevels=Math.max(1,S.shoeRackLevels-1);render()" ${levels<=1?'disabled':''} title="Fewer shelves">−</button>
-            <button class="shoe-rack-btn" ontouchend="event.preventDefault();S.shoeRackLevels=Math.min(4,S.shoeRackLevels+1);render();" onclick="S.shoeRackLevels=Math.min(4,S.shoeRackLevels+1);render()" ${levels>=4?'disabled':''} title="More shelves">+</button>
+            <span class="shoe-rack-level-label">${levels===1?'1 shelf':levels+' shelves'}</span>
+            <button class="shoe-rack-btn" ontouchend="event.preventDefault();S.${stateKey}=Math.max(1,S.${stateKey}-1);render();" onclick="S.${stateKey}=Math.max(1,S.${stateKey}-1);render()" ${levels<=1?'disabled':''} title="Fewer shelves">−</button>
+            <button class="shoe-rack-btn" ontouchend="event.preventDefault();S.${stateKey}=Math.min(4,S.${stateKey}+1);render();" onclick="S.${stateKey}=Math.min(4,S.${stateKey}+1);render()" ${levels>=4?'disabled':''} title="More shelves">+</button>
           </div>
         </div>
         <div class="shoe-shelf-wrap">${shelves}</div>
@@ -7853,7 +8417,15 @@ function viewWardrobe() {
       if (!catItems.length) return;
 
       if (cat === 'Shoes') {
-        sections += shoeRackHTML(catItems);
+        sections += shelfSectionHTML(catItems, '👠', 'Shoes', catItems.length===1?'pair':'pairs', 'shoeRackLevels', '👠');
+        return;
+      }
+      if (cat === 'Bags') {
+        sections += shelfSectionHTML(catItems, '👜', 'Bags', catItems.length===1?'bag':'bags', 'bagRackLevels', '👜');
+        return;
+      }
+      if (cat === 'Accessories') {
+        sections += shelfSectionHTML(catItems, '✨', 'Accessories', catItems.length===1?'item':'items', 'accessoryRackLevels', '💍');
         return;
       }
 
@@ -7957,17 +8529,67 @@ function viewWardrobe() {
       <span class="nav-logo">${S.profileName.trim() ? `${S.profileName.trim()}'s Closet` : 'My Closet'}</span>
       <button class="nav-add" onclick="navigate('new-piece')">${iconPlus()} New Piece</button>
     </div>
+    ${S.wardrobeTailoringFilter ? `
+    <div style="display:flex;align-items:center;gap:10px;background:#F0E6FF;border-bottom:1.5px solid #C8A8E0;padding:10px 16px;">
+      <span style="font-size:16px;">🧵</span>
+      <div style="flex:1;font-size:13px;font-weight:700;color:#7B35A8;">Showing items that need tailoring</div>
+      <button
+        ontouchend="event.preventDefault();S.wardrobeTailoringFilter=false;render()"
+        onclick="S.wardrobeTailoringFilter=false;render()"
+        style="font-size:12px;font-weight:700;color:#9050B8;background:none;border:1.5px solid #C8A0E8;border-radius:100px;padding:4px 10px;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
+        ✕ Clear
+      </button>
+    </div>` : ''}
     <div style="font-size:22px;font-weight:800;color:var(--text-1);padding:12px 16px 6px;">Know what you own.</div>
 
-    <div style="padding:4px 16px 16px;">
-      <button onclick="toast('Closet Assistant coming soon ✨')" style="width:100%;display:flex;align-items:center;gap:10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 14px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;">
-        <span style="font-size:22px;flex-shrink:0;">🤝</span>
-        <div>
-          <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.2;">Closet Assistant</div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Get organized</div>
+    <div style="padding:2px 16px 14px;">
+      <button
+        ontouchend="event.preventDefault();S.featureMenuOpen=true;S.menuSection='services';render()"
+        onclick="S.featureMenuOpen=true;S.menuSection='services';render()"
+        style="width:100%;display:flex;align-items:center;gap:10px;
+          background:var(--gold-bg);border:none;border-left:3px solid var(--gold);
+          border-radius:0 var(--r-sm) var(--r-sm) 0;padding:9px 12px;
+          cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;">
+        <div style="flex:1;font-size:12.5px;font-weight:600;color:var(--gold-dk);line-height:1.35;">
+          Want a more organized wardrobe? <strong>Book a Closet Assistant.</strong>
         </div>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gold-dk)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>
       </button>
     </div>
+
+    ${(()=>{
+      if (!S.giftNudge) return '';
+      const nudgeItems = S.giftNudge.items || [];
+      const nudgeName = nudgeItems.find(w => w.giftedBy)?.giftedBy;
+      const firstItemId = nudgeItems[0]?.id || '';
+      const headline = nudgeName
+        ? `This outfit includes a gift from ${esc(nudgeName)}!`
+        : `This outfit includes a gifted piece!`;
+      return `<div style="margin:0 16px 14px;background:#FDF0FF;border:1.5px solid #C8A0E8;border-radius:var(--r);padding:13px 14px;">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <span style="font-size:20px;flex-shrink:0;line-height:1.2;">💝</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:800;color:#7B35A8;margin-bottom:3px;">${headline}</div>
+            <div style="font-size:12px;color:#9050B8;line-height:1.45;">Want to let them know you wore it today?</div>
+            <div style="display:flex;gap:8px;margin-top:10px;">
+              <button
+                ontouchend="event.preventDefault();shareGiftWear('${firstItemId}')"
+                onclick="shareGiftWear('${firstItemId}')"
+                style="flex:1;padding:8px 0;background:#9050B8;color:#fff;border:none;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                💌 Send a note
+              </button>
+              <button
+                ontouchend="event.preventDefault();S.giftNudge=null;render()"
+                onclick="S.giftNudge=null;render()"
+                style="padding:8px 14px;background:none;border:1.5px solid #C8A0E8;border-radius:var(--r-sm);font-size:13px;font-weight:600;color:#9050B8;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    })()}
+
     ${(()=>{
       const heroes = S.wardrobe.filter(w => w.isHero && !w.retiredFromCloset);
       if (!heroes.length) return '';
@@ -8012,6 +8634,7 @@ function wardrobeGridCellHTML(w) {
   return `<div class="wardrobe-grid-cell${cellClass}" onclick="openWardrobeItem('${w.id}')" style="position:relative;">
     ${stripeEl}
     ${w.isHero ? `<div class="hero-badge" style="position:absolute;top:5px;left:5px;z-index:5;font-size:8px;padding:2px 5px;">💎 Hero</div>` : ''}
+    ${w.isSignature ? `<div style="position:absolute;top:5px;right:5px;z-index:5;font-size:8px;font-weight:800;color:var(--sig-dk);background:var(--sig-bg);border:1px solid var(--sig-border);border-radius:100px;padding:2px 5px;letter-spacing:.02em;">✦</div>` : ''}
     <div class="wgc-info" style="${w.isHero ? 'padding-top:6px;' : ''}">
       <div class="wgc-name">${esc(w.name)}</div>
       ${metaParts.length ? `<div class="wgc-meta">${metaParts.join(' · ')}</div>` : ''}
@@ -8078,6 +8701,7 @@ function hangerHTML(w) {
       ${w.size ? `<div class="hanger-brand" style="color:var(--text-2);font-weight:600;">${esc(w.size)}</div>` : ''}
       <div class="hanger-wears">${wears}w</div>
       ${w.isHero ? `<div style="font-size:9px;font-weight:700;color:var(--gold-dk);margin-top:3px;letter-spacing:.02em;">💎 Hero</div>` : ''}
+      ${w.isSignature ? `<div style="font-size:9px;font-weight:800;color:var(--sig-dk);margin-top:2px;letter-spacing:.02em;">✦ Signature</div>` : ''}
     </div>
   </div>`;
 }
@@ -8272,23 +8896,34 @@ function viewReceiptAdd() {
                     <button onclick="S.receiptFlow.preview.isNew=false;render()"
                       style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.isNew===false?'var(--gold)':'var(--border)'};background:${p.isNew===false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew===false?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
                   </div>
-                  ${p.isNew===false ? `<input class="form-input" type="month" value="${esc(p.purchasedDate||'')}" oninput="S.receiptFlow.preview.purchasedDate=this.value" style="margin-top:8px;font-size:14px;">` : ''}
+                  ${p.isNew===false ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">About how many years ago?</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${[1,2,3,4,5].map(y=>{const yr=(new Date().getFullYear()-y)+'-01';const act=p.purchasedDate===yr;return '<button ontouchend="event.preventDefault();S.receiptFlow.preview.purchasedDate=\''+yr+'\';render();" onclick="S.receiptFlow.preview.purchasedDate=\''+yr+'\';render()" style="padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid '+(act?'var(--gold)':'var(--border)')+';background:'+(act?'var(--gold-bg)':'var(--surface)')+';color:'+(act?'var(--gold-dk)':'var(--text-2)')+';">'+(y===1?'1 yr':y===5?'5+ yrs':y+' yrs')+'</button>';}).join('')}</div></div>` : ''}
                 </div>
               </div>
 
             </div>
 
             <!-- Flip button — always visible in top-right -->
-            <button class="flip-btn" onclick="document.getElementById('flipCardWrap').classList.toggle('flipped')" id="flipToggleBtn">
+            <button class="flip-btn"
+              ontouchend="event.preventDefault();document.getElementById('flipCardWrap').classList.toggle('flipped')"
+              onclick="document.getElementById('flipCardWrap').classList.toggle('flipped')"
+              id="flipToggleBtn">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
-              <span id="flipBtnLabel">Details</span>
+              <span id="flipBtnLabel">Edit Details</span>
             </button>
           </div>
+          <div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:10px;margin-bottom:2px;">
+            Tap <strong style="color:var(--gold-dk);">Edit Details</strong> to review name, category, and more
+          </div>
 
-          <button class="btn btn-primary" onclick="confirmReceiptItem()" style="margin-top:14px;margin-bottom:10px;">
+          <button class="btn btn-primary"
+            ontouchend="event.preventDefault();confirmReceiptItem()"
+            onclick="confirmReceiptItem()"
+            style="margin-top:14px;margin-bottom:10px;">
             ✦ Add to My Closet
           </button>
-          <button class="btn btn-secondary" onclick="navigate('wardrobe')">Cancel</button>
+          <button class="btn btn-secondary"
+            ontouchend="event.preventDefault();navigate('wardrobe')"
+            onclick="navigate('wardrobe')">Cancel</button>
           <div style="height:32px;"></div>
         </div>
       </div>`;
@@ -8364,13 +8999,18 @@ function viewReceiptAdd() {
             <button onclick="S.receiptFlow.preview.isNew=false;render()"
               style="padding:10px 0;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.isNew===false?'var(--gold)':'var(--border)'};background:${p.isNew===false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew===false?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
           </div>
-          ${p.isNew===false ? `<input class="form-input" type="month" value="${esc(p.purchasedDate||'')}" oninput="S.receiptFlow.preview.purchasedDate=this.value" placeholder="Approx. month you got it" style="font-size:14px;">` : ''}
+          ${p.isNew===false ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">About how many years ago?</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${[1,2,3,4,5].map(y=>{const yr=(new Date().getFullYear()-y)+'-01';const act=p.purchasedDate===yr;return '<button ontouchend="event.preventDefault();S.receiptFlow.preview.purchasedDate=\''+yr+'\';render();" onclick="S.receiptFlow.preview.purchasedDate=\''+yr+'\';render()" style="padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid '+(act?'var(--gold)':'var(--border)')+';background:'+(act?'var(--gold-bg)':'var(--surface)')+';color:'+(act?'var(--gold-dk)':'var(--text-2)')+';">'+(y===1?'1 yr':y===5?'5+ yrs':y+' yrs')+'</button>';}).join('')}</div></div>` : ''}
         </div>
 
-        <button class="btn btn-primary" onclick="confirmReceiptItem()" style="margin-bottom:10px;">
+        <button class="btn btn-primary"
+          ontouchend="event.preventDefault();confirmReceiptItem()"
+          onclick="confirmReceiptItem()"
+          style="margin-bottom:10px;">
           ✦ Add to My Closet
         </button>
-        <button class="btn btn-secondary" onclick="navigate('wardrobe')">Cancel</button>
+        <button class="btn btn-secondary"
+          ontouchend="event.preventDefault();navigate('wardrobe')"
+          onclick="navigate('wardrobe')">Cancel</button>
         <div style="height:32px;"></div>
       </div>
     </div>`;
@@ -8466,6 +9106,7 @@ function viewWardrobeItem() {
       ${w.brand ? `<div style="font-size:14px;color:var(--text-3);margin-top:-6px;font-weight:500;">${esc(w.brand)}</div>` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px;">
         ${w.isHero ? `<div style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#FFFAED,#FFF5D0);color:#8B6010;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;border:1px solid rgba(184,125,42,.35);letter-spacing:.03em;">💎 Hero Piece</div>` : ''}
+        ${w.isSignature ? `<div class="sig-badge">✦ Signature</div>` : ''}
         ${w.retiredFromCloset ? `<div class="retired-chip">📦 Retired</div>` : ''}
         ${w.tailoringNeeded && !w.retiredFromCloset ? `<div class="tailoring-chip">🧵 Needs tailoring</div>` : ''}
         ${w.retiring && !w.retiredFromCloset ? `<div class="retiring-chip">🪡 Flagged for replacement</div>` : ''}
@@ -8582,6 +9223,47 @@ function viewWardrobeItem() {
       </div>
     </div>
 
+    <!-- Signature Piece toggle -->
+    ${(()=>{
+      const sigCount = S.wardrobe.filter(i => i.isSignature).length;
+      const atLimit = !w.isSignature && sigCount >= SIG_MAX;
+      return `<div style="padding:0 20px;margin-bottom:16px;">
+        <div class="sig-toggle-box ${w.isSignature ? 'active' : ''}">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;color:${w.isSignature?'var(--sig-dk)':'var(--text)'};">
+                ✦ Signature Piece
+                <span style="font-size:11px;font-weight:600;color:var(--text-3);font-style:normal;">${w.isSignature ? `(${sigCount} of ${SIG_MAX})` : atLimit ? `${SIG_MAX}/${SIG_MAX} chosen` : `${sigCount} of ${SIG_MAX} used`}</span>
+              </div>
+              <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
+                ${w.isSignature
+                  ? 'People remember you for this piece. It\'s unmistakably you.'
+                  : atLimit
+                    ? `You've chosen all ${SIG_MAX} signature pieces. Open one to remove it first.`
+                    : 'The pieces that are unmistakably you — what people say "that\'s so you" about.'}
+              </div>
+            </div>
+            <button class="toggle ${w.isSignature ? 'on' : ''}"
+              style="${w.isSignature ? 'background:var(--sig);flex-shrink:0;' : atLimit ? 'opacity:.4;flex-shrink:0;' : 'flex-shrink:0;'}"
+              ontouchend="event.preventDefault();${atLimit ? "toast('Remove a signature piece first — you can only have 3.')" : `toggleSignaturePiece('${w.id}')`}"
+              onclick="${atLimit ? "toast('Remove a signature piece first — you can only have 3.')" : `toggleSignaturePiece('${w.id}')`}"></button>
+          </div>
+          ${w.isSignature ? `
+          <div style="margin-top:12px;">
+            <div style="font-size:11px;font-weight:700;color:var(--sig-dk);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Why is this a signature piece for you?</div>
+            <textarea class="form-input" placeholder='e.g. "I\'ve worn this to every big moment for six years."' style="min-height:52px;resize:vertical;font-size:13px;border-color:var(--sig-border);font-style:italic;" onchange="saveSignatureNote('${w.id}',this.value)">${esc(w.signatureNote||'')}</textarea>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="sig-share-btn" style="flex:1;padding:11px;font-size:13px;"
+              ontouchend="event.preventDefault();navigate('signature-pieces')"
+              onclick="navigate('signature-pieces')">
+              View All Signature Pieces
+            </button>
+          </div>` : ''}
+        </div>
+      </div>`;
+    })()}
+
     <div style="padding:0 20px;margin-bottom:16px;">
       <label class="form-label">Name</label>
       <input class="form-input" id="witemName" type="text" placeholder="Item name"
@@ -8638,20 +9320,15 @@ function viewWardrobeItem() {
     </div>
 
     ${(()=>{
-      // ── Tailoring section ────────────────────────────────────
-      const tailBorder = w.tailoringNeeded ? '1px solid #C8A8E0' : '1px solid var(--border)';
-      const tailBg = w.tailoringNeeded ? 'background:#FAF5FF;' : '';
+      // ── Tailoring section — slim toggle row ──────────────────
       return `<div style="padding:0 20px;margin-bottom:16px;">
-        <div style="background:var(--surface);border-radius:var(--r-sm);border:${tailBorder};padding:14px 16px;${tailBg}">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-            <div style="flex:1;min-width:0;">
-              <div style="font-weight:600;font-size:14px;">🧵 Needs Tailoring</div>
-              <div style="font-size:12px;color:var(--text-3);margin-top:3px;">Flag if something needs fixing or Claude suggested alterations.</div>
-              ${w.tailoringNeeded ? `<textarea class="form-input" id="tailoringNoteInput" placeholder="What needs fixing? e.g. hem the hem, replace button, take in the waist…" style="margin-top:10px;resize:vertical;min-height:60px;font-size:13px;" onchange="saveTailoringNote('${w.id}',this.value)">${esc(w.tailoringNote||'')}</textarea>` : ''}
-            </div>
-            <button class="toggle ${w.tailoringNeeded?'on':''}" style="${w.tailoringNeeded?'background:#9B60C8;flex-shrink:0;':'flex-shrink:0;'}" onclick="toggleTailoring('${w.id}')"></button>
-          </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:var(--r-sm);border:1px solid ${w.tailoringNeeded?'#C8A8E0':'var(--border)'};background:${w.tailoringNeeded?'#FAF5FF':'var(--surface)'};">
+          <div style="font-size:13.5px;font-weight:600;color:${w.tailoringNeeded?'#7B35A8':'var(--text-2)'};">🧵 Needs tailoring</div>
+          <button class="toggle ${w.tailoringNeeded?'on':''}" style="${w.tailoringNeeded?'background:#9B60C8;flex-shrink:0;':'flex-shrink:0;'}"
+            ontouchend="event.preventDefault();toggleTailoring('${w.id}')"
+            onclick="toggleTailoring('${w.id}')"></button>
         </div>
+        ${w.tailoringNeeded ? `<textarea class="form-input" id="tailoringNoteInput" placeholder="What needs fixing? e.g. hem the hem, replace button, take in waist…" style="margin-top:8px;resize:vertical;min-height:52px;font-size:13px;" onchange="saveTailoringNote('${w.id}',this.value)">${esc(w.tailoringNote||'')}</textarea>` : ''}
       </div>`;
     })()}
 
@@ -9191,6 +9868,10 @@ function shareBattleReplay() {
     label2:  runnerUp.battleLabel || 'Runner-up',
     rating1: winner.rating,
     rating2: runnerUp.rating,
+    note1:   winner.ratingNote   || '',
+    note2:   runnerUp.ratingNote || '',
+    items1:  winner.items   || [],
+    items2:  runnerUp.items || [],
     winner:  isTie ? 0 : 1,
     verdict: entry.battleVerdict || '',
   });
@@ -9204,28 +9885,62 @@ function shareBattleDraft() {
     label2:  bd.person2.label || 'Person 2',
     rating1: bd.person1.rating,
     rating2: bd.person2.rating,
+    note1:   bd.person1.ratingNote || '',
+    note2:   bd.person2.ratingNote || '',
+    items1:  bd.person1.items || [],
+    items2:  bd.person2.items || [],
     winner:  bd.winner,
     verdict: bd.verdict || '',
   });
 }
-async function shareBattleResult({ photo, label1, label2, rating1, rating2, winner, verdict }) {
+async function shareBattleResult({ photo, label1, label2, rating1, rating2, note1, note2, items1, items2, winner, verdict }) {
   const winnerLabel = winner === 1 ? label1 : winner === 2 ? label2 : null;
   const winLine = winnerLabel ? `👑 ${winnerLabel} takes the crown` : "🤝 It's a tie!";
-  const scoreText = `${label1} ${rating1}/10  ·  ${label2} ${rating2}/10`;
-  const shareText = `⚔️ Fashion Battle\n${winLine}\n${scoreText}\n\nClaude's verdict: "${verdict}"\n\nvia Closet 🪞`;
+  const shareText = `⚔️ Fashion Battle\n${winLine}\n${label1} ${rating1}/10  ·  ${label2} ${rating2}/10\n\nClaude's verdict: "${verdict}"\n\nvia Closet 🪞`;
 
-  // Build a composite share card on canvas
+  // ── Helper: word wrap ────────────────────────────────────
+  function wrapText(ctx, text, maxW) {
+    const words = text.split(' ');
+    const lines = [];
+    let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  // ── Helper: rounded rect path ────────────────────────────
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
   try {
-    const W = 800, PHOTO_H = 520, CARD_H = 320, H = PHOTO_H + CARD_H;
+    const W = 800, PHOTO_H = 400, GUTTER = 18;
+    const COL_W = (W - GUTTER * 3) / 2; // ~373px each
+
+    // ── Oversized canvas for layout pass ────────────────────
     const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
+    canvas.width = W; canvas.height = 1400;
     const ctx = canvas.getContext('2d');
 
     // Background
     ctx.fillStyle = '#1C1A18';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, W, 1400);
 
-    // Photo (top portion, object-fit:cover)
+    // ── Photo ────────────────────────────────────────────────
     await new Promise((res, rej) => {
       const img = new Image();
       img.onload = () => {
@@ -9233,7 +9948,7 @@ async function shareBattleResult({ photo, label1, label2, rating1, rating2, winn
         const dstAspect = W / PHOTO_H;
         let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
         if (srcAspect > dstAspect) { sw = Math.round(sh * dstAspect); sx = Math.round((img.naturalWidth - sw) / 2); }
-        else                       { sh = Math.round(sw / dstAspect); }
+        else { sh = Math.round(sw / dstAspect); }
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, PHOTO_H);
         res();
       };
@@ -9241,58 +9956,130 @@ async function shareBattleResult({ photo, label1, label2, rating1, rating2, winn
       img.src = photo;
     });
 
-    // Gradient fade photo → card
-    const grad = ctx.createLinearGradient(0, PHOTO_H - 100, 0, PHOTO_H);
-    grad.addColorStop(0, 'rgba(28,26,24,0)');
-    grad.addColorStop(1, 'rgba(28,26,24,1)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, PHOTO_H - 100, W, 100);
+    // Gradient fade photo → dark
+    const fadeGrad = ctx.createLinearGradient(0, PHOTO_H - 130, 0, PHOTO_H);
+    fadeGrad.addColorStop(0, 'rgba(28,26,24,0)');
+    fadeGrad.addColorStop(1, 'rgba(28,26,24,1)');
+    ctx.fillStyle = fadeGrad;
+    ctx.fillRect(0, PHOTO_H - 130, W, 130);
 
-    // ── Text card ────────────────────────────────────────
+    let y = PHOTO_H + 18;
+
+    // ── Header ───────────────────────────────────────────────
     ctx.textAlign = 'center';
-
-    // Gold title
-    let y = PHOTO_H + 30;
     ctx.fillStyle = '#C9A84C';
-    ctx.font = 'bold 30px -apple-system, system-ui, sans-serif';
-    ctx.fillText('⚔️ Fashion Battle', W / 2, y); y += 46;
+    ctx.font = 'bold 26px -apple-system, system-ui, sans-serif';
+    ctx.fillText('⚔️  FASHION BATTLE', W / 2, y); y += 36;
 
-    // Winner line
     ctx.fillStyle = '#F5F0E8';
-    ctx.font = 'bold 22px -apple-system, system-ui, sans-serif';
-    ctx.fillText(winLine, W / 2, y); y += 34;
+    ctx.font = 'bold 19px -apple-system, system-ui, sans-serif';
+    ctx.fillText(winLine, W / 2, y); y += 26;
 
-    // Scores
-    ctx.fillStyle = '#A89880';
-    ctx.font = '17px -apple-system, system-ui, sans-serif';
-    ctx.fillText(scoreText, W / 2, y); y += 30;
+    // Gold rule
+    ctx.strokeStyle = '#4A4030'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 40, y); ctx.stroke(); y += 20;
 
-    // Divider
-    ctx.strokeStyle = '#3A3530'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(W - 60, y); ctx.stroke(); y += 24;
+    // ── Two-column score panels ──────────────────────────────
+    const colStartY = y;
+    const isTie = winner === 0;
 
-    // Verdict (word-wrapped)
-    ctx.fillStyle = '#C8B99A';
-    ctx.font = 'italic 15px Georgia, serif';
-    const maxLineW = W - 100;
-    const words = `"${verdict}"`.split(' ');
-    let line = '';
-    for (const word of words) {
-      const test = line ? line + ' ' + word : word;
-      if (ctx.measureText(test).width > maxLineW && line) {
-        ctx.fillText(line, W / 2, y); y += 23; line = word;
-      } else { line = test; }
+    function drawPanel(label, rating, note, items, isWinner, colX) {
+      let cy = colStartY;
+      const cMid = colX + COL_W / 2;
+
+      // Panel BG
+      ctx.save();
+      roundRect(ctx, colX, cy, COL_W, 300, 12);
+      ctx.fillStyle = isWinner ? 'rgba(201,168,76,0.10)' : 'rgba(255,255,255,0.04)';
+      ctx.fill();
+      ctx.strokeStyle = isWinner ? '#C9A84C' : '#2E2B28';
+      ctx.lineWidth = isWinner ? 1.5 : 1;
+      ctx.stroke();
+      ctx.restore();
+      cy += 18;
+
+      // Crown
+      ctx.textAlign = 'center';
+      ctx.font = '30px serif';
+      ctx.fillStyle = '#F5F0E8';
+      ctx.fillText(isWinner ? '🏆' : isTie ? '🤝' : '🥈', cMid, cy + 28); cy += 50;
+
+      // Label
+      ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = isWinner ? '#C9A84C' : '#8A7F74';
+      ctx.fillText(label.toUpperCase(), cMid, cy); cy += 30;
+
+      // Big rating
+      const rStr = String(rating);
+      ctx.font = 'bold 52px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = isWinner ? '#C9A84C' : '#E8E0D4';
+      const rW = ctx.measureText(rStr).width;
+      // right-align rating, left-align /10
+      ctx.textAlign = 'right';
+      ctx.fillText(rStr, cMid + 4, cy);
+      ctx.font = '22px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = '#5A5550';
+      ctx.textAlign = 'left';
+      ctx.fillText('/10', cMid + 8, cy); cy += 10;
+
+      // Rating note
+      if (note) {
+        ctx.textAlign = 'center';
+        ctx.font = 'italic 12px Georgia, serif';
+        ctx.fillStyle = '#6E6560';
+        const noteLines = wrapText(ctx, `"${note}"`, COL_W - 28);
+        for (const ln of noteLines.slice(0, 3)) { ctx.fillText(ln, cMid, cy); cy += 18; }
+      }
+      cy += 10;
+
+      // Mini divider
+      ctx.strokeStyle = '#2A2724'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(colX + 14, cy); ctx.lineTo(colX + COL_W - 14, cy); ctx.stroke(); cy += 12;
+
+      // Items
+      ctx.textAlign = 'left';
+      ctx.font = '12.5px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = '#7A7268';
+      for (const it of (items || []).slice(0, 4)) {
+        const label = `${it.icon || '👕'}  ${it.name}`;
+        ctx.fillText(label, colX + 16, cy); cy += 22;
+      }
+
+      return cy + 10;
     }
-    if (line) { ctx.fillText(line, W / 2, y); y += 23; }
 
-    // Watermark
-    y += 10;
-    ctx.fillStyle = '#4A4540';
-    ctx.font = '12px -apple-system, system-ui, sans-serif';
-    ctx.fillText('🪞 Closet', W / 2, y);
+    const endY1 = drawPanel(label1, rating1, note1, items1, winner === 1, GUTTER);
+    const endY2 = drawPanel(label2, rating2, note2, items2, winner === 2, GUTTER * 2 + COL_W);
+    y = Math.max(endY1, endY2) + 16;
 
-    // Share or download
-    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    // ── Verdict ──────────────────────────────────────────────
+    ctx.strokeStyle = '#3A3530'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 40, y); ctx.stroke(); y += 22;
+
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 12px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = '#C9A84C';
+    ctx.fillText('👩‍⚖️  CLAUDE\'S VERDICT', 40, y); y += 22;
+
+    ctx.font = 'italic 13.5px Georgia, serif';
+    ctx.fillStyle = '#BFB09A';
+    const vLines = wrapText(ctx, `"${verdict}"`, W - 80);
+    for (const ln of vLines) { ctx.fillText(ln, 40, y); y += 22; }
+    y += 18;
+
+    // ── Footer ───────────────────────────────────────────────
+    ctx.textAlign = 'center';
+    ctx.font = '11px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = '#3E3A36';
+    ctx.fillText('🪞  Closet', W / 2, y); y += 24;
+
+    // ── Crop to actual height ────────────────────────────────
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = W; finalCanvas.height = y;
+    finalCanvas.getContext('2d').drawImage(canvas, 0, 0, W, y, 0, 0, W, y);
+
+    // ── Share or download ────────────────────────────────────
+    const blob = await new Promise(res => finalCanvas.toBlob(res, 'image/png'));
     const file = new File([blob], 'fashion-battle.png', { type: 'image/png' });
 
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -9300,7 +10087,6 @@ async function shareBattleResult({ photo, label1, label2, rating1, rating2, winn
     } else if (navigator.share) {
       await navigator.share({ title: '⚔️ Fashion Battle', text: shareText });
     } else {
-      // Fallback: download image
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'fashion-battle.png';
@@ -9310,7 +10096,6 @@ async function shareBattleResult({ photo, label1, label2, rating1, rating2, winn
     }
   } catch (e) {
     console.error('shareBattleResult:', e);
-    // Last resort: clipboard
     try { await navigator.clipboard.writeText(shareText); toast('Copied to clipboard!'); }
     catch { toast('Share not supported on this browser'); }
   }
@@ -9463,25 +10248,50 @@ function viewReview() {
     ${(()=>{
       const tips = d.stylingTips||[];
       const buys = d.purchaseRecs||[];
+      const tipRx = d.tipReactions||{};
+      const buyRx = d.purchaseReactions||{};
       let html = '';
-      if (tips.length) html += `<div class="form-section">
-        <label class="form-label">✂️ Styling Tips</label>
-        ${tips.map((r,i)=>`<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
-          <div class="rec-bullet" style="margin-top:2px;">${i+1}</div>
-          <div style="flex:1;font-size:13px;color:var(--text-2);line-height:1.5;">${esc(r)}</div>
-        </div>`).join('')}
-      </div>`;
-      if (buys.length) html += `<div class="form-section">
-        <label class="form-label">🛒 Wish List Picks</label>
-        <p style="font-size:11px;color:var(--text-3);margin-bottom:8px;">Heart these after saving to add them to your Shop wish list.</p>
-        ${buys.map((r,i)=>`<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
-          <div class="rec-bullet" style="margin-top:2px;">${i+1}</div>
-          <div style="flex:1;">
-            <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(r.item||r)}</div>
-            ${r.reason?`<div style="font-size:12px;color:var(--text-2);margin-top:1px;">${esc(r.reason)}</div>`:''}
-          </div>
-        </div>`).join('')}
-      </div>`;
+      if (tips.length) {
+        const visibleTips = tips.filter((_,i) => tipRx[String(i)] !== 'dismissed');
+        if (visibleTips.length) html += `<div class="form-section">
+          <label class="form-label">✂️ Styling Tips</label>
+          ${tips.map((r,i)=>{
+            if (tipRx[String(i)] === 'dismissed') return '';
+            const liked = tipRx[String(i)] === 'liked';
+            return `<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;padding:10px 12px;background:${liked?'var(--gold-bg)':'var(--surface-2)'};border:1.5px solid ${liked?'var(--gold)':'var(--border)'};border-radius:var(--r-sm);">
+              <div style="flex:1;font-size:13px;color:var(--text-2);line-height:1.5;">${esc(r)}</div>
+              <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+                <button ontouchend="event.preventDefault();setDraftTipReaction(${i},'liked');" onclick="setDraftTipReaction(${i},'liked')"
+                  style="background:none;border:none;cursor:pointer;font-size:18px;padding:2px;line-height:1;color:${liked?'var(--gold)':'var(--text-3)'};touch-action:manipulation;">${liked?'♥':'♡'}</button>
+                <button ontouchend="event.preventDefault();setDraftTipReaction(${i},'dismissed');" onclick="setDraftTipReaction(${i},'dismissed')"
+                  style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;color:var(--text-3);touch-action:manipulation;opacity:.6;">✕</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }
+      if (buys.length) {
+        const visibleBuys = buys.filter((_,i) => buyRx[String(i)] !== 'dismissed');
+        if (visibleBuys.length) html += `<div class="form-section">
+          <label class="form-label">🛒 Wish List Picks</label>
+          ${buys.map((r,i)=>{
+            if (buyRx[String(i)] === 'dismissed') return '';
+            const liked = buyRx[String(i)] === 'liked';
+            return `<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;padding:10px 12px;background:${liked?'var(--gold-bg)':'var(--surface-2)'};border:1.5px solid ${liked?'var(--gold)':'var(--border)'};border-radius:var(--r-sm);">
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:${liked?'var(--gold-dk)':'var(--text)'};">${esc(r.item||r)}</div>
+                ${r.reason?`<div style="font-size:12px;color:var(--text-2);margin-top:1px;">${esc(r.reason)}</div>`:''}
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+                <button ontouchend="event.preventDefault();setDraftPurchaseReaction(${i},'liked');" onclick="setDraftPurchaseReaction(${i},'liked')"
+                  style="background:none;border:none;cursor:pointer;font-size:18px;padding:2px;line-height:1;color:${liked?'var(--gold)':'var(--text-3)'};touch-action:manipulation;">${liked?'♥':'♡'}</button>
+                <button ontouchend="event.preventDefault();setDraftPurchaseReaction(${i},'dismissed');" onclick="setDraftPurchaseReaction(${i},'dismissed')"
+                  style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;color:var(--text-3);touch-action:manipulation;opacity:.6;">✕</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }
       return html;
     })()}
     <div class="form-section">
@@ -9641,9 +10451,10 @@ function viewMatchReview() {
                     value="${esc(u.size||'')}" oninput="S.matchReview.unmatched[${i}].size=this.value"
                     style="font-size:16px;padding:11px 14px;">
                 </div>` : `
-                <input class="form-input" type="month" value="${esc(u.purchasedDate||'')}"
-                  oninput="S.matchReview.unmatched[${i}].purchasedDate=this.value"
-                  placeholder="Approx. month you got it" style="font-size:16px;padding:11px 14px;">`}
+                <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">About how many years ago?</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  ${[1,2,3,4,5].map(y=>{const yr=(new Date().getFullYear()-y)+'-01';const act=u.purchasedDate===yr;return `<button ontouchend="event.preventDefault();S.matchReview.unmatched[${i}].purchasedDate='${yr}';render();" onclick="S.matchReview.unmatched[${i}].purchasedDate='${yr}';render()" style="padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${act?'var(--gold)':'var(--border)'};background:${act?'var(--gold-bg)':'var(--surface)'};color:${act?'var(--gold-dk)':'var(--text-2)'};">${y===1?'1 yr':y===5?'5+ yrs':y+' yrs'}</button>`;}).join('')}
+                </div>`}
             </div>` : ''}
         </div>`;
       }).join('')}
@@ -10127,7 +10938,7 @@ function viewSettings() {
         <div class="settings-hint" style="margin-bottom:8px;">Generates your Me page banner and shapes seasonal style suggestions.</div>
         <input class="form-input" type="text" placeholder="e.g. San Francisco"
           value="${esc(S.profileLocation)}"
-          onchange="S.profileLocation=this.value.trim();localStorage.setItem('closet-profile-location',S.profileLocation);fsSet('profileLocation',S.profileLocation);">
+          onchange="S.profileLocation=this.value.trim();S._bannerLoaded=false;localStorage.setItem('closet-profile-location',S.profileLocation);fsSet('profileLocation',S.profileLocation);">
       </div>
       <div class="settings-row">
         <div class="settings-label" style="margin-bottom:6px;">Generation</div>
@@ -10482,9 +11293,9 @@ async function selectItemPhoto(wId, url) {
 async function uploadWardrobeItemPhoto(wId, input) {
   const file = input.files[0]; if (!file) return;
   input.value = '';
-  const { data, mime } = await compressImage(file);
+  const { data } = await compressImage(file);
   const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
-  w.photo = `data:${mime};base64,${data}`;
+  w.photo = data; // compressImage already returns a full data URL
   await DB.wardrobe.put(w);
   S.wardrobe = await DB.wardrobe.getAll();
   render();
@@ -11039,6 +11850,15 @@ async function doConfirmMatchReview() {
   }
 
   S.wardrobe = await DB.wardrobe.getAll();
+
+  // Gift nudge — any gifted item making its first appearance in an outfit?
+  const giftedFirstWear = S.wardrobe.filter(w =>
+    w.gifted && w.wears?.some(wr => wr.outfitId === entryId) && w.wears.length === 1
+  );
+  if (giftedFirstWear.length > 0) {
+    S.giftNudge = { entryId, items: giftedFirstWear };
+  }
+
   S.matchReview = null;
   switchTab('closet');
   toast('Outfit saved! ✨');
