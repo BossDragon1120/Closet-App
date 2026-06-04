@@ -1146,8 +1146,7 @@ body {
   border-radius: var(--r); margin-bottom: 10px; overflow: hidden;
 }
 .event-card-header {
-  padding: 11px 14px 9px; border-bottom: 1px solid var(--border);
-  display: flex; align-items: flex-start; gap: 8px;
+  padding: 11px 14px; display: flex; align-items: center; gap: 10px;
 }
 .event-card-desc {
   flex: 1; font-size: 14px; font-weight: 700; color: var(--text-1);
@@ -2754,6 +2753,7 @@ const S = {
   braSize:            localStorage.getItem('closet-bra-size') || '',
   eyeColor:           localStorage.getItem('closet-eye-color') || '',
   _auraEdit:          null,
+  _expandedEvents:    {},
   assistantTier:      'core',
   _assistantBooked:   null,
   // Cloud Sync
@@ -5065,8 +5065,6 @@ function toast(msg) {
 }
 function navigate(view) { S.view = view; S.error = null; render(); window.scrollTo(0,0); }
 function switchTab(tab)  {
-  // Remap legacy 'home' tab to 'closet' (Fits) for existing users
-  if (tab === 'home') tab = 'closet';
   S.activeTab = tab; navigate(tab);
 }
 
@@ -5393,23 +5391,26 @@ function iconBurger() {
 function iconPerson() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
 }
+function iconCompass() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>`;
+}
 function tabBarHTML() {
   const t = S.activeTab;
   return `<div class="tab-bar">
-    <button class="tab-btn ${t==='profile'?'active':''}" onclick="switchTab('profile')" title="Profile">
-      ${iconPerson()} <span>Me</span>
-    </button>
-    <button class="tab-btn ${t==='closet'?'active':''}" onclick="switchTab('closet')">
-      ${iconHanger()} <span>Fits</span>
+    <button class="tab-btn ${t==='profile'?'active':''}" onclick="switchTab('profile')" title="Portfolio">
+      ${iconPerson()} <span>Portfolio</span>
     </button>
     <button class="tab-btn ${t==='wardrobe'?'active':''}" onclick="switchTab('wardrobe')">
       ${iconWardrobe()} <span>Closet</span>
     </button>
+    <button class="tab-btn ${t==='closet'?'active':''}" onclick="switchTab('closet')">
+      ${iconHanger()} <span>Fits</span>
+    </button>
     <button class="tab-btn ${t==='plan'?'active':''}" onclick="switchTab('plan')">
       ${iconSparkle()} <span>Plan</span>
     </button>
-    <button class="tab-btn ${t==='shop'?'active':''}" onclick="switchTab('shop')">
-      ${iconBag()} <span>Shop</span>
+    <button class="tab-btn ${t==='home'?'active':''}" onclick="switchTab('home')">
+      ${iconCompass()} <span>Discover</span>
     </button>
   </div>`;
 }
@@ -6204,18 +6205,12 @@ function viewCloset() {
       onclick="setFilter(S.filter==='${key}'?'all':'${key}')">🏷 ${esc(tag)}</div>`;
   }).join('');
 
-  const battleEntries = S.entries.filter(e => e.battleId);
-  const battleChip = battleEntries.length > 0
-    ? `<div class="filter-chip ${S.filter==='battle'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();setFilter(S.filter==='battle'?'all':'battle')" onclick="setFilter(S.filter==='battle'?'all':'battle')">⚔️ Battles (${Math.ceil(battleEntries.length/2)})</div>`
-    : '';
-
   // Wrapping chip grid — no horizontal scroll, tags flow into as many rows as needed
   const filterHTML = S.entries.length > 1 ? `
     <div style="padding:4px 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
       <div class="filter-chip ${S.filter==='best'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();setFilter(S.filter==='best'?'all':'best')"
         onclick="setFilter(S.filter==='best'?'all':'best')">⭐ Best Rated</div>
-      ${battleChip}
       ${tagChips}
     </div>` : '';
 
@@ -6277,20 +6272,22 @@ function viewCloset() {
 }
 
 function outfitCardHTML(e) {
-  return `<div class="outfit-card${e.doNotRepeat?' dnr':''}" onclick="openEntry('${e.id}')">
+  const retired = isRetiredFit(e);
+  const photoStyle = (e.doNotRepeat || retired) ? 'opacity:0.65;filter:saturate(0.25);' : '';
+  return `<div class="outfit-card${e.doNotRepeat?' dnr':''}" onclick="openEntry('${e.id}')" style="${retired?'opacity:0.82;':''}">
     <div class="outfit-card-photo-wrap">
-      <img class="outfit-card-photo" src="${e.photo}" alt="Outfit" loading="lazy"${e.doNotRepeat?' style="opacity:0.7;filter:saturate(0.25);"':''}>
+      <img class="outfit-card-photo" src="${e.photo}" alt="Outfit" loading="lazy"${(e.doNotRepeat||retired)?` style="${photoStyle}"`:''}>
       ${e.doNotRepeat ? `<div class="outfit-card-dnr-overlay"></div>` : ''}
       <button class="outfit-card-dnr-btn${e.doNotRepeat?' active':''}"
         onclick="event.stopPropagation();toggleDoNotRepeat('${e.id}')"
         title="${e.doNotRepeat?'Remove flag':'Flag: won\'t wear again'}">✕</button>
+      ${retired ? `<div style="position:absolute;bottom:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);backdrop-filter:blur(4px);">📦 Retired</div>` : ''}
     </div>
     <div class="outfit-card-body">
       <div class="outfit-card-date">${fmtDate(e.createdAt)}</div>
       <div class="outfit-card-rating">⭐ ${e.rating}/10</div>
       ${e.occasionTag ? `<div class="occasion-tag" style="margin-top:6px;">${e.occasionTag===WFH_TAG?'🏠':'🏷'} ${esc(e.occasionTag)}</div>` : ''}
       ${e.weather ? `<div class="weather-chip-card">${e.weather.icon} ${e.weather.tempF}°F</div>` : ''}
-      ${e.battleId ? `<div class="battle-badge" style="margin-top:5px;">⚔️ Battle</div>` : ''}
     </div>
   </div>`;
 }
@@ -6876,20 +6873,7 @@ function viewPlan() {
                   <span style="font-size:12px;font-weight:800;color:var(--gold-dk);">✈️ ${esc(trip.name)}</span>
                   <span style="font-size:11px;color:var(--text-3);">${tripEvents.length} event${tripEvents.length===1?'':'s'}</span>
                 </div>
-                ${tripEvents.map(ev => `
-                <div class="event-card" style="margin-left:12px;border-left:3px solid var(--gold);">
-                  <div class="event-card-header">
-                    <div>
-                      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px;">${esc(ev.title||autoTitle(ev.desc))}</div>
-                      <div style="font-size:11px;color:var(--text-3);line-height:1.4;">${esc(ev.desc)}</div>
-                    </div>
-                    <button class="event-card-delete" ontouchend="if(_touchMoved)return;event.preventDefault();deleteEventBoardItem('${ev.id}');" onclick="deleteEventBoardItem('${ev.id}')" title="Remove">✕</button>
-                  </div>
-                  <div class="event-card-body">
-                    <div class="event-card-items">${(ev.suggestion?.items||[]).map(it=>`<span class="event-card-chip">${esc(it)}</span>`).join('')}</div>
-                    ${ev.suggestion?.reasoning ? `<div class="event-card-reasoning">${esc(ev.suggestion.reasoning)}</div>` : ''}
-                  </div>
-                </div>`).join('')}
+                ${tripEvents.map(ev => eventCardHTML(ev, 'margin-left:12px;border-left:3px solid var(--gold);')).join('')}
               </div>`;
             });
             // Standalone events
@@ -6898,21 +6882,7 @@ function viewPlan() {
               if (S.eventTrips.some(t => S.eventBoard.find(ev => ev.tripId === t.id))) {
                 html += `<div style="font-size:12px;font-weight:800;color:var(--text-3);padding:0 16px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Solo Events</div>`;
               }
-              solo.forEach(ev => {
-                html += `<div class="event-card">
-                  <div class="event-card-header">
-                    <div>
-                      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px;">${esc(ev.title||autoTitle(ev.desc))}</div>
-                      <div style="font-size:11px;color:var(--text-3);line-height:1.4;">${esc(ev.desc)}</div>
-                    </div>
-                    <button class="event-card-delete" ontouchend="if(_touchMoved)return;event.preventDefault();deleteEventBoardItem('${ev.id}');" onclick="deleteEventBoardItem('${ev.id}')" title="Remove">✕</button>
-                  </div>
-                  <div class="event-card-body">
-                    <div class="event-card-items">${(ev.suggestion?.items||[]).map(it=>`<span class="event-card-chip">${esc(it)}</span>`).join('')}</div>
-                    ${ev.suggestion?.reasoning ? `<div class="event-card-reasoning">${esc(ev.suggestion.reasoning)}</div>` : ''}
-                  </div>
-                </div>`;
-              });
+              solo.forEach(ev => { html += eventCardHTML(ev, ''); });
             }
             return html;
           })()}
@@ -7024,6 +6994,87 @@ async function doSuggestOutfits() {
     if (!result) toast('Something went wrong — try again');
   } catch(e) { console.error(e); toast('Something went wrong — try again'); }
   S.plan.loadingSuggest = false; render();
+}
+
+function eventEmojiFor(text) {
+  const t = (text || '').toLowerCase();
+  const rules = [
+    [['birthday','bday','bachelorette','bach party','hen party'], '🎂'],
+    [['wedding','bridal','bride','rehearsal dinner'],             '💍'],
+    [['concert','music','festival','guitar','band','gig','rave','coachella','lollapalooza','edm','rap show','live music'], '🎵'],
+    [['park','garden','picnic','hike','hiking','trail','nature','outdoors','camping','bonfire'],  '🌳'],
+    [['beach','pool','swim','surf','cabo','miami','ibiza','bahamas','tropics'],  '🏖️'],
+    [['ski','skiing','snowboard','apres ski','mountain','chalet'],               '⛷️'],
+    [['brunch','mimosa'],                                                         '🥂'],
+    [['dinner','restaurant','reservations','tasting','fine dining'],              '🍽️'],
+    [['bar','cocktail','drinks','happy hour','wine','rooftop','speakeasy'],       '🍸'],
+    [['coffee','café','cafe','latte'],                                            '☕'],
+    [['club','nightclub','dancing','disco','dj set','dj night'],                  '🪩'],
+    [['interview','office','work trip','meeting','conference','professional','job'], '💼'],
+    [['gym','workout','fitness','yoga','pilates','spin','crossfit'],               '💪'],
+    [['running','run','marathon','race','5k','10k','half marathon'],               '🏃'],
+    [['game','stadium','sports','football','basketball','baseball','soccer','match'], '🏟️'],
+    [['art','gallery','museum','exhibit','opening'],                               '🎨'],
+    [['theater','theatre','broadway','opera','ballet','performance','show'],       '🎭'],
+    [['travel','trip','flight','vacation','holiday','paris','nyc','london','tokyo','europe','abroad'], '✈️'],
+    [['shopping','shop','mall','market'],                                          '🛍️'],
+    [['graduation','grad','commencement'],                                         '🎓'],
+    [['date night','romantic','anniversary','valentines'],                         '💕'],
+    [['baby shower','baby'],                                                       '👶'],
+    [['halloween','costume','spooky'],                                             '🎃'],
+    [['christmas','holiday party','new year','nye','xmas'],                        '🎄'],
+    [['photoshoot','photo shoot','shoot'],                                         '📸'],
+    [['casual','brunch','everyday','chill','hangout','friends'],                   '☀️'],
+  ];
+  for (const [keywords, emoji] of rules) {
+    if (keywords.some(k => t.includes(k))) return emoji;
+  }
+  return '📅';
+}
+
+function eventCardHTML(ev, extraStyle) {
+  const expanded = !!S._expandedEvents[ev.id];
+  const emoji = eventEmojiFor((ev.desc || '') + ' ' + (ev.title || ''));
+  const title = esc(ev.title || autoTitle(ev.desc || ''));
+  const toggleAct = `S._expandedEvents['${ev.id}']=!S._expandedEvents['${ev.id}'];render()`;
+  const deleteAct = `deleteEventBoardItem('${ev.id}')`;
+  const borderBottom = expanded ? 'border-bottom:1px solid var(--border);' : '';
+  const chevronRot   = expanded ? 'rotate(90deg)' : 'rotate(0deg)';
+
+  return '<div class="event-card"' + (extraStyle ? ' style="' + extraStyle + '"' : '') + '>' +
+    '<div class="event-card-header" style="' + borderBottom + '">' +
+      '<div ontouchend="if(_touchMoved)return;event.preventDefault();' + toggleAct + '" onclick="' + toggleAct + '" ' +
+           'style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;touch-action:manipulation;">' +
+        '<div style="font-size:20px;flex-shrink:0;line-height:1;">' + emoji + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:13px;font-weight:800;color:var(--text);' + (expanded ? 'margin-bottom:2px;' : '') + '">' + title + '</div>' +
+          (expanded && ev.desc ? '<div style="font-size:11px;color:var(--text-3);line-height:1.4;">' + esc(ev.desc) + '</div>' : '') +
+        '</div>' +
+        '<div style="font-size:16px;color:var(--text-3);flex-shrink:0;transform:' + chevronRot + ';transition:transform .2s;">›</div>' +
+      '</div>' +
+      '<button class="event-card-delete" ontouchend="if(_touchMoved)return;event.preventDefault();' + deleteAct + '" onclick="' + deleteAct + '" title="Remove">✕</button>' +
+    '</div>' +
+    (expanded ?
+      '<div class="event-card-body">' +
+        '<div class="event-card-items">' + (ev.suggestion?.items || []).map(it => '<span class="event-card-chip">' + esc(it) + '</span>').join('') + '</div>' +
+        (ev.suggestion?.reasoning ? '<div class="event-card-reasoning">' + esc(ev.suggestion.reasoning) + '</div>' : '') +
+      '</div>'
+    : '') +
+  '</div>';
+}
+
+function isRetiredFit(entry) {
+  if (!entry || !entry.items || !entry.items.length) return false;
+  const retired = S.wardrobe.filter(w => w.retiredFromCloset);
+  if (!retired.length) return false;
+  return entry.items.some(it => {
+    const iName = (it.name || it || '').toString().toLowerCase().trim();
+    if (iName.length < 3) return false;
+    return retired.some(w => {
+      const wName = (w.name || '').toLowerCase().trim();
+      return wName.length > 2 && (wName === iName || wName.includes(iName) || iName.includes(wName));
+    });
+  });
 }
 
 function autoTitle(desc) {
@@ -7436,9 +7487,8 @@ function viewProfile() {
 
   const html = `<div class="view">
     <div class="nav">
-      <span class="nav-logo">🪞 ${S.profileName ? esc(S.profileName) : 'Me'}</span>
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();S.battleMode=true;navigate('upload')" onclick="S.battleMode=true;navigate('upload')"
-        style="display:flex;align-items:center;gap:5px;background:var(--gold);color:#fff;border:none;border-radius:100px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;touch-action:manipulation;margin-right:4px;">
+      <span class="nav-logo">✦ My Style Portfolio</span>
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();S.battleMode=true;navigate('upload')" onclick="S.battleMode=true;navigate('upload')" style="touch-action:manipulation;">
         ⚔️ Fashion Battle
       </button>
     </div>
@@ -7475,11 +7525,6 @@ function viewProfile() {
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">Day Streak</div>
       </div>
     </div>
-
-    <!-- Style chips -->
-    ${styleWords.length ? `<div style="padding:12px 16px 0;display:flex;flex-wrap:wrap;gap:7px;">
-      ${styleWords.map(w=>`<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:100px;padding:5px 13px;font-size:12px;font-weight:700;color:var(--text-2);">${esc(w)}</div>`).join('')}
-    </div>` : ''}
 
     <!-- ══ ZONE 2: Your best stuff ══ -->
 
@@ -7617,6 +7662,35 @@ function viewProfile() {
           </div>
           <div style="font-size:10px;color:var(--text-3);margin-top:3px;">${winPct}% win rate · tap to see all</div>
         </div>
+      </div>`;
+    })()}
+
+    <!-- 📦 Past Looks — retired fits carousel -->
+    ${(()=>{
+      const retiredFits = soloEntries.filter(e => e.photo && !e.battleId && isRetiredFit(e))
+        .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 12);
+      if (!retiredFits.length) return '';
+      const cards = retiredFits.map((e,i) => {
+        const rating = e.rating != null ? `<div style="position:absolute;bottom:5px;left:5px;background:rgba(0,0,0,0.6);border-radius:100px;padding:2px 7px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.85);">⭐ ${e.rating}</div>` : '';
+        return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')" onclick="openEntry('${e.id}')"
+          style="flex-shrink:0;width:80px;cursor:pointer;touch-action:manipulation;">
+          <div style="width:80px;height:107px;border-radius:10px;overflow:hidden;border:1.5px solid rgba(150,80,220,0.25);background:#1A1520;position:relative;">
+            <img src="${esc(e.photo)}" loading="${i<4?'eager':'lazy'}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;filter:saturate(0.55);opacity:0.85;">
+            ${rating}
+          </div>
+          <div style="font-size:9px;color:rgba(150,80,220,0.7);margin-top:4px;text-align:center;font-weight:600;">${fmtDate(e.createdAt)}</div>
+        </div>`;
+      }).join('');
+      return `<div style="margin:0 0 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 16px;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(150,80,220,0.8);">📦 Past Looks</div>
+          <div style="font-size:11px;color:rgba(150,80,220,0.55);">${retiredFits.length} look${retiredFits.length===1?'':'s'} retired</div>
+        </div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 16px 4px;scrollbar-width:none;">
+          <div style="display:flex;gap:8px;width:max-content;">${cards}</div>
+        </div>
+        <div style="margin:8px 16px 0;font-size:11px;color:rgba(150,80,220,0.5);font-style:italic;">One or more items in these looks have been retired from your closet.</div>
       </div>`;
     })()}
 
@@ -7774,7 +7848,7 @@ function viewClosetAssistant() {
 
   return '<div class="view">' +
     '<div class="nav">' +
-      '<button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(\'home\')" onclick="navigate(\'home\')">‹</button>' +
+      '<button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(\'profile\')" onclick="navigate(\'profile\')">‹</button>' +
       '<span class="nav-title">Closet Assistant</span>' +
       '<div style="width:40px;"></div>' +
     '</div>' +
@@ -7864,9 +7938,9 @@ function viewAssistantBook() {
         '</div>' +
 
         '<div style="padding:0 16px 32px;">' +
-          '<button ontouchend="if(_touchMoved)return;event.preventDefault();navigate(\'home\')" onclick="navigate(\'home\')" ' +
+          '<button ontouchend="if(_touchMoved)return;event.preventDefault();navigate(\'profile\')" onclick="navigate(\'profile\')" ' +
             'style="width:100%;padding:14px;background:var(--gold);color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">' +
-            'Back to Closet' +
+            'Back to Portfolio' +
           '</button>' +
         '</div>' +
       '</div>' +
@@ -8246,7 +8320,7 @@ function viewHome() {
 
   return `<div class="view">
     <div class="nav">
-      <span class="nav-logo">Closet ✦</span>
+      <span class="nav-logo">✦ Discover</span>
       <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
     </div>
     <div class="tab-headline">Your style, your story.</div>
@@ -8717,7 +8791,7 @@ function viewSignaturePieces() {
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate('profile')">${iconBack()} Me</button>
+      <button class="nav-back" onclick="navigate('profile')">${iconBack()} Portfolio</button>
       <span class="nav-title" style="color:var(--sig-dk);">✦ Signature Pieces</span>
       <span style="width:72px"></span>
     </div>
@@ -9760,7 +9834,7 @@ function viewBulkAdd() {
 
     <!-- Photo -->
     <div style="margin:10px 16px 0;border-radius:var(--r-sm);overflow:hidden;border:1.5px solid var(--border);height:220px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;">
-      <img src="${current.dataUrl}" style="width:100%;height:220px;object-fit:cover;object-position:top;display:block;">
+      <img src="${current.dataUrl}" style="width:100%;height:220px;object-fit:contain;display:block;">
     </div>
 
     <!-- Identify state -->
@@ -10034,7 +10108,7 @@ function viewReceiptAdd() {
                  ${p.brand ? `<div style="font-size:13px;color:var(--text-3);">${esc(p.brand)}</div>` : ''}
                </div>
              </div>
-             ${rf.imageData ? `<img src="data:${rf.imageMime};base64,${rf.imageData}" style="width:100%;max-height:180px;object-fit:cover;border-radius:var(--r-sm);margin-bottom:20px;border:1px solid var(--border);">` : ''}`}
+             ${rf.imageData ? `<img src="data:${rf.imageMime};base64,${rf.imageData}" style="width:100%;max-height:180px;object-fit:contain;border-radius:var(--r-sm);margin-bottom:20px;border:1px solid var(--border);">` : ''}`}
 
         <div class="form-group" style="margin-bottom:14px;">
           <label class="form-label">Item Name</label>
