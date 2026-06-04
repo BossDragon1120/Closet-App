@@ -2696,6 +2696,7 @@ const S = {
   outfitLinker: null, // { mode:'from-wardrobe'|'from-outfit', wardrobeId?, entryId?, selected:{[id]:bool} }
   wardrobePickerFor: null, // { unmatchedIdx } — wardrobe item picker in match review
   receiptFlow: null, // { step:'input'|'parsing'|'preview', imageData, imageMime, pasteText, preview:{name,brand,price,description,category,icon} }
+  bulkQueue: [], bulkIdx: 0, bulkSaved: 0, bulkAnalyzing: false,
   styleWith: null, // { entryId, need:'', loading:false, result:{recommendation,reasoning,searchQuery,altQuery} }
   imageSearch: null,  // { wardrobeId, loading, results:[{thumb,full,title}] } — photo picker
   giftNudge: null, // { entryId, items:[wardrobeItems] } — set after first wear of a gifted piece
@@ -5207,6 +5208,7 @@ function featuresMenuHTML() {
       <div class="feat-body" style="padding:0;">
         ${menuRow('✦', 'About Closet', 'Everything built into your style journal', "S.menuSection='about';render()")}
         ${menuRow('💼', 'Services', 'Book a Closet Assistant or Stylist', "S.menuSection='services';render()")}
+        ${menuRow('⚙️', 'Settings', 'API key, sync, and app preferences', "closeMenu();switchTab('settings')")}
       </div>
       <div style="padding:12px 16px calc(12px + var(--safe-b));border-top:1px solid var(--border);flex-shrink:0;">
         <button onclick="S.featureMenuOpen=false;S.menuSection=null;signOut();" style="width:100%;background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Sign out</button>
@@ -5302,6 +5304,7 @@ function render() {
     case 'rip':          html = viewRIP();          break;
     case 'receipt-add':  html = viewReceiptAdd();   break;
     case 'new-piece':    html = viewNewPiece();     break;
+    case 'bulk-add':     html = viewBulkAdd();      break;
     case 'squad':        html = viewSquadDetail();  break;
     case 'hot':          html = viewHot();          break;
     case 'hero-pieces':       html = viewHeroPieces();        break;
@@ -5865,12 +5868,12 @@ function viewSetup() {
         </div>
       </div>
       <div style="width:100%">
-        <label class="form-label" style="text-align:left;display:block;margin-bottom:8px;">Your City / Location <span style="color:var(--gold);font-weight:800;">*</span></label>
-        <input class="form-input" id="setupLocation" type="text" placeholder="e.g. San Francisco, London, Tokyo…" value="${esc(S.profileLocation)}" style="margin-bottom:14px;">
+        <label class="form-label" style="text-align:left;display:block;margin-bottom:8px;">First name <span style="color:var(--gold);font-weight:800;">*</span></label>
+        <input class="form-input" id="setupName" type="text" autocomplete="given-name" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="e.g. Dana" value="${esc(S.profileName)}" style="margin-bottom:18px;">
         <label class="form-label" style="text-align:left;display:block;margin-bottom:8px;">Your Anthropic API Key <span style="color:var(--gold);font-weight:800;">*</span></label>
         <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;line-height:1.5;">Free to start at <a href="https://console.anthropic.com" target="_blank" class="settings-link">console.anthropic.com</a> → API Keys → Create Key</div>
         <input class="form-input" id="setupKey" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="sk-ant-..." value="${esc(S.apiKey)}" style="margin-bottom:14px;font-family:monospace;font-size:13px;">
-        <button class="btn btn-primary" onclick="doSetupSave()" style="margin:0;width:100%;">Get Started →</button>
+        <button class="btn btn-primary" ontouchend="event.preventDefault();doSetupSave();" onclick="doSetupSave()" style="margin:0;width:100%;">Get Started →</button>
       </div>
     </div>
   </div>`;
@@ -5983,20 +5986,30 @@ function buildJourneyHTML() {
 function viewCloset() {
   const entries = filteredEntries();
   const allTags = [...new Set(S.entries.map(e => e.occasionTag).filter(Boolean))];
-  const tagChips = allTags.map(tag =>
-    `<div class="filter-chip ${S.filter==='tag:'+tag?'active':''}" onclick="setFilter('tag:${tag.replace(/'/g,'&#39;')}')">🏷 ${esc(tag)}</div>`
-  ).join('');
+  // Tag chips — toggle-off when already active
+  const tagChips = allTags.map(tag => {
+    const esc2 = tag.replace(/'/g, '&#39;');
+    const key  = `tag:${esc2}`;
+    const active = S.filter === 'tag:' + tag;
+    return `<div class="filter-chip ${active ? 'active' : ''}"
+      ontouchend="event.preventDefault();setFilter(S.filter==='${key}'?'all':'${key}')"
+      onclick="setFilter(S.filter==='${key}'?'all':'${key}')">🏷 ${esc(tag)}</div>`;
+  }).join('');
+
   const battleEntries = S.entries.filter(e => e.battleId);
   const battleChip = battleEntries.length > 0
-    ? `<div class="filter-chip ${S.filter==='battle'?'active':''}" ontouchend="event.preventDefault();setFilter(S.filter==='battle'?'all':'battle')" onclick="setFilter(S.filter==='battle'?'all':'battle')">⚔️ Battles${battleEntries.length > 0 ? ` (${Math.ceil(battleEntries.length/2)})` : ''}</div>`
+    ? `<div class="filter-chip ${S.filter==='battle'?'active':''}" ontouchend="event.preventDefault();setFilter(S.filter==='battle'?'all':'battle')" onclick="setFilter(S.filter==='battle'?'all':'battle')">⚔️ Battles (${Math.ceil(battleEntries.length/2)})</div>`
     : '';
+
+  // Wrapping chip grid — no horizontal scroll, tags flow into as many rows as needed
   const filterHTML = S.entries.length > 1 ? `
-    <div class="filter-bar-wrap at-start" id="fbw-closet">
-    <div class="filter-bar">
-      <div class="filter-chip ${S.filter==='best'?'active':''}" onclick="setFilter(S.filter==='best'?'all':'best')">Best Rated</div>
+    <div style="padding:4px 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+      <div class="filter-chip ${S.filter==='best'?'active':''}"
+        ontouchend="event.preventDefault();setFilter(S.filter==='best'?'all':'best')"
+        onclick="setFilter(S.filter==='best'?'all':'best')">⭐ Best Rated</div>
       ${battleChip}
       ${tagChips}
-    </div></div>` : '';
+    </div>` : '';
 
   const CLOSET_LIMIT = 6;
   const displayEntries = S.closetExpanded ? entries : entries.slice(0, CLOSET_LIMIT);
@@ -6023,10 +6036,6 @@ function viewCloset() {
     <div class="nav">
       <span class="nav-logo">${S.profileName.trim() ? `${S.profileName.trim()}'s Fits` : 'My Fits'}</span>
       <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
-    </div>
-    <div style="padding:8px 16px 0;">
-      <button ontouchend="event.preventDefault();switchTab('hot')" onclick="switchTab('hot')"
-        style="background:none;border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:12px;color:var(--text-3);font-weight:600;cursor:pointer;touch-action:manipulation;letter-spacing:.02em;">✦ Get Trend Alert</button>
     </div>
     ${S.weatherPin ? `
     <div onclick="switchTab('plan')" style="margin:10px 16px 0;display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--surface);border-radius:var(--r-sm);border:1px solid var(--border);cursor:pointer;touch-action:manipulation;" >
@@ -6237,15 +6246,16 @@ function viewShop() {
   const sel = S.shopSelectedQuery;
   const selItem = activeItems.find(i => i.query === sel);
 
-  // ── Item row HTML ────────────────────────────────────────────
+  // ── Item row HTML (with inline accordion when selected) ──────
   function itemRowHTML(item) {
     const isSelected = item.query === sel;
     const { bg, border } = shopItemBg(item.query);
     const emoji = shopItemEmoji(item.query);
-    return `<div
-      ontouchend="event.preventDefault();S.shopSelectedQuery=S.shopSelectedQuery==='${esc(item.query).replace(/'/g,"\\'")}' ? null : '${esc(item.query).replace(/'/g,"\\'")}';S.shopExpanded=false;render();"
-      onclick="S.shopSelectedQuery=S.shopSelectedQuery==='${esc(item.query).replace(/'/g,"\\'")}' ? null : '${esc(item.query).replace(/'/g,"\\'")}';S.shopExpanded=false;render();"
-      style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:${isSelected ? 'var(--gold-bg)' : 'var(--surface)'};border:${isSelected ? '2px solid var(--gold)' : '1.5px solid var(--border)'};border-radius:var(--r-sm);margin-bottom:8px;cursor:pointer;touch-action:manipulation;transition:all .15s;">
+    const safeQ = esc(item.query).replace(/'/g,"\\'");
+    const rowHTML = `<div
+      ontouchend="event.preventDefault();S.shopSelectedQuery=S.shopSelectedQuery==='${safeQ}' ? null : '${safeQ}';S.shopExpanded=false;render();"
+      onclick="S.shopSelectedQuery=S.shopSelectedQuery==='${safeQ}' ? null : '${safeQ}';S.shopExpanded=false;render();"
+      style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:${isSelected ? 'var(--gold-bg)' : 'var(--surface)'};border:${isSelected ? '2px solid var(--gold)' : '1.5px solid var(--border)'};border-radius:${isSelected ? 'var(--r-sm) var(--r-sm) 0 0' : 'var(--r-sm)'};margin-bottom:${isSelected ? '0' : '8px'};cursor:pointer;touch-action:manipulation;transition:all .15s;">
       <div style="width:44px;height:44px;border-radius:10px;background:${bg};border:1px solid ${border};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${emoji}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:14px;font-weight:${isSelected?'800':'600'};color:${isSelected?'var(--gold-dk)':'var(--text)'};line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${esc(item.label)}</div>
@@ -6255,12 +6265,61 @@ function viewShop() {
         ${isSelected ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
       </div>
     </div>`;
-  }
 
-  // ── "Shop it" URL ────────────────────────────────────────────
-  const shopUrl = selItem
-    ? `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(selItem.query + budgetSearchSuffix(S.shopBudget))}`
-    : '#';
+    if (!isSelected) return rowHTML;
+
+    // ── Inline accordion ──────────────────────────────────────
+    const assocOutfits = (item.outfitIds || [])
+      .map(id => S.entries.find(e => e.id === id))
+      .filter(Boolean);
+
+    const thumbsHTML = assocOutfits.length > 0 ? `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:8px;">Outfits that inspired this</div>
+        <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;">
+          ${assocOutfits.map(e => {
+            const d = new Date(e.createdAt);
+            const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+            const ratingLabel = e.rating ? `${e.rating}/10` : '';
+            return `<div
+              ontouchend="event.preventDefault();openEntry('${e.id}')"
+              onclick="openEntry('${e.id}')"
+              style="flex-shrink:0;width:72px;cursor:pointer;touch-action:manipulation;">
+              ${e.photo
+                ? `<img src="${e.photo}" style="width:72px;height:90px;object-fit:cover;object-position:top;border-radius:8px;border:1.5px solid var(--border);display:block;">`
+                : `<div style="width:72px;height:90px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;">📸</div>`}
+              <div style="font-size:9px;color:var(--text-3);text-align:center;margin-top:4px;line-height:1.3;">${dateLabel}${ratingLabel ? `<br><span style="color:var(--gold-dk);font-weight:700;">${ratingLabel}</span>` : ''}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+
+    const itemShopUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(item.query + budgetSearchSuffix(S.shopBudget))}`;
+
+    const accordionHTML = `<div style="background:var(--gold-bg);border:2px solid var(--gold);border-top:none;border-radius:0 0 var(--r-sm) var(--r-sm);padding:14px;margin-bottom:8px;">
+      ${thumbsHTML}
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:8px;">Price range</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        ${[1,2,3].map(t => {
+          const active = S.shopBudget === t;
+          return `<button ontouchend="event.preventDefault();setShopBudget(${t});" onclick="setShopBudget(${t})"
+            style="flex:1;padding:8px 4px;border-radius:var(--r-sm);border:${active?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${active?'var(--gold)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
+            <div style="font-size:14px;margin-bottom:1px;">${budgetIcons[t]}</div>
+            <div style="font-size:11px;font-weight:${active?'800':'600'};color:${active?'#fff':'var(--text-2)'};">${budgetTiers[t]}</div>
+            <div style="font-size:9px;color:${active?'rgba(255,255,255,.8)':'var(--text-3)'};margin-top:1px;">${budgetDescs[t]}</div>
+          </button>`;
+        }).join('')}
+      </div>
+      <a href="${itemShopUrl}" target="_blank" rel="noopener"
+        style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:var(--gold);border-radius:var(--r-sm);font-size:14px;font-weight:800;color:#fff;text-decoration:none;box-shadow:0 2px 10px rgba(184,125,42,.28);touch-action:manipulation;">
+        🛍 Shop it on Google
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </a>
+      <div style="text-align:center;margin-top:6px;font-size:10px;color:var(--gold-dk);opacity:.7;">Searching for: <em>${esc(item.label)}${S.shopBudget ? ' · ' + budgetTiers[S.shopBudget] : ''}</em></div>
+    </div>`;
+
+    return rowHTML + accordionHTML;
+  }
 
   return `<div class="view">
     <div class="nav">
@@ -6302,55 +6361,6 @@ function viewShop() {
       }
       ${moreCount > 0 ? `<button class="show-more-btn" style="margin-bottom:16px;" ontouchend="event.preventDefault();S.shopExpanded=true;render();" onclick="S.shopExpanded=true;render()">Show ${moreCount} more ↓</button>` : ''}
 
-      <!-- Step 3: Price range + Shop it (only after item selected) -->
-      ${selItem ? `
-      <div style="border-top:1px solid var(--border);padding-top:18px;margin-top:4px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Price range</div>
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
-          ${[1,2,3].map(t => {
-            const active = S.shopBudget === t;
-            return `<button ontouchend="event.preventDefault();setShopBudget(${t});" onclick="setShopBudget(${t})"
-              style="flex:1;padding:10px 4px;border-radius:var(--r-sm);border:${active?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${active?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
-              <div style="font-size:16px;margin-bottom:2px;">${budgetIcons[t]}</div>
-              <div style="font-size:12px;font-weight:${active?'800':'600'};color:${active?'var(--gold-dk)':'var(--text-2)'};">${budgetTiers[t]}</div>
-              <div style="font-size:10px;color:${active?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;opacity:.8;">${budgetDescs[t]}</div>
-            </button>`;
-          }).join('')}
-        </div>
-        <a href="${shopUrl}" target="_blank" rel="noopener"
-          style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;background:var(--gold);border-radius:var(--r-sm);font-size:15px;font-weight:800;color:#fff;text-decoration:none;box-shadow:0 2px 12px rgba(184,125,42,.28);touch-action:manipulation;">
-          🛍 Shop it on Google
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </a>
-        <div style="text-align:center;margin-top:8px;font-size:11px;color:var(--text-3);">Searching for: <em>${esc(selItem.label)}${S.shopBudget ? ' · ' + budgetTiers[S.shopBudget] : ''}</em></div>
-
-        ${(()=>{
-          // Outfits that generated this recommendation
-          const assocOutfits = (selItem.outfitIds || [])
-            .map(id => S.entries.find(e => e.id === id))
-            .filter(Boolean);
-          if (!assocOutfits.length) return '';
-          return `<div style="margin-top:18px;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Outfits that inspired this rec</div>
-            <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;">
-              ${assocOutfits.map(e => {
-                const d = new Date(e.createdAt);
-                const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-                const ratingLabel = e.rating ? `${e.rating}/10` : '';
-                return `<div
-                  ontouchend="event.preventDefault();openEntry('${e.id}')"
-                  onclick="openEntry('${e.id}')"
-                  style="flex-shrink:0;width:80px;cursor:pointer;touch-action:manipulation;">
-                  ${e.photo
-                    ? `<img src="${e.photo}" style="width:80px;height:100px;object-fit:cover;object-position:top;border-radius:10px;border:1.5px solid var(--border);display:block;">`
-                    : `<div style="width:80px;height:100px;border-radius:10px;background:var(--surface);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;">📸</div>`}
-                  <div style="font-size:10px;color:var(--text-3);text-align:center;margin-top:5px;line-height:1.3;">${dateLabel}${ratingLabel ? `<br><span style="color:var(--gold-dk);font-weight:700;">${ratingLabel}</span>` : ''}</div>
-                </div>`;
-              }).join('')}
-            </div>
-          </div>`;
-        })()}
-      </div>` : ''}
 
     </div>
 
@@ -6553,37 +6563,16 @@ function viewPlan() {
           </div>
 
           <!-- Action buttons -->
-          ${!p.tripPickerOpen ? `
           <div style="display:flex;gap:8px;padding:12px 16px 14px;">
             <button ontouchend="event.preventDefault();saveEventStandalone();" onclick="saveEventStandalone()"
               style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
               💾 Save Event
             </button>
-            <button ontouchend="event.preventDefault();S.plan.tripPickerOpen=true;render();" onclick="S.plan.tripPickerOpen=true;render()"
-              style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:none;background:var(--gold);font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            <button ontouchend="event.preventDefault();toast('✈️ Trip collections coming soon!');" onclick="toast('✈️ Trip collections coming soon!');"
+              style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;opacity:.7;">
               ✈️ Add to Trip
             </button>
           </div>
-          ` : `
-          <!-- Trip picker -->
-          <div style="padding:12px 16px 16px;border-top:1px solid var(--border);">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin-bottom:10px;">Add to which trip?</div>
-            <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;">
-              ${p.activeTripId ? `<div style="font-size:12px;color:var(--gold-dk);font-weight:600;width:100%;margin-bottom:2px;">↩ Continuing: ${esc((S.eventTrips.find(t=>t.id===p.activeTripId)||{}).name||'')}</div>` : ''}
-              ${S.eventTrips.map(t=>`
-                <button ontouchend="event.preventDefault();saveEventToTrip('${esc(t.id)}');" onclick="saveEventToTrip('${esc(t.id)}')"
-                  style="padding:8px 16px;border-radius:100px;border:${p.activeTripId===t.id?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${p.activeTripId===t.id?'var(--gold-bg)':'var(--surface)'};font-size:13px;font-weight:700;color:${p.activeTripId===t.id?'var(--gold-dk)':'var(--text-2)'};cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                  ✈️ ${esc(t.name)}
-                </button>`).join('')}
-              <button ontouchend="event.preventDefault();startNewTrip();" onclick="startNewTrip()"
-                style="padding:8px 16px;border-radius:100px;border:1.5px dashed var(--border);background:var(--surface);font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                ＋ New Trip
-              </button>
-            </div>
-            <button ontouchend="event.preventDefault();S.plan.tripPickerOpen=false;render();" onclick="S.plan.tripPickerOpen=false;render()"
-              style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;">← Back</button>
-          </div>
-          `}
         </div>
       ` : ''}
 
@@ -6949,7 +6938,6 @@ function viewProfile() {
 
   // ── Profile chips (location + generation only — no aura fields) ──
   const chips = [
-    S.profileLocation   ? { icon:'📍', label: S.profileLocation }   : null,
     S.profileGeneration ? { icon:'🎂', label: S.profileGeneration.split(' ').slice(0,2).join(' ') } : null,
   ].filter(Boolean);
   const chipsHTML = chips.length
@@ -7203,38 +7191,6 @@ function viewProfile() {
   </div>`;
 
   // ── Location banner ───────────────────────────────────────
-  const locationBanner = S.profileLocation ? `
-    <div style="position:relative;width:100%;height:200px;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,${colors.bg1},${colors.bg2});">
-      <!-- Shimmer shown while image loads -->
-      <div id="locBannerShimmer" style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0) 100%);background-size:200% 100%;animation:shimmer 1.6s infinite;${S._bannerLoaded?'display:none;':''}"></div>
-      <!-- Loading label -->
-      <div id="locBannerLoading" style="position:absolute;inset:0;display:${S._bannerLoaded?'none':'flex'};align-items:center;justify-content:center;">
-        <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.45);letter-spacing:.05em;">Generating city view…</span>
-      </div>
-      <!-- Retry button shown on error -->
-      <div id="locBannerError" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;">
-        <button onclick="reloadLocationBanner()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:100px;padding:7px 16px;font-size:12px;font-weight:700;color:rgba(255,255,255,.8);cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);">↺ Retry</button>
-      </div>
-      <img id="locBannerImg" src="${esc(pollinationsLocationBannerUrl(S.profileLocation))}"
-        style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:${S._bannerLoaded?'1':'0'};transition:opacity .6s ease;"
-        loading="eager"
-        onload="S._bannerLoaded=true;this.style.opacity='1';var s=document.getElementById('locBannerShimmer');if(s)s.style.display='none';var l=document.getElementById('locBannerLoading');if(l)l.style.display='none';"
-        onerror="S._bannerLoaded=false;this.style.display='none';var s=document.getElementById('locBannerShimmer');if(s)s.style.display='none';var l=document.getElementById('locBannerLoading');if(l)l.style.display='none';var e=document.getElementById('locBannerError');if(e)e.style.display='flex';">
-      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.04) 0%,rgba(0,0,0,0.65) 100%);"></div>
-      <!-- Name + location pin bottom-left -->
-      <div style="position:absolute;bottom:0;left:0;right:0;padding:12px 16px 16px;">
-        <div style="min-width:0;padding-bottom:2px;">
-          <div style="font-size:22px;font-weight:900;letter-spacing:-.3px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5);margin-bottom:2px;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
-          ${S.profileStyleWords ? `<div style="font-size:11px;color:rgba(255,255,255,.75);line-height:1.4;margin-bottom:5px;">${esc(S.profileStyleWords.length>60?S.profileStyleWords.slice(0,60)+'…':S.profileStyleWords)}</div>` : ''}
-          <div style="font-size:10px;font-weight:600;color:rgba(255,255,255,.6);">📍 ${esc(S.profileLocation)}</div>
-        </div>
-      </div>
-      <!-- Style score overlay top-right -->
-      ${avgRating !== '—' ? `
-      <div style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,.32);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:12px;padding:8px 12px;text-align:center;border:1px solid rgba(255,255,255,.12);">
-        <div style="font-size:22px;font-weight:900;color:#fff;line-height:1;letter-spacing:-.5px;">${avgRating}</div>
-      </div>` : ''}
-    </div>` : null;
 
   function profileSection(title, content) {
     return `<div style="padding:0 16px;margin-bottom:20px;">
@@ -7246,16 +7202,14 @@ function viewProfile() {
   const html = `<div class="view">
     <div class="nav">
       <span class="nav-logo">Me</span>
-      <button onclick="switchTab('settings')" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:5px 13px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;">Settings</button>
     </div>
 
-    ${locationBanner || `
-    <!-- Header: name + chips (no location set) -->
+    <!-- Header -->
     <div style="padding:16px 16px 14px;">
-      <div style="font-size:22px;font-weight:900;letter-spacing:-.3px;margin-bottom:3px;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
+      <div style="font-size:22px;font-weight:900;letter-spacing:-.3px;margin-bottom:3px;">${S.profileName ? `${esc(S.profileName)}'s Dash` : 'My Dash'}</div>
       ${S.profileStyleWords ? `<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:8px;">${esc(S.profileStyleWords.length>80?S.profileStyleWords.slice(0,80)+'…':S.profileStyleWords)}</div>` : ''}
       ${chipsHTML}
-    </div>`}
+    </div>
 
     <!-- Style Portrait -->
     <div style="padding:14px 16px 16px;">${portraitHTML}</div>
@@ -7304,18 +7258,50 @@ function viewProfile() {
     ${(()=>{
       const sigs = S.wardrobe.filter(w => w.isSignature && !w.retiredFromCloset);
       const full = sigs.length === SIG_MAX;
-      return `<div
-        onclick="navigate('signature-pieces')"
-        ontouchend="event.preventDefault();navigate('signature-pieces')"
-        style="margin:0 16px 16px;background:${full ? 'linear-gradient(135deg,#FFF8FA,#FFF1F6)' : 'var(--surface)'};border:1.5px solid ${full ? 'var(--sig-border)' : 'var(--border)'};border-radius:16px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;touch-action:manipulation;">
-        <div style="width:44px;height:44px;border-radius:12px;background:${full ? 'linear-gradient(135deg,var(--sig),#C2185B)' : 'linear-gradient(135deg,#FFE4EE,#FFD0E4)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;font-weight:900;color:${full ? '#fff' : 'var(--sig-dk)'};">
-          ✦
+      // Build 3 slots — filled or nudge
+      const slots = Array.from({length: SIG_MAX}, (_, i) => {
+        const w = sigs[i];
+        if (w) {
+          // Filled slot
+          return `<div
+            ontouchend="event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+            onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
+            <div style="width:100%;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:2px solid var(--sig-border);background:var(--surface-2);display:flex;align-items:center;justify-content:center;position:relative;">
+              ${w.photo
+                ? `<img src="${w.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                : `<div style="font-size:28px;">${w.icon||'👕'}</div>`}
+              <div style="position:absolute;top:4px;right:4px;background:var(--sig);border-radius:100px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:8px;color:#fff;font-weight:900;">✦</span>
+              </div>
+            </div>
+            <div style="font-size:10px;font-weight:700;color:var(--sig-dk);text-align:center;line-height:1.3;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 2px;">${esc(w.name)}</div>
+          </div>`;
+        } else {
+          // Empty slot nudge
+          return `<div
+            ontouchend="event.preventDefault();navigate('wardrobe')"
+            onclick="navigate('wardrobe')"
+            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
+            <div style="width:100%;aspect-ratio:3/4;border-radius:10px;border:2px dashed var(--sig-border);background:linear-gradient(135deg,#FFF8FA,#FFF1F6);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;">
+              <div style="font-size:20px;">✦</div>
+              <div style="font-size:9px;font-weight:800;color:var(--sig-dk);text-align:center;line-height:1.4;">This is<br>SO me</div>
+            </div>
+            <div style="font-size:10px;color:var(--text-3);text-align:center;line-height:1.3;">Add piece</div>
+          </div>`;
+        }
+      }).join('');
+      return `<div style="margin:0 16px 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:800;color:var(--sig-dk);display:flex;align-items:center;gap:5px;">✦ Signature Pieces</div>
+          <button
+            ontouchend="event.preventDefault();navigate('signature-pieces')"
+            onclick="navigate('signature-pieces')"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--sig-dk);cursor:pointer;font-family:inherit;opacity:.7;touch-action:manipulation;">
+            ${full ? 'Share ›' : 'Manage ›'}
+          </button>
         </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:15px;font-weight:800;color:${full ? 'var(--sig-dk)' : 'var(--text)'};margin-bottom:2px;">Signature Pieces</div>
-          <div style="font-size:12px;color:var(--text-3);">${full ? `All ${SIG_MAX} chosen · tap to view or share` : sigs.length > 0 ? `${sigs.length} of ${SIG_MAX} chosen — add more` : 'The pieces that are unmistakably you'}</div>
-        </div>
-        ${full ? `<div class="sig-badge" style="flex-shrink:0;">✦ ${SIG_MAX}</div>` : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>`}
+        <div style="display:flex;gap:10px;">${slots}</div>
       </div>`;
     })()}
 
@@ -8758,8 +8744,205 @@ function viewNewPiece() {
           <div style="font-size:18px;color:var(--text-3);">›</div>
         </button>
 
+        <!-- Bulk upload -->
+        <button
+          ontouchend="event.preventDefault();S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;S.bulkAnalyzing=false;navigate('bulk-add')"
+          onclick="S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;S.bulkAnalyzing=false;navigate('bulk-add')"
+          style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
+          <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">📦</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;">Bulk upload photos</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Select many photos at once — add shoes, bags, tops in one go</div>
+          </div>
+          <div style="font-size:18px;color:var(--text-3);">›</div>
+        </button>
+
       </div>
     </div>
+  </div>`;
+}
+
+/* ================================================================
+   VIEW: BULK ADD
+   ================================================================ */
+function viewBulkAdd() {
+  const queue = S.bulkQueue || [];
+  const idx   = S.bulkIdx   || 0;
+  const total  = queue.length;
+
+  // ── No photos selected yet ───────────────────────────────────
+  if (total === 0) {
+    return `<div class="view view-notab">
+      <div class="nav">
+        <button class="nav-back" ontouchend="event.preventDefault();navigate('new-piece')" onclick="navigate('new-piece')">${iconBack()} Back</button>
+        <span class="nav-title">Bulk Upload</span>
+        <span style="width:72px"></span>
+      </div>
+      <div style="padding:32px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;">
+        <div style="font-size:56px;margin-bottom:16px;">📦</div>
+        <div style="font-size:20px;font-weight:900;color:var(--text);margin-bottom:8px;">Add many pieces at once</div>
+        <div style="font-size:14px;color:var(--text-3);line-height:1.6;margin-bottom:32px;max-width:290px;">Select all your photos from your camera roll — you'll fill in the details one piece at a time, and Claude will identify each one for you.</div>
+
+        <div style="width:100%;background:var(--surface);border:2px dashed var(--gold);border-radius:var(--r);padding:36px 20px;cursor:pointer;margin-bottom:20px;"
+          ontouchend="event.preventDefault();document.getElementById('bulkFileInput').click()"
+          onclick="document.getElementById('bulkFileInput').click()">
+          <div style="font-size:40px;margin-bottom:10px;">🖼️</div>
+          <div style="font-size:15px;font-weight:700;color:var(--gold-dk);margin-bottom:4px;">Tap to select photos</div>
+          <div style="font-size:12px;color:var(--text-3);">Choose as many as you like from your library</div>
+        </div>
+        <input id="bulkFileInput" type="file" accept="image/*" multiple style="display:none;"
+          onchange="bulkFilesSelected(this)">
+
+        <div style="font-size:11px;color:var(--text-3);line-height:1.8;">Works great for shoes, bags, jackets — anything you<br>want to log all at once.</div>
+      </div>
+    </div>`;
+  }
+
+  // ── All done ─────────────────────────────────────────────────
+  if (idx >= total) {
+    const saved = S.bulkSaved || 0;
+    return `<div class="view view-notab">
+      <div class="nav">
+        <span style="width:72px"></span>
+        <span class="nav-title">All Done!</span>
+        <span style="width:72px"></span>
+      </div>
+      <div style="padding:48px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;">
+        <div style="font-size:64px;margin-bottom:20px;">🎉</div>
+        <div style="font-size:24px;font-weight:900;color:var(--text);margin-bottom:8px;">${saved} piece${saved===1?'':'s'} added!</div>
+        <div style="font-size:14px;color:var(--text-3);line-height:1.6;margin-bottom:36px;">Your wardrobe is looking amazing.</div>
+        <button class="btn btn-primary"
+          ontouchend="event.preventDefault();S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;navigate('wardrobe')"
+          onclick="S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;navigate('wardrobe')"
+          style="margin-bottom:12px;">View My Wardrobe →</button>
+        <button class="btn btn-secondary"
+          ontouchend="event.preventDefault();S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;navigate('bulk-add')"
+          onclick="S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;navigate('bulk-add')">Add More Pieces</button>
+      </div>
+    </div>`;
+  }
+
+  // ── Review current photo ──────────────────────────────────────
+  const current = queue[idx];
+  const p = current.preview || {};
+  const cats = ['Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Accessories','Other'];
+  const pct  = Math.round((idx / total) * 100);
+  const isLast = idx === total - 1;
+
+  return `<div class="view view-notab">
+    <div class="nav">
+      <button class="nav-back"
+        ontouchend="event.preventDefault();bulkExitConfirm()"
+        onclick="bulkExitConfirm()">${iconBack()} Exit</button>
+      <span class="nav-title">${idx+1} of ${total}</span>
+      <button
+        ontouchend="event.preventDefault();bulkSkip()"
+        onclick="bulkSkip()"
+        style="background:none;border:none;font-size:13px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;padding:4px 8px;touch-action:manipulation;">Skip →</button>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="height:3px;background:var(--border);">
+      <div style="height:100%;width:${pct}%;background:var(--gold);transition:width .3s;border-radius:0 2px 2px 0;"></div>
+    </div>
+    <div style="padding:5px 16px 0;display:flex;justify-content:space-between;">
+      <div style="font-size:10px;color:var(--text-3);">${S.bulkSaved||0} saved so far</div>
+      <div style="font-size:10px;color:var(--text-3);">${total - idx} left</div>
+    </div>
+
+    <!-- Photo -->
+    <div style="margin:10px 16px 0;border-radius:var(--r-sm);overflow:hidden;border:1.5px solid var(--border);height:220px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;">
+      <img src="${current.dataUrl}" style="width:100%;height:220px;object-fit:cover;object-position:top;display:block;">
+    </div>
+
+    <!-- Identify state -->
+    <div style="padding:10px 16px 0;">
+      ${S.bulkAnalyzing
+        ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r-sm);">
+            <div class="loading-dots" style="font-size:16px;color:var(--gold-dk);"><span>·</span><span>·</span><span>·</span></div>
+            <div style="font-size:13px;font-weight:600;color:var(--gold-dk);">Identifying this piece…</div>
+          </div>`
+        : current.preview
+          ? `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r-sm);">
+              <div style="font-size:12px;font-weight:700;color:var(--gold-dk);">✦ Claude identified this</div>
+              <button ontouchend="event.preventDefault();bulkAnalyzeCurrent()" onclick="bulkAnalyzeCurrent()" style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">Re-identify</button>
+            </div>`
+          : `<button class="btn btn-primary"
+              ontouchend="event.preventDefault();bulkAnalyzeCurrent()"
+              onclick="bulkAnalyzeCurrent()"
+              style="margin:0;padding:10px 16px;font-size:13px;">✨ Identify this piece</button>`}
+    </div>
+
+    <!-- Form -->
+    <div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <label class="form-label" style="font-size:10px;margin-bottom:3px;">Name <span style="color:var(--gold);">*</span></label>
+        <input class="form-input" type="text" value="${esc(p.name||'')}"
+          oninput="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.name=this.value"
+          placeholder="e.g. White Leather Sneakers" style="margin:0;">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label class="form-label" style="font-size:10px;margin-bottom:3px;">Brand</label>
+          <input class="form-input" type="text" value="${esc(p.brand||'')}"
+            oninput="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.brand=this.value"
+            placeholder="e.g. Nike" style="margin:0;">
+        </div>
+        <div>
+          <label class="form-label" style="font-size:10px;margin-bottom:3px;">Size</label>
+          <input class="form-input" type="text" value="${esc(p.size||'')}"
+            oninput="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.size=this.value"
+            placeholder="S, 8.5, 28…" style="margin:0;">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label class="form-label" style="font-size:10px;margin-bottom:3px;">Category</label>
+          <select class="form-input" style="margin:0;"
+            onchange="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.category=this.value">
+            ${cats.map(c=>`<option value="${c}" ${(p.category||'Tops')===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:10px;margin-bottom:3px;">Price paid ($)</label>
+          <input class="form-input" type="number" min="0" step="0.01" value="${p.price||''}"
+            oninput="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.price=this.value"
+            placeholder="0.00" style="margin:0;">
+        </div>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:10px;margin-bottom:3px;">Notes</label>
+        <textarea class="form-textarea" style="min-height:50px;margin:0;"
+          oninput="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.description=this.value"
+          placeholder="Color, material, fit…">${esc(p.description||'')}</textarea>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:10px;margin-bottom:3px;">When did you get this?</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <button
+            ontouchend="event.preventDefault();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.isNew=true;render()"
+            onclick="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.isNew=true;render()"
+            style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${p.isNew!==false?'var(--gold)':'var(--border)'};background:${p.isNew!==false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew!==false?'var(--gold-dk)':'var(--text-2)'};">✨ Just got it</button>
+          <button
+            ontouchend="event.preventDefault();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.isNew=false;render()"
+            onclick="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.isNew=false;render()"
+            style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${p.isNew===false?'var(--gold)':'var(--border)'};background:${p.isNew===false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew===false?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-primary"
+        ontouchend="event.preventDefault();bulkSaveAndNext()"
+        onclick="bulkSaveAndNext()"
+        style="margin:0;">${isLast ? '✓ Save & Finish' : 'Save & Next →'}</button>
+      <button class="btn btn-secondary"
+        ontouchend="event.preventDefault();bulkSkip()"
+        onclick="bulkSkip()"
+        style="margin:0;">Skip this photo</button>
+    </div>
+    <div style="height:24px;"></div>
   </div>`;
 }
 
@@ -9778,7 +9961,9 @@ function viewBattle() {
       <div class="battle-verdict-text">"${esc(bd.verdict||'')}"</div>
     </div>
 
-    <button class="btn btn-primary" onclick="doSaveBattle()">⚔️ Save Both Outfits</button>
+    <button class="btn btn-primary"
+      ontouchend="event.preventDefault();doSaveBattle()"
+      onclick="doSaveBattle()">⚔️ Save Both Outfits</button>
     <div style="height:10px"></div>
     <button class="btn btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:7px;"
       onclick="shareBattleDraft()">📤 Share Result</button>
@@ -9898,49 +10083,64 @@ async function shareBattleResult({ photo, label1, label2, rating1, rating2, note
   const winLine = winnerLabel ? `👑 ${winnerLabel} takes the crown` : "🤝 It's a tie!";
   const shareText = `⚔️ Fashion Battle\n${winLine}\n${label1} ${rating1}/10  ·  ${label2} ${rating2}/10\n\nClaude's verdict: "${verdict}"\n\nvia Closet 🪞`;
 
-  // ── Helper: word wrap ────────────────────────────────────
+  // Resolved CSS variable values — matches the actual battle screen exactly
+  const C = {
+    bg:      '#F7F4F0',   // --bg
+    surface: '#FFFFFF',   // --surface
+    border:  '#E3DAD0',   // --border
+    text:    '#1C1A18',   // --text
+    text2:   '#6B6563',   // --text-2
+    text3:   '#B0A9A4',   // --text-3
+    gold:    '#B87D2A',   // --gold
+    goldBg:  '#FDF5E4',   // --gold-bg
+    dark:    '#1C1A18',   // battle separator / banner bg start
+    dark2:   '#3B2F1A',   // battle banner bg end
+  };
+
   function wrapText(ctx, text, maxW) {
     const words = text.split(' ');
     const lines = [];
     let cur = '';
-    for (const w of words) {
-      const test = cur ? cur + ' ' + w : w;
-      if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+    for (const word of words) {
+      const test = cur ? cur + ' ' + word : word;
+      if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = word; }
       else cur = test;
     }
     if (cur) lines.push(cur);
     return lines;
   }
 
-  // ── Helper: rounded rect path ────────────────────────────
-  function roundRect(ctx, x, y, w, h, r) {
+  function rrect(ctx, x, y, w, h, r) {
     ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+    ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r);
+    ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r);
+    ctx.quadraticCurveTo(x,y,x+r,y);
     ctx.closePath();
   }
 
   try {
-    const W = 800, PHOTO_H = 400, GUTTER = 18;
-    const COL_W = (W - GUTTER * 3) / 2; // ~373px each
+    const W = 780;
+    // Photo: portrait crop anchored at top (same as screen's object-position:top)
+    const PHOTO_H = 560;
+    const BANNER_H = 68;
+    const COL_W = W / 2;        // two equal columns, no gutter — matches CSS flex:1
+    const SEP = 2;               // dark separator width — matches border-left: 2px solid #1C1A18
+    const MARGIN = 20;           // matches .battle-verdict-wrap margin: 16px 20px
 
-    // ── Oversized canvas for layout pass ────────────────────
     const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = 1400;
+    canvas.width = W; canvas.height = 1800;
     const ctx = canvas.getContext('2d');
 
-    // Background
-    ctx.fillStyle = '#1C1A18';
-    ctx.fillRect(0, 0, W, 1400);
+    // ── App background ────────────────────────────────────────
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, W, 1800);
 
-    // ── Photo ────────────────────────────────────────────────
+    // ── Photo (object-fit:cover, object-position:top) ─────────
     await new Promise((res, rej) => {
       const img = new Image();
       img.onload = () => {
@@ -9948,7 +10148,7 @@ async function shareBattleResult({ photo, label1, label2, rating1, rating2, note
         const dstAspect = W / PHOTO_H;
         let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
         if (srcAspect > dstAspect) { sw = Math.round(sh * dstAspect); sx = Math.round((img.naturalWidth - sw) / 2); }
-        else { sh = Math.round(sw / dstAspect); }
+        else { sh = Math.round(sw / dstAspect); sy = 0; } // anchor top
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, PHOTO_H);
         res();
       };
@@ -9956,129 +10156,164 @@ async function shareBattleResult({ photo, label1, label2, rating1, rating2, note
       img.src = photo;
     });
 
-    // Gradient fade photo → dark
-    const fadeGrad = ctx.createLinearGradient(0, PHOTO_H - 130, 0, PHOTO_H);
-    fadeGrad.addColorStop(0, 'rgba(28,26,24,0)');
-    fadeGrad.addColorStop(1, 'rgba(28,26,24,1)');
-    ctx.fillStyle = fadeGrad;
-    ctx.fillRect(0, PHOTO_H - 130, W, 130);
+    let y = PHOTO_H;
 
-    let y = PHOTO_H + 18;
+    // ── Battle banner (.battle-banner) ────────────────────────
+    // background: linear-gradient(135deg, #1C1A18 0%, #3B2F1A 100%)
+    const bannerGrad = ctx.createLinearGradient(0, y, W, y + BANNER_H);
+    bannerGrad.addColorStop(0, C.dark);
+    bannerGrad.addColorStop(1, C.dark2);
+    ctx.fillStyle = bannerGrad;
+    ctx.fillRect(0, y, W, BANNER_H);
 
-    // ── Header ───────────────────────────────────────────────
+    // Title — .battle-banner-title: 18px bold white
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#C9A84C';
-    ctx.font = 'bold 26px -apple-system, system-ui, sans-serif';
-    ctx.fillText('⚔️  FASHION BATTLE', W / 2, y); y += 36;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 20px -apple-system, system-ui, sans-serif';
+    ctx.fillText('⚔️  Fashion Battle', W / 2, y + 26);
 
-    ctx.fillStyle = '#F5F0E8';
-    ctx.font = 'bold 19px -apple-system, system-ui, sans-serif';
-    ctx.fillText(winLine, W / 2, y); y += 26;
+    // Sub — .battle-banner-sub: 12px rgba(255,255,255,0.6)
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '13px -apple-system, system-ui, sans-serif';
+    ctx.fillText(winLine, W / 2, y + 50);
 
-    // Gold rule
-    ctx.strokeStyle = '#4A4030'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 40, y); ctx.stroke(); y += 20;
+    y += BANNER_H;
 
-    // ── Two-column score panels ──────────────────────────────
-    const colStartY = y;
+    // ── VS row border-top: 2px solid #1C1A18 ─────────────────
+    ctx.fillStyle = C.dark;
+    ctx.fillRect(0, y, W, SEP);
+    y += SEP;
+
+    // ── Two side panels (.battle-vs-row / .battle-side) ───────
     const isTie = winner === 0;
+    const panelTopY = y;
 
-    function drawPanel(label, rating, note, items, isWinner, colX) {
-      let cy = colStartY;
+    function drawSide(label, rating, note, items, isWinner, colX) {
       const cMid = colX + COL_W / 2;
+      const PAD_X = 14, PAD_TOP = 16, PAD_BOT = 20;
+      let cy = panelTopY + PAD_TOP;
 
-      // Panel BG
-      ctx.save();
-      roundRect(ctx, colX, cy, COL_W, 300, 12);
-      ctx.fillStyle = isWinner ? 'rgba(201,168,76,0.10)' : 'rgba(255,255,255,0.04)';
-      ctx.fill();
-      ctx.strokeStyle = isWinner ? '#C9A84C' : '#2E2B28';
-      ctx.lineWidth = isWinner ? 1.5 : 1;
-      ctx.stroke();
-      ctx.restore();
-      cy += 18;
+      // Panel background — .battle-side / .battle-side.winner
+      ctx.fillStyle = isWinner ? C.goldBg : C.surface;
+      ctx.fillRect(colX, panelTopY, COL_W, 800); // will be cropped at the end
 
-      // Crown
+      // Crown — .battle-side-crown: 22px centered
       ctx.textAlign = 'center';
-      ctx.font = '30px serif';
-      ctx.fillStyle = '#F5F0E8';
-      ctx.fillText(isWinner ? '🏆' : isTie ? '🤝' : '🥈', cMid, cy + 28); cy += 50;
+      ctx.font = '26px serif';
+      ctx.fillStyle = C.text;
+      ctx.fillText(isWinner ? '🏆' : isTie ? '🤝' : '🥈', cMid, cy + 22); cy += 40;
 
-      // Label
-      ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = isWinner ? '#C9A84C' : '#8A7F74';
-      ctx.fillText(label.toUpperCase(), cMid, cy); cy += 30;
+      // Label — .battle-side-label: 10px uppercase letter-spacing .8px text-3 centered
+      ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = C.text3;
+      ctx.letterSpacing = '0.8px';
+      ctx.fillText(label.toUpperCase(), cMid, cy); cy += 18;
+      ctx.letterSpacing = '0px';
 
-      // Big rating
+      // Rating — .battle-rating-big: 52px bold gold, with /10 in text-3
+      cy += 6;
       const rStr = String(rating);
       ctx.font = 'bold 52px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = isWinner ? '#C9A84C' : '#E8E0D4';
+      ctx.fillStyle = C.gold;
       const rW = ctx.measureText(rStr).width;
-      // right-align rating, left-align /10
-      ctx.textAlign = 'right';
-      ctx.fillText(rStr, cMid + 4, cy);
-      ctx.font = '22px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = '#5A5550';
+      // Center "X/10" as a unit
+      ctx.font = '20px -apple-system, system-ui, sans-serif';
+      const denomW = ctx.measureText('/10').width;
+      const totalW = rW + denomW;
+      ctx.font = 'bold 52px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = C.gold;
       ctx.textAlign = 'left';
-      ctx.fillText('/10', cMid + 8, cy); cy += 10;
+      ctx.fillText(rStr, cMid - totalW / 2, cy + 46);
+      ctx.font = '20px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = C.text3;
+      ctx.fillText('/10', cMid - totalW / 2 + rW, cy + 46);
+      cy += 58;
 
-      // Rating note
+      // Rating note — .battle-rating-note: 12px italic text-2 centered lh 1.45
       if (note) {
         ctx.textAlign = 'center';
         ctx.font = 'italic 12px Georgia, serif';
-        ctx.fillStyle = '#6E6560';
-        const noteLines = wrapText(ctx, `"${note}"`, COL_W - 28);
+        ctx.fillStyle = C.text2;
+        const noteLines = wrapText(ctx, note, COL_W - PAD_X * 2);
         for (const ln of noteLines.slice(0, 3)) { ctx.fillText(ln, cMid, cy); cy += 18; }
       }
-      cy += 10;
+      cy += 12;
 
-      // Mini divider
-      ctx.strokeStyle = '#2A2724'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(colX + 14, cy); ctx.lineTo(colX + COL_W - 14, cy); ctx.stroke(); cy += 12;
-
-      // Items
+      // Items — .battle-items-mini / .battle-item-mini
       ctx.textAlign = 'left';
-      ctx.font = '12.5px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = '#7A7268';
-      for (const it of (items || []).slice(0, 4)) {
-        const label = `${it.icon || '👕'}  ${it.name}`;
-        ctx.fillText(label, colX + 16, cy); cy += 22;
-      }
+      ctx.font = '12px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = C.text2;
+      const itemList = (items || []).slice(0, 4);
+      itemList.forEach((it, idx) => {
+        ctx.fillText(`${it.icon || '👕'}  ${it.name}`, colX + PAD_X, cy + 14);
+        // border-bottom: 1px solid --border (except last)
+        if (idx < itemList.length - 1) {
+          ctx.strokeStyle = C.border; ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(colX + PAD_X, cy + 20);
+          ctx.lineTo(colX + COL_W - PAD_X, cy + 20);
+          ctx.stroke();
+        }
+        cy += 22;
+      });
 
-      return cy + 10;
+      cy += PAD_BOT;
+      return cy;
     }
 
-    const endY1 = drawPanel(label1, rating1, note1, items1, winner === 1, GUTTER);
-    const endY2 = drawPanel(label2, rating2, note2, items2, winner === 2, GUTTER * 2 + COL_W);
-    y = Math.max(endY1, endY2) + 16;
+    const endY1 = drawSide(label1, rating1, note1, items1, winner === 1, 0);
+    const endY2 = drawSide(label2, rating2, note2, items2, winner === 2, COL_W);
 
-    // ── Verdict ──────────────────────────────────────────────
-    ctx.strokeStyle = '#3A3530'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 40, y); ctx.stroke(); y += 22;
+    // Vertical separator between columns — border-left: 2px solid #1C1A18
+    const colH = Math.max(endY1, endY2) - panelTopY;
+    ctx.fillStyle = C.dark;
+    ctx.fillRect(COL_W - 1, panelTopY, SEP, colH);
 
+    y = Math.max(endY1, endY2);
+
+    // ── Verdict wrap (.battle-verdict-wrap) ───────────────────
+    // margin: 16px 20px; padding: 16px; bg surface; border 1px border; border-radius r-sm (8px)
+    y += 16;
+    const VP = 16, VR = 8;
+    const verdictLabelH = 20 + 8; // label + gap
+    ctx.font = 'italic 14px Georgia, serif';
+    const vLines = wrapText(ctx, `"${verdict}"`, W - MARGIN * 2 - VP * 2);
+    const boxH = VP + verdictLabelH + vLines.length * 24 + VP;
+
+    rrect(ctx, MARGIN, y, W - MARGIN * 2, boxH, VR);
+    ctx.fillStyle = C.surface;
+    ctx.fill();
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    let vy = y + VP;
+
+    // Verdict label — .battle-verdict-label: 11px bold uppercase letter-spacing 1px text-3
     ctx.textAlign = 'left';
-    ctx.font = 'bold 12px -apple-system, system-ui, sans-serif';
-    ctx.fillStyle = '#C9A84C';
-    ctx.fillText('👩‍⚖️  CLAUDE\'S VERDICT', 40, y); y += 22;
+    ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = C.text3;
+    ctx.fillText('👩‍⚖️  CLAUDE\'S VERDICT', MARGIN + VP, vy + 12); vy += verdictLabelH;
 
-    ctx.font = 'italic 13.5px Georgia, serif';
-    ctx.fillStyle = '#BFB09A';
-    const vLines = wrapText(ctx, `"${verdict}"`, W - 80);
-    for (const ln of vLines) { ctx.fillText(ln, 40, y); y += 22; }
-    y += 18;
+    // Verdict text — .battle-verdict-text: 14px italic text lh 1.65
+    ctx.font = 'italic 14px Georgia, serif';
+    ctx.fillStyle = C.text;
+    for (const ln of vLines) { ctx.fillText(ln, MARGIN + VP, vy + 16); vy += 24; }
 
-    // ── Footer ───────────────────────────────────────────────
+    y = y + boxH + 16;
+
+    // ── Footer ────────────────────────────────────────────────
     ctx.textAlign = 'center';
     ctx.font = '11px -apple-system, system-ui, sans-serif';
-    ctx.fillStyle = '#3E3A36';
-    ctx.fillText('🪞  Closet', W / 2, y); y += 24;
+    ctx.fillStyle = C.text3;
+    ctx.fillText('🪞  Closet', W / 2, y + 14);
+    y += 30;
 
-    // ── Crop to actual height ────────────────────────────────
+    // ── Crop & share ──────────────────────────────────────────
     const finalCanvas = document.createElement('canvas');
     finalCanvas.width = W; finalCanvas.height = y;
     finalCanvas.getContext('2d').drawImage(canvas, 0, 0, W, y, 0, 0, W, y);
 
-    // ── Share or download ────────────────────────────────────
     const blob = await new Promise(res => finalCanvas.toBlob(res, 'image/png'));
     const file = new File([blob], 'fashion-battle.png', { type: 'image/png' });
 
@@ -10218,8 +10453,30 @@ function viewReview() {
       <div style="width:72px"></div>
     </div>
     ${S.error?`<div class="error-banner">${esc(S.error)}</div>`:''}
-    <div style="padding:0 20px 20px;">
+    <div style="padding:0 20px 20px;position:relative;">
       <img style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;border-radius:var(--r);display:block;" src="${d.photo}" alt="Outfit">
+      ${(()=>{
+        // Find any gifted wardrobe items mentioned in this draft
+        const draftNames = (d.items||[]).map(it => (typeof it==='string'?it:(it.name||'')).toLowerCase());
+        const giftedInFit = S.wardrobe.filter(w => w.gifted && !w.retiredFromCloset &&
+          draftNames.some(n => n && w.name && w.name.toLowerCase().includes(n.slice(0,6)))
+        );
+        // Also check any wardrobe items linked by id
+        const linkedGifted = S.wardrobe.filter(w => w.gifted && !w.retiredFromCloset &&
+          (d.items||[]).some(it => it && it.wardrobeId === w.id)
+        );
+        const allGifted = [...new Map([...giftedInFit,...linkedGifted].map(w=>[w.id,w])).values()];
+        if (!allGifted.length) return '';
+        const gifterName = allGifted.find(w=>w.giftedBy)?.giftedBy;
+        const firstId = allGifted[0]?.id || '';
+        return `<button
+          ontouchend="event.preventDefault();shareGiftWear('${firstId}')"
+          onclick="shareGiftWear('${firstId}')"
+          style="position:absolute;top:28px;right:28px;background:rgba(255,255,255,0.92);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:none;border-radius:100px;padding:6px 11px;display:flex;align-items:center;gap:5px;cursor:pointer;touch-action:manipulation;box-shadow:0 2px 12px rgba(0,0,0,0.15);">
+          <span style="font-size:18px;line-height:1;">🙏</span>
+          <span style="font-size:11px;font-weight:800;color:#7B35A8;">${gifterName ? `Thank ${esc(gifterName)}` : 'Say thanks'}</span>
+        </button>`;
+      })()}
     </div>
     <div class="form-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -10299,9 +10556,13 @@ function viewReview() {
       <textarea class="form-textarea" id="notesInput" placeholder="How did you feel? Where did you wear this?">${esc(d.notes||'')}</textarea>
       <p style="font-size:12px;color:var(--text-3);margin-top:8px;">✨ Mention where you wore it and Claude will auto-tag the occasion (e.g. "Date Night", "Work Offsite")</p>
     </div>
-    <button class="btn btn-primary" onclick="doSaveNew()">✨ Save This Fit</button>
+    <button class="btn btn-primary"
+      ontouchend="event.preventDefault();doSaveNew()"
+      onclick="doSaveNew()">✨ Save This Fit</button>
     <div style="height:11px"></div>
-    <button class="btn btn-secondary" onclick="navigate(S.activeTab);clearPending()">Discard</button>
+    <button class="btn btn-secondary"
+      ontouchend="event.preventDefault();navigate(S.activeTab);clearPending()"
+      onclick="navigate(S.activeTab);clearPending()">Discard</button>
     <div style="height:36px"></div>
   </div>`;
 }
@@ -10866,7 +11127,32 @@ function viewEdit() {
       <label class="form-label">Notes</label>
       <textarea class="form-textarea" id="notesInput" placeholder="How did you feel? Where did you wear this?">${esc(d.notes||'')}</textarea>
     </div>
-    <button class="btn btn-primary" onclick="doSaveEdit()">Save Changes</button>
+    <div class="form-section">
+      <label class="form-label">Activity</label>
+      <p style="font-size:12px;color:var(--text-3);margin-bottom:10px;">Pick an existing tag or type a custom one below.</p>
+      ${(()=>{
+        const allTags = [...new Set(S.entries.map(e => e.occasionTag).filter(Boolean))];
+        const noneActive = !d.occasionTag;
+        const chips = [
+          `<div class="filter-chip ${noneActive?'active':''}"
+            ontouchend="event.preventDefault();S.draft.occasionTag=null;S.draft._manualTag=true;render()"
+            onclick="S.draft.occasionTag=null;S.draft._manualTag=true;render()">✕ None</div>`,
+          ...allTags.map(tag => {
+            const jsVal = JSON.stringify(tag).replace(/"/g,'&quot;');
+            const active = d.occasionTag === tag;
+            return `<div class="filter-chip ${active?'active':''}"
+              ontouchend="event.preventDefault();S.draft.occasionTag=${jsVal};S.draft._manualTag=true;render()"
+              onclick="S.draft.occasionTag=${jsVal};S.draft._manualTag=true;render()">🏷 ${esc(tag)}</div>`;
+          })
+        ].join('');
+        const customVal = d.occasionTag && !allTags.includes(d.occasionTag) ? esc(d.occasionTag) : '';
+        return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">${chips}</div>
+          <input class="form-input" id="customTagInput" placeholder="Custom activity (e.g. Vacation, Gym)…"
+            value="${customVal}" style="margin:0;font-size:14px;"
+            oninput="S.draft.occasionTag=this.value.trim()||null;S.draft._manualTag=true;">`;
+      })()}
+    </div>
+    <button class="btn btn-primary" ontouchend="event.preventDefault();doSaveEdit()" onclick="doSaveEdit()">Save Changes</button>
     <div style="height:36px"></div>
   </div>`;
 }
@@ -11450,6 +11736,143 @@ function receiptImageSelected(input) {
 }
 
 // Called when user picks a photo of a wardrobe item
+// ── BULK UPLOAD FUNCTIONS ────────────────────────────────────────
+function bulkFilesSelected(input) {
+  const files = Array.from(input.files || []);
+  if (!files.length) return;
+  S.bulkQueue = [];
+  S.bulkIdx = 0;
+  S.bulkSaved = 0;
+  S.bulkAnalyzing = false;
+  let loaded = 0;
+  const results = new Array(files.length);
+  files.forEach((file, i) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      results[i] = { dataUrl: e.target.result, imageMime: file.type || 'image/jpeg', preview: null };
+      loaded++;
+      if (loaded === files.length) {
+        S.bulkQueue = results;
+        navigate('bulk-add');
+        if (S.apiKey) setTimeout(() => bulkAnalyzeCurrent(), 200);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function bulkAnalyzeCurrent() {
+  const queue = S.bulkQueue || [];
+  const idx   = S.bulkIdx   || 0;
+  const current = queue[idx];
+  if (!current) return;
+  if (!S.apiKey) { toast('Add your API key in Settings first.'); return; }
+  S.bulkAnalyzing = true;
+  render();
+  const comma     = current.dataUrl.indexOf(',');
+  const imageData = current.dataUrl.slice(comma + 1);
+  const imageMime = current.imageMime;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: imageMime, data: imageData } },
+          { type: 'text', text: `You are a fashion expert. Look at this clothing/accessory item and return ONLY valid JSON — no markdown, no code fences.
+
+{
+  "name": "Specific descriptive name, e.g. 'White Leather Sneakers' or 'Tan Suede Ankle Boots'",
+  "brand": "Brand name if visible on label, tag, or logo — otherwise empty string",
+  "category": "exactly one of: Tops, Jackets, Pants, Dresses, Shoes, Bags, Jewelry, Accessories, Other",
+  "icon": "single most fitting clothing emoji",
+  "description": "Color, material, fit, and notable details in 1-2 sentences"
+}` }
+        ]}]
+      }),
+    });
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const data = await res.json();
+    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('No JSON');
+    const parsed = JSON.parse(m[0]);
+    if (S.bulkIdx === idx) {
+      S.bulkQueue[idx].preview = { ...parsed, price: '', size: '', isNew: true, purchasedDate: '' };
+    }
+  } catch(e) {
+    console.error('bulkAnalyzeCurrent:', e);
+    if (S.bulkIdx === idx) toast('Couldn\'t identify — fill in details manually.');
+  }
+  S.bulkAnalyzing = false;
+  render();
+}
+
+async function bulkSaveAndNext() {
+  const queue = S.bulkQueue || [];
+  const idx   = S.bulkIdx   || 0;
+  const current = queue[idx];
+  if (!current) { bulkAdvance(); return; }
+  const p = current.preview || {};
+  const itemName = (p.name || '').trim();
+  if (!itemName) { toast('Please enter an item name before saving.'); return; }
+  const cat = normalizeCat(p.category || 'Other');
+  const _today = new Date();
+  const _todayMonth = `${_today.getFullYear()}-${String(_today.getMonth()+1).padStart(2,'0')}`;
+  const newItem = {
+    id: uid(), name: itemName,
+    brand: p.brand?.trim() || null,
+    description: p.description?.trim() || null,
+    price: parseFloat(p.price) || null,
+    size: p.size?.trim() || null,
+    icon: p.icon || '👕',
+    category: cat,
+    subCategory: subCategoryFromName(itemName, cat),
+    paidOff: false, retiring: false, gifted: false,
+    addedAt: new Date().toISOString(),
+    wears: [],
+    addedVia: 'bulk',
+    isNew: p.isNew !== false,
+    purchasedDate: p.isNew !== false ? _todayMonth : (p.purchasedDate || null),
+    photo: current.dataUrl,
+  };
+  await DB.wardrobe.put(newItem);
+  S.wardrobe = await DB.wardrobe.getAll();
+  S.bulkSaved = (S.bulkSaved || 0) + 1;
+  bulkAdvance();
+}
+
+function bulkSkip() { bulkAdvance(); }
+
+function bulkAdvance() {
+  S.bulkIdx = (S.bulkIdx || 0) + 1;
+  S.bulkAnalyzing = false;
+  render();
+  const queue = S.bulkQueue || [];
+  const idx   = S.bulkIdx;
+  if (idx < queue.length && S.apiKey && !queue[idx].preview) {
+    setTimeout(() => bulkAnalyzeCurrent(), 150);
+  }
+}
+
+function bulkExitConfirm() {
+  const saved = S.bulkSaved || 0;
+  const done  = S.bulkIdx  || 0;
+  if (saved > 0 || done > 0) {
+    if (!confirm(`Exit bulk upload? ${saved} piece${saved===1?'':'s'} already saved to your wardrobe.`)) return;
+  }
+  S.bulkQueue = []; S.bulkIdx = 0; S.bulkSaved = 0; S.bulkAnalyzing = false;
+  navigate('new-piece');
+}
+
+// ── SINGLE PHOTO UPLOAD ──────────────────────────────────────────
 function photoItemSelected(input) {
   const file = input.files?.[0];
   if (!file) return;
@@ -11906,12 +12329,13 @@ function linkUnmatchedToExisting(i, wardrobeId) {
 async function doSaveEdit() {
   if (!S.draft) return;
   syncNotes();
-  // Re-tag from notes if notes are present
-  if (S.draft.notes) {
+  // Only AI-retag from notes if the user didn't manually pick an activity
+  if (!S.draft._manualTag && S.draft.notes) {
     const newTag = await tagOccasion(S.draft.notes);
     if (newTag) S.draft.occasionTag = newTag;
     else if (!S.draft.notes.trim()) S.draft.occasionTag = null;
   }
+  delete S.draft._manualTag; // transient — don't persist
   await DB.entries.put(S.draft);
   S.entries = await DB.entries.getAll();
   S.draft = null;
@@ -12329,20 +12753,18 @@ function removeItem(i) {
 }
 
 function doSetupSave() {
-  const locEl = document.getElementById('setupLocation');
-  const keyEl = document.getElementById('setupKey');
-  const loc = locEl?.value.trim();
-  const key = keyEl?.value.trim();
-  if (!loc) { toast('Please enter your city or location ✦'); locEl?.focus(); return; }
+  const nameEl = document.getElementById('setupName');
+  const keyEl  = document.getElementById('setupKey');
+  const name = nameEl?.value.trim();
+  const key  = keyEl?.value.trim();
+  if (!name) { toast('Please enter your first name'); nameEl?.focus(); return; }
   if (!key || !key.startsWith('sk-')) { toast('Please enter a valid Anthropic API key (starts with sk-)'); keyEl?.focus(); return; }
-  // Save everything to localStorage first — reload will read these on startup
-  localStorage.setItem('closet-profile-location', loc);
+  localStorage.setItem('closet-profile-name', name);
+  S.profileName = name;
+  try { fsSet('profileName', name); } catch(e) {}
   localStorage.setItem('closet-api-key', key);
-  S.profileLocation = loc;
   S.apiKey = key;
-  // Fire-and-forget Firestore saves, then reload the page cleanly
-  // (reload is the most reliable cross-device navigation, same as a manual refresh)
-  try { fsSet('profileLocation', loc); fsSet('apiKey', key); } catch(e) {}
+  try { fsSet('apiKey', key); } catch(e) {}
   window.location.reload();
 }
 function doSaveApiKey() {
