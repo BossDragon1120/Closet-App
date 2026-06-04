@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Closet">
 <meta name="theme-color" content="#F7F4F0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <title>Closet · Your Wardrobe, Your Story</title>
 <style>
 /* ── VARIABLES ───────────────────────────────────────────── */
@@ -479,7 +481,8 @@ body {
   word-break: break-word; min-height: 27px;
 }
 .hanger-brand {
-  font-size: 9.5px; color: var(--text-3); margin-top: 2px;
+  font-size: 9px; color: var(--gold-dk, #8a5e1c); margin-top: 1px; margin-bottom: 1px;
+  font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .hanger-wears {
@@ -2718,7 +2721,7 @@ const S = {
   // ui
   loading: false, loadingMsg: '', error: null,
   filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All',
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: 2, bagRackLevels: 2, accessoryRackLevels: 2, wardrobeExpanded: false, wardrobeRetiredExpanded: false,
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: 2, bagRackLevels: 2, accessoryRackLevels: 2, wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
   // Style Persona
@@ -2756,6 +2759,17 @@ const S = {
   _expandedEvents:    {},
   assistantTier:      'core',
   _assistantBooked:   null,
+  wardrobeSearch:     '',
+  _wardrobeSearchOpen: false,
+  _wardrobeSelectMode: false,
+  _wardrobeSelected:  [],
+  _wardrobeVisibleIds:[],
+  _localStatus:       null,
+  _localLat:          null,
+  _localLng:          null,
+  _localBrand:        null,
+  _localStores:       [],
+  _localStoresLoading: false,
   // Cloud Sync
   syncUrl:            localStorage.getItem('closet-sync-url')  || '',
   syncCode:           localStorage.getItem('closet-sync-code') || '',
@@ -5321,7 +5335,7 @@ async function signOut() {
 /* ================================================================
    RENDER ROUTER
    ================================================================ */
-const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','hero-pieces','signature-pieces']);
+const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','hero-pieces','signature-pieces']);
 
 function render() {
   const root = document.getElementById('root');
@@ -5359,6 +5373,7 @@ function render() {
     case 'onboarding':   html = viewOnboarding();   break;
     case 'squad':        html = viewSquadDetail();  break;
     case 'hot':          html = viewHot();          break;
+    case 'local':        html = viewLocal();        break;
     case 'hero-pieces':       html = viewHeroPieces();        break;
     case 'signature-pieces':  html = viewSignaturePieces();   break;
   }
@@ -5377,6 +5392,15 @@ function render() {
   if (S.toast) html += `<div class="toast">${esc(S.toast)}</div>`;
   root.innerHTML = html;
   attachListeners();
+  // Post-render: local map init
+  if (S.view === 'local') requestAnimationFrame(initLocalMap);
+  // Post-render: re-focus wardrobe search input after debounced re-render
+  if (S._wardrobeSearchOpen && S.view === 'wardrobe') {
+    requestAnimationFrame(() => {
+      const inp = document.getElementById('wardrobe-search-input');
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    });
+  }
 }
 
 /* ================================================================
@@ -5434,11 +5458,191 @@ function bottomBarHTML() {
       onclick="switchTab('hot')" title="What's Hot">
       ${iconFlame()} <span>What's Hot</span>
     </button>
-    <button class="bottom-btn"
-      ontouchend="if(_touchMoved)return;event.preventDefault();toast('Local discovery coming soon 📍')"
-      onclick="toast('Local discovery coming soon 📍')" title="Local">
+    <button class="bottom-btn ${S.view==='local'?'bottom-btn-active':''}"
+      ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('local')"
+      onclick="switchTab('local')" title="Local">
       ${iconMapPin()} <span>Local</span>
     </button>
+  </div>`;
+}
+
+/* ================================================================
+   VIEW: LOCAL — Brand store map
+   ================================================================ */
+let _localMap = null;
+
+function initLocalMap() {
+  if (S.view !== 'local') return;
+  const container = document.getElementById('local-map');
+  if (!container || !window.L) return;
+  // Destroy previous map instance
+  if (_localMap) { try { _localMap.remove(); } catch(e) {} _localMap = null; }
+  delete container._leaflet_id;
+
+  const lat = S._localLat || 40.7550;
+  const lng = S._localLng || -73.9857;
+  _localMap = L.map(container, { zoomControl: true, attributionControl: false })
+    .setView([lat, lng], S._localLat ? 13 : 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_localMap);
+
+  if (S._localLat) {
+    const youIcon = L.divIcon({
+      className: '',
+      html: '<div style="width:13px;height:13px;background:#2196F3;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 5px rgba(0,0,0,0.4);"></div>',
+      iconSize: [13, 13], iconAnchor: [6, 6]
+    });
+    L.marker([S._localLat, S._localLng], { icon: youIcon }).addTo(_localMap).bindPopup('📍 You are here');
+  }
+
+  const allPts = S._localLat ? [[S._localLat, S._localLng]] : [];
+  S._localStores.forEach(store => {
+    const slat = store.lat || (store.center && store.center.lat);
+    const slng = store.lon || (store.center && store.center.lon);
+    if (!slat || !slng) return;
+    allPts.push([slat, slng]);
+    const name = (store.tags && (store.tags.name || store.tags.brand)) || S._localBrand || 'Store';
+    const pinIcon = L.divIcon({
+      className: '',
+      html: '<div style="background:#B87D2A;color:#fff;font-size:9px;font-weight:800;padding:3px 8px;border-radius:100px;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,0.3);">' + name + '</div>',
+      iconAnchor: [28, 10]
+    });
+    const addr = store.tags && store.tags['addr:street'] ? store.tags['addr:street'] : '';
+    L.marker([slat, slng], { icon: pinIcon }).addTo(_localMap)
+      .bindPopup('<b>' + name + '</b>' + (addr ? '<br>' + addr : ''));
+  });
+
+  if (allPts.length > 1) {
+    _localMap.fitBounds(allPts, { padding: [32, 32], maxZoom: 14 });
+  }
+}
+
+function requestLocalLocation() {
+  if (!navigator.geolocation) { toast('Geolocation not supported on this device.'); return; }
+  S._localStatus = 'requesting'; render();
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      S._localLat = pos.coords.latitude;
+      S._localLng = pos.coords.longitude;
+      S._localStatus = 'granted';
+      if (S._localBrand) fetchLocalStores();
+      else render();
+    },
+    () => { S._localStatus = 'denied'; render(); }
+  );
+}
+
+async function fetchLocalStores() {
+  if (!S._localLat || !S._localBrand) return;
+  S._localStoresLoading = true;
+  S._localStores = [];
+  render();
+  const brand = S._localBrand.replace(/"/g, '');
+  const query = `[out:json][timeout:20];(node["name"~"${brand}",i]["shop"](around:12000,${S._localLat},${S._localLng});way["name"~"${brand}",i]["shop"](around:12000,${S._localLat},${S._localLng});node["brand"~"${brand}",i](around:12000,${S._localLat},${S._localLng});way["brand"~"${brand}",i](around:12000,${S._localLat},${S._localLng}););out center;`;
+  try {
+    const r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+    const data = await r.json();
+    S._localStores = data.elements || [];
+  } catch(e) {
+    S._localStores = [];
+    toast('Could not reach store data. Check your connection.');
+  }
+  S._localStoresLoading = false;
+  render();
+}
+
+function selectLocalBrand(brand) {
+  S._localBrand = brand;
+  if (S._localLat) fetchLocalStores();
+  else requestLocalLocation();
+  render();
+}
+
+function viewLocal() {
+  // Gather user's brands, sorted by item count
+  const brandCounts = {};
+  S.wardrobe.filter(w => !w.retiredFromCloset).forEach(w => {
+    if (w.brand && w.brand.trim()) {
+      const b = w.brand.trim();
+      brandCounts[b] = (brandCounts[b] || 0) + 1;
+    }
+  });
+  const brands = Object.keys(brandCounts).sort((a,b) => brandCounts[b] - brandCounts[a]);
+
+  const noBrands = brands.length === 0;
+
+  const brandChips = brands.map(b => {
+    const active = S._localBrand === b;
+    return `<button ontouchend="if(_touchMoved)return;event.preventDefault();selectLocalBrand('${b.replace(/'/g, "\\'")}');" onclick="selectLocalBrand('${b.replace(/'/g, "\\'")}');"
+      style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:${active ? 'var(--gold)' : 'var(--surface)'};color:${active ? '#fff' : 'var(--text)'};border:1.5px solid ${active ? 'var(--gold)' : 'var(--border)'};border-radius:100px;font-size:13px;font-weight:${active ? '800' : '600'};cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
+      ${active ? '📍 ' : ''}${esc(b)}<span style="font-size:10px;opacity:.65;">${brandCounts[b]}</span>
+    </button>`;
+  }).join('');
+
+  const locStatus = S._localStatus;
+  const hasLocation = S._localLat !== null;
+  const hasStores = S._localStores.length > 0;
+  const isLoading = S._localStoresLoading;
+
+  // Store list below map
+  const storeListHTML = isLoading
+    ? `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:13px;"><div class="spinner" style="width:20px;height:20px;border-width:2px;border-top-color:var(--gold);margin:0 auto 10px;"></div>Finding ${esc(S._localBrand || '')} stores nearby…</div>`
+    : hasStores
+    ? S._localStores.slice(0, 12).map(store => {
+        const slat = store.lat || (store.center && store.center.lat);
+        const slng = store.lon || (store.center && store.center.lon);
+        const name = (store.tags && (store.tags.name || store.tags.brand)) || S._localBrand || 'Store';
+        const addr = store.tags && store.tags['addr:street'] ? store.tags['addr:street'] + (store.tags['addr:city'] ? ', ' + store.tags['addr:city'] : '') : '';
+        const mapsUrl = slat ? `https://www.google.com/maps/search/?api=1&query=${slat},${slng}` : `https://www.google.com/maps/search/${encodeURIComponent(name)}`;
+        return `<a href="${mapsUrl}" target="_blank" rel="noopener"
+          style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:var(--text);background:var(--surface);">
+          <span style="font-size:20px;flex-shrink:0;">🏪</span>
+          <span style="flex:1;min-width:0;">
+            <span style="display:block;font-size:13px;font-weight:700;">${esc(name)}</span>
+            ${addr ? `<span style="display:block;font-size:11px;color:var(--text-3);margin-top:1px;">${esc(addr)}</span>` : ''}
+          </span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </a>`;
+      }).join('')
+    : S._localBrand && hasLocation
+    ? `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:13px;">No ${esc(S._localBrand)} stores found within 12 km. Try another brand or check back later.</div>`
+    : '';
+
+  const mapOrPromptHTML = noBrands
+    ? `<div style="text-align:center;padding:48px 24px;">
+        <div style="font-size:36px;margin-bottom:12px;">🏪</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;">Add brands to your wardrobe</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;">When you add a brand to your wardrobe items, they'll show up here so you can find nearby stores.</div>
+      </div>`
+    : `
+      ${!hasLocation && locStatus !== 'requesting' ? `
+        <div style="margin:0 16px 14px;background:var(--gold-bg);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:22px;flex-shrink:0;">📍</span>
+          <span style="flex:1;font-size:13px;color:var(--text-2);line-height:1.5;">Tap a brand above, then allow location access to find nearby stores.</span>
+        </div>` : ''}
+      ${locStatus === 'requesting' ? `<div style="text-align:center;padding:14px;font-size:13px;color:var(--text-3);">Finding your location…</div>` : ''}
+      ${locStatus === 'denied' ? `<div style="margin:0 16px 12px;padding:12px 14px;background:#FEE2E2;border-radius:12px;font-size:12px;color:#B91C1C;">Location access was denied. Enable it in your device settings to use this feature.</div>` : ''}
+      <div id="local-map" style="height:280px;margin:0 16px 0;border-radius:16px;overflow:hidden;border:1px solid var(--border);background:#e8e0d8;"></div>
+      ${hasStores || isLoading ? `
+        <div style="margin:14px 16px 4px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">${isLoading ? 'Searching…' : `${S._localStores.length} store${S._localStores.length===1?'':'s'} found`}</div>
+        <div style="margin:0 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;">
+          ${storeListHTML}
+        </div>` : storeListHTML}
+    `;
+
+  return `<div class="view">
+    <div class="nav">
+      <span class="nav-logo">📍 Local</span>
+    </div>
+    <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding-bottom:80px;">
+      <div style="padding:14px 16px 10px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Your Brands</div>
+        ${noBrands
+          ? '<span style="font-size:13px;color:var(--text-3);">No brands added yet</span>'
+          : `<div style="display:flex;flex-wrap:wrap;gap:8px;">${brandChips}</div>`}
+      </div>
+      ${mapOrPromptHTML}
+      <div style="padding:16px 16px 0;font-size:11px;color:var(--text-3);line-height:1.6;">Store data from OpenStreetMap contributors. Results may vary by area.</div>
+    </div>
   </div>`;
 }
 
@@ -5907,8 +6111,8 @@ async function _downloadOrShareCanvas(canvas, filename) {
 /* ================================================================
    SHARE: WISH LIST CARD
    ================================================================ */
-async function shareWishListCard() {
-  // 1. Hearted wish list items come first
+function openWishShareSheet() {
+  // Collect all hearted wish list items
   const wishItems = [];
   const wishNames = new Set();
   S.entries.forEach(e => {
@@ -5918,35 +6122,32 @@ async function shareWishListCard() {
         const name = r.item || r;
         if (!wishNames.has(name.toLowerCase())) {
           wishNames.add(name.toLowerCase());
-          wishItems.push({ name, reason: r.reason || '' });
+          wishItems.push({ name, reason: r.reason || '', selected: true });
         }
       }
     });
   });
-
   if (!wishItems.length) {
     toast('No wish list items yet — heart some picks in the Shop tab!');
-    S.shopWishShareOpen = false;
-    render();
     return;
   }
+  S._wishShareItems = wishItems;
+  S.shopWishShareOpen = true;
+  render();
+}
 
-  // 2. Fill remaining slots (up to 8) with top Claude recs if wish list is short
-  const items = [...wishItems];
-  if (items.length < 8) {
-    S.entries.forEach(e => {
-      if (items.length >= 8) return;
-      (e.purchaseRecs || []).forEach((r, i) => {
-        if (items.length >= 8) return;
-        const reaction = e.purchaseReactions?.[String(i)];
-        if (reaction === 'liked' || reaction === 'dismissed') return; // skip already added or dismissed
-        const name = r.item || r;
-        if (!wishNames.has(name.toLowerCase())) {
-          wishNames.add(name.toLowerCase());
-          items.push({ name, reason: r.reason || '' });
-        }
-      });
-    });
+function toggleWishShareItem(idx) {
+  if (!S._wishShareItems || !S._wishShareItems[idx]) return;
+  S._wishShareItems[idx].selected = !S._wishShareItems[idx].selected;
+  render();
+}
+
+async function shareWishListCard() {
+  // Use the selected items from the picker
+  const items = (S._wishShareItems || []).filter(x => x.selected);
+  if (!items.length) {
+    toast('Select at least one item first!');
+    return;
   }
   const occasion = S.shopWishOccasion.trim();
   const userName = S.profileName || 'My';
@@ -6549,7 +6750,7 @@ function viewShop() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">Shop</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishShareOpen=true;render();" onclick="S.shopWishShareOpen=true;render()">
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openWishShareSheet();" onclick="openWishShareSheet()">
         🎁 Share Wish List
       </button>
     </div>
@@ -6591,37 +6792,74 @@ function viewShop() {
     <div style="height:80px"></div>
 
     <!-- Share Wish List bottom sheet -->
-    ${S.shopWishShareOpen ? (() => {
+    ${S.shopWishShareOpen && S._wishShareItems ? (() => {
+      const wishItems = S._wishShareItems;
+      const selectedCount = wishItems.filter(x => x.selected).length;
       const QUICK = ['🎂 Birthday','🎄 Holiday','💍 Registry'];
       return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishShareOpen=false;render();" onclick="S.shopWishShareOpen=false;render()">
-        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;padding:24px 20px 40px;box-shadow:0 -4px 30px rgba(0,0,0,.15);"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishShareOpen=false;S._wishShareItems=null;render();" onclick="S.shopWishShareOpen=false;S._wishShareItems=null;render()">
+        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:85dvh;display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.18);"
           ontouchend="event.stopPropagation();" onclick="event.stopPropagation()">
-          <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px;"></div>
-          <div style="font-size:18px;font-weight:900;margin-bottom:4px;">🎁 Share Wish List</div>
-          <div style="font-size:13px;color:var(--text-3);margin-bottom:20px;">Creates a card with up to 8 ❤️ items you can share with anyone.</div>
 
-          <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">Occasion <span style="font-weight:400;color:var(--text-3)">(optional)</span></div>
-          <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;">
-            ${QUICK.map(label => {
-              const active = S.shopWishOccasion === label;
-              return `<button
-                ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render();"
-                onclick="S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render()"
-                style="border-radius:100px;border:1.5px solid ${active?'var(--gold)':'var(--border)'};background:${active?'var(--gold-bg)':'none'};color:${active?'var(--gold-dk)':'var(--text-2)'};font-size:12px;font-weight:600;padding:6px 13px;cursor:pointer;font-family:inherit;touch-action:manipulation;"
-              >${label}</button>`;
-            }).join('')}
+          <!-- Fixed header -->
+          <div style="padding:14px 20px 12px;flex-shrink:0;">
+            <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;">
+              <div style="font-size:18px;font-weight:900;">🎁 Share Wish List</div>
+              <div style="font-size:12px;color:var(--text-3);">${selectedCount} of ${wishItems.length} selected</div>
+            </div>
           </div>
-          <input type="text" placeholder="Or type your own… e.g. Christmas Ideas"
-            value="${esc(S.shopWishOccasion)}"
-            oninput="S.shopWishOccasion=this.value"
-            style="width:100%;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text);box-sizing:border-box;margin-bottom:18px;outline:none;">
-          <button
-            ontouchend="if(_touchMoved)return;event.preventDefault();shareWishListCard();"
-            onclick="shareWishListCard()"
-            style="width:100%;background:var(--gold);color:#fff;border:none;border-radius:var(--r-sm);padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            Create Card →
-          </button>
+
+          <!-- Scrollable content -->
+          <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:0 20px;">
+
+            <!-- Item picker -->
+            <div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:18px;">
+              ${wishItems.map((item, idx) => {
+                const sel = item.selected;
+                return `<button
+                  ontouchend="if(_touchMoved)return;event.preventDefault();toggleWishShareItem(${idx});"
+                  onclick="toggleWishShareItem(${idx});"
+                  style="width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;background:${sel?'var(--gold-bg)':'var(--surface)'};border:none;border-bottom:1px solid var(--border);cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;${idx===wishItems.length-1?'border-bottom:none;':''}" >
+                  <div style="width:22px;height:22px;border-radius:50%;background:${sel?'var(--gold)':'transparent'};border:2px solid ${sel?'var(--gold)':'var(--border)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s,border-color .12s;">
+                    ${sel?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}
+                  </div>
+                  <span style="flex:1;font-size:14px;font-weight:${sel?'700':'500'};color:var(--text);line-height:1.35;">${esc(item.name)}</span>
+                </button>`;
+              }).join('')}
+            </div>
+
+            <!-- Occasion -->
+            <div style="margin-bottom:6px;">
+              <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">Occasion <span style="font-weight:400;color:var(--text-3)">(optional)</span></div>
+              <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;">
+                ${QUICK.map(label => {
+                  const active = S.shopWishOccasion === label;
+                  return `<button
+                    ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render();"
+                    onclick="S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render()"
+                    style="border-radius:100px;border:1.5px solid ${active?'var(--gold)':'var(--border)'};background:${active?'var(--gold-bg)':'none'};color:${active?'var(--gold-dk)':'var(--text-2)'};font-size:12px;font-weight:600;padding:6px 13px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                  ${label}</button>`;
+                }).join('')}
+              </div>
+              <input type="text" placeholder="Or type your own… e.g. Christmas Ideas"
+                value="${esc(S.shopWishOccasion)}"
+                oninput="S.shopWishOccasion=this.value"
+                style="width:100%;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text);box-sizing:border-box;outline:none;">
+            </div>
+            <div style="height:4px;"></div>
+          </div>
+
+          <!-- Sticky action button — never scrolls away -->
+          <div style="flex-shrink:0;padding:12px 20px max(20px,env(safe-area-inset-bottom,20px));border-top:1px solid var(--border);background:var(--surface);">
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();shareWishListCard();"
+              onclick="shareWishListCard()"
+              ${selectedCount===0?'disabled':''}
+              style="width:100%;background:${selectedCount?'var(--gold)':'var(--border)'};color:${selectedCount?'#fff':'var(--text-3)'};border:none;border-radius:var(--r-sm);padding:14px;font-size:15px;font-weight:800;cursor:${selectedCount?'pointer':'default'};font-family:inherit;touch-action:manipulation;transition:background .15s,color .15s;">
+              ${selectedCount ? `Create Card (${selectedCount}) →` : 'Select items above'}
+            </button>
+          </div>
         </div>
       </div>`;
     })() : ''}
@@ -8911,6 +9149,60 @@ async function shareSignaturePieces() {
 }
 
 /* ================================================================
+   WARDROBE SELECT MODE — long-press bulk delete
+   ================================================================ */
+let _wLongPressTimer = null;
+
+function wLongPressStart(id, e) {
+  wLongPressCancel();
+  _wLongPressTimer = setTimeout(() => {
+    if (_touchMoved) return;
+    if (navigator.vibrate) navigator.vibrate(40);
+    S._wardrobeSelectMode = true;
+    if (!S._wardrobeSelected.includes(id)) S._wardrobeSelected = [id];
+    render();
+  }, 490);
+}
+function wLongPressCancel() {
+  clearTimeout(_wLongPressTimer);
+  _wLongPressTimer = null;
+}
+function toggleWardrobeSelect(id) {
+  if (S._wardrobeSelected.includes(id)) {
+    S._wardrobeSelected = S._wardrobeSelected.filter(x => x !== id);
+  } else {
+    S._wardrobeSelected = [...S._wardrobeSelected, id];
+  }
+  render();
+}
+function exitWardrobeSelectMode() {
+  S._wardrobeSelectMode = false;
+  S._wardrobeSelected = [];
+  render();
+}
+function selectAllVisibleWardrobe() {
+  S._wardrobeSelected = [...new Set([...S._wardrobeSelected, ...S._wardrobeVisibleIds])];
+  render();
+}
+async function deleteSelectedItems() {
+  const ids = [...S._wardrobeSelected];
+  if (!ids.length) return;
+  const noun = ids.length === 1 ? '1 item' : `${ids.length} items`;
+  const ok = confirm(`Remove ${noun} from your wardrobe? This cannot be undone.`);
+  if (!ok) return;
+  S.loading = true; S.loadingMsg = `Deleting ${noun}…`; render();
+  for (const id of ids) {
+    await DB.wardrobe.del(id);
+  }
+  S.wardrobe = await DB.wardrobe.getAll();
+  S._wardrobeSelectMode = false;
+  S._wardrobeSelected = [];
+  S.loading = false;
+  toast(`${noun} removed from your wardrobe.`);
+  render();
+}
+
+/* ================================================================
    VIEW: WARDROBE
    ================================================================ */
 function viewWardrobe() {
@@ -8956,6 +9248,18 @@ function viewWardrobe() {
     return ppwA - ppwB;
   });
   if (S.wardrobeSort === 'az') items.sort((a,b) => a.name.localeCompare(b.name));
+
+  // Search filter — applied after sort so results maintain sort order
+  if (S.wardrobeSearch.trim()) {
+    const q = S.wardrobeSearch.toLowerCase().trim();
+    items = items.filter(w =>
+      (w.name || '').toLowerCase().includes(q) ||
+      (w.brand || '').toLowerCase().includes(q) ||
+      (w.category || '').toLowerCase().includes(q) ||
+      (w.subCategory || '').toLowerCase().includes(q) ||
+      (w.color || '').toLowerCase().includes(q)
+    );
+  }
 
   // Category chips — always show all categories, with count badges
   const catBar = S.wardrobe.length > 0 ? `
@@ -9222,10 +9526,32 @@ function viewWardrobe() {
     </div>`;
   })() : '';
 
+  // Track visible IDs so "Select All" knows what's currently shown
+  S._wardrobeVisibleIds = items.map(w => w.id);
+
   return `<div class="view">
     <div class="nav">
-      <span class="nav-logo">${S.profileName.trim() ? `${S.profileName.trim()}'s Closet` : 'My Closet'}</span>
-      <button class="nav-add" onclick="navigate('new-piece')">${iconPlus()} New Piece</button>
+      ${S._wardrobeSelectMode ? `
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();exitWardrobeSelectMode()" onclick="exitWardrobeSelectMode()" style="font-size:14px;font-weight:700;color:var(--text-2);background:none;border:none;cursor:pointer;padding:4px 8px;font-family:inherit;touch-action:manipulation;">Cancel</button>
+        <span style="flex:1;text-align:center;font-size:14px;font-weight:700;color:var(--text);">${S._wardrobeSelected.length ? `${S._wardrobeSelected.length} selected` : 'Select items'}</span>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();selectAllVisibleWardrobe()" onclick="selectAllVisibleWardrobe()" style="font-size:14px;font-weight:700;color:var(--gold-dk,#8a5e1c);background:none;border:none;cursor:pointer;padding:4px 8px;font-family:inherit;touch-action:manipulation;">All</button>
+      ` : S._wardrobeSearchOpen ? `
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeSearchOpen=false;S.wardrobeSearch='';render()" onclick="S._wardrobeSearchOpen=false;S.wardrobeSearch='';render()" style="touch-action:manipulation;">✕</button>
+        <input id="wardrobe-search-input" type="search" value="${esc(S.wardrobeSearch)}"
+          placeholder="Brand, name, category…"
+          oninput="S.wardrobeSearch=this.value;clearTimeout(window._wsDebounce);window._wsDebounce=setTimeout(()=>render(),280);"
+          style="flex:1;border:none;background:transparent;font-size:15px;color:var(--text);outline:none;padding:0 6px;font-family:inherit;min-width:0;">
+        <span style="width:44px;"></span>
+      ` : `
+        <span class="nav-logo">${S.profileName.trim() ? `${S.profileName.trim()}'s Closet` : 'My Closet'}</span>
+        <span style="display:flex;align-items:center;gap:4px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeSearchOpen=true;render()" onclick="S._wardrobeSearchOpen=true;render()" style="background:none;border:none;cursor:pointer;padding:7px;color:var(--text-2);touch-action:manipulation;line-height:0;">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeSelectMode=true;render()" onclick="S._wardrobeSelectMode=true;render()" style="font-size:12px;font-weight:700;color:var(--text-2);background:none;border:none;cursor:pointer;padding:4px 6px;font-family:inherit;touch-action:manipulation;">Select</button>
+          <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('new-piece')" onclick="navigate('new-piece')" style="touch-action:manipulation;">${iconPlus()} New Piece</button>
+        </span>
+      `}
     </div>
     ${S.wardrobeTailoringFilter ? `
     <div style="display:flex;align-items:center;gap:10px;background:#F0E6FF;border-bottom:1.5px solid #C8A8E0;padding:10px 16px;">
@@ -9278,8 +9604,24 @@ function viewWardrobe() {
     </div>` : ''}
     ${catBar}${subCatBar}${sortBar}${gridHTML}
     ${retiredSectionHTML}
-    <div style="height:8px"></div>
-  </div>`;
+    <div style="height:${S._wardrobeSelectMode ? '100px' : '8px'}"></div>
+  </div>
+  ${S._wardrobeSelectMode ? `
+  <div style="position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(247,244,240,0.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1.5px solid var(--border);padding:10px 16px max(18px,env(safe-area-inset-bottom,18px));display:flex;gap:8px;align-items:stretch;">
+    <button ontouchend="if(_touchMoved)return;event.preventDefault();exitWardrobeSelectMode()" onclick="exitWardrobeSelectMode()"
+      style="flex:1;padding:11px 4px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+      Cancel
+    </button>
+    <button ontouchend="if(_touchMoved)return;event.preventDefault();selectAllVisibleWardrobe()" onclick="selectAllVisibleWardrobe()"
+      style="flex:1;padding:11px 4px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+      Select All (${S._wardrobeVisibleIds.length})
+    </button>
+    <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteSelectedItems()" onclick="deleteSelectedItems()"
+      ${!S._wardrobeSelected.length ? 'disabled' : ''}
+      style="flex:1.4;padding:11px 4px;background:${S._wardrobeSelected.length ? '#DC2626' : 'var(--border)'};border:none;border-radius:12px;font-size:13px;font-weight:800;color:${S._wardrobeSelected.length ? '#fff' : 'var(--text-3)'};cursor:${S._wardrobeSelected.length ? 'pointer' : 'default'};font-family:inherit;touch-action:manipulation;transition:background .15s;">
+      🗑 Delete${S._wardrobeSelected.length ? ` (${S._wardrobeSelected.length})` : ''}
+    </button>
+  </div>` : ''}`;
 }
 
 function wardrobeGridCellHTML(w) {
@@ -9321,19 +9663,26 @@ function wardrobeCardHTML(w) {
     : ppw
       ? `<span class="ppw-badge">${ppw}</span>`
       : w.price ? `<span class="ppw-badge" style="background:var(--surface-2);color:var(--text-3);">$${parseFloat(w.price).toFixed(2)}</span>` : '';
-  return `<div class="wardrobe-card${w.retiring?' retiring':''}" onclick="openWardrobeItem('${w.id}')" style="position:relative;">
+  const wSel = S._wardrobeSelectMode && S._wardrobeSelected.includes(w.id);
+  return `<div class="wardrobe-card${w.retiring?' retiring':''}"
+    onclick="${S._wardrobeSelectMode ? `toggleWardrobeSelect('${w.id}')` : `openWardrobeItem('${w.id}')`}"
+    ontouchstart="wLongPressStart('${w.id}',event)"
+    ontouchend="wLongPressCancel()"
+    ontouchmove="wLongPressCancel()"
+    style="position:relative;user-select:none;-webkit-user-select:none;${wSel ? 'border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);background:var(--gold-bg);' : ''}">
     ${w.isHero ? `<div class="hero-badge">💎 Hero</div>` : ''}
-    <div class="wardrobe-icon">${w.icon||'👕'}</div>
-    <div class="wardrobe-info">
+    ${S._wardrobeSelectMode ? `<div style="position:absolute;top:50%;right:14px;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:${wSel ? 'var(--gold)' : 'var(--surface)'};border:2px solid ${wSel ? 'var(--gold)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;z-index:5;flex-shrink:0;">${wSel ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>` : ''}
+    <div class="wardrobe-icon" style="${wSel ? 'opacity:0.65;' : ''}">${w.icon||'👕'}</div>
+    <div class="wardrobe-info" style="${S._wardrobeSelectMode ? 'padding-right:34px;' : ''}">
+      ${w.brand ? `<div style="font-size:10px;font-weight:800;color:var(--gold-dk,#8a5e1c);letter-spacing:.05em;text-transform:uppercase;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.brand)}</div>` : ''}
       <div class="wardrobe-name">${esc(w.name)}</div>
-      ${w.brand ? `<div style="font-size:11px;color:var(--text-3);margin-bottom:4px;font-weight:500;">${esc(w.brand)}</div>` : ''}
       <div class="wardrobe-meta">
         <span class="wear-badge">${iconClock(14)} ${wears} wear${wears===1?'':'s'}</span>
         ${priceBadge}
         ${w.retiring ? `<span class="retiring-chip">🪡 Retiring</span>` : ''}
       </div>
     </div>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    ${S._wardrobeSelectMode ? '' : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>`}
   </div>`;
 }
 
@@ -9356,19 +9705,26 @@ function hangerHTML(w) {
     <path d="M38 20 Q54 24 71 30"
           stroke="#B07828" stroke-width="2.5" stroke-linecap="round" fill="none"/>
   </svg>`;
-  return `<div class="hanger" onclick="openWardrobeItem('${w.id}')">
+  const hSel = S._wardrobeSelectMode && S._wardrobeSelected.includes(w.id);
+  return `<div class="hanger"
+    onclick="${S._wardrobeSelectMode ? `toggleWardrobeSelect('${w.id}')` : `openWardrobeItem('${w.id}')`}"
+    ontouchstart="wLongPressStart('${w.id}',event)"
+    ontouchend="wLongPressCancel()"
+    ontouchmove="wLongPressCancel()"
+    style="user-select:none;-webkit-user-select:none;">
     ${hangerSVG}
-    <div class="hanger-card" style="${w.isHero ? 'border-color:var(--gold);box-shadow:0 2px 10px rgba(184,125,42,0.18);' : ''}">
+    <div class="hanger-card" style="${w.isHero ? 'border-color:var(--gold);box-shadow:0 2px 10px rgba(184,125,42,0.18);' : ''}${hSel ? 'border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);' : ''}position:relative;">
       ${stripeEl}
       ${w.photo
-        ? `<img src="${esc(w.photo)}" class="hanger-img" alt="${esc(w.name)}">`
-        : `<div class="hanger-icon">${w.icon || '👕'}</div>`}
-      <div class="hanger-name">${esc(w.name)}</div>
+        ? `<img src="${esc(w.photo)}" class="hanger-img" alt="${esc(w.name)}" style="${hSel ? 'opacity:0.7;' : ''}">`
+        : `<div class="hanger-icon" style="${hSel ? 'opacity:0.7;' : ''}">${w.icon || '👕'}</div>`}
       ${w.brand ? `<div class="hanger-brand">${esc(w.brand)}</div>` : ''}
-      ${w.size ? `<div class="hanger-brand" style="color:var(--text-2);font-weight:600;">${esc(w.size)}</div>` : ''}
+      <div class="hanger-name">${esc(w.name)}</div>
+      ${w.size ? `<div class="hanger-brand" style="color:var(--text-2);font-weight:600;text-transform:none;letter-spacing:0;">${esc(w.size)}</div>` : ''}
       <div class="hanger-wears">${wears}w</div>
       ${w.isHero ? `<div style="font-size:9px;font-weight:700;color:var(--gold-dk);margin-top:3px;letter-spacing:.02em;">💎 Hero</div>` : ''}
       ${w.isSignature ? `<div style="font-size:9px;font-weight:800;color:var(--sig-dk);margin-top:2px;letter-spacing:.02em;">✦ Signature</div>` : ''}
+      ${S._wardrobeSelectMode ? `<div style="position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:50%;background:${hSel ? 'var(--gold)' : 'rgba(255,255,255,0.85)'};border:2px solid ${hSel ? 'var(--gold)' : '#ccc'};display:flex;align-items:center;justify-content:center;z-index:5;">${hSel ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>` : ''}
     </div>
   </div>`;
 }
