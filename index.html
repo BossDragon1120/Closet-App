@@ -2745,6 +2745,10 @@ const S = {
   // What's Hot trends
   hotTrends:          JSON.parse(localStorage.getItem('closet-hot-trends') || 'null'),
   _trendsLoading:     false,
+  brandMap:           JSON.parse(localStorage.getItem('closet-brand-map') || 'null'),
+  _brandMapLoading:   false,
+  brandDiscovery:     JSON.parse(localStorage.getItem('closet-brand-discovery') || 'null'),
+  _brandDiscoveryLoading: false,
   // About Me panel
   showAboutMe:        false,
   _aboutMeRetiring:   null,   // 'scent' | 'hair' | null
@@ -5162,7 +5166,7 @@ function featuresMenuHTML() {
     {
       title: 'Social & Fun',
       items: [
-        { icon: '💎', text: '<strong>Hero Pieces</strong> — Flag your standout garments and share them with a stylist for expert advice on how to wear them.', action: `S.featureMenuOpen=false;navigate('hero-pieces')` },
+        { icon: '👑', text: '<strong>Hero Pieces</strong> — Flag your standout garments and share them with a stylist for expert advice on how to wear them.', action: `S.featureMenuOpen=false;navigate('hero-pieces')` },
         { icon: '👯', text: '<strong>Friend\'s Fit Check</strong> — Snap a photo of a friend\'s outfit, get an instant rating, and share it on the spot — never saved to your journal.' },
         { icon: '⚔️', text: '<strong>Fashion Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best.' },
         { icon: '💌', text: '<strong>Share Outfits</strong> — Share any outfit entry as a photo card with your rating and notes.' },
@@ -5335,7 +5339,7 @@ async function signOut() {
 /* ================================================================
    RENDER ROUTER
    ================================================================ */
-const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','hero-pieces','signature-pieces']);
+const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','hero-pieces','signature-pieces','brand-map']);
 
 function render() {
   const root = document.getElementById('root');
@@ -5376,6 +5380,7 @@ function render() {
     case 'local':        html = viewLocal();        break;
     case 'hero-pieces':       html = viewHeroPieces();        break;
     case 'signature-pieces':  html = viewSignaturePieces();   break;
+    case 'brand-map':         html = viewBrandMap();          break;
   }
   // Inject tab bar right after the .nav block on every tab view
   if (TAB_VIEWS.has(S.view)) {
@@ -5452,11 +5457,6 @@ function bottomBarHTML() {
       ontouchend="if(_touchMoved)return;event.preventDefault();S.featureMenuOpen=true;render()"
       onclick="S.featureMenuOpen=true;render()" title="Menu">
       ${iconBurger()} <span>Menu</span>
-    </button>
-    <button class="bottom-btn ${isHot ? 'bottom-btn-active' : ''}"
-      ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('hot')"
-      onclick="switchTab('hot')" title="What's Hot">
-      ${iconFlame()} <span>What's Hot</span>
     </button>
     <button class="bottom-btn ${S.view==='local'?'bottom-btn-active':''}"
       ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('local')"
@@ -5804,6 +5804,272 @@ Rules: exactly 10 trends (2 per category). Pick real, current trends that feel r
   }
 }
 
+/* ================================================================
+   BRAND FEATURES — Map, Discovery, Instagram
+   ================================================================ */
+
+// ── Instagram URL helper ──────────────────────────────────────
+function brandInstagramUrl(brand) {
+  const known = {
+    'h&m':'hm','j.crew':'jcrew','j crew':'jcrew','a.p.c.':'apc_paris',
+    'a.p.c':'apc_paris','apc':'apc_paris','cos':'cosstores','arket':'arketofficial',
+    'madewell':'madewell','everlane':'everlane','reformation':'reformation',
+    'anthropologie':'anthropologie','free people':'freepeople',
+    'urban outfitters':'urbanoutfitters','banana republic':'bananarepublic',
+    'gap':'gap','old navy':'oldnavy','uniqlo':'uniqlo',
+    'zara':'zara','mango':'mango','bershka':'bershka',
+    'pull&bear':'pullandbear','stradivarius':'stradivarius',
+    'massimo dutti':'massimodutti','oak + fort':'oakandfort',
+    'allsaints':'allsaints','reiss':'reisslondon',
+    'sandro':'sandro_official','maje':'maje',
+    'isabel marant':'isabelmarant','ba&sh':'ba_sh_paris',
+    'toteme':'totemeofficial','the frankie shop':'thefrankieshop',
+    'agolde':'agolde','frame':'frame_denim','mother':'motherdenim',
+    'citizens of humanity':'citizensofhumanity','rag & bone':'ragandbone',
+    'theory':'theory','vince':'vince','equipment':'equipmentfr',
+    'rails':'rails','l\'agence':'lagence','joie':'joieclothing',
+    'club monaco':'clubmonaco','tory burch':'toryburch',
+    'kate spade':'katespadeny','coach':'coach','michael kors':'michaelkors',
+    'marc jacobs':'themarcjacobs','versace':'versace',
+    'gucci':'gucci','prada':'prada','fendi':'fendi','dior':'dior',
+    'chanel':'chanelofficial','saint laurent':'ysl',
+    'balenciaga':'balenciaga','valentino':'maisonvalentino',
+    'celine':'celine','bottega veneta':'bottegaveneta',
+    'loewe':'loewe','burberry':'burberry','mulberry':'mulberry',
+    'acne studios':'acnestudios','ami':'ami_paris',
+    'jacquemus':'jacquemus','ganni':'ganni','stine goya':'stinegoya',
+    'nanushka':'nanushka','rotate':'rotate.birgerchristensen',
+    'nike':'nike','adidas':'adidas','new balance':'newbalance',
+    'converse':'converse','vans':'vans','puma':'puma',
+    'lululemon':'lululemon','aritzia':'aritzia',
+    'ssense':'ssense','net-a-porter':'netaporter',
+    'princess polly':'princesspolly','abercrombie':'abercrombie',
+    'revolve':'revolve','shopbop':'shopbop',
+    'steven alan':'stevenalan','rag and bone':'ragandbone',
+  };
+  const lower = brand.toLowerCase().trim();
+  if (known[lower]) return `https://www.instagram.com/${known[lower]}/`;
+  const handle = lower.replace(/[&'\s\.]+/g,'').replace(/[^a-z0-9_]/g,'');
+  return `https://www.instagram.com/${handle}/`;
+}
+
+// ── Generate Brand Map ────────────────────────────────────────
+async function generateBrandMap() {
+  if (S._brandMapLoading) return;
+  if (!S.apiKey.trim()) { switchTab('settings'); toast('Add your API key in Settings first'); return; }
+  const brandCounts = {};
+  S.wardrobe.forEach(w => { if (w.brand) brandCounts[w.brand] = (brandCounts[w.brand]||0) + (w.wears?.length||1); });
+  const brands = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  if (!brands.length) { toast('Add brands to your wardrobe items first'); return; }
+
+  S._brandMapLoading = true; render();
+  const brandList = brands.map(([b,c])=>`${b} (${c} wears)`).join(', ');
+  const prompt = `You are a fashion expert. A user owns these brands: ${brandList}.
+For each brand, position it on two axes and give an aesthetic descriptor.
+Return ONLY a JSON array with no markdown or explanation:
+[{"name":"Brand Name","formality":50,"pricePoint":60,"aesthetic":"2-3 word aesthetic"}]
+Where:
+- formality: 0-100 (0=athleisure/streetwear, 25=casual, 50=smart casual, 75=polished, 100=formal/couture)
+- pricePoint: 0-100 (0=fast fashion/budget, 25=affordable, 50=contemporary/mid, 75=premium, 100=ultra luxury)
+- aesthetic: a concise 2-3 word vibe label (e.g. "quiet luxury", "coastal casual", "urban edge", "boho free", "classic preppy", "minimalist chic")
+Be accurate and differentiated — position brands distinctly based on their real identity.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'x-api-key':S.apiKey.trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','content-type':'application/json'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1000,messages:[{role:'user',content:prompt}]}),
+    });
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text || '';
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('No JSON');
+    const parsed = JSON.parse(match[0]);
+    // Merge wear counts back in
+    const withCounts = parsed.map(b => ({...b, count: brandCounts[b.name]||1}));
+    const result = {brands: withCounts, generatedAt: new Date().toISOString()};
+    S.brandMap = result;
+    localStorage.setItem('closet-brand-map', JSON.stringify(result));
+    toast('Brand map updated ✦');
+  } catch(err) {
+    console.error('generateBrandMap', err);
+    toast('Couldn\'t generate brand map — check your API key');
+  } finally {
+    S._brandMapLoading = false; render();
+  }
+}
+
+// ── Generate Brand Discovery ──────────────────────────────────
+async function generateBrandDiscovery() {
+  if (S._brandDiscoveryLoading) return;
+  if (!S.apiKey.trim()) { switchTab('settings'); toast('Add your API key in Settings first'); return; }
+  const brandCounts = {};
+  S.wardrobe.forEach(w => { if (w.brand) brandCounts[w.brand] = (brandCounts[w.brand]||0) + (w.wears?.length||1); });
+  const brands = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([b])=>b);
+  if (!brands.length) { toast('Add brands to your wardrobe items first'); return; }
+
+  S._brandDiscoveryLoading = true; render();
+  const prompt = `You are a personal stylist. A fashion enthusiast's current favourite brands are: ${brands.join(', ')}.
+Suggest 5 brands they would genuinely love that are NOT in their current collection.
+Focus on aesthetic coherence — brands that naturally complement their existing taste.
+Return ONLY a JSON array with no markdown or explanation:
+[{"name":"Brand Name","reason":"One sentence why this fits their aesthetic.","vibe":"3-4 word aesthetic label","emoji":"single emoji capturing the brand vibe"}]
+Be specific and thoughtful. Prefer real, discoverable brands. Mix price points slightly for variety.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'x-api-key':S.apiKey.trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','content-type':'application/json'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:800,messages:[{role:'user',content:prompt}]}),
+    });
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text || '';
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('No JSON');
+    const parsed = JSON.parse(match[0]);
+    const result = {suggestions: parsed, generatedAt: new Date().toISOString()};
+    S.brandDiscovery = result;
+    localStorage.setItem('closet-brand-discovery', JSON.stringify(result));
+    toast('Brand discoveries updated ✦');
+  } catch(err) {
+    console.error('generateBrandDiscovery', err);
+    toast('Couldn\'t generate suggestions — check your API key');
+  } finally {
+    S._brandDiscoveryLoading = false; render();
+  }
+}
+
+// ── Brand Map View ────────────────────────────────────────────
+function viewBrandMap() {
+  const map = S.brandMap;
+  const loading = S._brandMapLoading;
+
+  const svgHTML = (() => {
+    if (!map?.brands?.length) return '';
+    const W = 320, H = 280;
+    const PAD = 44;
+    const plotW = W - PAD * 2, plotH = H - PAD * 2;
+    const maxCount = Math.max(...map.brands.map(b=>b.count||1));
+
+    // Quadrant label helper
+    const qLabel = (x, y, txt) =>
+      `<text x="${x}" y="${y}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.12)" text-anchor="middle" font-weight="700" letter-spacing="0.08em">${txt.toUpperCase()}</text>`;
+
+    // Compute dot positions
+    const dots = map.brands.map(b => {
+      const x = PAD + (b.formality/100) * plotW;
+      const y = PAD + ((100-b.pricePoint)/100) * plotH; // invert Y so luxury is top
+      const r = 5 + Math.round((b.count/maxCount) * 10);
+      return {...b, svgX: x, svgY: y, r};
+    });
+
+    const circles = dots.map((b,i) => {
+      // Color based on formality: warm coral → cool slate
+      const hue = Math.round(20 + (b.formality/100)*200);
+      const sat = 60, lit = 55;
+      const col = `hsl(${hue},${sat}%,${lit}%)`;
+      return `
+      <g onclick="void(0)" style="cursor:default;">
+        <circle cx="${b.svgX.toFixed(1)}" cy="${b.svgY.toFixed(1)}" r="${b.r+4}" fill="${col}" opacity="0.15"/>
+        <circle cx="${b.svgX.toFixed(1)}" cy="${b.svgY.toFixed(1)}" r="${b.r}" fill="${col}" opacity="0.9"/>
+        <text x="${b.svgX.toFixed(1)}" y="${(b.svgY - b.r - 4).toFixed(1)}" font-size="9" font-family="system-ui" fill="rgba(255,255,255,0.9)" text-anchor="middle" font-weight="700">${esc(b.name)}</text>
+        <text x="${b.svgX.toFixed(1)}" y="${(b.svgY + b.r + 11).toFixed(1)}" font-size="7.5" font-family="system-ui" fill="rgba(255,255,255,0.45)" text-anchor="middle">${esc(b.aesthetic||'')}</text>
+      </g>`;
+    }).join('');
+
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:16px;background:linear-gradient(160deg,#0F0D14 0%,#1A1625 100%);">
+      <!-- Grid -->
+      <line x1="${PAD}" y1="${H/2}" x2="${W-PAD}" y2="${H/2}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+      <line x1="${W/2}" y1="${PAD}" x2="${W/2}" y2="${H-PAD}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+      <!-- Quadrant labels -->
+      ${qLabel(W*0.27, H*0.32, 'Everyday')}
+      ${qLabel(W*0.73, H*0.32, 'Quiet Luxury')}
+      ${qLabel(W*0.27, H*0.72, 'Relaxed')}
+      ${qLabel(W*0.73, H*0.72, 'Contemporary')}
+      <!-- Axis arrows -->
+      <line x1="${PAD}" y1="${H-PAD}" x2="${W-PAD}" y2="${H-PAD}" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+      <line x1="${PAD}" y1="${H-PAD}" x2="${PAD}" y2="${PAD}" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+      <!-- X axis labels -->
+      <text x="${PAD}" y="${H-PAD+14}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.4)" text-anchor="start">Casual</text>
+      <text x="${W-PAD}" y="${H-PAD+14}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.4)" text-anchor="end">Polished</text>
+      <!-- Y axis labels -->
+      <text x="${PAD-6}" y="${H-PAD}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.4)" text-anchor="end">$</text>
+      <text x="${PAD-6}" y="${PAD+4}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.4)" text-anchor="end">$$$</text>
+      <!-- Brand dots + labels -->
+      ${circles}
+    </svg>`;
+  })();
+
+  const brandCounts = {};
+  S.wardrobe.forEach(w => { if (w.brand) brandCounts[w.brand] = (brandCounts[w.brand]||0)+(w.wears?.length||1); });
+  const hasEnoughBrands = Object.keys(brandCounts).length >= 2;
+
+  return `<div class="view" style="background:linear-gradient(160deg,#0F0D14 0%,#1A1625 50%,#0F0D14 100%);min-height:100dvh;">
+    <div class="nav" style="background:transparent;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')" style="color:rgba(255,255,255,0.7);">${iconBack()} Portfolio</button>
+      <span class="nav-title" style="color:rgba(255,255,255,0.9);">Brand Map 🗺</span>
+      ${map?.brands?.length ? `<button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandMap()" onclick="generateBrandMap()" style="color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.08);border:none;border-radius:100px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">↻</button>` : '<span style="width:44px;"></span>'}
+    </div>
+
+    <div style="padding:16px 16px 40px;">
+
+      ${loading ? `<div style="text-align:center;padding:60px 20px;">
+        <div class="spinner" style="width:28px;height:28px;border-color:rgba(255,255,255,0.2);border-top-color:rgba(255,255,255,0.8);margin:0 auto 16px;"></div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.5);">Claude is mapping your aesthetic universe…</div>
+      </div>` : !map?.brands?.length ? `<div style="text-align:center;padding:50px 20px;">
+        <div style="font-size:48px;margin-bottom:16px;">🗺</div>
+        <div style="font-size:16px;font-weight:800;color:rgba(255,255,255,0.9);margin-bottom:8px;">${hasEnoughBrands ? 'Map Your Brand Aesthetic' : 'Add Brands First'}</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.45);line-height:1.6;margin-bottom:24px;">${hasEnoughBrands ? 'See where your brands sit on the style spectrum — from casual to polished, accessible to luxury.' : 'Add brand names to your wardrobe items, then come back to generate your map.'}</div>
+        ${hasEnoughBrands ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandMap()" onclick="generateBrandMap()" style="background:linear-gradient(135deg,rgba(184,125,42,0.9),rgba(212,160,60,0.9));color:#fff;border:none;border-radius:100px;padding:12px 28px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">✦ Generate Brand Map</button>` : ''}
+      </div>` : `
+        <!-- The map SVG -->
+        <div style="margin-bottom:20px;">${svgHTML}</div>
+
+        <!-- Legend: dot size = wear count -->
+        <div style="display:flex;align-items:center;gap:16px;justify-content:center;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="font-size:11px;color:rgba(255,255,255,0.35);text-align:center;">Dot size = wear count</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:hsl(20,60%,55%);opacity:0.9;"></div>
+            <span style="font-size:10px;color:rgba(255,255,255,0.35);">Casual</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:hsl(130,60%,55%);opacity:0.9;"></div>
+            <span style="font-size:10px;color:rgba(255,255,255,0.35);">Versatile</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:hsl(220,60%,55%);opacity:0.9;"></div>
+            <span style="font-size:10px;color:rgba(255,255,255,0.35);">Polished</span>
+          </div>
+        </div>
+
+        <!-- Brand list cards -->
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,0.35);margin-bottom:12px;">Your Brands</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${map.brands.sort((a,b)=>(b.count||0)-(a.count||0)).map(b => {
+            const hue = Math.round(20 + (b.formality/100)*200);
+            const col = `hsl(${hue},60%,55%)`;
+            return `<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 14px;">
+              <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0;"></div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,0.9);">${esc(b.name)}</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.35);">${esc(b.aesthetic||'')} · ${b.count||1} wear${(b.count||1)===1?'':'s'}</div>
+              </div>
+              <a href="${brandInstagramUrl(b.name)}" target="_blank" rel="noopener"
+                style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:100px;padding:6px 12px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-decoration:none;white-space:nowrap;flex-shrink:0;">
+                📸 Instagram
+              </a>
+            </div>`;
+          }).join('')}
+        </div>
+
+        <div style="font-size:10px;color:rgba(255,255,255,0.2);text-align:center;margin-top:20px;">Generated ${new Date(map.generatedAt).toLocaleDateString()}</div>
+      `}
+    </div>
+  </div>`;
+}
+
 function setTrendReaction(trendId, reaction) {
   const key = 'closet-hot-reactions';
   const reactions = JSON.parse(localStorage.getItem(key) || '{}');
@@ -5825,7 +6091,7 @@ async function toggleHeroPiece(id) {
   w.isHero = !w.isHero;
   await DB.wardrobe.put(w);
   S.wardrobe = await DB.wardrobe.getAll();
-  toast(w.isHero ? '💎 Marked as a Hero Piece!' : 'Removed from Hero Pieces');
+  toast(w.isHero ? '👑 Marked as a Hero Piece!' : 'Removed from Hero Pieces');
   render();
 }
 
@@ -5873,7 +6139,7 @@ function viewHeroPieces() {
   return `<div class="view">
     <div class="nav">
       <button class="nav-back" onclick="switchTab('wardrobe')">${iconBack()} Wardrobe</button>
-      <span class="nav-title">Hero Pieces 💎</span>
+      <span class="nav-title">Hero Pieces 👑</span>
       <div style="width:72px"></div>
     </div>
     ${bodyHTML}
@@ -7731,6 +7997,9 @@ function viewProfile() {
   const html = `<div class="view">
     <div class="nav">
       <span class="nav-logo">✦ My Style Portfolio</span>
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();S.battleMode=true;navigate('upload')" onclick="S.battleMode=true;navigate('upload')" style="touch-action:manipulation;">
+        ⚔️ Battle
+      </button>
     </div>
 
     <!-- ══ ZONE 1: You at a glance ══ -->
@@ -7801,7 +8070,7 @@ function viewProfile() {
             <div style="width:100%;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:2px solid var(--sig-border);background:var(--surface-2);display:flex;align-items:center;justify-content:center;position:relative;">
               ${w.photo ? `<img src="${w.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">` : `<div style="font-size:28px;">${w.icon||'👕'}</div>`}
               <div style="position:absolute;top:4px;right:4px;background:var(--gold);border-radius:100px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
-                <span style="font-size:8px;">🪄</span>
+                <span style="font-size:8px;">💎</span>
               </div>
             </div>
             <div style="font-size:10px;font-weight:700;color:var(--sig-dk);text-align:center;line-height:1.3;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 2px;">${esc(w.name)}</div>
@@ -7810,7 +8079,7 @@ function viewProfile() {
           return `<div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')"
             style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
             <div style="width:100%;aspect-ratio:3/4;border-radius:10px;border:2px dashed var(--sig-border);background:linear-gradient(135deg,#F8F4EE,#F0E9DC);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;">
-              <div style="font-size:20px;">🪄</div>
+              <div style="font-size:20px;">💎</div>
               <div style="font-size:9px;font-weight:800;color:var(--sig-dk);text-align:center;line-height:1.4;">This is<br>SO me</div>
             </div>
             <div style="font-size:10px;color:var(--text-3);text-align:center;line-height:1.3;">Add piece</div>
@@ -7819,7 +8088,7 @@ function viewProfile() {
       }).join('');
       return `<div style="margin:16px 16px 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">🪄 Signature Pieces</div>
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">💎 Signature Pieces</div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('signature-pieces')" onclick="navigate('signature-pieces')"
             style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.85;touch-action:manipulation;">${full ? 'Share ›' : 'Manage ›'}</button>
         </div>
@@ -7851,13 +8120,71 @@ function viewProfile() {
         : '';
       return `<div style="margin:16px 16px 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);">💎 Hero Pieces</div>
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);">👑 Hero Pieces</div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')"
             style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.7;touch-action:manipulation;">${heroes.length} piece${heroes.length===1?'':'s'} ›</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center;" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')">${thumbs}${extra}</div>
       </div>`;
     })()}
+
+    <!-- ══ Most Worn ══ -->
+    ${mostWornHTML ? `<div style="margin:16px 16px 0;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);margin-bottom:10px;">🔥 Most Worn</div>
+      ${mostWornHTML}
+    </div>` : ''}
+
+    <!-- ══ Top Brands ══ -->
+    ${topBrands.length ? `<div style="margin:16px 16px 0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">🏷 Top Brands</div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('brand-map')" onclick="navigate('brand-map')"
+          style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">🗺 Map ›</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${topBrands.map(([brand,count])=>`
+          <div style="display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:12px;padding:10px 12px;border:1px solid var(--border);">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:700;color:var(--text);">${esc(brand)}</div>
+              <div style="font-size:11px;color:var(--text-3);">${count} wear${count===1?'':'s'}</div>
+            </div>
+            <div style="flex:2;max-width:90px;height:4px;background:var(--surface-2);border-radius:100px;overflow:hidden;">
+              <div style="height:100%;border-radius:100px;background:var(--gold);width:${Math.round((count/topBrands[0][1])*100)}%;"></div>
+            </div>
+            <a href="${brandInstagramUrl(brand)}" target="_blank" rel="noopener"
+              style="flex-shrink:0;background:none;border:1.5px solid var(--border);border-radius:100px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--text-2);text-decoration:none;white-space:nowrap;">📸</a>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- ══ Brand Discovery ══ -->
+    ${topBrands.length ? `<div style="margin:16px 16px 0;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);margin-bottom:12px;">✨ You Might Also Love</div>
+      ${S._brandDiscoveryLoading ? `<div style="text-align:center;padding:20px;background:var(--surface);border-radius:12px;border:1px solid var(--border);">
+        <div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>
+        <div style="font-size:12px;color:var(--text-3);">Finding brands that match your aesthetic…</div>
+      </div>` : S.brandDiscovery?.suggestions?.length ? `
+        <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+          ${S.brandDiscovery.suggestions.map(s=>`
+            <div style="flex-shrink:0;width:165px;scroll-snap-align:start;background:var(--surface);border-radius:14px;border:1.5px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:7px;">
+              <div style="font-size:22px;line-height:1;">${s.emoji||'✦'}</div>
+              <div style="font-size:14px;font-weight:800;color:var(--text);line-height:1.2;">${esc(s.name)}</div>
+              <div style="font-size:10px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 8px;align-self:flex-start;letter-spacing:.02em;">${esc(s.vibe)}</div>
+              <div style="font-size:11px;color:var(--text-3);line-height:1.45;flex:1;">${esc(s.reason)}</div>
+              <a href="${brandInstagramUrl(s.name)}" target="_blank" rel="noopener"
+                style="margin-top:4px;display:block;background:none;border:1.5px solid var(--border);border-radius:100px;padding:6px 10px;font-size:11px;font-weight:600;color:var(--text-2);text-decoration:none;text-align:center;">📸 Instagram</a>
+            </div>`).join('')}
+        </div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
+          style="width:100%;margin-top:10px;background:none;border:1px solid var(--border);border-radius:100px;padding:9px;font-size:12px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">↻ Refresh suggestions</button>
+      ` : `<div style="background:var(--surface);border-radius:14px;border:1.5px dashed var(--border);padding:20px;text-align:center;">
+        <div style="font-size:24px;margin-bottom:8px;">🔍</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:6px;">Discover your next favourite brand</div>
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;">Claude analyzes your aesthetic and finds brands you'll love</div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
+          style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">✦ Find My Brands</button>
+      </div>`}
+    </div>` : ''}
 
     <!-- ══ Divider ══ -->
     <div style="height:1px;background:var(--border);margin:20px 16px;"></div>
@@ -8573,6 +8900,50 @@ function viewHome() {
 
     ${highlightHTML}
 
+    ${(()=>{
+      const trends = S.hotTrends;
+      const loading = S._trendsLoading;
+      if (loading) return `<div class="home-section"><div style="display:flex;align-items:center;gap:10px;padding:4px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Curating trends…</span></div></div>`;
+      if (!trends?.trends?.length) return `<div class="home-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div class="home-section-label" style="margin-bottom:0;">🔥 What's Trending</div>
+        </div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
+          style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          ✦ Generate this week's trend report
+        </button>
+      </div>`;
+      const reactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
+      const allTrends = trends.trends || [];
+      return `<div class="home-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div class="home-section-label" style="margin-bottom:0;">🔥 What's Trending</div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
+        </div>
+        <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+          ${allTrends.slice(0,10).map(trend => {
+            const r = reactions[trend.id];
+            return `<div style="scroll-snap-align:start;flex-shrink:0;width:200px;border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
+              <div style="padding:12px 12px 8px;">
+                <div style="font-size:24px;margin-bottom:6px;line-height:1;">${esc(trend.emoji||'🔥')}</div>
+                <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(trend.name)}</div>
+                <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(trend.description)}</div>
+                ${trend.tip ? `<div style="margin-top:8px;font-size:11px;color:var(--gold-dk);font-weight:600;background:var(--gold-bg);border-radius:6px;padding:5px 8px;line-height:1.4;">💡 ${esc(trend.tip)}</div>` : ''}
+              </div>
+              <div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border);margin-top:auto;">
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(trend.id)}','up')" onclick="setTrendReaction('${esc(trend.id)}','up')"
+                  style="flex:1;background:${r==='up'?'var(--gold-bg)':'var(--surface-2)'};border:1px solid ${r==='up'?'var(--gold)':'var(--border)'};border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">👍</button>
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(trend.id)}','down')" onclick="setTrendReaction('${esc(trend.id)}','down')"
+                  style="flex:1;background:${r==='down'?'#FEF2F2':'var(--surface-2)'};border:1px solid ${r==='down'?'#FCA5A5':'var(--border)'};border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">👎</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        ${trends.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right;">AI-curated · ${(() => { const d = Math.floor((Date.now()-new Date(trends.updated).getTime())/86400000); return d===0?'Updated today':d===1?'Updated yesterday':'Updated '+d+' days ago'; })()}</div>` : ''}
+      </div>`;
+    })()}
+
     ${weekHTML}
 
     ${gems.length ? homeSection('gems','💎 Hidden Gems',
@@ -8586,32 +8957,12 @@ function viewHome() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </div>`).join('')) : ''}
 
-    ${topBrands.length ? homeSection('brands','🏷 Top Brands',
-      topBrands.map(([brand,count])=>`
-        <div class="dash-bar-row">
-          <div class="dash-bar-label" style="min-width:90px;">${esc(brand)}</div>
-          <div class="dash-bar-wrap"><div class="dash-bar-fill" style="width:${Math.round((count/topBrands[0][1])*100)}%"></div></div>
-          <div class="dash-bar-count">${count}w</div>
-        </div>`).join('')) : ''}
-
     ${topTags.length ? homeSection('occasions','🎭 Top Activities',
       topTags.map(([tag,count])=>`
         <div class="dash-bar-row">
           <div class="dash-bar-label">${esc(tag)}</div>
           <div class="dash-bar-wrap"><div class="dash-bar-fill" style="width:${Math.round((count/maxTagCount)*100)}%"></div></div>
           <div class="dash-bar-count">${count}</div>
-        </div>`).join('')) : ''}
-
-    ${mostWorn.length ? homeSection('worn','🔥 Most Worn',
-      mostWorn.map((w,i)=>`
-        <div class="dash-item-row" onclick="openWardrobeItem('${w.id}')">
-          <div class="dash-rank">${i+1}</div>
-          <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;">${w.icon||'👕'}</div>
-          <div class="dash-item-info">
-            <div class="dash-item-name">${esc(w.name)}</div>
-            <div class="dash-item-sub">${w.wears.length} wear${w.wears.length===1?'':'s'}${w.price&&w.wears.length?` · $${(w.price/w.wears.length).toFixed(2)}/wear`:''}</div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </div>`).join('')) : ''}
 
     ${(()=>{
@@ -8947,7 +9298,7 @@ async function toggleSignaturePiece(id) {
   if (!w.isSignature) delete w.signatureNote;
   await DB.wardrobe.put(w);
   S.wardrobe = await DB.wardrobe.getAll();
-  toast(w.isSignature ? '✦ Added as a Signature Piece!' : 'Removed from Signature Pieces');
+  toast(w.isSignature ? '💎 Added as a Signature Piece!' : 'Removed from Signature Pieces');
   render();
 }
 
@@ -9016,7 +9367,7 @@ function viewSignaturePieces() {
   return `<div class="view view-notab">
     <div class="nav">
       <button class="nav-back" onclick="navigate('profile')">${iconBack()} Portfolio</button>
-      <span class="nav-title" style="color:var(--sig-dk);">🪄 Signature Pieces</span>
+      <span class="nav-title" style="color:var(--sig-dk);">💎 Signature Pieces</span>
       <span style="width:72px"></span>
     </div>
     <div style="background:linear-gradient(135deg,var(--sig),#C2185B);padding:18px 20px 20px;">
@@ -9343,7 +9694,7 @@ function viewWardrobe() {
     if (heroItems.length) {
       sections += `<div class="rod-section">
         <div class="rod-section-header">
-          <span class="rod-section-cat" style="color:var(--gold-dk);">💎 Hero Pieces</span>
+          <span class="rod-section-cat" style="color:var(--gold-dk);">👑 Hero Pieces</span>
           <span class="rod-section-meta">${heroItems.length} item${heroItems.length===1?'':'s'}</span>
         </div>
         <div class="rod-track" style="background-image:linear-gradient(180deg,#FBEDC8 0px,#D4A84B 2px,#B07828 5px,#8B5E1A 7px,#C8932A 9px,transparent 10px);">
@@ -9709,7 +10060,7 @@ function hangerHTML(w) {
       ${w.size ? `<div class="hanger-brand" style="color:var(--text-2);font-weight:600;text-transform:none;letter-spacing:0;">${esc(w.size)}</div>` : ''}
       <div class="hanger-wears">${wears}w</div>
       ${w.isHero ? `<div style="font-size:9px;font-weight:700;color:var(--gold-dk);margin-top:3px;letter-spacing:.02em;">💎 Hero</div>` : ''}
-      ${w.isSignature ? `<div style="font-size:9px;font-weight:800;color:var(--sig-dk);margin-top:2px;letter-spacing:.02em;">🪄 Signature</div>` : ''}
+      ${w.isSignature ? `<div style="font-size:9px;font-weight:800;color:var(--sig-dk);margin-top:2px;letter-spacing:.02em;">💎 Signature</div>` : ''}
       ${S._wardrobeSelectMode ? `<div style="position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:50%;background:${hSel ? 'var(--gold)' : 'rgba(255,255,255,0.85)'};border:2px solid ${hSel ? 'var(--gold)' : '#ccc'};display:flex;align-items:center;justify-content:center;z-index:5;">${hSel ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>` : ''}
     </div>
   </div>`;
@@ -9951,7 +10302,7 @@ function viewOnboarding() {
         <div style="background:var(--surface);border-radius:16px;padding:14px;border:1.5px solid var(--border);">
           <div style="font-size:17px;font-weight:900;color:var(--text);margin-bottom:1px;">${S.profileName?`${esc(S.profileName)}'s Dash`:"Dana's Dash"}</div>
           <div style="font-size:10px;color:var(--text-3);margin-bottom:12px;">Style portrait · Battles · Stats</div>
-          <div style="font-size:10px;font-weight:800;color:#9D174D;margin-bottom:7px;">🪄 Signature Pieces</div>
+          <div style="font-size:10px;font-weight:800;color:#9D174D;margin-bottom:7px;">💎 Signature Pieces</div>
           <div style="display:flex;gap:7px;">
             ${[{icon:'🧥',name:'Camel Coat'},{icon:'👜',name:'Mini Bag'},{empty:true}].map(p=>p.empty
               ?`<div style="flex:1;background:#FFF8FA;border:2px dashed #E8B4C8;border-radius:8px;height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;"><div style="font-size:12px;color:#9D174D;">✦</div><div style="font-size:7px;font-weight:800;color:#9D174D;text-align:center;line-height:1.3;">This is<br>SO me</div></div>`
@@ -10399,6 +10750,16 @@ function viewReceiptAdd() {
                   </div>
                   ${p.isNew===false ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">About how many years ago?</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${[1,2,3,4,5].map(y=>{const yr=(new Date().getFullYear()-y)+'-01';const act=p.purchasedDate===yr;return '<button ontouchend="if(_touchMoved)return;event.preventDefault();S.receiptFlow.preview.purchasedDate=\''+yr+'\';render();" onclick="S.receiptFlow.preview.purchasedDate=\''+yr+'\';render()" style="padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid '+(act?'var(--gold)':'var(--border)')+';background:'+(act?'var(--gold-bg)':'var(--surface)')+';color:'+(act?'var(--gold-dk)':'var(--text-2)')+';">'+(y===1?'1 yr':y===5?'5+ yrs':y+' yrs')+'</button>';}).join('')}</div></div>` : ''}
                 </div>
+                <div style="margin-top:10px;">
+                  <label class="form-label" style="font-size:10px;">Was this a gift? 💝</label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;">
+                    <button onclick="S.receiptFlow.preview.gifted=true;render()"
+                      style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.gifted===true?'#9B35C8':'var(--border)'};background:${p.gifted===true?'#F5EEFF':'var(--surface)'};color:${p.gifted===true?'#7B35A8':'var(--text-2)'};">💝 Yes!</button>
+                    <button onclick="S.receiptFlow.preview.gifted=false;render()"
+                      style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.gifted===false?'var(--gold)':'var(--border)'};background:${p.gifted===false?'var(--gold-bg)':'var(--surface)'};color:${p.gifted===false?'var(--gold-dk)':'var(--text-2)'};">Nope</button>
+                  </div>
+                  ${p.gifted===true ? `<input class="form-input" type="text" placeholder="Who gave it to you? (optional)" value="${esc(p.giftedBy||'')}" oninput="S.receiptFlow.preview.giftedBy=this.value" style="margin-top:6px;font-size:13px;">` : ''}
+                </div>
               </div>
 
             </div>
@@ -10501,6 +10862,19 @@ function viewReceiptAdd() {
               style="padding:10px 0;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.isNew===false?'var(--gold)':'var(--border)'};background:${p.isNew===false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew===false?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
           </div>
           ${p.isNew===false ? `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">About how many years ago?</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${[1,2,3,4,5].map(y=>{const yr=(new Date().getFullYear()-y)+'-01';const act=p.purchasedDate===yr;return '<button ontouchend="if(_touchMoved)return;event.preventDefault();S.receiptFlow.preview.purchasedDate=\''+yr+'\';render();" onclick="S.receiptFlow.preview.purchasedDate=\''+yr+'\';render()" style="padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid '+(act?'var(--gold)':'var(--border)')+';background:'+(act?'var(--gold-bg)':'var(--surface)')+';color:'+(act?'var(--gold-dk)':'var(--text-2)')+';">'+(y===1?'1 yr':y===5?'5+ yrs':y+' yrs')+'</button>';}).join('')}</div></div>` : ''}
+        </div>
+
+        <div class="form-group" style="margin-bottom:20px;">
+          <label class="form-label">Was this a gift? 💝</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+            <button onclick="S.receiptFlow.preview.gifted=true;render()"
+              style="padding:10px 0;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.gifted===true?'#9B35C8':'var(--border)'};background:${p.gifted===true?'#F5EEFF':'var(--surface)'};color:${p.gifted===true?'#7B35A8':'var(--text-2)'};">💝 Yes!</button>
+            <button onclick="S.receiptFlow.preview.gifted=false;render()"
+              style="padding:10px 0;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.gifted===false?'var(--gold)':'var(--border)'};background:${p.gifted===false?'var(--gold-bg)':'var(--surface)'};color:${p.gifted===false?'var(--gold-dk)':'var(--text-2)'};">Nope</button>
+          </div>
+          ${p.gifted===true ? `<input class="form-input" type="text" placeholder="Who gave it to you? (optional)"
+            value="${esc(p.giftedBy||'')}" oninput="S.receiptFlow.preview.giftedBy=this.value"
+            style="margin-top:8px;">` : ''}
         </div>
 
         <button class="btn btn-primary"
@@ -10606,8 +10980,8 @@ function viewWardrobeItem() {
       <div class="witem-name">${esc(w.name)}</div>
       ${w.brand ? `<div style="font-size:14px;color:var(--text-3);margin-top:-6px;font-weight:500;">${esc(w.brand)}</div>` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px;">
-        ${w.isHero ? `<div style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#FFFAED,#FFF5D0);color:#8B6010;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;border:1px solid rgba(184,125,42,.35);letter-spacing:.03em;">💎 Hero Piece</div>` : ''}
-        ${w.isSignature ? `<div class="sig-badge">🪄 Signature</div>` : ''}
+        ${w.isHero ? `<div style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#FFFAED,#FFF5D0);color:#8B6010;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;border:1px solid rgba(184,125,42,.35);letter-spacing:.03em;">👑 Hero Piece</div>` : ''}
+        ${w.isSignature ? `<div class="sig-badge">💎 Signature</div>` : ''}
         ${w.retiredFromCloset ? `<div class="retired-chip">📦 Retired</div>` : ''}
         ${w.tailoringNeeded && !w.retiredFromCloset ? `<div class="tailoring-chip">🧵 Needs tailoring</div>` : ''}
         ${w.retiring && !w.retiredFromCloset ? `<div class="retiring-chip">🪡 Flagged for replacement</div>` : ''}
@@ -10697,7 +11071,7 @@ function viewWardrobeItem() {
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
           <div style="flex:1;min-width:0;">
             <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">
-              💎 Hero Piece
+              👑 Hero Piece
             </div>
             <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
               ${w.isHero
@@ -10733,7 +11107,7 @@ function viewWardrobeItem() {
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
             <div style="flex:1;min-width:0;">
               <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;color:${w.isSignature?'var(--sig-dk)':'var(--text)'};">
-                🪄 Signature Piece
+                💎 Signature Piece
                 <span style="font-size:11px;font-weight:600;color:var(--text-3);font-style:normal;">${w.isSignature ? `(${sigCount} of ${SIG_MAX})` : atLimit ? `${SIG_MAX}/${SIG_MAX} chosen` : `${sigCount} of ${SIG_MAX} used`}</span>
               </div>
               <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
@@ -12121,6 +12495,17 @@ function viewMatchReview() {
                 <div style="display:flex;flex-wrap:wrap;gap:6px;">
                   ${[1,2,3,4,5].map(y=>{const yr=(new Date().getFullYear()-y)+'-01';const act=u.purchasedDate===yr;return `<button ontouchend="if(_touchMoved)return;event.preventDefault();S.matchReview.unmatched[${i}].purchasedDate='${yr}';render();" onclick="S.matchReview.unmatched[${i}].purchasedDate='${yr}';render()" style="padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${act?'var(--gold)':'var(--border)'};background:${act?'var(--gold-bg)':'var(--surface)'};color:${act?'var(--gold-dk)':'var(--text-2)'};">${y===1?'1 yr':y===5?'5+ yrs':y+' yrs'}</button>`;}).join('')}
                 </div>`}
+
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:4px;">Was this a gift? 💝</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;">
+                <button onclick="S.matchReview.unmatched[${i}].gifted=true;render()"
+                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${u.gifted===true?'#9B35C8':'var(--border)'};background:${u.gifted===true?'#F5EEFF':'var(--surface)'};color:${u.gifted===true?'#7B35A8':'var(--text-2)'};">💝 Yes!</button>
+                <button onclick="S.matchReview.unmatched[${i}].gifted=false;render()"
+                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${u.gifted===false?'var(--gold)':'var(--border)'};background:${u.gifted===false?'var(--gold-bg)':'var(--surface)'};color:${u.gifted===false?'var(--gold-dk)':'var(--text-2)'};">Nope</button>
+              </div>
+              ${u.gifted===true ? `<input class="form-input" type="text" placeholder="Who gave it to you? (optional)"
+                value="${esc(u.giftedBy||'')}" oninput="S.matchReview.unmatched[${i}].giftedBy=this.value"
+                style="font-size:16px;padding:11px 14px;margin-top:6px;">` : ''}
             </div>` : ''}
         </div>`;
       }).join('')}
@@ -12131,9 +12516,13 @@ function viewMatchReview() {
         No items to review. Your wardrobe is up to date!
       </div>` : ''}
 
-    <button class="btn btn-primary" onclick="doConfirmMatchReview()">${btnLabel}</button>
+    <button class="btn btn-primary"
+      ontouchend="if(_touchMoved)return;event.preventDefault();doConfirmMatchReview()"
+      onclick="doConfirmMatchReview()">${btnLabel}</button>
     <div style="height:10px"></div>
-    <button class="btn btn-secondary" onclick="skipMatchReview()">Skip for now</button>
+    <button class="btn btn-secondary"
+      ontouchend="if(_touchMoved)return;event.preventDefault();skipMatchReview()"
+      onclick="skipMatchReview()">Skip for now</button>
     <div style="height:36px"></div>
   </div>`;
 }
@@ -13477,7 +13866,7 @@ async function confirmReceiptItem() {
     icon: p.icon || '👕',
     category: cat,
     subCategory: subCategoryFromName(itemName, cat),
-    paidOff: false, retiring: false, gifted: false,
+    paidOff: false, retiring: false, gifted: p.gifted === true, giftedBy: p.gifted === true ? (p.giftedBy?.trim() || null) : null,
     addedAt: new Date().toISOString(),
     wears: [],
     addedVia: rf.mode === 'manual' ? 'manual' : 'receipt',
@@ -13701,7 +14090,7 @@ async function doConfirmMatchReview() {
       size: u.size?.trim() || null,
       category: itemCat,
       subCategory: subCategoryFromName(itemName, itemCat),
-      paidOff: false, retiring: false, gifted: false,
+      paidOff: false, retiring: false, gifted: u.gifted === true, giftedBy: u.gifted === true ? (u.giftedBy?.trim() || null) : null,
       addedAt: new Date().toISOString(),
       wears: [{ outfitId:entryId, date:new Date().toISOString() }],
       isNew: u.isNew === true,
