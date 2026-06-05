@@ -5433,8 +5433,8 @@ function tabBarHTML() {
     <button class="tab-btn ${t==='plan'?'active':''}" onclick="switchTab('plan')">
       ${iconSparkle()} <span>Plan</span>
     </button>
-    <button class="tab-btn ${t==='home'?'active':''}" onclick="switchTab('home')">
-      ${iconCompass()} <span>Discover</span>
+    <button class="tab-btn ${t==='shop'?'active':''}" onclick="switchTab('shop')">
+      ${iconBag()} <span>Shop</span>
     </button>
   </div>`;
 }
@@ -5462,6 +5462,11 @@ function bottomBarHTML() {
       ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('local')"
       onclick="switchTab('local')" title="Local">
       ${iconMapPin()} <span>Local</span>
+    </button>
+    <button class="bottom-btn ${S.view==='home'?'bottom-btn-active':''}"
+      ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('home')"
+      onclick="switchTab('home')" title="Discover">
+      ${iconCompass()} <span>Discover</span>
     </button>
   </div>`;
 }
@@ -7726,9 +7731,6 @@ function viewProfile() {
   const html = `<div class="view">
     <div class="nav">
       <span class="nav-logo">✦ My Style Portfolio</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();S.battleMode=true;navigate('upload')" onclick="S.battleMode=true;navigate('upload')" style="touch-action:manipulation;">
-        ⚔️ Fashion Battle
-      </button>
     </div>
 
     <!-- ══ ZONE 1: You at a glance ══ -->
@@ -7799,7 +7801,7 @@ function viewProfile() {
             <div style="width:100%;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:2px solid var(--sig-border);background:var(--surface-2);display:flex;align-items:center;justify-content:center;position:relative;">
               ${w.photo ? `<img src="${w.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">` : `<div style="font-size:28px;">${w.icon||'👕'}</div>`}
               <div style="position:absolute;top:4px;right:4px;background:var(--gold);border-radius:100px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
-                <span style="font-size:8px;color:#fff;font-weight:900;">✦</span>
+                <span style="font-size:8px;">🪄</span>
               </div>
             </div>
             <div style="font-size:10px;font-weight:700;color:var(--sig-dk);text-align:center;line-height:1.3;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 2px;">${esc(w.name)}</div>
@@ -7808,7 +7810,7 @@ function viewProfile() {
           return `<div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')"
             style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
             <div style="width:100%;aspect-ratio:3/4;border-radius:10px;border:2px dashed var(--sig-border);background:linear-gradient(135deg,#F8F4EE,#F0E9DC);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;">
-              <div style="font-size:20px;color:var(--sig-border);">✦</div>
+              <div style="font-size:20px;">🪄</div>
               <div style="font-size:9px;font-weight:800;color:var(--sig-dk);text-align:center;line-height:1.4;">This is<br>SO me</div>
             </div>
             <div style="font-size:10px;color:var(--text-3);text-align:center;line-height:1.3;">Add piece</div>
@@ -7817,7 +7819,7 @@ function viewProfile() {
       }).join('');
       return `<div style="margin:16px 16px 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">✦ Signature Pieces</div>
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">🪄 Signature Pieces</div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('signature-pieces')" onclick="navigate('signature-pieces')"
             style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.85;touch-action:manipulation;">${full ? 'Share ›' : 'Manage ›'}</button>
         </div>
@@ -7865,44 +7867,6 @@ function viewProfile() {
     <!-- Style Portrait (moved to bottom) -->
     <div style="padding:0 16px 16px;">${portraitHTML}</div>
 
-    <!-- Fashion Battles W/L -->
-    ${(()=>{
-      const battleEntries = S.entries.filter(e => e.battleId);
-      if (battleEntries.length === 0) return '';
-      const uniqueIds = new Set(battleEntries.map(e => e.battleId));
-      const totalBattles = uniqueIds.size;
-      const seen = new Set();
-      let wins = 0, losses = 0, ties = 0;
-      battleEntries.forEach(e => {
-        if (seen.has(e.battleId)) return;
-        seen.add(e.battleId);
-        const partner = S.entries.find(p => p.battleId === e.battleId && p.id !== e.id);
-        const isTie = partner && !e.battleWon && !partner.battleWon;
-        if (isTie) ties++;
-        else if (e.battleWon) wins++;
-        else losses++;
-      });
-      const winPct = totalBattles > 0 ? Math.round((wins / totalBattles) * 100) : 0;
-      const barW = Math.round((wins / Math.max(totalBattles, 1)) * 100);
-      return `<div ontouchend="if(_touchMoved)return;event.preventDefault();setFilter('battle');switchTab('closet')" onclick="setFilter('battle');switchTab('closet')"
-        style="margin:0 16px 16px;background:linear-gradient(135deg,#1C1A18,#23201A);border:1.5px solid #3A3228;border-radius:16px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px;touch-action:manipulation;">
-        <div style="width:44px;height:44px;border-radius:12px;background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">⚔️</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:15px;font-weight:800;color:var(--gold);margin-bottom:4px;">My Fashion Battles</div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">
-            <span style="font-size:12px;font-weight:700;color:#6BBF8E;">🏆 ${wins}W</span>
-            <span style="font-size:12px;font-weight:700;color:#C07070;">🥈 ${losses}L</span>
-            ${ties > 0 ? `<span style="font-size:12px;font-weight:700;color:var(--text-3);">🤝 ${ties}T</span>` : ''}
-            <span style="font-size:11px;color:var(--text-3);margin-left:auto;">${totalBattles} ${totalBattles===1?'battle':'battles'}</span>
-          </div>
-          <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:100px;overflow:hidden;">
-            <div style="height:100%;width:${barW}%;background:linear-gradient(90deg,#6BBF8E,var(--gold));border-radius:100px;"></div>
-          </div>
-          <div style="font-size:10px;color:var(--text-3);margin-top:3px;">${winPct}% win rate · tap to see all</div>
-        </div>
-      </div>`;
-    })()}
-
     <!-- 📦 Past Looks — retired fits carousel -->
     ${(()=>{
       const retiredFits = soloEntries.filter(e => e.photo && !e.battleId && isRetiredFit(e))
@@ -7929,6 +7893,28 @@ function viewProfile() {
           <div style="display:flex;gap:8px;width:max-content;">${cards}</div>
         </div>
         <div style="margin:8px 16px 0;font-size:11px;color:rgba(150,80,220,0.5);font-style:italic;">One or more items in these looks have been retired from your closet.</div>
+      </div>`;
+    })()}
+
+    <!-- 🌹 Memorial Garden -->
+    ${(()=>{
+      const memorialized = S.wardrobe.filter(w => w.memorial);
+      if (!memorialized.length) return '';
+      const thumbs = memorialized.slice(0,4).map(w =>
+        w.photo
+          ? `<img src="${esc(w.photo)}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1.5px solid rgba(150,80,220,0.25);filter:saturate(0.5);opacity:0.75;">`
+          : `<div style="width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,#16121A,#1D1825);border:1.5px solid rgba(150,80,220,0.25);display:flex;align-items:center;justify-content:center;font-size:20px;">${w.icon||'👕'}</div>`
+      ).join('');
+      return `<div style="margin:0 16px 16px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('rip')" onclick="navigate('rip')"
+          style="width:100%;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#16121A 0%,#1D1825 100%);border:1.5px solid rgba(150,80,220,0.28);border-radius:16px;padding:14px 16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
+          <div style="font-size:24px;flex-shrink:0;">🌹</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:800;color:rgba(196,160,240,0.9);margin-bottom:4px;">Memorial Garden</div>
+            <div style="display:flex;gap:6px;align-items:center;">${thumbs}</div>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:rgba(160,100,240,0.6);flex-shrink:0;">${memorialized.length} piece${memorialized.length===1?'':'s'} ›</div>
+        </button>
       </div>`;
     })()}
 
@@ -9030,7 +9016,7 @@ function viewSignaturePieces() {
   return `<div class="view view-notab">
     <div class="nav">
       <button class="nav-back" onclick="navigate('profile')">${iconBack()} Portfolio</button>
-      <span class="nav-title" style="color:var(--sig-dk);">✦ Signature Pieces</span>
+      <span class="nav-title" style="color:var(--sig-dk);">🪄 Signature Pieces</span>
       <span style="width:72px"></span>
     </div>
     <div style="background:linear-gradient(135deg,var(--sig),#C2185B);padding:18px 20px 20px;">
@@ -9723,7 +9709,7 @@ function hangerHTML(w) {
       ${w.size ? `<div class="hanger-brand" style="color:var(--text-2);font-weight:600;text-transform:none;letter-spacing:0;">${esc(w.size)}</div>` : ''}
       <div class="hanger-wears">${wears}w</div>
       ${w.isHero ? `<div style="font-size:9px;font-weight:700;color:var(--gold-dk);margin-top:3px;letter-spacing:.02em;">💎 Hero</div>` : ''}
-      ${w.isSignature ? `<div style="font-size:9px;font-weight:800;color:var(--sig-dk);margin-top:2px;letter-spacing:.02em;">✦ Signature</div>` : ''}
+      ${w.isSignature ? `<div style="font-size:9px;font-weight:800;color:var(--sig-dk);margin-top:2px;letter-spacing:.02em;">🪄 Signature</div>` : ''}
       ${S._wardrobeSelectMode ? `<div style="position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:50%;background:${hSel ? 'var(--gold)' : 'rgba(255,255,255,0.85)'};border:2px solid ${hSel ? 'var(--gold)' : '#ccc'};display:flex;align-items:center;justify-content:center;z-index:5;">${hSel ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>` : ''}
     </div>
   </div>`;
@@ -9748,15 +9734,28 @@ function viewNewPiece() {
 
       <div style="display:flex;flex-direction:column;gap:12px;">
 
-        <!-- From Photo — PRIMARY -->
-        <button onclick="S.receiptFlow={step:'input',mode:'photo',imageData:'',imageMime:'',pasteText:'',preview:null};navigate('receipt-add')"
+        <!-- Bulk upload — PRIMARY -->
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;S.bulkAnalyzing=false;navigate('bulk-add')"
+          onclick="S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;S.bulkAnalyzing=false;navigate('bulk-add')"
           style="display:flex;align-items:center;gap:16px;background:var(--gold-bg);border:2px solid var(--gold);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
-          <div style="width:48px;height:48px;border-radius:12px;background:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">📸</div>
+          <div style="width:48px;height:48px;border-radius:12px;background:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">📦</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:700;color:var(--gold-dk);margin-bottom:2px;">From a photo</div>
-            <div style="font-size:12px;color:var(--gold-dk);opacity:.7;line-height:1.4;">Snap or upload your item — Claude identifies the name, category &amp; details</div>
+            <div style="font-size:15px;font-weight:700;color:var(--gold-dk);margin-bottom:2px;">Bulk upload photos</div>
+            <div style="font-size:12px;color:var(--gold-dk);opacity:.7;line-height:1.4;">Select many photos at once — add shoes, bags, tops in one go</div>
           </div>
           <div style="font-size:18px;color:var(--gold);">›</div>
+        </button>
+
+        <!-- From Photo -->
+        <button onclick="S.receiptFlow={step:'input',mode:'photo',imageData:'',imageMime:'',pasteText:'',preview:null};navigate('receipt-add')"
+          style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
+          <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">📸</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;">From a photo</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Snap or upload your item — Claude identifies the name, category &amp; details</div>
+          </div>
+          <div style="font-size:18px;color:var(--text-3);">›</div>
         </button>
 
         <!-- Manual entry -->
@@ -9777,19 +9776,6 @@ function viewNewPiece() {
           <div style="flex:1;min-width:0;">
             <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;">Scan a receipt</div>
             <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Upload or paste your order confirmation — Claude fills in the details</div>
-          </div>
-          <div style="font-size:18px;color:var(--text-3);">›</div>
-        </button>
-
-        <!-- Bulk upload -->
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;S.bulkAnalyzing=false;navigate('bulk-add')"
-          onclick="S.bulkQueue=[];S.bulkIdx=0;S.bulkSaved=0;S.bulkAnalyzing=false;navigate('bulk-add')"
-          style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
-          <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">📦</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;">Bulk upload photos</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Select many photos at once — add shoes, bags, tops in one go</div>
           </div>
           <div style="font-size:18px;color:var(--text-3);">›</div>
         </button>
@@ -9965,7 +9951,7 @@ function viewOnboarding() {
         <div style="background:var(--surface);border-radius:16px;padding:14px;border:1.5px solid var(--border);">
           <div style="font-size:17px;font-weight:900;color:var(--text);margin-bottom:1px;">${S.profileName?`${esc(S.profileName)}'s Dash`:"Dana's Dash"}</div>
           <div style="font-size:10px;color:var(--text-3);margin-bottom:12px;">Style portrait · Battles · Stats</div>
-          <div style="font-size:10px;font-weight:800;color:#9D174D;margin-bottom:7px;">✦ Signature Pieces</div>
+          <div style="font-size:10px;font-weight:800;color:#9D174D;margin-bottom:7px;">🪄 Signature Pieces</div>
           <div style="display:flex;gap:7px;">
             ${[{icon:'🧥',name:'Camel Coat'},{icon:'👜',name:'Mini Bag'},{empty:true}].map(p=>p.empty
               ?`<div style="flex:1;background:#FFF8FA;border:2px dashed #E8B4C8;border-radius:8px;height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;"><div style="font-size:12px;color:#9D174D;">✦</div><div style="font-size:7px;font-weight:800;color:#9D174D;text-align:center;line-height:1.3;">This is<br>SO me</div></div>`
@@ -10621,7 +10607,7 @@ function viewWardrobeItem() {
       ${w.brand ? `<div style="font-size:14px;color:var(--text-3);margin-top:-6px;font-weight:500;">${esc(w.brand)}</div>` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px;">
         ${w.isHero ? `<div style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#FFFAED,#FFF5D0);color:#8B6010;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;border:1px solid rgba(184,125,42,.35);letter-spacing:.03em;">💎 Hero Piece</div>` : ''}
-        ${w.isSignature ? `<div class="sig-badge">✦ Signature</div>` : ''}
+        ${w.isSignature ? `<div class="sig-badge">🪄 Signature</div>` : ''}
         ${w.retiredFromCloset ? `<div class="retired-chip">📦 Retired</div>` : ''}
         ${w.tailoringNeeded && !w.retiredFromCloset ? `<div class="tailoring-chip">🧵 Needs tailoring</div>` : ''}
         ${w.retiring && !w.retiredFromCloset ? `<div class="retiring-chip">🪡 Flagged for replacement</div>` : ''}
@@ -10747,7 +10733,7 @@ function viewWardrobeItem() {
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
             <div style="flex:1;min-width:0;">
               <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;color:${w.isSignature?'var(--sig-dk)':'var(--text)'};">
-                ✦ Signature Piece
+                🪄 Signature Piece
                 <span style="font-size:11px;font-weight:600;color:var(--text-3);font-style:normal;">${w.isSignature ? `(${sigCount} of ${SIG_MAX})` : atLimit ? `${SIG_MAX}/${SIG_MAX} chosen` : `${sigCount} of ${SIG_MAX} used`}</span>
               </div>
               <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
@@ -13239,7 +13225,9 @@ async function bulkAnalyzeCurrent() {
           { type: 'image', source: { type: 'base64', media_type: imageMime, data: imageData } },
           { type: 'text', text: `You are a fashion expert. Look at this clothing/accessory item and return ONLY valid JSON — no markdown, no code fences.
 
-{"name":"Specific descriptive name e.g. White Leather Sneakers","category":"exactly one of: Tops Jackets Pants Dresses Shoes Bags Jewelry Accessories Other","icon":"single clothing emoji"}` }
+{"name":"Specific descriptive name e.g. White Leather Sneakers","category":"exactly one of: Tops Jackets Pants Dresses Shoes Bags Jewelry Accessories Other","icon":"single clothing emoji"}
+
+Do NOT include a brand field unless the brand name is explicitly readable as text in this photo (on a visible label, hangtag, logo, or tag). Never infer or guess the brand from style or appearance.` }
         ]}]
       }),
     });
@@ -13249,6 +13237,8 @@ async function bulkAnalyzeCurrent() {
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('No JSON');
     const parsed = JSON.parse(m[0]);
+    // Never carry over a guessed brand from bulk auto-analysis — user can fill it in manually
+    delete parsed.brand;
     if (S.bulkIdx === idx) {
       S.bulkQueue[idx].preview = { ...parsed, price: '', size: '', isNew: true, purchasedDate: '' };
     }
@@ -13361,7 +13351,7 @@ async function analyzeItemPhoto() {
 
 {
   "name": "Specific descriptive name, e.g. 'Navy Wool Blazer' or 'Ivory Linen Wide-Leg Trousers'",
-  "brand": "Brand name if visible on label, tag, or logo — otherwise empty string",
+  "brand": "ONLY if the brand name is explicitly readable as text in this photo (on a label, tag, logo, or packaging). Use empty string if you cannot clearly read the brand name — do NOT guess or infer from style, fabric, or silhouette",
   "category": "exactly one of: Tops, Jackets, Pants, Dresses, Shoes, Bags, Jewelry, Accessories, Other",
   "icon": "single most fitting clothing emoji",
   "description": "Color, material, fit, and notable details in 1-2 sentences"
@@ -13406,7 +13396,7 @@ async function parseReceipt() {
           { type: 'text', text: `Parse this receipt screenshot and return ONLY this JSON (no code fences):
 {
   "name": "full item name",
-  "brand": "brand/store name or null",
+  "brand": "brand name only if clearly and explicitly stated in the receipt — null if not stated",
   "price": 49.99,
   "description": "1-sentence description — color, style, material",
   "category": "Tops|Bottoms|Dresses|Outerwear|Shoes|Bags|Jewelry|Accessories",
@@ -13416,7 +13406,7 @@ async function parseReceipt() {
       : [{ type: 'text', text: `Parse this receipt text and return ONLY this JSON (no code fences):
 {
   "name": "full item name",
-  "brand": "brand/store name or null",
+  "brand": "brand name only if clearly and explicitly stated in the receipt — null if not stated",
   "price": 49.99,
   "description": "1-sentence description — color, style, material if known",
   "category": "Tops|Bottoms|Dresses|Outerwear|Shoes|Bags|Jewelry|Accessories",
