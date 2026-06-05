@@ -2707,7 +2707,7 @@ const S = {
   outfitLinker: null, // { mode:'from-wardrobe'|'from-outfit', wardrobeId?, entryId?, selected:{[id]:bool} }
   wardrobePickerFor: null, // { unmatchedIdx } — wardrobe item picker in match review
   receiptFlow: null, // { step:'input'|'parsing'|'preview', imageData, imageMime, pasteText, preview:{name,brand,price,description,category,icon} }
-  bulkQueue: [], bulkIdx: 0, bulkSaved: 0, bulkAnalyzing: false,
+  bulkQueue: [], bulkIdx: 0, bulkSaved: 0, bulkAnalyzing: false, bulkSaving: false,
   onboardStep: 0,
   styleWith: null, // { entryId, need:'', loading:false, result:{recommendation,reasoning,searchQuery,altQuery} }
   imageSearch: null,  // { wardrobeId, loading, results:[{thumb,full,title}] } — photo picker
@@ -2745,10 +2745,9 @@ const S = {
   // What's Hot trends
   hotTrends:          JSON.parse(localStorage.getItem('closet-hot-trends') || 'null'),
   _trendsLoading:     false,
-  brandMap:           JSON.parse(localStorage.getItem('closet-brand-map') || 'null'),
-  _brandMapLoading:   false,
   brandDiscovery:     JSON.parse(localStorage.getItem('closet-brand-discovery') || 'null'),
   _brandDiscoveryLoading: false,
+  _brandsExpanded:        false,
   // About Me panel
   showAboutMe:        false,
   _aboutMeRetiring:   null,   // 'scent' | 'hair' | null
@@ -4123,7 +4122,7 @@ async function buildSyncPayload() {
   });
   const stripSquadPhotos = plans => plans.map(p => {
     const cp = JSON.parse(JSON.stringify(p));
-    cp.members?.forEach(m => Object.values(m.looks || {}).forEach(l => { delete l.photo; }));
+    cp.slots?.forEach(s => { delete s.photo; });
     return cp;
   });
   const [entries, wardrobe] = await Promise.all([
@@ -4255,276 +4254,66 @@ function saveSyncSettings() {
   render();
 }
 
-// Strip photos before encoding so share codes stay small
-function encodeSquadPlan(plan) {
-  try {
-    const slim = JSON.parse(JSON.stringify(plan));
-    slim.members.forEach(m => {
-      if (m.looks) Object.values(m.looks).forEach(l => { delete l.photo; });
-    });
-    return 'CLOSET-SQUAD-' + btoa(unescape(encodeURIComponent(JSON.stringify(slim))));
-  } catch { return null; }
-}
-function decodeSquadPlan(code) {
-  const prefix = 'CLOSET-SQUAD-';
-  const idx = code.indexOf(prefix);
-  if (idx === -1) return null;
-  try { return JSON.parse(decodeURIComponent(escape(atob(code.slice(idx + prefix.length))))); }
-  catch { return null; }
-}
-
-// Get or init a look object for member+event
-function getMemberLook(plan, memberId, eventId) {
-  const mem = plan.members.find(m => m.id === memberId); if (!mem) return null;
-  if (!mem.looks) mem.looks = {};
-  if (!mem.looks[eventId]) mem.looks[eventId] = { outfit:'', photo:null, reactions:{}, vibeScore:null, vibeNote:null };
-  return mem.looks[eventId];
-}
-
-// Make a blank member object with looks
-function blankMember(id, name, isMe) {
-  return { id, name, isMe, looks:{} };
-}
-
-function openSquadDetail(id) {
-  S.selectedSquadId = id;
-  const plan = S.squadPlans.find(p => p.id === id);
-  // Support new days[] or legacy events[]
-  if (plan?.days?.length) {
-    S.squadActiveEventId = plan.days[0].date;
-  } else if (plan?.events?.length) {
-    S.squadActiveEventId = plan.events[0].id;
-  } else {
-    S.squadActiveEventId = SQUAD_DEFAULT_EVT;
-  }
-  navigate('squad');
-}
-
 function startCreateSquad() {
-  S.squadFlow = { step:'create', name:'', type:'custom', dateStart:'', dateEnd:'', vibe:'', dressCode:'', myName:S.profileName||'', memberNames:['',''] };
+  S.squadFlow = { step:'create', name:'', type:'custom', dateStart:'', dateEnd:'', vibe:'', dressCode:'', names:'' };
   render();
 }
-function startJoinSquad() { S.squadFlow = { step:'join', code:'' }; render(); }
 function cancelSquadFlow() { S.squadFlow = null; render(); }
 
-function addSquadMemberSlot() {
-  if (!S.squadFlow || S.squadFlow.step !== 'create') return;
-  if (S.squadFlow.memberNames.length >= 9) { toast('Max 9 members'); return; }
-  S.squadFlow.memberNames.push(''); render();
-}
-function removeSquadMemberSlot(i) {
-  if (!S.squadFlow || S.squadFlow.step !== 'create') return;
-  S.squadFlow.memberNames.splice(i, 1); render();
-}
-
 function confirmCreateSquad() {
-  // Dismiss keyboard on iOS before doing anything
-  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  try {
-    const flow = S.squadFlow; if (!flow || flow.step !== 'create') return;
-    if (!flow.name.trim()) { toast('Give your event a name ✏️'); return; }
-    if (!flow.myName.trim()) { toast('What\'s your name?'); return; }
-    const myId = 'mem-' + Date.now();
-    const otherMembers = flow.memberNames.map(n=>n.trim()).filter(Boolean)
-      .map(n => blankMember('mem-'+Math.random().toString(36).slice(2,9), n, false));
-    const days = generateSquadDays(flow.dateStart, flow.dateEnd);
-    const plan = {
-      id: 'sq-'+Date.now(), name:flow.name.trim(), type:flow.type,
-      dateStart:flow.dateStart, dateEnd:flow.dateEnd,
-      vibe:flow.vibe.trim(), dressCode:flow.dressCode.trim(),
-      days,
-      members:[blankMember(myId, flow.myName.trim(), true), ...otherMembers],
-      myMemberId:myId, squadVibeChecks:{}, createdAt:new Date().toISOString(),
-    };
-    S.squadPlans.unshift(plan); saveSquadPlans();
-    S.squadFlow = null; S.selectedSquadId = plan.id;
-    S.squadActiveEventId = days[0]?.date || SQUAD_DEFAULT_EVT;
-    navigate('squad');
-    toast(`${getSquadType(plan.type).icon} "${plan.name}" created! Share with your squad.`);
-  } catch(e) {
-    console.error('confirmCreateSquad error:', e);
-    toast('Something went wrong: ' + (e.message || 'unknown error'));
-  }
+  if (document.activeElement?.blur) document.activeElement.blur();
+  const flow = S.squadFlow;
+  if (!flow || flow.step !== 'create') return;
+  if (!flow.name.trim()) { toast('Give your event a name ✏️'); return; }
+  const plan = {
+    id: 'sq-'+Date.now(),
+    name: flow.name.trim(),
+    type: flow.type,
+    dateStart: flow.dateStart,
+    dateEnd: flow.dateEnd,
+    vibe: flow.vibe.trim(),
+    dressCode: flow.dressCode.trim(),
+    names: flow.names.trim(),
+    slots: [
+      { label: 'Look 1', photo: null },
+      { label: 'Look 2', photo: null },
+      { label: 'Look 3', photo: null },
+      { label: 'Look 4', photo: null },
+      { label: 'Look 5', photo: null },
+    ],
+    createdAt: new Date().toISOString(),
+  };
+  S.squadPlans.unshift(plan);
+  saveSquadPlans();
+  S.squadFlow = null;
+  S.selectedSquadId = plan.id;
+  navigate('squad');
+  toast(`${getSquadType(plan.type).icon} "${plan.name}" created!`);
 }
 
-function confirmJoinSquad() {
-  const flow = S.squadFlow; if (!flow || flow.step !== 'join') return;
-  const imported = decodeSquadPlan(flow.code||'');
-  if (!imported) { toast('Invalid squad code — check and try again'); return; }
-  const existing = S.squadPlans.find(p => p.id === imported.id);
-  if (existing) {
-    // Merge: keep local photos & my slot data, update everything else
-    const myMem = existing.members.find(m => m.isMe);
-    const merged = imported.members.map(m => {
-      if (myMem && m.id === myMem.id) {
-        // Merge looks: keep local photos, take incoming text/reactions/scores
-        if (!m.looks) m.looks = {};
-        Object.entries(myMem.looks||{}).forEach(([evtId, lk]) => {
-          if (!m.looks[evtId]) m.looks[evtId] = lk;
-          else if (lk.photo) m.looks[evtId].photo = lk.photo; // preserve my photos
-        });
-        m.isMe = true;
-        return m;
-      }
-      return existing.members.find(lm => lm.id === m.id) || m;
-    });
-    imported.members.forEach(m => { if (!merged.find(mm=>mm.id===m.id)) merged.push(m); });
-    existing.members = merged;
-    existing.days = imported.days || existing.days || [];
-    existing.dateStart = imported.dateStart || existing.dateStart || '';
-    existing.dateEnd = imported.dateEnd || existing.dateEnd || '';
-    existing.squadVibeChecks = imported.squadVibeChecks || existing.squadVibeChecks || {};
-    saveSquadPlans();
-    S.squadFlow = null; S.selectedSquadId = existing.id;
-    S.squadActiveEventId = existing.days?.[0]?.date || SQUAD_DEFAULT_EVT;
-    navigate('squad'); toast('Plan updated with the latest! ✓'); return;
-  }
-  S.squadFlow = { step:'claim', plan:imported, claimId:imported.members[0]?.id||'__new__', myName:S.profileName||'' };
-  render();
-}
-
-function confirmClaimSlot() {
-  const flow = S.squadFlow; if (!flow || flow.step !== 'claim') return;
-  const plan = JSON.parse(JSON.stringify(flow.plan));
-  const myName = (flow.myName||'').trim() || 'Me';
-  let myMem;
-  if (flow.claimId === '__new__') {
-    myMem = blankMember('mem-'+Date.now(), myName, true);
-    plan.members.push(myMem);
-  } else {
-    myMem = plan.members.find(m => m.id === flow.claimId);
-    if (myMem) { myMem.isMe = true; myMem.name = myName||myMem.name; if (!myMem.looks) myMem.looks = {}; }
-  }
-  plan.myMemberId = myMem?.id || null;
-  S.squadPlans.unshift(plan); saveSquadPlans();
-  S.squadFlow = null; S.selectedSquadId = plan.id;
-  S.squadActiveEventId = plan.days?.[0]?.date || SQUAD_DEFAULT_EVT;
-  navigate('squad'); toast(`Joined as ${myMem?.name}! 🎉 Add your look.`);
-}
-
-// ── Day helpers ───────────────────────────────────────────────
-function generateSquadDays(dateStart, dateEnd) {
-  if (!dateStart) return [];
-  const start = new Date(dateStart + 'T12:00:00');
-  const end = dateEnd ? new Date(dateEnd + 'T12:00:00') : start;
-  if (isNaN(start) || isNaN(end) || end < start) return [{ date: dateStart, description: '' }];
-  const days = [];
-  const curr = new Date(start);
-  let count = 0;
-  while (curr <= end && count < 14) {
-    const y = curr.getFullYear();
-    const m = String(curr.getMonth()+1).padStart(2,'0');
-    const d = String(curr.getDate()).padStart(2,'0');
-    days.push({ date: `${y}-${m}-${d}`, description: '' });
-    curr.setDate(curr.getDate() + 1);
-    count++;
-  }
-  return days;
-}
-
-function updateSquadDayDesc(planId, date, desc) {
-  const plan = S.squadPlans.find(p => p.id === planId); if (!plan) return;
-  const day = (plan.days||[]).find(d => d.date === date); if (!day) return;
-  day.description = desc; saveSquadPlans();
-}
-
-// ── Look actions ─────────────────────────────────────────────
-function saveSquadLook(planId, memberId, eventId, outfit) {
-  const plan = S.squadPlans.find(p => p.id === planId); if (!plan) return;
-  const look = getMemberLook(plan, memberId, eventId); if (!look) return;
-  look.outfit = outfit; look.vibeScore = null; look.vibeNote = null;
-  saveSquadPlans(); toast('Look saved ✓');
-}
-
-function addSquadReaction(planId, memberId, eventId, emoji) {
-  const plan = S.squadPlans.find(p => p.id === planId); if (!plan) return;
-  const look = getMemberLook(plan, memberId, eventId); if (!look) return;
-  look.reactions[emoji] = (look.reactions[emoji]||0) + 1;
-  saveSquadPlans(); render();
-}
-
-async function handleSquadPhoto(planId, memberId, eventId, file) {
+async function squadSlotPhoto(planId, slotIdx, file) {
   if (!file) return;
-  const plan = S.squadPlans.find(p => p.id === planId); if (!plan) return;
-  const look = getMemberLook(plan, memberId, eventId); if (!look) return;
+  const plan = S.squadPlans.find(p => p.id === planId);
+  if (!plan || !plan.slots?.[slotIdx]) return;
   try {
     const compressed = await compressImage(file);
-    look.photo = compressed.data;
+    plan.slots[slotIdx].photo = compressed.data;
     saveSquadPlans(); render();
   } catch { toast('Could not load photo'); }
 }
 
-function removeSquadPhoto(planId, memberId, eventId) {
-  const plan = S.squadPlans.find(p => p.id === planId); if (!plan) return;
-  const look = getMemberLook(plan, memberId, eventId); if (!look) return;
-  look.photo = null; saveSquadPlans(); render();
-}
-
-async function runMemberVibeCheck(planId, memberId, eventId) {
-  const plan = S.squadPlans.find(p => p.id === planId); if (!plan) return;
-  const look = getMemberLook(plan, memberId, eventId); if (!look?.outfit) return;
-  if (!S.apiKey) { toast('Add your API key in Settings'); return; }
-  look.vibeScore = 'loading'; saveSquadPlans(); render();
-  try {
-    const t = getSquadType(plan.type);
-    const day = (plan.days||[]).find(d => d.date === eventId);
-    const evtLabel = day ? ` · ${new Date(day.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}${day.description?' — '+day.description:''}` : '';
-    const dc = plan.dressCode || 'none';
-    const mem = plan.members.find(m => m.id === memberId);
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:100,
-        messages:[{ role:'user', content:`Event: "${plan.name}" (${t.label})${evtLabel}. Overall vibe: "${plan.vibe||'unspecified'}". Dress code: "${dc}". ${mem?.name||'Member'} plans to wear: "${look.outfit}". Score 1-10 for fit and give ONE punchy sentence of fashion feedback (max 15 words). JSON only: {"score":8,"note":"feedback here"}` }]
-      })
-    });
-    if (r.ok) {
-      const d = await r.json();
-      const parsed = JSON.parse((d.content?.[0]?.text||'{}').replace(/```json|```/g,'').trim());
-      look.vibeScore = parsed.score ?? null; look.vibeNote = parsed.note ?? null;
-    } else { look.vibeScore = null; }
-  } catch { look.vibeScore = null; }
+function removeSquadSlotPhoto(planId, slotIdx) {
+  const plan = S.squadPlans.find(p => p.id === planId);
+  if (!plan || !plan.slots?.[slotIdx]) return;
+  plan.slots[slotIdx].photo = null;
   saveSquadPlans(); render();
 }
 
-async function runSquadVibeCheck(planId, eventId) {
-  const plan = S.squadPlans.find(p => p.id === planId); if (!plan) return;
-  const dressed = plan.members.filter(m => getMemberLook(plan, m.id, eventId)?.outfit?.trim());
-  if (!dressed.length) { toast('Add some looks first'); return; }
-  if (!S.apiKey) { toast('Add your API key in Settings'); return; }
-  if (!plan.squadVibeChecks) plan.squadVibeChecks = {};
-  plan.squadVibeChecks[eventId] = { loading:true }; saveSquadPlans(); render();
-  try {
-    const t = getSquadType(plan.type);
-    const day = (plan.days||[]).find(d => d.date === eventId);
-    const evtLabel = day ? ` · ${new Date(day.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}${day.description?' — '+day.description:''}` : '';
-    const dc = plan.dressCode || 'none';
-    const list = dressed.map(m => `- ${m.name}: ${getMemberLook(plan,m.id,eventId).outfit}`).join('\n');
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:220,
-        messages:[{ role:'user', content:`Stylish event consultant. Event: "${plan.name}" (${t.label})${evtLabel}. Vibe: "${plan.vibe||'unspecified'}". Dress code: "${dc}". Squad:\n${list}\n\n2-3 sentences: Is the squad cohesive? Who's nailing it? Any clashes? Playful, specific, fashion-forward. Plain text.` }]
-      })
-    });
-    if (r.ok) {
-      const d = await r.json();
-      plan.squadVibeChecks[eventId] = { text:d.content?.[0]?.text?.trim()||'', ts:Date.now() };
-    } else { plan.squadVibeChecks[eventId] = null; }
-  } catch { plan.squadVibeChecks[eventId] = null; }
-  saveSquadPlans(); render();
-}
-
-async function shareSquadPlan(planId) {
-  const plan = S.squadPlans.find(p => p.id === planId); if (!plan) return;
-  const code = encodeSquadPlan(plan); if (!code) { toast('Could not encode plan'); return; }
-  const t = getSquadType(plan.type);
-  const text = `${t.icon} ${plan.name} — Squad Plan on Closet\n\nPaste this code in Closet → Plan → Squad Mode → Join:\n\n${code}\n\n(Note: your photos stay on your device — only outfit descriptions are shared)`;
-  if (navigator.share) {
-    try { await navigator.share({ title:plan.name, text }); return; } catch(e) { if(e.name==='AbortError') return; }
-  }
-  try { await navigator.clipboard.writeText(text); toast('Copied! Share with your squad ✓'); }
-  catch { toast('Could not copy'); }
+function updateSquadSlotLabel(planId, slotIdx, label) {
+  const plan = S.squadPlans.find(p => p.id === planId);
+  if (!plan || !plan.slots?.[slotIdx]) return;
+  plan.slots[slotIdx].label = label;
+  saveSquadPlans();
 }
 
 function deleteSquadPlan(id) {
@@ -4533,12 +4322,186 @@ function deleteSquadPlan(id) {
   saveSquadPlans(); navigate('plan'); toast('Removed');
 }
 
+async function shareSquadCard(planId) {
+  const plan = S.squadPlans.find(p => p.id === planId);
+  if (!plan) return;
+  toast('Generating card…');
+
+  const slots = (plan.slots || []).slice(0, 5);
+  const t = getSquadType(plan.type);
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const bg = isDark ? '#1c1c1e' : '#f9f7f4';
+  const surface = isDark ? '#2c2c2e' : '#ffffff';
+  const border = isDark ? '#3a3a3c' : '#e5e0d8';
+  const textPrimary = isDark ? '#f5f5f5' : '#1a1a1a';
+  const textSecondary = isDark ? '#8e8e93' : '#888888';
+  const gold = '#b87d2a';
+
+  const fmtDate = (() => {
+    if (plan.dateStart && plan.dateEnd && plan.dateStart !== plan.dateEnd) {
+      const s = new Date(plan.dateStart+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      const e = new Date(plan.dateEnd+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      return `${s} – ${e}`;
+    } else if (plan.dateStart) {
+      return new Date(plan.dateStart+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    }
+    return '';
+  })();
+
+  // Canvas layout
+  const W = 750;
+  const SLOT_W = 130, SLOT_H = 174;
+  const HEADER_H = 160;
+  const SLOTS_ROW_H = SLOT_H + 44;
+  const H = HEADER_H + SLOTS_ROW_H + 48;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Gold top bar
+  ctx.fillStyle = gold;
+  ctx.fillRect(0, 0, W, 4);
+
+  // Header card
+  ctx.fillStyle = surface;
+  ctx.beginPath();
+  ctx.roundRect(16, 14, W-32, HEADER_H - 8, 14);
+  ctx.fill();
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Event type icon
+  ctx.font = '38px serif';
+  ctx.fillText(t.icon, 28, 68);
+
+  // Event name
+  ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
+  ctx.fillStyle = textPrimary;
+  ctx.fillText(plan.name.slice(0, 38), 78, 60);
+
+  // Type + date
+  ctx.font = '12px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
+  ctx.fillStyle = textSecondary;
+  ctx.fillText(`${t.label}${fmtDate ? ' · ' + fmtDate : ''}`, 78, 78);
+
+  // Vibe
+  if (plan.vibe) {
+    ctx.font = 'italic 12px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
+    ctx.fillStyle = gold;
+    ctx.fillText(`✦ ${plan.vibe.slice(0,50)}`, 78, 96);
+  }
+
+  // Dress code + squad
+  let infoY = 116;
+  if (plan.dressCode) {
+    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
+    ctx.fillStyle = textSecondary;
+    ctx.fillText(`Dress code: ${plan.dressCode.slice(0,50)}`, 28, infoY);
+    infoY += 16;
+  }
+  if (plan.names) {
+    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
+    ctx.fillStyle = textSecondary;
+    ctx.fillText(`Squad: ${plan.names.slice(0,60)}`, 28, infoY);
+  }
+
+  // Slots
+  const totalW = slots.length * SLOT_W + (slots.length - 1) * 10;
+  const startX = Math.round((W - totalW) / 2);
+  const slotY = HEADER_H + 8;
+
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i] || { label: `Look ${i+1}`, photo: null };
+    const x = startX + i * (SLOT_W + 10);
+
+    // Slot card
+    ctx.fillStyle = surface;
+    ctx.beginPath();
+    ctx.roundRect(x, slotY, SLOT_W, SLOT_H + 30, 10);
+    ctx.fill();
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    if (slot.photo) {
+      await new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(x, slotY, SLOT_W, SLOT_H, 10);
+          ctx.clip();
+          const ar = img.width / img.height;
+          const slotAr = SLOT_W / SLOT_H;
+          let sx=0,sy=0,sw=img.width,sh=img.height;
+          if (ar > slotAr) { sw = img.height * slotAr; sx = (img.width - sw) / 2; }
+          else { sh = img.width / slotAr; sy = (img.height - sh) / 2; }
+          ctx.drawImage(img, sx, sy, sw, sh, x, slotY, SLOT_W, SLOT_H);
+          ctx.restore();
+          resolve();
+        };
+        img.onerror = resolve;
+        img.src = slot.photo;
+      });
+    } else {
+      ctx.fillStyle = isDark ? '#3a3a3c' : '#f0ede8';
+      ctx.beginPath();
+      ctx.roundRect(x, slotY, SLOT_W, SLOT_H, 10);
+      ctx.fill();
+      ctx.font = '30px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('👗', x + SLOT_W/2, slotY + SLOT_H/2 + 10);
+      ctx.textAlign = 'left';
+    }
+
+    // Label
+    ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
+    ctx.fillStyle = textPrimary;
+    ctx.textAlign = 'center';
+    const labelText = (slot.label || `Look ${i+1}`).slice(0, 14);
+    ctx.fillText(labelText, x + SLOT_W/2, slotY + SLOT_H + 18);
+    ctx.textAlign = 'left';
+  }
+
+  // Watermark
+  ctx.font = '11px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
+  ctx.fillStyle = isDark ? '#48484a' : '#c7c2b8';
+  ctx.textAlign = 'center';
+  ctx.fillText('Made with Closet', W/2, H - 12);
+  ctx.textAlign = 'left';
+
+  canvas.toBlob(async blob => {
+    const fileName = `${plan.name.replace(/[^a-z0-9]/gi,'-').toLowerCase()}-squad.png`;
+    const file = new File([blob], fileName, { type:'image/png' });
+    if (navigator.share && navigator.canShare?.({ files:[file] })) {
+      try { await navigator.share({ files:[file], title:plan.name }); return; }
+      catch(e) { if (e.name==='AbortError') return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('Card saved ✓');
+  }, 'image/png');
+}
+
 /* ================================================================
    VIEW: SQUAD DETAIL
    ================================================================ */
 function viewSquadDetail() {
   const plan = S.squadPlans.find(p => p.id === S.selectedSquadId);
   if (!plan) { navigate('plan'); return ''; }
+
+  // Ensure slots exist (backward compat with old schema)
+  if (!plan.slots || !Array.isArray(plan.slots)) plan.slots = [];
+  while (plan.slots.length < 5) plan.slots.push({ label: `Look ${plan.slots.length+1}`, photo: null });
+
   const t = getSquadType(plan.type);
   const fmtDate = (() => {
     if (plan.dateStart && plan.dateEnd && plan.dateStart !== plan.dateEnd) {
@@ -4553,151 +4516,64 @@ function viewSquadDetail() {
     return '';
   })();
 
-  const hasDays = plan.days?.length > 0;
-  const hasLegacyEvents = !hasDays && plan.events?.length > 0;
-  // Active event ID: date string for new plans, legacy event id for old plans
-  const activeEvtId = S.squadActiveEventId ||
-    (hasDays ? plan.days[0].date : (hasLegacyEvents ? plan.events[0].id : SQUAD_DEFAULT_EVT));
-  const activeDay = hasDays ? (plan.days.find(d => d.date === activeEvtId) || plan.days[0]) : null;
-  const activeLegacyEvt = hasLegacyEvents ? (plan.events?.find(e => e.id === activeEvtId) || null) : null;
-
-  // ── Day pill bar (new plans) or legacy event pills ──────────
-  const eventPillsHTML = (() => {
-    if (hasDays) {
-      const pills = plan.days.map(day => {
-        const active = day.date === activeEvtId;
-        const label = new Date(day.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-        return `<button onclick="S.squadActiveEventId='${day.date}';render()" style="flex-shrink:0;padding:6px 14px;border-radius:100px;border:${active?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${active?'var(--gold-bg)':'var(--surface)'};font-size:12px;font-weight:${active?'800':'600'};color:${active?'var(--gold-dk)':'var(--text-2)'};cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .12s;">${label}</button>`;
-      });
-      return `<div style="display:flex;gap:6px;overflow-x:auto;padding:0 16px 12px;scrollbar-width:none;">${pills.join('')}</div>`;
-    }
-    if (hasLegacyEvents) {
-      const pills = plan.events.map(evt => {
-        const active = evt.id === activeEvtId;
-        return `<button onclick="S.squadActiveEventId='${evt.id}';render()" style="flex-shrink:0;padding:6px 14px;border-radius:100px;border:${active?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${active?'var(--gold-bg)':'var(--surface)'};font-size:12px;font-weight:${active?'800':'600'};color:${active?'var(--gold-dk)':'var(--text-2)'};cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .12s;">${esc(evt.name)}</button>`;
-      });
-      return `<div style="display:flex;gap:6px;overflow-x:auto;padding:0 16px 12px;scrollbar-width:none;">${pills.join('')}</div>`;
-    }
-    return '';
-  })();
-
-  // Active day description editor (new plans only)
-  const activeEvtEditorHTML = activeDay ? `
-    <div style="margin:0 16px 12px;padding:10px 12px;background:var(--surface-2);border-radius:var(--r-sm);border:1px solid var(--border);">
-      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${new Date(activeDay.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
-      <textarea class="plan-textarea" rows="2" style="margin:0;font-size:13px;" placeholder="What's happening this day? (e.g. Welcome dinner, Beach day, Ceremony…)"
-        oninput="updateSquadDayDesc('${plan.id}','${activeDay.date}',this.value)">${esc(activeDay.description||'')}</textarea>
-    </div>` : '';
-
-  // ── Member cards ────────────────────────────────────────────
-  const membersHTML = plan.members.map(mem => {
-    const initials = mem.name.slice(0,2).toUpperCase();
-    const isMine = mem.isMe;
-    const look = getMemberLook(plan, mem.id, activeEvtId) || { outfit:'', photo:null, reactions:{}, vibeScore:null, vibeNote:null };
-
-    const vibeHTML = look.vibeScore && look.vibeScore !== 'loading'
-      ? `<div class="squad-vibe-badge">${look.vibeScore}/10</div>` : '';
-    const vibeNoteHTML = look.vibeNote && look.vibeScore !== 'loading'
-      ? `<div style="font-size:12px;color:var(--gold-dk);font-style:italic;margin-top:4px;line-height:1.35;">"${esc(look.vibeNote)}"</div>` : '';
-    const loadingVibeHTML = look.vibeScore === 'loading'
-      ? `<div style="font-size:11px;color:var(--text-3);margin-top:4px;">Checking vibe…</div>` : '';
-
-    // Photo section
-    const photoId = `squad-photo-${mem.id}-${activeEvtId}`;
-    const photoHTML = look.photo
-      ? `<div style="position:relative;margin-bottom:8px;">
-          <img src="${look.photo}" style="width:100%;height:auto;border-radius:var(--r-sm);display:block;">
-          ${isMine ? `<button onclick="removeSquadPhoto('${plan.id}','${mem.id}','${activeEvtId}')" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>` : ''}
-        </div>` : '';
-
-    const mySection = isMine ? `
-      ${photoHTML}
-      <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <label style="flex:1;padding:8px 10px;border:1.5px dashed var(--border);border-radius:var(--r-sm);text-align:center;font-size:12px;font-weight:600;color:var(--gold);cursor:pointer;">
-          📸 ${look.photo ? 'Change' : 'Add'} Photo
-          <input type="file" accept="image/*" style="display:none;" onchange="handleSquadPhoto('${plan.id}','${mem.id}','${activeEvtId}',this.files[0])">
-        </label>
-      </div>
-      <textarea id="${photoId}" rows="2" class="plan-textarea" style="font-size:13px;margin:0 0 6px;"
-        placeholder="Describe your look…">${esc(look.outfit||'')}</textarea>
-      <div style="display:flex;gap:6px;">
-        <button onclick="saveSquadLook('${plan.id}','${mem.id}','${activeEvtId}',document.getElementById('${photoId}').value)" class="btn btn-primary" style="margin:0;padding:7px 12px;font-size:12px;flex:1;">Save Look</button>
-        ${look.outfit ? `<button onclick="runMemberVibeCheck('${plan.id}','${mem.id}','${activeEvtId}')" class="btn btn-secondary" style="margin:0;padding:7px 12px;font-size:12px;">✦ Vibe</button>` : ''}
-      </div>` : `
-      ${photoHTML}
-      ${look.outfit ? `<div class="squad-member-outfit">${esc(look.outfit)}</div>` : `<div style="font-size:12px;color:var(--text-3);font-style:italic;">No look added yet</div>`}
-      ${(look.outfit || look.photo) ? `<div class="squad-reaction-row" style="margin-top:8px;">${SQUAD_REACTIONS.map(em => {
-        const cnt = look.reactions?.[em]||0;
-        return `<button class="squad-reaction-btn" onclick="addSquadReaction('${plan.id}','${mem.id}','${activeEvtId}','${em}')">${em}${cnt>0?` <span style="font-size:10px;font-weight:700;">${cnt}</span>`:''}</button>`;
-      }).join('')}</div>` : ''}`;
-
-    return `<div class="squad-member-row" style="flex-direction:column;align-items:stretch;gap:0;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-        <div class="squad-member-avatar">${initials}</div>
-        <div style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <div class="squad-member-name">${esc(mem.name)}${isMine?' <span style="font-size:10px;color:var(--gold-dk);font-weight:700;">(you)</span>':''}</div>
-          ${vibeHTML}
+  // ── Photo slots ─────────────────────────────────────────────
+  const slotsHTML = plan.slots.slice(0,5).map((slot, i) => {
+    return `
+      <div style="display:flex;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        ${slot.photo
+          ? `<div style="position:relative;">
+              <img src="${slot.photo}" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();removeSquadSlotPhoto('${plan.id}',${i})" onclick="removeSquadSlotPhoto('${plan.id}',${i})" style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.55);border:none;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;">✕</button>
+            </div>`
+          : `<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;aspect-ratio:3/4;background:var(--surface-2);cursor:pointer;">
+              <span style="font-size:24px;">📸</span>
+              <span style="font-size:10px;font-weight:700;color:var(--gold);text-align:center;line-height:1.3;">Add Photo</span>
+              <input type="file" accept="image/*" style="display:none;" onchange="squadSlotPhoto('${plan.id}',${i},this.files[0])">
+            </label>`}
+        <div style="padding:6px 8px;">
+          <input class="form-input" style="margin:0;font-size:11px;padding:5px 7px;font-weight:700;"
+            placeholder="Label…"
+            value="${esc(slot.label||'')}"
+            onchange="updateSquadSlotLabel('${plan.id}',${i},this.value)"
+            oninput="updateSquadSlotLabel('${plan.id}',${i},this.value)">
         </div>
-      </div>
-      ${mySection}
-      ${loadingVibeHTML}
-      ${vibeNoteHTML}
-    </div>`;
+      </div>`;
   }).join('');
-
-  // ── Squad vibe check for active event ──────────────────────
-  const svc = plan.squadVibeChecks?.[activeEvtId];
-  const vibeCheckSection = svc
-    ? (svc.loading
-        ? `<div class="squad-vibe-check-card"><div style="font-size:13px;color:var(--gold-dk);">✦ Checking squad vibe…</div></div>`
-        : `<div class="squad-vibe-check-card">
-            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-dk);margin-bottom:6px;">✦ Squad Vibe Check${activeDay?' — '+new Date(activeDay.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):(activeLegacyEvt?' — '+activeLegacyEvt.name:'')}</div>
-            <div style="font-size:13px;color:var(--text);line-height:1.55;">${esc(svc.text)}</div>
-          </div>`)
-    : '';
-
-  const looksCount = plan.members.filter(m => { const l = getMemberLook(plan,m.id,activeEvtId); return l?.outfit||l?.photo; }).length;
-  const slimCode = encodeSquadPlan(plan);
-  const qrUrl = slimCode ? `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=8&data=${encodeURIComponent(slimCode)}` : '';
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate('plan')">‹ Plan</button>
-      <button onclick="deleteSquadPlan('${plan.id}')" style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:4px;">Remove</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('plan')" onclick="navigate('plan')">${iconBack()} Plan</button>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteSquadPlan('${plan.id}')" onclick="deleteSquadPlan('${plan.id}')" style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:4px;">Remove</button>
     </div>
 
-    <div style="padding:14px 16px 10px;">
+    <!-- Plan info card -->
+    <div style="margin:14px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--shadow);">
       <div style="display:flex;align-items:flex-start;gap:12px;">
-        <div style="font-size:34px;line-height:1;">${t.icon}</div>
-        <div style="flex:1;">
-          <div style="font-size:19px;font-weight:800;line-height:1.2;">${esc(plan.name)}</div>
-          <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${t.label}${fmtDate?' · '+fmtDate:''} · ${plan.members.length} members</div>
-          ${plan.vibe ? `<div style="font-size:12px;color:var(--gold-dk);margin-top:2px;font-weight:600;">✦ ${esc(plan.vibe)}</div>` : ''}
+        <div style="font-size:36px;line-height:1;">${t.icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:20px;font-weight:800;line-height:1.2;color:var(--text);">${esc(plan.name)}</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:3px;">${t.label}${fmtDate ? ' · ' + fmtDate : ''}</div>
+          ${plan.vibe ? `<div style="font-size:12px;color:var(--gold-dk);margin-top:4px;font-weight:600;">✦ ${esc(plan.vibe)}</div>` : ''}
         </div>
       </div>
+      ${plan.dressCode ? `<div style="margin-top:10px;font-size:12px;color:var(--text-2);"><span style="font-weight:700;">Dress Code:</span> ${esc(plan.dressCode)}</div>` : ''}
+      ${plan.names ? `<div style="margin-top:4px;font-size:12px;color:var(--text-2);"><span style="font-weight:700;">Squad:</span> ${esc(plan.names)}</div>` : ''}
     </div>
 
-    ${eventPillsHTML}
-    ${activeEvtEditorHTML}
-
-    <div style="margin:0 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);">
-      <div style="padding:9px 14px 7px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);border-bottom:1px solid var(--border);">
-        The Squad${activeDay ? ' · '+new Date(activeDay.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : (activeLegacyEvt?' · '+activeLegacyEvt.name:'')}
+    <!-- Photo slots -->
+    <div style="margin:16px 16px 0;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">📸 Looks</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        ${slotsHTML}
+        <div style="display:none;"></div>
       </div>
-      ${membersHTML}
+      <div style="font-size:11px;color:var(--text-3);margin-top:8px;text-align:center;">Tap a slot to add a photo · Edit labels below each photo</div>
     </div>
 
-    ${vibeCheckSection}
-
-    <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px;">
-      ${looksCount >= 2 ? `<button onclick="runSquadVibeCheck('${plan.id}','${activeEvtId}')" class="btn btn-primary" style="margin:0;">✦ ${svc&&!svc.loading?'Refresh':'Get'} Squad Vibe Check</button>` : ''}
-      <button onclick="shareSquadPlan('${plan.id}')" class="btn btn-secondary" style="margin:0;">📤 Share with Squad</button>
-      ${qrUrl ? `<div style="text-align:center;margin-top:2px;">
-        <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">Or scan to share · photos stay on your device</div>
-        <img src="${qrUrl}" width="160" height="160" style="border-radius:var(--r-sm);border:1px solid var(--border);" alt="QR Code">
-      </div>` : ''}
+    <!-- Actions -->
+    <div style="padding:16px 16px max(24px,env(safe-area-inset-bottom,24px));display:flex;flex-direction:column;gap:8px;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();shareSquadCard('${plan.id}')" onclick="shareSquadCard('${plan.id}')" class="btn btn-primary" style="margin:0;">📤 Share Squad Card</button>
     </div>
-    <div style="height:20px;"></div>
   </div>`;
 }
 
@@ -5136,7 +5012,7 @@ function featuresMenuHTML() {
     {
       title: 'Dashboard & Insights',
       items: [
-        { icon: '💎', text: '<strong>Hidden Gems</strong> — Expensive pieces you rarely reach for, so you know what to rediscover.' },
+        { icon: '🔮', text: '<strong>Hidden Gems</strong> — Your wallet already said yes. Surface the pieces your morning routine forgot.' },
         { icon: '🏷', text: '<strong>Top Brands</strong> — See which labels dominate your most-worn looks.' },
         { icon: '🎭', text: '<strong>Top Activities</strong> — See which occasions you dress for most, based on your outfit tags.' },
         { icon: '🙅', text: '<strong>Wasted Spend Tracker</strong> — Items retired because they didn\'t suit you, with total cost — learn from past misses.' },
@@ -5335,7 +5211,7 @@ async function signOut() {
 /* ================================================================
    RENDER ROUTER
    ================================================================ */
-const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','hero-pieces','signature-pieces','brand-map']);
+const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','hero-pieces','signature-pieces']);
 
 function render() {
   const root = document.getElementById('root');
@@ -5376,7 +5252,6 @@ function render() {
     case 'local':        html = viewLocal();        break;
     case 'hero-pieces':       html = viewHeroPieces();        break;
     case 'signature-pieces':  html = viewSignaturePieces();   break;
-    case 'brand-map':         html = viewBrandMap();          break;
   }
   // Inject tab bar right after the .nav block on every tab view
   if (TAB_VIEWS.has(S.view)) {
@@ -5562,6 +5437,56 @@ function viewLocal() {
   const city = S.profileLocation ? S.profileLocation.split(',')[0].trim() : null;
   const locationLine = city ? `📍 ${esc(city)}` : '📍 Your City';
 
+  const cityEmoji = (c => {
+    if (!c) return '📍';
+    const l = c.toLowerCase();
+    if (l.includes('san francisco') || l.includes('sf')) return '🌉';
+    if (l.includes('new york') || l.includes('nyc') || l.includes('brooklyn') || l.includes('manhattan')) return '🗽';
+    if (l.includes('los angeles') || l.includes('l.a.') || l.includes('hollywood') || l.includes('malibu')) return '🌴';
+    if (l.includes('chicago')) return '🌬️';
+    if (l.includes('miami') || l.includes('fort lauderdale')) return '🌊';
+    if (l.includes('las vegas')) return '🎰';
+    if (l.includes('new orleans')) return '🎷';
+    if (l.includes('seattle')) return '☕';
+    if (l.includes('austin')) return '🤠';
+    if (l.includes('nashville')) return '🎸';
+    if (l.includes('boston')) return '🦞';
+    if (l.includes('washington') || l.includes('dc')) return '🏛️';
+    if (l.includes('atlanta')) return '🍑';
+    if (l.includes('denver') || l.includes('boulder')) return '🏔️';
+    if (l.includes('portland')) return '🌲';
+    if (l.includes('phoenix') || l.includes('scottsdale') || l.includes('tucson')) return '🌵';
+    if (l.includes('houston')) return '🚀';
+    if (l.includes('dallas') || l.includes('fort worth')) return '🤠';
+    if (l.includes('philadelphia') || l.includes('philly')) return '🔔';
+    if (l.includes('minneapolis') || l.includes('st. paul') || l.includes('saint paul')) return '❄️';
+    if (l.includes('detroit')) return '🚗';
+    if (l.includes('pittsburgh')) return '🌉';
+    if (l.includes('san diego')) return '☀️';
+    if (l.includes('honolulu') || l.includes('hawaii') || l.includes('maui')) return '🌺';
+    if (l.includes('london')) return '🎡';
+    if (l.includes('paris')) return '🗼';
+    if (l.includes('tokyo')) return '⛩️';
+    if (l.includes('dubai')) return '🏙️';
+    if (l.includes('sydney') || l.includes('melbourne')) return '🦘';
+    if (l.includes('toronto') || l.includes('vancouver') || l.includes('montreal')) return '🍁';
+    if (l.includes('barcelona') || l.includes('madrid')) return '💃';
+    if (l.includes('rome') || l.includes('milan') || l.includes('florence')) return '🍕';
+    if (l.includes('amsterdam')) return '🌷';
+    if (l.includes('berlin') || l.includes('munich')) return '🍺';
+    if (l.includes('seoul')) return '🏮';
+    if (l.includes('mexico city') || l.includes('guadalajara')) return '🌮';
+    if (l.includes('portland')) return '🌲';
+    if (l.includes('charlotte')) return '🏎️';
+    if (l.includes('salt lake')) return '⛷️';
+    if (l.includes('new haven') || l.includes('connecticut')) return '🎓';
+    if (l.includes('richmond') || l.includes('raleigh') || l.includes('durham')) return '🌿';
+    if (l.includes('kansas city')) return '🎺';
+    if (l.includes('memphis')) return '🎵';
+    if (l.includes('sacramento') || l.includes('san jose') || l.includes('oakland')) return '🌁';
+    return '📍';
+  })(city);
+
   const features = [
     {
       icon: '🏪',
@@ -5597,7 +5522,7 @@ function viewLocal() {
 
   return `<div class="view">
     <div class="nav">
-      <span class="nav-logo">📍 Local</span>
+      <span class="nav-logo">${cityEmoji} Local</span>
     </div>
     <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding-bottom:80px;">
 
@@ -5832,53 +5757,6 @@ function brandInstagramUrl(brand) {
   return `https://www.instagram.com/${handle}/`;
 }
 
-// ── Generate Brand Map ────────────────────────────────────────
-async function generateBrandMap() {
-  if (S._brandMapLoading) return;
-  if (!S.apiKey.trim()) { switchTab('settings'); toast('Add your API key in Settings first'); return; }
-  const brandCounts = {};
-  S.wardrobe.forEach(w => { if (w.brand) brandCounts[w.brand] = (brandCounts[w.brand]||0) + (w.wears?.length||1); });
-  const brands = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1]).slice(0,12);
-  if (!brands.length) { toast('Add brands to your wardrobe items first'); return; }
-
-  S._brandMapLoading = true; render();
-  const brandList = brands.map(([b,c])=>`${b} (${c} wears)`).join(', ');
-  const prompt = `You are a fashion expert. A user owns these brands: ${brandList}.
-For each brand, position it on two axes and give an aesthetic descriptor.
-Return ONLY a JSON array with no markdown or explanation:
-[{"name":"Brand Name","formality":50,"pricePoint":60,"aesthetic":"2-3 word aesthetic"}]
-Where:
-- formality: 0-100 (0=athleisure/streetwear, 25=casual, 50=smart casual, 75=polished, 100=formal/couture)
-- pricePoint: 0-100 (0=fast fashion/budget, 25=affordable, 50=contemporary/mid, 75=premium, 100=ultra luxury)
-- aesthetic: a concise 2-3 word vibe label (e.g. "quiet luxury", "coastal casual", "urban edge", "boho free", "classic preppy", "minimalist chic")
-Be accurate and differentiated — position brands distinctly based on their real identity.`;
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'x-api-key':S.apiKey.trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','content-type':'application/json'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1000,messages:[{role:'user',content:prompt}]}),
-    });
-    if (!resp.ok) throw new Error(`API ${resp.status}`);
-    const data = await resp.json();
-    const raw = data.content?.[0]?.text || '';
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error('No JSON');
-    const parsed = JSON.parse(match[0]);
-    // Merge wear counts back in
-    const withCounts = parsed.map(b => ({...b, count: brandCounts[b.name]||1}));
-    const result = {brands: withCounts, generatedAt: new Date().toISOString()};
-    S.brandMap = result;
-    localStorage.setItem('closet-brand-map', JSON.stringify(result));
-    toast('Brand map updated ✦');
-  } catch(err) {
-    console.error('generateBrandMap', err);
-    toast('Couldn\'t generate brand map — check your API key');
-  } finally {
-    S._brandMapLoading = false; render();
-  }
-}
-
 // ── Generate Brand Discovery ──────────────────────────────────
 async function generateBrandDiscovery() {
   if (S._brandDiscoveryLoading) return;
@@ -5918,135 +5796,6 @@ Be specific and thoughtful. Prefer real, discoverable brands. Mix price points s
   } finally {
     S._brandDiscoveryLoading = false; render();
   }
-}
-
-// ── Brand Map View ────────────────────────────────────────────
-function viewBrandMap() {
-  const map = S.brandMap;
-  const loading = S._brandMapLoading;
-
-  const svgHTML = (() => {
-    if (!map?.brands?.length) return '';
-    const W = 320, H = 280;
-    const PAD = 44;
-    const plotW = W - PAD * 2, plotH = H - PAD * 2;
-    const maxCount = Math.max(...map.brands.map(b=>b.count||1));
-
-    // Quadrant label helper
-    const qLabel = (x, y, txt) =>
-      `<text x="${x}" y="${y}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.12)" text-anchor="middle" font-weight="700" letter-spacing="0.08em">${txt.toUpperCase()}</text>`;
-
-    // Compute dot positions
-    const dots = map.brands.map(b => {
-      const x = PAD + (b.formality/100) * plotW;
-      const y = PAD + ((100-b.pricePoint)/100) * plotH; // invert Y so luxury is top
-      const r = 5 + Math.round((b.count/maxCount) * 10);
-      return {...b, svgX: x, svgY: y, r};
-    });
-
-    const circles = dots.map((b,i) => {
-      // Color based on formality: warm coral → cool slate
-      const hue = Math.round(20 + (b.formality/100)*200);
-      const sat = 60, lit = 55;
-      const col = `hsl(${hue},${sat}%,${lit}%)`;
-      return `
-      <g onclick="void(0)" style="cursor:default;">
-        <circle cx="${b.svgX.toFixed(1)}" cy="${b.svgY.toFixed(1)}" r="${b.r+4}" fill="${col}" opacity="0.15"/>
-        <circle cx="${b.svgX.toFixed(1)}" cy="${b.svgY.toFixed(1)}" r="${b.r}" fill="${col}" opacity="0.9"/>
-        <text x="${b.svgX.toFixed(1)}" y="${(b.svgY - b.r - 4).toFixed(1)}" font-size="9" font-family="system-ui" fill="rgba(255,255,255,0.9)" text-anchor="middle" font-weight="700">${esc(b.name)}</text>
-        <text x="${b.svgX.toFixed(1)}" y="${(b.svgY + b.r + 11).toFixed(1)}" font-size="7.5" font-family="system-ui" fill="rgba(255,255,255,0.45)" text-anchor="middle">${esc(b.aesthetic||'')}</text>
-      </g>`;
-    }).join('');
-
-    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:16px;background:linear-gradient(160deg,#0F0D14 0%,#1A1625 100%);">
-      <!-- Grid -->
-      <line x1="${PAD}" y1="${H/2}" x2="${W-PAD}" y2="${H/2}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
-      <line x1="${W/2}" y1="${PAD}" x2="${W/2}" y2="${H-PAD}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
-      <!-- Quadrant labels -->
-      ${qLabel(W*0.27, H*0.32, 'Everyday')}
-      ${qLabel(W*0.73, H*0.32, 'Quiet Luxury')}
-      ${qLabel(W*0.27, H*0.72, 'Relaxed')}
-      ${qLabel(W*0.73, H*0.72, 'Contemporary')}
-      <!-- Axis arrows -->
-      <line x1="${PAD}" y1="${H-PAD}" x2="${W-PAD}" y2="${H-PAD}" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
-      <line x1="${PAD}" y1="${H-PAD}" x2="${PAD}" y2="${PAD}" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
-      <!-- X axis labels -->
-      <text x="${PAD}" y="${H-PAD+14}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.4)" text-anchor="start">Casual</text>
-      <text x="${W-PAD}" y="${H-PAD+14}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.4)" text-anchor="end">Polished</text>
-      <!-- Y axis labels -->
-      <text x="${PAD-6}" y="${H-PAD}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.4)" text-anchor="end">$</text>
-      <text x="${PAD-6}" y="${PAD+4}" font-size="8" font-family="system-ui" fill="rgba(255,255,255,0.4)" text-anchor="end">$$$</text>
-      <!-- Brand dots + labels -->
-      ${circles}
-    </svg>`;
-  })();
-
-  const brandCounts = {};
-  S.wardrobe.forEach(w => { if (w.brand) brandCounts[w.brand] = (brandCounts[w.brand]||0)+(w.wears?.length||1); });
-  const hasEnoughBrands = Object.keys(brandCounts).length >= 2;
-
-  return `<div class="view" style="background:linear-gradient(160deg,#0F0D14 0%,#1A1625 50%,#0F0D14 100%);min-height:100dvh;">
-    <div class="nav" style="background:transparent;border-bottom:1px solid rgba(255,255,255,0.08);">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')" style="color:rgba(255,255,255,0.7);">${iconBack()} Portfolio</button>
-      <span class="nav-title" style="color:rgba(255,255,255,0.9);">Brand Map 🗺</span>
-      ${map?.brands?.length ? `<button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandMap()" onclick="generateBrandMap()" style="color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.08);border:none;border-radius:100px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">↻</button>` : '<span style="width:44px;"></span>'}
-    </div>
-
-    <div style="padding:16px 16px 40px;">
-
-      ${loading ? `<div style="text-align:center;padding:60px 20px;">
-        <div class="spinner" style="width:28px;height:28px;border-color:rgba(255,255,255,0.2);border-top-color:rgba(255,255,255,0.8);margin:0 auto 16px;"></div>
-        <div style="font-size:13px;color:rgba(255,255,255,0.5);">Claude is mapping your aesthetic universe…</div>
-      </div>` : !map?.brands?.length ? `<div style="text-align:center;padding:50px 20px;">
-        <div style="font-size:48px;margin-bottom:16px;">🗺</div>
-        <div style="font-size:16px;font-weight:800;color:rgba(255,255,255,0.9);margin-bottom:8px;">${hasEnoughBrands ? 'Map Your Brand Aesthetic' : 'Add Brands First'}</div>
-        <div style="font-size:13px;color:rgba(255,255,255,0.45);line-height:1.6;margin-bottom:24px;">${hasEnoughBrands ? 'See where your brands sit on the style spectrum — from casual to polished, accessible to luxury.' : 'Add brand names to your wardrobe items, then come back to generate your map.'}</div>
-        ${hasEnoughBrands ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandMap()" onclick="generateBrandMap()" style="background:linear-gradient(135deg,rgba(184,125,42,0.9),rgba(212,160,60,0.9));color:#fff;border:none;border-radius:100px;padding:12px 28px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">✦ Generate Brand Map</button>` : ''}
-      </div>` : `
-        <!-- The map SVG -->
-        <div style="margin-bottom:20px;">${svgHTML}</div>
-
-        <!-- Legend: dot size = wear count -->
-        <div style="display:flex;align-items:center;gap:16px;justify-content:center;margin-bottom:20px;flex-wrap:wrap;">
-          <div style="font-size:11px;color:rgba(255,255,255,0.35);text-align:center;">Dot size = wear count</div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:hsl(20,60%,55%);opacity:0.9;"></div>
-            <span style="font-size:10px;color:rgba(255,255,255,0.35);">Casual</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:hsl(130,60%,55%);opacity:0.9;"></div>
-            <span style="font-size:10px;color:rgba(255,255,255,0.35);">Versatile</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:hsl(220,60%,55%);opacity:0.9;"></div>
-            <span style="font-size:10px;color:rgba(255,255,255,0.35);">Polished</span>
-          </div>
-        </div>
-
-        <!-- Brand list cards -->
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,0.35);margin-bottom:12px;">Your Brands</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          ${map.brands.sort((a,b)=>(b.count||0)-(a.count||0)).map(b => {
-            const hue = Math.round(20 + (b.formality/100)*200);
-            const col = `hsl(${hue},60%,55%)`;
-            return `<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 14px;">
-              <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0;"></div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,0.9);">${esc(b.name)}</div>
-                <div style="font-size:11px;color:rgba(255,255,255,0.35);">${esc(b.aesthetic||'')} · ${b.count||1} wear${(b.count||1)===1?'':'s'}</div>
-              </div>
-              <a href="${brandInstagramUrl(b.name)}" target="_blank" rel="noopener"
-                style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:100px;padding:6px 12px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-decoration:none;white-space:nowrap;flex-shrink:0;">
-                📸 Instagram
-              </a>
-            </div>`;
-          }).join('')}
-        </div>
-
-        <div style="font-size:10px;color:rgba(255,255,255,0.2);text-align:center;margin-top:20px;">Generated ${new Date(map.generatedAt).toLocaleDateString()}</div>
-      `}
-    </div>
-  </div>`;
 }
 
 function setTrendReaction(trendId, reaction) {
@@ -6116,9 +5865,9 @@ function viewHeroPieces() {
 
   return `<div class="view">
     <div class="nav">
-      <button class="nav-back" onclick="switchTab('wardrobe')">${iconBack()} Wardrobe</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">${iconBack()} Portfolio</button>
       <span class="nav-title">Hero Pieces 👑</span>
-      <div style="width:72px"></div>
+      <span style="width:72px;display:inline-block;"></span>
     </div>
     ${bodyHTML}
   </div>`;
@@ -7119,96 +6868,45 @@ function viewShop() {
 function viewPlan() {
   const p = S.plan;
 
-  // ── Squad Mode section ────────────────────────────────────
+  // ── Group Fit section ─────────────────────────────────────
   const squadSectionHTML = (() => {
     const flow = S.squadFlow;
 
     // Create flow
     if (flow?.step === 'create') {
       const typeGrid = SQUAD_TYPES.map(t => `
-        <button class="squad-type-btn ${flow.type===t.id?'active':''}" onclick="S.squadFlow.type='${t.id}';render()">
+        <button class="squad-type-btn ${flow.type===t.id?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();S.squadFlow.type='${t.id}';render()" onclick="S.squadFlow.type='${t.id}';render()">
           <span class="squad-type-icon">${t.icon}</span>
           <span class="squad-type-label">${t.label}</span>
         </button>`).join('');
-      const memberInputs = (flow.memberNames||[]).map((n,i) => `
-        <div style="display:flex;gap:6px;margin-bottom:6px;">
-          <input class="form-input" style="margin:0;flex:1;" placeholder="Name" value="${esc(n)}"
-            oninput="S.squadFlow.memberNames[${i}]=this.value">
-          <button onclick="removeSquadMemberSlot(${i})" style="background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:0 10px;cursor:pointer;font-size:14px;color:var(--text-3);">✕</button>
-        </div>`).join('');
       return `<div class="plan-card" style="margin-bottom:0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div class="plan-card-title" style="margin-bottom:0;">New Squad Event</div>
-          <button onclick="cancelSquadFlow()" style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;">Cancel</button>
+          <div class="plan-card-title" style="margin-bottom:0;">New Group Plan</div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();cancelSquadFlow()" onclick="cancelSquadFlow()" style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;">Cancel</button>
         </div>
         <div class="form-group"><label class="form-label">Event Name</label>
-          <input class="form-input" placeholder='e.g. "Cabo June 2026"' value="${esc(flow.name)}" oninput="S.squadFlow.name=this.value"></div>
+          <input class="form-input" placeholder='e.g. "Indian Wedding — Cabo June 2026"' value="${esc(flow.name)}" oninput="S.squadFlow.name=this.value"></div>
         <div class="form-group"><label class="form-label">Type</label>
           <div class="squad-type-grid">${typeGrid}</div></div>
-        <div class="form-group"><label class="form-label">Dates <span style="font-weight:400;color:var(--text-3);">(optional — each day becomes a slot)</span></label>
+        <div class="form-group"><label class="form-label">Dates <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
           <div style="display:flex;gap:8px;align-items:center;">
             <input class="form-input" type="date" style="margin:0;flex:1;" value="${esc(flow.dateStart||'')}" onchange="S.squadFlow.dateStart=this.value">
             <span style="font-size:12px;color:var(--text-3);flex-shrink:0;">to</span>
             <input class="form-input" type="date" style="margin:0;flex:1;" value="${esc(flow.dateEnd||'')}" onchange="S.squadFlow.dateEnd=this.value">
           </div>
-          ${(flow.dateStart && flow.dateEnd && flow.dateStart <= flow.dateEnd) ? `<div style="font-size:11px;color:var(--gold-dk);margin-top:4px;">✦ ${generateSquadDays(flow.dateStart,flow.dateEnd).length} day${generateSquadDays(flow.dateStart,flow.dateEnd).length===1?'':'s'} — each becomes a slot</div>` : ''}
         </div>
         <div class="form-group"><label class="form-label">Vibe / Theme</label>
-          <input class="form-input" placeholder='e.g. what are we --maxxing?' value="${esc(flow.vibe)}" oninput="S.squadFlow.vibe=this.value"></div>
+          <input class="form-input" placeholder='e.g. maximalist South Asian glam' value="${esc(flow.vibe)}" oninput="S.squadFlow.vibe=this.value"></div>
         <div class="form-group"><label class="form-label">Dress Code <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
           <input class="form-input" placeholder='e.g. "All white, no exceptions"' value="${esc(flow.dressCode)}" oninput="S.squadFlow.dressCode=this.value"></div>
-        <div class="form-group"><label class="form-label">Your Name</label>
-          <input class="form-input" placeholder="Your name" value="${esc(flow.myName)}" oninput="S.squadFlow.myName=this.value"></div>
-        <div class="form-group"><label class="form-label">Squad Members</label>
-          ${memberInputs}
-          <button onclick="addSquadMemberSlot()" style="width:100%;padding:8px;border:1.5px dashed var(--border);border-radius:var(--r-sm);background:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:2px;">+ Add Member</button>
-        </div>
-        <button onclick="confirmCreateSquad()" ontouchend="if(_touchMoved)return;event.preventDefault();confirmCreateSquad()" class="btn btn-primary" style="margin:4px 0 0;width:100%;touch-action:manipulation;">Create Squad Plan</button>
+        <div class="form-group"><label class="form-label">Who's coming?</label>
+          <input class="form-input" placeholder='e.g. Dana, Sarah, Priya, Tom' value="${esc(flow.names)}" oninput="S.squadFlow.names=this.value">
+          <div style="font-size:11px;color:var(--text-3);margin-top:4px;">Names, separated by commas</div></div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();confirmCreateSquad()" onclick="confirmCreateSquad()" class="btn btn-primary" style="margin:4px 0 0;width:100%;touch-action:manipulation;">Create Squad Plan ✓</button>
       </div>`;
     }
 
-    // Join flow
-    if (flow?.step === 'join') {
-      return `<div class="plan-card" style="margin-bottom:0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div class="plan-card-title" style="margin-bottom:0;">Join a Squad Plan</div>
-          <button onclick="cancelSquadFlow()" style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;">Cancel</button>
-        </div>
-        <div class="settings-hint" style="margin-bottom:10px;">Paste the squad code someone shared with you:</div>
-        <textarea class="plan-textarea" rows="4" placeholder="Paste CLOSET-SQUAD-... code here"
-          oninput="S.squadFlow.code=this.value">${esc(flow.code||'')}</textarea>
-        <button onclick="confirmJoinSquad()" class="btn btn-primary" style="margin:10px 0 0;width:100%;">Join Squad</button>
-      </div>`;
-    }
-
-    // Claim slot flow
-    if (flow?.step === 'claim') {
-      const plan = flow.plan;
-      const t = getSquadType(plan.type);
-      const slotOptions = plan.members.map(m => `
-        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ${flow.claimId===m.id?'var(--gold)':'var(--border)'};border-radius:var(--r-sm);cursor:pointer;margin-bottom:6px;background:${flow.claimId===m.id?'var(--gold-bg)':'var(--surface)'};" onclick="S.squadFlow.claimId='${m.id}';render()">
-          <div class="squad-member-avatar" style="width:32px;height:32px;font-size:13px;">${m.name.slice(0,2).toUpperCase()}</div>
-          <div>
-            <div style="font-size:13px;font-weight:700;">${esc(m.name)}</div>
-            ${m.outfit?`<div style="font-size:11px;color:var(--text-3);">Has a look</div>`:`<div style="font-size:11px;color:var(--text-3);">Empty slot</div>`}
-          </div>
-        </label>`).join('');
-      return `<div class="plan-card" style="margin-bottom:0;">
-        <div style="font-size:16px;font-weight:800;margin-bottom:4px;">${t.icon} ${esc(plan.name)}</div>
-        <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;">${t.label}${plan.date?' · '+plan.date:''}</div>
-        <div class="plan-card-title">Which slot is you?</div>
-        ${slotOptions}
-        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px dashed ${flow.claimId==='__new__'?'var(--gold)':'var(--border)'};border-radius:var(--r-sm);cursor:pointer;margin-bottom:12px;background:${flow.claimId==='__new__'?'var(--gold-bg)':'var(--surface)'};" onclick="S.squadFlow.claimId='__new__';render()">
-          <div style="width:32px;height:32px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:16px;">+</div>
-          <div style="font-size:13px;font-weight:700;">Join as a new member</div>
-        </label>
-        <div class="form-group"><label class="form-label">Your Name</label>
-          <input class="form-input" placeholder="Your name" value="${esc(flow.myName||'')}" oninput="S.squadFlow.myName=this.value"></div>
-        <button onclick="confirmClaimSlot()" class="btn btn-primary" style="margin:0;width:100%;">Join Squad 🎉</button>
-      </div>`;
-    }
-
-    // Default: list of squad plans + create/join buttons
+    // Default: list of squad plans + create button
     const planCards = S.squadPlans.map(sp => {
       const st = getSquadType(sp.type);
       const fmtD = (() => {
@@ -7223,13 +6921,13 @@ function viewPlan() {
         }
         return '';
       })();
-      const filled = sp.members.filter(m=>m.outfit).length;
-      return `<div class="squad-event-card" onclick="openSquadDetail('${sp.id}')">
+      const photoCount = (sp.slots||[]).filter(s=>s.photo).length;
+      return `<div class="squad-event-card" ontouchend="if(_touchMoved)return;event.preventDefault();openSquadDetail('${sp.id}')" onclick="openSquadDetail('${sp.id}')">
         <div class="squad-event-header">
           <div class="squad-event-icon">${st.icon}</div>
           <div style="flex:1;min-width:0;">
             <div class="squad-event-name">${esc(sp.name)}</div>
-            <div class="squad-event-meta">${st.label}${fmtD?' · '+fmtD:''} · ${sp.members.length} members · ${filled} look${filled===1?'':'s'} added</div>
+            <div class="squad-event-meta">${st.label}${fmtD?' · '+fmtD:''}${photoCount?' · '+photoCount+' photo'+(photoCount===1?'':'s'):''}</div>
             ${sp.vibe?`<div style="font-size:11px;color:var(--gold-dk);margin-top:2px;font-weight:600;">✦ ${esc(sp.vibe)}</div>`:''}
           </div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
@@ -7239,13 +6937,10 @@ function viewPlan() {
 
     return `<div style="margin-bottom:4px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">👯 Squad Mode</div>
-        <div style="display:flex;gap:6px;">
-          <button onclick="startJoinSquad()" style="padding:6px 12px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;">Join</button>
-          <button onclick="startCreateSquad()" style="padding:6px 12px;border-radius:100px;border:none;background:var(--gold);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ Create</button>
-        </div>
+        <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">👯 Group Fit</div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();startCreateSquad()" onclick="startCreateSquad()" style="padding:6px 12px;border-radius:100px;border:none;background:var(--gold);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ Create</button>
       </div>
-      ${planCards || `<div style="font-size:13px;color:var(--text-3);font-style:italic;padding:4px 0 8px;">Plan a trip, party, or event with your crew — coordinating looks has never been this fun.</div>`}
+      ${planCards || `<div style="font-size:13px;color:var(--text-3);font-style:italic;padding:4px 0 8px;">Plan a trip, party, or event — add up to 5 photos with custom labels and share a card with the squad.</div>`}
     </div>`;
   })();
 
@@ -7435,12 +7130,32 @@ async function doGetForecast() {
   S.plan.loadingForecast = false; render();
 }
 
+// Utility: generate an array of date strings for a date range (used by trip planning)
+function generateDateRange(dateStart, dateEnd) {
+  if (!dateStart) return [];
+  const start = new Date(dateStart + 'T12:00:00');
+  const end = dateEnd ? new Date(dateEnd + 'T12:00:00') : start;
+  if (isNaN(start) || isNaN(end) || end < start) return [{ date: dateStart }];
+  const days = [];
+  const curr = new Date(start);
+  let count = 0;
+  while (curr <= end && count < 14) {
+    const y = curr.getFullYear();
+    const m = String(curr.getMonth()+1).padStart(2,'0');
+    const d = String(curr.getDate()).padStart(2,'0');
+    days.push({ date: `${y}-${m}-${d}` });
+    curr.setDate(curr.getDate() + 1);
+    count++;
+  }
+  return days;
+}
+
 async function doSuggestTripOutfits() {
   const dest = S.plan.tripDestination.trim();
   if (!dest) { toast('Enter a destination ✈️'); return; }
   if (!S.apiKey.trim()) { navigate('settings'); toast('Add your API key first!'); return; }
   const ds = S.plan.tripDateStart; const de = S.plan.tripDateEnd;
-  const days = (ds && de && ds <= de) ? generateSquadDays(ds, de) : [];
+  const days = (ds && de && ds <= de) ? generateDateRange(ds, de) : [];
   const numDays = days.length || 3;
   S.plan.loadingTrip = true; S.plan.tripSuggestions = null; render();
   try {
@@ -8013,121 +7728,130 @@ function viewProfile() {
       </div>
     </div>
 
-    <!-- ══ ZONE 2: Your best stuff ══ -->
-
-    <!-- Best Outfits Carousel (small thumbnails) -->
-    ${topLooks.length ? `<div style="margin:16px 0 0;">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;padding:0 16px;">⭐ Best Outfits</div>
-      <div style="display:flex;gap:8px;overflow-x:auto;padding:0 16px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-        ${topLooks.slice(0,8).map((e,i) => `
-          <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')" onclick="openEntry('${e.id}')"
-            style="flex-shrink:0;width:82px;scroll-snap-align:start;cursor:pointer;touch-action:manipulation;">
-            <div style="width:82px;height:110px;border-radius:10px;overflow:hidden;position:relative;background:var(--surface-2);${i===0?'border:2px solid var(--gold);':'border:1.5px solid var(--border);'}">
-              <img src="${esc(e.photo)}" loading="${i===0?'eager':'lazy'}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">
-              <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 45%,rgba(0,0,0,.75) 100%);pointer-events:none;"></div>
-              ${i===0?`<div style="position:absolute;top:4px;left:4px;background:var(--gold);border-radius:100px;padding:1px 5px;font-size:8px;font-weight:800;color:#fff;">⭐1</div>`:''}
-              <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:11px;font-weight:900;color:#fff;line-height:1;">${e.rating??'—'}</div>
-            </div>
-            ${e.occasionTag?`<div style="font-size:9px;color:var(--text-3);margin-top:3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(e.occasionTag)}</div>`:''}
-          </div>`).join('')}
-      </div>
-    </div>` : ''}
-
-    <!-- Signature Pieces -->
+    <!-- ══ ZONE 2: Your best stuff — grouped ══ -->
     ${(()=>{
-      const sigs = S.wardrobe.filter(w => w.isSignature && !w.retiredFromCloset);
-      const full = sigs.length === SIG_MAX;
-      const slots = Array.from({length: SIG_MAX}, (_, i) => {
-        const w = sigs[i];
-        if (w) {
-          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
-            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
-            <div style="width:100%;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:2px solid var(--sig-border);background:var(--surface-2);display:flex;align-items:center;justify-content:center;position:relative;">
-              ${w.photo ? `<img src="${w.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">` : `<div style="font-size:28px;">${w.icon||'👕'}</div>`}
-              <div style="position:absolute;top:4px;right:4px;background:var(--gold);border-radius:100px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
-                <span style="font-size:8px;">💎</span>
+      const bestOutfitsHTML = topLooks.length ? `<div>
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;padding:0 14px;">⭐ Best Outfits</div>
+        <div style="display:flex;gap:8px;overflow-x:auto;padding:0 14px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+          ${topLooks.slice(0,8).map((e,i) => `
+            <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')" onclick="openEntry('${e.id}')"
+              style="flex-shrink:0;width:82px;scroll-snap-align:start;cursor:pointer;touch-action:manipulation;">
+              <div style="width:82px;height:110px;border-radius:10px;overflow:hidden;position:relative;background:var(--surface-2);${i===0?'border:2px solid var(--gold);':'border:1.5px solid var(--border);'}">
+                <img src="${esc(e.photo)}" loading="${i===0?'eager':'lazy'}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">
+                <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 45%,rgba(0,0,0,.75) 100%);pointer-events:none;"></div>
+                ${i===0?`<div style="position:absolute;top:4px;left:4px;background:var(--gold);border-radius:100px;padding:1px 5px;font-size:8px;font-weight:800;color:#fff;">⭐1</div>`:''}
+                <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:11px;font-weight:900;color:#fff;line-height:1;">${e.rating??'—'}</div>
               </div>
+              ${e.occasionTag?`<div style="font-size:9px;color:var(--text-3);margin-top:3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(e.occasionTag)}</div>`:''}
+            </div>`).join('')}
+        </div>
+      </div>` : '';
+
+      const signaturesHTML = (()=>{
+        const sigs = S.wardrobe.filter(w => w.isSignature && !w.retiredFromCloset);
+        const full = sigs.length === SIG_MAX;
+        const slots = Array.from({length: SIG_MAX}, (_, i) => {
+          const w = sigs[i];
+          if (w) {
+            return `<div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+              style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
+              <div style="width:100%;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:2px solid var(--sig-border);background:var(--surface-2);display:flex;align-items:center;justify-content:center;position:relative;">
+                ${w.photo ? `<img src="${w.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">` : `<div style="font-size:28px;">${w.icon||'👕'}</div>`}
+                <div style="position:absolute;top:4px;right:4px;background:var(--gold);border-radius:100px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
+                  <span style="font-size:8px;">💎</span>
+                </div>
+              </div>
+              <div style="font-size:10px;font-weight:700;color:var(--sig-dk);text-align:center;line-height:1.3;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 2px;">${esc(w.name)}</div>
+            </div>`;
+          } else {
+            return `<div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')"
+              style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
+              <div style="width:100%;aspect-ratio:3/4;border-radius:10px;border:2px dashed var(--sig-border);background:linear-gradient(135deg,#F8F4EE,#F0E9DC);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;">
+                <div style="font-size:20px;">💎</div>
+                <div style="font-size:9px;font-weight:800;color:var(--sig-dk);text-align:center;line-height:1.4;">This is<br>SO me</div>
+              </div>
+              <div style="font-size:10px;color:var(--text-3);text-align:center;line-height:1.3;">Add piece</div>
+            </div>`;
+          }
+        }).join('');
+        return `<div style="margin:14px 0 0;padding:0 14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">💎 Signature Pieces</div>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('signature-pieces')" onclick="navigate('signature-pieces')"
+              style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.85;touch-action:manipulation;">${full ? 'Share ›' : 'Manage ›'}</button>
+          </div>
+          <div style="display:flex;gap:10px;">${slots}</div>
+        </div>`;
+      })();
+
+      const heroHTML = (()=>{
+        const heroes = S.wardrobe.filter(w => w.isHero && !w.retiredFromCloset);
+        if (!heroes.length) {
+          return `<div style="margin:14px 14px 0;background:var(--gold-bg);border:1.5px dashed rgba(184,125,42,.3);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:12px;"
+            ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')">
+            <span style="font-size:22px;flex-shrink:0;">💎</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:800;color:var(--gold-dk);margin-bottom:1px;">Hero Pieces</div>
+              <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Flag standout garments — the bold blazer, the bag everyone asks about.</div>
             </div>
-            <div style="font-size:10px;font-weight:700;color:var(--sig-dk);text-align:center;line-height:1.3;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 2px;">${esc(w.name)}</div>
-          </div>`;
-        } else {
-          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')"
-            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
-            <div style="width:100%;aspect-ratio:3/4;border-radius:10px;border:2px dashed var(--sig-border);background:linear-gradient(135deg,#F8F4EE,#F0E9DC);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;">
-              <div style="font-size:20px;">💎</div>
-              <div style="font-size:9px;font-weight:800;color:var(--sig-dk);text-align:center;line-height:1.4;">This is<br>SO me</div>
-            </div>
-            <div style="font-size:10px;color:var(--text-3);text-align:center;line-height:1.3;">Add piece</div>
+            <span style="font-size:12px;font-weight:700;color:var(--gold-dk);opacity:.7;flex-shrink:0;">Add ›</span>
           </div>`;
         }
-      }).join('');
-      return `<div style="margin:16px 16px 0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">💎 Signature Pieces</div>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('signature-pieces')" onclick="navigate('signature-pieces')"
-            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.85;touch-action:manipulation;">${full ? 'Share ›' : 'Manage ›'}</button>
-        </div>
-        <div style="display:flex;gap:10px;">${slots}</div>
-      </div>`;
-    })()}
-
-    <!-- Hero Pieces -->
-    ${(()=>{
-      const heroes = S.wardrobe.filter(w => w.isHero && !w.retiredFromCloset);
-      if (!heroes.length) {
-        return `<div style="margin:16px 16px 0;background:var(--gold-bg);border:1.5px dashed rgba(184,125,42,.3);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:12px;"
-          ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')">
-          <span style="font-size:22px;flex-shrink:0;">💎</span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:800;color:var(--gold-dk);margin-bottom:1px;">Hero Pieces</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Flag standout garments — the bold blazer, the bag everyone asks about.</div>
+        const thumbs = heroes.slice(0,5).map(w =>
+          w.photo
+            ? `<img src="${esc(w.photo)}" style="width:56px;height:56px;border-radius:10px;object-fit:cover;border:1.5px solid rgba(184,125,42,.25);">`
+            : `<div style="width:56px;height:56px;border-radius:10px;background:var(--gold-bg);border:1.5px solid rgba(184,125,42,.25);display:flex;align-items:center;justify-content:center;font-size:24px;">${w.icon||'💎'}</div>`
+        ).join('');
+        const extra = heroes.length > 5
+          ? `<div style="width:56px;height:56px;border-radius:10px;background:var(--gold-bg);border:1.5px solid rgba(184,125,42,.25);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--gold-dk);">+${heroes.length-5}</div>`
+          : '';
+        return `<div style="margin:14px 0 0;padding:0 14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);">👑 Hero Pieces</div>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')"
+              style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.7;touch-action:manipulation;">${heroes.length} piece${heroes.length===1?'':'s'} ›</button>
           </div>
-          <span style="font-size:12px;font-weight:700;color:var(--gold-dk);opacity:.7;flex-shrink:0;">Add ›</span>
+          <div style="display:flex;gap:8px;align-items:center;" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')">${thumbs}${extra}</div>
         </div>`;
-      }
-      const thumbs = heroes.slice(0,5).map(w =>
-        w.photo
-          ? `<img src="${esc(w.photo)}" style="width:56px;height:56px;border-radius:10px;object-fit:cover;border:1.5px solid rgba(184,125,42,.25);">`
-          : `<div style="width:56px;height:56px;border-radius:10px;background:var(--gold-bg);border:1.5px solid rgba(184,125,42,.25);display:flex;align-items:center;justify-content:center;font-size:24px;">${w.icon||'💎'}</div>`
-      ).join('');
-      const extra = heroes.length > 5
-        ? `<div style="width:56px;height:56px;border-radius:10px;background:var(--gold-bg);border:1.5px solid rgba(184,125,42,.25);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--gold-dk);">+${heroes.length-5}</div>`
-        : '';
-      return `<div style="margin:16px 16px 0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);">👑 Hero Pieces</div>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')"
-            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.7;touch-action:manipulation;">${heroes.length} piece${heroes.length===1?'':'s'} ›</button>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')">${thumbs}${extra}</div>
+      })();
+
+      return `<div style="margin:16px 16px 0;background:rgba(184,125,42,0.05);border:1.5px solid rgba(184,125,42,0.18);border-radius:16px;padding:14px 0 14px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(184,125,42,0.45);margin-bottom:12px;padding:0 14px;">✦ Your Best</div>
+        ${bestOutfitsHTML}
+        ${signaturesHTML}
+        ${heroHTML}
       </div>`;
     })()}
-
-    <!-- ══ Most Worn ══ -->
-    ${mostWornHTML ? `<div style="margin:16px 16px 0;">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);margin-bottom:10px;">🔥 Most Worn</div>
-      ${mostWornHTML}
-    </div>` : ''}
 
     <!-- ══ Top Brands ══ -->
-    ${topBrands.length ? `<div style="margin:16px 16px 0;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">🏷 Top Brands</div>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('brand-map')" onclick="navigate('brand-map')"
-          style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">🗺 Map ›</button>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        ${topBrands.map(([brand,count])=>`
-          <div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:5px 7px 5px 11px;">
-            <span style="font-size:12px;font-weight:600;color:var(--text);">${esc(brand)}</span>
-            <span style="font-size:11px;color:var(--text-3);">${count}×</span>
-            <a href="${brandInstagramUrl(brand)}" target="_blank" rel="noopener"
-              style="display:flex;align-items:center;color:var(--text-3);text-decoration:none;padding:2px 1px;">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-            </a>
-          </div>`).join('')}
-      </div>
-    </div>` : ''}
+    ${topBrands.length ? (()=>{
+      const BRAND_CAP = 5;
+      const showAll = S._brandsExpanded;
+      const visible = showAll ? topBrands : topBrands.slice(0, BRAND_CAP);
+      const rows = visible.map(([brand,count])=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;">
+          <div style="flex:1;min-width:0;">
+            <span style="font-size:13px;font-weight:700;color:var(--text);">${esc(brand)}</span>
+            <span style="font-size:12px;color:var(--text-3);margin-left:6px;">${count}×</span>
+          </div>
+          <a href="${brandInstagramUrl(brand)}" target="_blank" rel="noopener"
+            style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);border-radius:100px;padding:5px 10px;text-decoration:none;flex-shrink:0;"
+            ontouchend="event.stopPropagation()">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            <span style="font-size:10px;font-weight:700;color:#fff;">Instagram</span>
+          </a>
+        </div>`).join('');
+      const expandBtn = topBrands.length > BRAND_CAP ? `
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=!S._brandsExpanded;render()" onclick="S._brandsExpanded=!S._brandsExpanded;render()"
+          style="width:100%;background:none;border:1px solid var(--border);border-radius:100px;padding:8px;font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:2px;">
+          ${showAll ? 'Show less ↑' : `Show ${topBrands.length - BRAND_CAP} more ↓`}
+        </button>` : '';
+      return `<div style="margin:16px 16px 0;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);margin-bottom:10px;">🏷 Top Brands</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">${rows}</div>
+        ${expandBtn}
+      </div>`;
+    })() : ''}
 
     <!-- ══ Brand Discovery ══ -->
     ${topBrands.length ? `<div style="margin:10px 16px 0;">
@@ -8160,10 +7884,50 @@ function viewProfile() {
     <!-- ══ Divider ══ -->
     <div style="height:1px;background:var(--border);margin:20px 16px;"></div>
 
-    <!-- ══ ZONE 3: Your portrait ══ -->
-
-    <!-- Style Portrait (moved to bottom) -->
-    <div style="padding:0 16px 16px;">${portraitHTML}</div>
+    <!-- ══ ZONE 3: Your Identity — Style Portrait + Aura grouped ══ -->
+    <div style="margin:0 16px 16px;background:rgba(100,74,138,0.05);border:1.5px solid rgba(100,74,138,0.15);border-radius:16px;padding:14px 14px 14px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(100,74,138,0.45);margin-bottom:12px;">✨ Your Identity</div>
+      ${portraitHTML}
+      <div style="margin-top:12px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('aura')" onclick="navigate('aura')"
+          style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
+          <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#F3E8FF,#E8D5F5);border:1px solid #D5B8F0;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">✨</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">Your Aura</div>
+            <div style="font-size:12px;color:var(--text-3);">${auraFilledCount === 0 ? 'Add your personal details' : auraFilledCount === 9 ? 'All details filled in ✓' : `${auraFilledCount}/9 details filled in`}</div>
+          </div>
+          <div style="font-size:18px;color:var(--text-3);">›</div>
+        </button>
+      </div>
+      ${(()=>{
+        const tips = [];
+        S.entries.forEach(e => {
+          if (!e.recReactions) return;
+          if (e.stylingTips?.length) {
+            e.stylingTips.forEach((r, i) => { if (e.recReactions[String(i)] === 'liked') tips.push({ text: r, entry: e }); });
+          } else {
+            (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') tips.push({ text: r, entry: e }); });
+          }
+        });
+        if (!tips.length) return '';
+        const rows = tips.slice(0, 5).map(({text, entry}) => `
+          <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')" onclick="openEntry('${entry.id}')"
+            style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(100,74,138,0.1);cursor:pointer;touch-action:manipulation;">
+            ${entry.photo
+              ? `<img src="${esc(entry.photo)}" style="width:34px;height:34px;border-radius:7px;object-fit:cover;object-position:top;flex-shrink:0;border:1px solid rgba(100,74,138,0.15);">`
+              : `<div style="width:34px;height:34px;border-radius:7px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;">👗</div>`}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;color:var(--text);line-height:1.45;">${esc(text)}</div>
+              <div style="font-size:10px;color:rgba(100,74,138,0.5);margin-top:2px;">${entry.rating != null ? `⭐ ${entry.rating}` : ''} ${entry.occasionTag ? '· '+esc(entry.occasionTag) : '· '+fmtDate(entry.createdAt)}</div>
+            </div>
+          </div>`).join('');
+        return `<div style="margin-top:14px;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(100,74,138,0.45);margin-bottom:2px;">✂️ Style Playbook</div>
+          <div>${rows}</div>
+          ${tips.length > 5 ? `<div style="font-size:11px;color:rgba(100,74,138,0.45);text-align:center;margin-top:6px;">+${tips.length - 5} more saved</div>` : ''}
+        </div>`;
+      })()}
+    </div>
 
     <!-- 📦 Past Looks + 🌹 Memorial Garden — grouped as "Looking Back" -->
     ${(()=>{
@@ -8219,19 +7983,6 @@ function viewProfile() {
         ${gardenHTML}
       </div>`;
     })()}
-
-    <!-- ✨ Aura entry point -->
-    <div style="padding:0 16px 16px;">
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('aura')" onclick="navigate('aura')"
-        style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
-        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#F3E8FF,#E8D5F5);border:1px solid #D5B8F0;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">✨</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">Your Aura</div>
-          <div style="font-size:12px;color:var(--text-3);">${auraFilledCount === 0 ? 'Add your personal details' : auraFilledCount === 9 ? 'All details filled in ✓' : `${auraFilledCount}/9 details filled in`}</div>
-        </div>
-        <div style="font-size:18px;color:var(--text-3);">›</div>
-      </button>
-    </div>
 
     <div style="height:40px;"></div>
   </div>`;
@@ -8849,8 +8600,6 @@ function viewHome() {
       <span class="nav-logo">✦ Discover</span>
       <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
     </div>
-    <div class="tab-headline">Your style, your story.</div>
-
     ${!hasData ? `<div class="empty" style="padding-top:52px;">
       <div class="empty-icon">✨</div>
       <h2>Welcome to your Closet!</h2>
@@ -8917,11 +8666,25 @@ function viewHome() {
       </div>`;
     })()}
 
+    ${(()=>{
+      const _tReactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
+      const savedTrends = (S.hotTrends?.trends || []).filter(t => _tReactions[t.id] === 'up');
+      if (!savedTrends.length) return '';
+      return `<div class="home-section" style="padding-top:0;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">👍 Saved Trends</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${savedTrends.map(t=>`
+            <div style="display:inline-flex;align-items:center;gap:5px;background:var(--gold-bg);border:1px solid rgba(184,125,42,0.22);border-radius:100px;padding:5px 11px;">
+              <span style="font-size:13px;line-height:1;">${esc(t.emoji||'🔥')}</span>
+              <span style="font-size:12px;font-weight:600;color:var(--text);">${esc(t.name)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    })()}
+
     ${topBrands.length ? `<div class="home-section">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="margin-bottom:10px;">
         <div class="home-section-label" style="margin-bottom:0;">🏷 Your Top Brands</div>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('brand-map')" onclick="navigate('brand-map')"
-          style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">🗺 Map ›</button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">
         ${topBrands.map(([brand,count])=>`
@@ -8962,7 +8725,8 @@ function viewHome() {
           style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:100px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">✦ Find similar brands</button>`}
     </div>` : ''}
 
-    ${gems.length ? homeSection('gems','💎 Hidden Gems',
+    ${gems.length ? homeSection('gems','🔮 Hidden Gems',
+      `<div style="font-size:12px;color:var(--text-3);line-height:1.5;padding:2px 0 10px;font-style:italic;">Your wallet already said yes — your morning routine just forgot.</div>` +
       gems.map(w=>`
         <div class="dash-item-row" onclick="openWardrobeItem('${w.id}')">
           <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;">${w.icon||'👕'}</div>
@@ -8972,60 +8736,6 @@ function viewHome() {
           </div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </div>`).join('')) : ''}
-
-    ${(()=>{
-      // Liked styling tips + wish list carousels — bottom of home
-      const likedRecs = [];
-      S.entries.forEach(e => {
-        if (!e.recReactions) return;
-        if (e.stylingTips?.length) {
-          e.stylingTips.forEach((r, i) => { if (e.recReactions[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e }); });
-        } else {
-          (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') likedRecs.push({ rec: r, entry: e }); });
-        }
-      });
-      const wishRecs = [];
-      S.entries.forEach(e => {
-        if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
-        e.purchaseRecs.forEach((r, i) => { if (e.purchaseReactions[String(i)] === 'liked') wishRecs.push({ rec: r, entry: e }); });
-      });
-      if (!likedRecs.length && !wishRecs.length) return '';
-      const tipsHTML = likedRecs.length ? `
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);padding:0 16px 8px;">✂️ Saved Style Tips</div>
-        <div style="display:flex;gap:10px;overflow-x:auto;padding:0 16px 12px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-          ${likedRecs.map(({rec, entry}) => `
-            <div onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:220px;cursor:pointer;
-              border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
-              ${entry.photo ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" alt="Outfit"></div>`
-                : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
-              <div style="padding:10px 12px 12px;flex:1;">
-                <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Styling tip</div>
-                <div style="font-size:13px;color:var(--text);line-height:1.45;">${esc(rec)}</div>
-                <div style="font-size:11px;color:var(--text-3);margin-top:6px;">⭐ ${entry.rating}/10 · ${entry.occasionTag ? esc(entry.occasionTag) : fmtDateLong(entry.createdAt)}</div>
-              </div>
-            </div>`).join('')}
-        </div>` : '';
-      const wishHTML = wishRecs.length ? `
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);padding:0 16px 8px;">🛒 Wish List</div>
-        <div style="display:flex;gap:10px;overflow-x:auto;padding:0 16px 12px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-          ${wishRecs.map(({rec, entry}) => {
-            const name = rec.item || rec;
-            const query = encodeURIComponent(rec.query || name);
-            return `<div style="scroll-snap-align:start;flex-shrink:0;width:220px;
-              border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
-              ${entry.photo ? `<div onclick="openEntry('${entry.id}')" style="width:100%;height:80px;overflow:hidden;flex-shrink:0;cursor:pointer;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" alt="Outfit"></div>`
-                : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">🛍</div>`}
-              <div style="padding:10px 12px 12px;flex:1;display:flex;flex-direction:column;">
-                <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Wish list</div>
-                <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.35;flex:1;">${esc(name)}</div>
-                <a href="https://www.google.com/search?tbm=shop&q=${query}" target="_blank" rel="noopener"
-                  style="display:inline-block;margin-top:7px;font-size:11px;font-weight:700;color:var(--gold-dk);text-decoration:none;border:1px solid var(--gold);border-radius:100px;padding:3px 10px;align-self:flex-start;">🛍 Shop it</a>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>` : '';
-      return `<div style="margin-top:10px;margin-bottom:6px;">${tipsHTML}${wishHTML}</div>`;
-    })()}
 
     <div style="height:16px"></div>
   </div>`;
@@ -9230,7 +8940,7 @@ function viewDashboard() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </div>`).join('')) : ''}
 
-    ${gems.length ? dashSection('gems', '💎 Hidden Gems — Wear These More!',
+    ${gems.length ? dashSection('gems', '🔮 Hidden Gems — Wear These More!',
       gems.map(w=>`
         <div class="dash-item-row" onclick="openWardrobeItem('${w.id}')">
           <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;">${w.icon||'👕'}</div>
@@ -9819,18 +9529,7 @@ function viewWardrobe() {
     const wastedSpend = retiredWardrobe
       .filter(w => w.retireReason === 'didnt-suit-me' && w.price)
       .reduce((sum, w) => sum + parseFloat(w.price || 0), 0);
-    const memorialCount = retiredWardrobe.filter(w => w.memorial).length;
     return `<div style="margin:4px 16px 8px;">
-      ${memorialCount > 0 ? `<button onclick="navigate('rip')" style="
-        width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
-        background:linear-gradient(135deg,#16121A 0%,#1D1825 100%);
-        border:1px solid rgba(150,80,220,0.28);border-radius:var(--r);
-        padding:11px 16px;cursor:pointer;font-family:inherit;margin-bottom:8px;
-      ">
-        <span style="font-size:15px;">🌹</span>
-        <span style="font-size:13px;font-weight:600;color:rgba(160,100,240,0.9);">Memorial Garden (${memorialCount})</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(160,100,240,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </button>` : ''}
       <button onclick="S.wardrobeRetiredExpanded=!S.wardrobeRetiredExpanded;render()" style="
         width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;
         background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
@@ -10561,8 +10260,8 @@ function viewBulkAdd() {
     <div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
       <div>
         <label class="form-label" style="font-size:10px;margin-bottom:3px;">Name <span style="color:var(--gold);">*</span></label>
-        <input id="bulk-name" class="form-input" type="text" value="${esc(p.name||'')}"
-          placeholder="e.g. White Leather Sneakers" style="margin:0;">
+        <input id="bulk-name" class="form-input" type="text" value=""
+          placeholder="${esc(p.name||'e.g. White Leather Sneakers')}" style="margin:0;">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
@@ -10614,10 +10313,16 @@ function viewBulkAdd() {
       <button class="btn btn-primary"
         ontouchend="if(_touchMoved)return;event.preventDefault();bulkSaveAndNext()"
         onclick="bulkSaveAndNext()"
-        style="margin:0;">${isLast ? '✓ Save & Finish' : 'Save & Next →'}</button>
+        ${S.bulkSaving ? 'disabled' : ''}
+        style="margin:0;opacity:${S.bulkSaving?'.65':'1'};">
+        ${S.bulkSaving
+          ? `<span style="display:inline-flex;align-items:center;gap:8px;"><span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#fff;"></span> Saving…</span>`
+          : (isLast ? '✓ Save & Finish' : 'Save & Next →')}
+      </button>
       <button class="btn btn-secondary"
         ontouchend="if(_touchMoved)return;event.preventDefault();bulkSkip()"
         onclick="bulkSkip()"
+        ${S.bulkSaving ? 'disabled' : ''}
         style="margin:0;">Skip this photo</button>
     </div>
     <div style="height:24px;"></div>
@@ -12972,18 +12677,27 @@ function viewSettings() {
 
     <!-- ── ACCOUNT ───────────────────────────────── -->
     <div class="settings-group-label">Account</div>
-    <div class="settings-section">
-      <div class="settings-row" style="display:flex;align-items:center;gap:12px;">
-        <div style="width:40px;height:40px;border-radius:50%;background:var(--gold-bg);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">
-          ${S.profileName ? esc(S.profileName[0].toUpperCase()) : '✦'}
+    <div class="settings-section" style="overflow:hidden;">
+      <!-- Account identity -->
+      <div style="padding:20px 16px 16px;background:linear-gradient(135deg,var(--gold-bg) 0%,var(--surface) 65%);border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#c9913a 0%,#b87d2a 100%);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;flex-shrink:0;box-shadow:0 2px 10px rgba(184,125,42,0.25);">
+            ${S.profileName ? esc(S.profileName[0].toUpperCase()) : '✦'}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.15;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${currentUser?.email ? esc(currentUser.email) : 'Signed in with Google'}</div>
+            <div style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;background:rgba(184,125,42,0.1);border-radius:100px;padding:3px 8px;">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block;flex-shrink:0;"></span>
+              <span style="font-size:10px;font-weight:700;color:var(--gold-dk);letter-spacing:.03em;">Synced</span>
+            </div>
+          </div>
         </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:14px;font-weight:700;color:var(--text);">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
-          <div style="font-size:12px;color:var(--text-3);margin-top:1px;">${currentUser?.email ? esc(currentUser.email) : 'Signed in with Google'}</div>
-        </div>
-        <button onclick="signOut()" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">Sign out</button>
       </div>
-      <div class="settings-hint" style="margin-top:10px;">Your data syncs automatically across devices when signed in with the same Google account.</div>
+      <!-- Sign out -->
+      <div style="padding:12px 16px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();signOut()" onclick="signOut()" style="width:100%;padding:10px;background:none;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Sign out</button>
+      </div>
     </div>
 
     <!-- ── CLAUDE AI (REQUIRED) ──────────────────── -->
@@ -13011,9 +12725,9 @@ function viewSettings() {
           oninput="S.profileName=this.value.trim();localStorage.setItem('closet-profile-name',S.profileName);fsSet('profileName',S.profileName);render()">
       </div>
       <div class="settings-row">
-        <div class="settings-label">City / Location</div>
-        <div class="settings-hint" style="margin-bottom:8px;">Generates your Me page banner and shapes seasonal style suggestions.</div>
-        <input class="form-input" type="text" placeholder="e.g. San Francisco"
+        <div class="settings-label">Your City</div>
+        <div class="settings-hint" style="margin-bottom:8px;">Sets the city shown in your Local tab — including the nav icon, city banner, and nearby brand store search. Also used by Claude for climate-aware outfit suggestions.</div>
+        <input class="form-input" type="text" placeholder="e.g. San Francisco, CA"
           value="${esc(S.profileLocation)}"
           onchange="S.profileLocation=this.value.trim();S._bannerLoaded=false;localStorage.setItem('closet-profile-location',S.profileLocation);fsSet('profileLocation',S.profileLocation);">
       </div>
@@ -13633,6 +13347,7 @@ Do NOT include a brand field unless the brand name is explicitly readable as tex
 }
 
 async function bulkSaveAndNext() {
+  if (S.bulkSaving) return; // prevent double-tap
   const queue = S.bulkQueue || [];
   const idx   = S.bulkIdx   || 0;
   const current = queue[idx];
@@ -13663,13 +13378,16 @@ async function bulkSaveAndNext() {
     purchasedDate: p.isNew !== false ? _todayMonth : (p.purchasedDate || null),
     photo: current.dataUrl,
   };
+  S.bulkSaving = true; render(); // show spinner immediately
   try {
     await DB.wardrobe.put(newItem);
     S.wardrobe.push(newItem); // update in-memory — skip getAll() round-trip
     S.bulkSaved = (S.bulkSaved || 0) + 1;
+    S.bulkSaving = false;
     bulkAdvance();
   } catch(err) {
     console.error('bulkSaveAndNext:', err);
+    S.bulkSaving = false; render();
     toast('Couldn\'t save — please try again.');
   }
 }
