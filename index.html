@@ -5504,6 +5504,9 @@ const FASHION_WORDS = [
 ];
 
 function checkWordOfTheDay() {
+  // Only surface the word from the 2nd login onward — let new users settle in first
+  const loginCount = parseInt(localStorage.getItem('closet-login-count') || '0', 10);
+  if (loginCount < 2) return;
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const last  = localStorage.getItem('closet-wotd-date');
   if (last === today) return; // already seen today
@@ -15199,6 +15202,9 @@ auth.onAuthStateChanged(async (user) => {
     const alreadyOnboarded = localStorage.getItem('closet-onboarded');
     S.view = S.apiKey ? (alreadyOnboarded ? 'closet' : 'onboarding') : 'setup';
     S.activeTab = S.apiKey ? 'closet' : S.activeTab;
+    // Track login count so delight features can wait until the user is settled in
+    const _lc = parseInt(localStorage.getItem('closet-login-count') || '0', 10) + 1;
+    localStorage.setItem('closet-login-count', _lc);
   } catch(e) {
     console.error('Data load failed:', e);
     S.view = S.apiKey ? 'closet' : 'setup';
