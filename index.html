@@ -2663,30 +2663,33 @@ const DB = {
   wardrobe: {
     getAll: async () => {
       const snap = await userCol('wardrobe').get();
-      return snap.docs.map(d => {
-        const item = d.data();
-        // Restore photo from localStorage if not in Firestore (avoids 1MB doc limit)
+      const items = snap.docs.map(d => d.data());
+      // Restore photos from IndexedDB (avoids Firestore 1MB doc limit)
+      await Promise.all(items.map(async item => {
         if (!item.photo) {
-          try {
-            const local = localStorage.getItem('closet-item-photo-' + item.id);
-            if (local) item.photo = local;
-          } catch {}
+          const photo = await PhotoDB.get(item.id);
+          if (photo) item.photo = photo;
         }
-        return item;
-      });
+      }));
+      return items;
     },
     put: async (w) => {
-      // Separate photo from Firestore doc — store locally to avoid 1MB limit
+      // Strip photo from Firestore doc; persist in IndexedDB instead
       const { photo, ...firestoreItem } = w;
       if (photo) {
-        try { localStorage.setItem('closet-item-photo-' + w.id, photo); } catch {}
+        try {
+          await PhotoDB.put(w.id, photo);
+        } catch(e) {
+          console.error('PhotoDB.put failed:', e);
+          toast('Photo couldn\'t be saved — storage may be full');
+        }
       }
       await userCol('wardrobe').doc(String(w.id)).set(firestoreItem);
       return w; // return with photo intact for in-memory use
     },
     del: async (id) => {
       await userCol('wardrobe').doc(String(id)).delete();
-      try { localStorage.removeItem('closet-item-photo-' + id); } catch {}
+      await PhotoDB.del(id);
     },
   },
 };
@@ -2813,6 +2816,76 @@ const S = {
 /* ================================================================
    IMAGE UTILITY
    ================================================================ */
+/* ================================================================
+   PHOTO STORAGE — IndexedDB
+   localStorage has a hard 5MB iOS Safari limit; IndexedDB gives
+   50MB+ and is the correct store for binary/image data.
+   ================================================================ */
+const PhotoDB = (() => {
+  const DB_NAME = 'closet-photos';
+  const STORE   = 'photos';
+  const VERSION = 1;
+  let _db = null;
+
+  function openDB() {
+    if (_db) return Promise.resolve(_db);
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, VERSION);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess = e => { _db = e.target.result; res(_db); };
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  async function get(id) {
+    try {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(String(id));
+        req.onsuccess = () => res(req.result || null);
+        req.onerror   = e => rej(e.target.error);
+      });
+    } catch(e) { console.warn('PhotoDB.get', e); return null; }
+  }
+
+  async function put(id, data) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(data, String(id));
+      req.onsuccess = () => res();
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  async function del(id) {
+    try {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const req = db.transaction(STORE, 'readwrite').objectStore(STORE).delete(String(id));
+        req.onsuccess = () => res();
+        req.onerror   = e => rej(e.target.error);
+      });
+    } catch(e) { console.warn('PhotoDB.del', e); }
+  }
+
+  // One-time migration: move any photos still in localStorage → IndexedDB
+  async function migrate() {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('closet-item-photo-'));
+    if (!keys.length) return;
+    let moved = 0;
+    for (const key of keys) {
+      const id   = key.replace('closet-item-photo-', '');
+      const data = localStorage.getItem(key);
+      if (data) {
+        try { await put(id, data); localStorage.removeItem(key); moved++; } catch(e) { console.warn('migrate photo', id, e); }
+      }
+    }
+    if (moved) console.log(`📸 Migrated ${moved} photo${moved===1?'':'s'} from localStorage → IndexedDB`);
+  }
+
+  return { get, put, del, migrate };
+})();
+
 function compressImage(file) {
   return new Promise(res => {
     const reader = new FileReader();
@@ -2820,14 +2893,15 @@ function compressImage(file) {
       const img = new Image();
       img.onload = () => {
         let w = img.naturalWidth, h = img.naturalHeight;
-        const maxH = 1200, maxW = 900;
-        if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+        // 800×1066 max — enough for Claude vision + display; keeps base64 under ~120KB
+        const maxW = 800, maxH = 1066;
         if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-        res({ data: canvas.toDataURL(mime, 0.82), mime });
+        // Always JPEG (smaller than PNG); 0.78 quality is imperceptible at display sizes
+        res({ data: canvas.toDataURL('image/jpeg', 0.78), mime: 'image/jpeg' });
       };
       img.src = evt.target.result;
     };
@@ -9504,13 +9578,30 @@ function wLongPressCancel() {
   clearTimeout(_wLongPressTimer);
   _wLongPressTimer = null;
 }
+// Save scroll position of all rod-track containers + window Y
+function _saveWardrobeScroll() {
+  return {
+    winY: window.scrollY,
+    rods: [...document.querySelectorAll('.rod-track')].map(el => el.scrollLeft),
+  };
+}
+// Restore after render() rebuilds the DOM
+function _restoreWardrobeScroll(saved) {
+  if (!saved) return;
+  window.scrollTo(0, saved.winY);
+  [...document.querySelectorAll('.rod-track')].forEach((el, i) => {
+    if (saved.rods[i] != null) el.scrollLeft = saved.rods[i];
+  });
+}
 function toggleWardrobeSelect(id) {
   if (S._wardrobeSelected.includes(id)) {
     S._wardrobeSelected = S._wardrobeSelected.filter(x => x !== id);
   } else {
     S._wardrobeSelected = [...S._wardrobeSelected, id];
   }
+  const scroll = _saveWardrobeScroll();
   render();
+  requestAnimationFrame(() => _restoreWardrobeScroll(scroll));
 }
 function exitWardrobeSelectMode() {
   S._wardrobeSelectMode = false;
@@ -9519,7 +9610,9 @@ function exitWardrobeSelectMode() {
 }
 function selectAllVisibleWardrobe() {
   S._wardrobeSelected = [...new Set([...S._wardrobeSelected, ...S._wardrobeVisibleIds])];
+  const scroll = _saveWardrobeScroll();
   render();
+  requestAnimationFrame(() => _restoreWardrobeScroll(scroll));
 }
 async function deleteSelectedItems() {
   const ids = [...S._wardrobeSelected];
@@ -14969,6 +15062,8 @@ auth.onAuthStateChanged(async (user) => {
   render();
   if (S.apiKey) initNewsFlash();
   initWeatherPin();
+  // Migrate any photos still in localStorage → IndexedDB (one-time, silent)
+  PhotoDB.migrate();
   // Word of the Day — show once per calendar day, after a brief settle delay
   setTimeout(() => {
     checkWordOfTheDay();
