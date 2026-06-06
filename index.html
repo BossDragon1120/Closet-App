@@ -2378,13 +2378,14 @@ function styleScore(entries) {
    WARDROBE CATEGORIES
    Edit this list to add or rename item categories.
    ================================================================ */
-const WARDROBE_CATEGORIES = ['All','Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Other','Accessories'];
+const WARDROBE_CATEGORIES = ['All','Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry','Other','Accessories'];
 
 const WARDROBE_SUBCATEGORIES = {
   Tops:        ['All','Camis','Tees','Long Sleeve','Blouses & Shirts','Sweaters','Bodysuits'],
   Jackets:     ['All','Blazers','Jackets','Coats'],
   Pants:       ['All','Shorts','Jeans','Dressy Pants','Skirts','Leggings'],
   Dresses:     ['All','Casual','Dressy','Jumpsuits'],
+  Sweats:      ['All','Hoodies','Sweatpants','Joggers','Loungewear','Sets'],
   Shoes:       ['All','Heels & Pumps','Boots','Sneakers','Sandals & Mules','Flats & Loafers'],
   Bags:        ['All','Handbags','Totes','Crossbody','Clutches','Backpacks'],
   Jewelry:     ['All','Necklaces','Earrings','Rings','Bracelets','Watches'],
@@ -2396,6 +2397,7 @@ const WARDROBE_SUBCATEGORIES = {
 function normalizeCat(cat) {
   if (cat === 'Outerwear') return 'Jackets';
   if (cat === 'Bottoms')   return 'Pants';
+  if (cat === 'Comfy' || cat === 'Loungewear' || cat === 'Athleisure') return 'Sweats';
   return cat || 'Other';
 }
 
@@ -2517,7 +2519,8 @@ function categoryFromIcon(icon, name) {
   };
   if (icon && iconMap[icon]) return iconMap[icon];
   const n = (name || '').toLowerCase();
-  if (/shirt|blouse|top|tee|tank|cami|cardigan|sweater|jumper|knit|hoodie|long.?sleeve/.test(n)) return 'Tops';
+  if (/sweat|hoodie|jogger|lounge|athleisure|fleece|tracksuit|track pant|comfy|cozy/.test(n)) return 'Sweats';
+  if (/shirt|blouse|top|tee|tank|cami|cardigan|sweater|jumper|knit|long.?sleeve/.test(n)) return 'Tops';
   if (/pant|trouser|jean|denim|skirt|short|legging/.test(n)) return 'Pants';
   if (/dress|gown/.test(n)) return 'Dresses';
   if (/jumpsuit|romper|playsuit/.test(n)) return 'Dresses';
@@ -2747,7 +2750,7 @@ const S = {
   // ui
   loading: false, loadingMsg: '', error: null,
   filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All',
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: 2, bagRackLevels: 2, accessoryRackLevels: 2, wardrobeExpanded: false, wardrobeRetiredExpanded: false,
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
   // Style Persona
@@ -8115,8 +8118,8 @@ function viewProfile() {
         <div style="display:flex;gap:8px;overflow-x:auto;padding:0 14px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
           ${topLooks.slice(0,8).map((e,i) => `
             <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')" onclick="openEntry('${e.id}')"
-              style="flex-shrink:0;width:82px;scroll-snap-align:start;cursor:pointer;touch-action:manipulation;">
-              <div style="width:82px;height:110px;border-radius:10px;overflow:hidden;position:relative;background:var(--surface-2);${i===0?'border:2px solid var(--gold);':'border:1.5px solid var(--border);'}">
+              style="flex-shrink:0;width:108px;scroll-snap-align:start;cursor:pointer;touch-action:manipulation;">
+              <div style="width:108px;height:144px;border-radius:12px;overflow:hidden;position:relative;background:var(--surface-2);${i===0?'border:2px solid var(--gold);':'border:1.5px solid var(--border);'}">
                 <img src="${esc(e.photo)}" loading="${i===0?'eager':'lazy'}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">
                 <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 45%,rgba(0,0,0,.75) 100%);pointer-events:none;"></div>
                 ${i===0?`<div style="position:absolute;top:4px;left:4px;background:var(--gold);border-radius:100px;padding:1px 5px;font-size:8px;font-weight:800;color:#fff;">⭐1</div>`:''}
@@ -8134,7 +8137,7 @@ function viewProfile() {
           const w = sigs[i];
           if (w) {
             return `<div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
-              style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
+              style="flex:0 0 70px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
               <div style="width:100%;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:2px solid var(--sig-border);background:var(--surface-2);display:flex;align-items:center;justify-content:center;position:relative;">
                 ${w.photo ? `<img src="${w.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">` : `<div style="font-size:28px;">${w.icon||'👕'}</div>`}
                 <div style="position:absolute;top:4px;right:4px;background:var(--gold);border-radius:100px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
@@ -8145,7 +8148,7 @@ function viewProfile() {
             </div>`;
           } else {
             return `<div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')"
-              style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
+              style="flex:0 0 70px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
               <div style="width:100%;aspect-ratio:3/4;border-radius:10px;border:2px dashed var(--sig-border);background:linear-gradient(135deg,#F8F4EE,#F0E9DC);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;">
                 <div style="font-size:20px;">💎</div>
                 <div style="font-size:9px;font-weight:800;color:var(--sig-dk);text-align:center;line-height:1.4;">This is<br>SO me</div>
@@ -8160,7 +8163,7 @@ function viewProfile() {
             <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('signature-pieces')" onclick="navigate('signature-pieces')"
               style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.85;touch-action:manipulation;">${full ? 'Share ›' : 'Manage ›'}</button>
           </div>
-          <div style="display:flex;gap:10px;">${slots}</div>
+          <div style="display:flex;gap:10px;justify-content:center;">${slots}</div>
         </div>`;
       })();
 
@@ -9173,6 +9176,15 @@ function viewDashboard() {
   const topActivity = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1])[0];
   const costPerWear = totalWears > 0 && closetValue > 0 ? (closetValue/totalWears).toFixed(2) : null;
 
+  // sale stats
+  const saleItems = S.wardrobe.filter(w => w.onSale);
+  const totalSaved = saleItems.filter(w=>w.originalPrice&&w.price).reduce((s,w)=>s+Math.max(0,parseFloat(w.originalPrice)-parseFloat(w.price)),0);
+  const bestDeal = saleItems.filter(w=>w.originalPrice&&w.price).sort((a,b)=>{
+    const savA = (parseFloat(a.originalPrice)-parseFloat(a.price))/parseFloat(a.originalPrice);
+    const savB = (parseFloat(b.originalPrice)-parseFloat(b.price))/parseFloat(b.originalPrice);
+    return savB - savA;
+  })[0];
+
   const noData = !S.entries.length && !S.wardrobe.length;
 
   // ── Tile builders ──────────────────────────────────────────
@@ -9202,6 +9214,8 @@ function viewDashboard() {
     ...(closetValue > 0 ? [tile('💰', '$'+Math.round(closetValue).toLocaleString(), 'Closet Value', costPerWear ? `$${costPerWear}/wear avg` : '')] : []),
     ...(wastedTotal > 0 ? [tile('💸', '$'+Math.round(wastedTotal), "Didn't Suit Me", `${wastedItems.length} piece${wastedItems.length===1?'':'s'} retired`)] : []),
     ...(gifted > 0 ? [tile('🎁', gifted, 'Gifted Pieces', `${Math.round(gifted/Math.max(S.wardrobe.length,1)*100)}% of closet`)] : []),
+    ...(saleItems.length > 0 ? [tile('🏷️', saleItems.length, 'Bought on Sale', `${Math.round(saleItems.length/Math.max(S.wardrobe.length,1)*100)}% of closet`, '#16A34A')] : []),
+    ...(totalSaved > 0 ? [tile('💚', '$'+Math.round(totalSaved).toLocaleString(), 'Total Saved', 'on sale purchases', '#16A34A')] : []),
     ...(tailoring > 0 ? [tile('🪡', tailoring, 'Need Tailoring', 'check your closet', '#C8A8E0')] : []),
     ...(retired > 0 ? [tile('🪦', retired, 'Retired', 'graduated from the closet')] : []),
   ];
@@ -9224,6 +9238,14 @@ function viewDashboard() {
         ${mostWorn ? wideTile('🏆', 'Most Worn Piece', esc(mostWorn.name), `${mostWorn.wears.length} wear${mostWorn.wears.length===1?'':'s'}${mostWorn.price ? ' · $'+(mostWorn.price/mostWorn.wears.length).toFixed(2)+'/wear' : ''}`) : ''}
         ${topBrand ? wideTile('🏷', 'Top Brand', esc(topBrand[0]), `${topBrand[1]} total wear${topBrand[1]===1?'':'s'}`) : ''}
         ${topActivity ? wideTile('🎭', 'Top Activity', esc(topActivity[0]), `${topActivity[1]} outfit${topActivity[1]===1?'':'s'} logged`) : ''}
+        ${bestDeal ? `<div style="background:#F0FDF4;border:1.5px solid rgba(22,163,74,0.3);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
+          <div style="font-size:28px;line-height:1;flex-shrink:0;">🏷️</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#15803D;margin-bottom:3px;">Best Deal</div>
+            <div style="font-size:16px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(bestDeal.name)}</div>
+            <div style="font-size:11px;color:#15803D;margin-top:1px;">Saved $${Math.max(0,parseFloat(bestDeal.originalPrice)-parseFloat(bestDeal.price)).toFixed(0)} · ${Math.round((1-parseFloat(bestDeal.price)/parseFloat(bestDeal.originalPrice))*100)}% off retail</div>
+          </div>
+        </div>` : ''}
       </div>
 
       `}
@@ -9750,28 +9772,87 @@ function viewWardrobe() {
   // ── Grid content (rod view) ─────────────────────────────────
   let gridHTML = '';
 
+
+// ── Shoe rack renderer ────────────────────────────────────
+// ── Generic shelf card + section (Shoes, Bags, Accessories) ─
+function shelfCardHTML(w, fallbackIcon) {
+  const wears = w.wears?.length || 0;
+  const isHero = !!w.isHero;
+  const imgHTML = w.photo
+    ? `<img src="${esc(w.photo)}" class="shoe-card-img" alt="${esc(w.name)}">`
+    : `<span class="shoe-card-emoji">${w.icon || fallbackIcon}</span>`;
+  return `<div class="shoe-card" onclick="openWardrobeItem('${w.id}')">
+    <div class="shoe-card-img-wrap${isHero?' hero':''}">
+      ${imgHTML}
+      ${isHero ? `<div style="position:absolute;bottom:2px;right:3px;font-size:7px;font-weight:800;color:var(--gold-dk);background:rgba(255,255,255,.85);border-radius:3px;padding:1px 3px;">💎</div>` : ''}
+    </div>
+    <div class="shoe-card-name">${esc(w.name)}</div>
+    <div class="shoe-card-wears">${wears}w</div>
+  </div>`;
+}
+
+function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackIcon, bg) {
+  const levels = Math.max(1, Math.min(4, S[stateKey] || 2));
+  const _lsKey = {'shoeRackLevels':'closet-shoe-shelves','bagRackLevels':'closet-bag-shelves','accessoryRackLevels':'closet-acc-shelves','sweatRackLevels':'closet-sweat-shelves'}[stateKey];
+  const _saveShelfLevel = (v) => { if (_lsKey) localStorage.setItem(_lsKey, v); };
+  const perShelf = Math.ceil(catItems.length / levels);
+  const cost = catCost(catItems);
+  const costStr = fmtCost(cost);
+  let shelves = '';
+  for (let i = 0; i < levels; i++) {
+    const batch = catItems.slice(i * perShelf, (i + 1) * perShelf);
+    if (!batch.length) continue;
+    shelves += `<div class="shoe-shelf">${batch.map(w => shelfCardHTML(w, fallbackIcon)).join('')}</div>`;
+  }
+  return `<div class="shoe-rack-section"${bg ? ` style="background:${bg};"` : ''}>
+    <div class="shoe-rack-header">
+      <div class="shoe-rack-title">
+        <span class="shoe-rack-cat">${icon} ${label}</span>
+        <span class="shoe-rack-meta">${catItems.length} ${countLabel}${costStr?' · '+costStr:''}</span>
+      </div>
+      <div class="shoe-rack-controls">
+        <span class="shoe-rack-level-label">${levels===1?'1 shelf':levels+' shelves'}</span>
+        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();S.${stateKey}=Math.max(1,S.${stateKey}-1);_saveShelfLevel(S.${stateKey});render();" onclick="S.${stateKey}=Math.max(1,S.${stateKey}-1);_saveShelfLevel(S.${stateKey});render()" ${levels<=1?'disabled':''} title="Fewer shelves">−</button>
+        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();S.${stateKey}=Math.min(4,S.${stateKey}+1);_saveShelfLevel(S.${stateKey});render();" onclick="S.${stateKey}=Math.min(4,S.${stateKey}+1);_saveShelfLevel(S.${stateKey});render()" ${levels>=4?'disabled':''} title="More shelves">+</button>
+      </div>
+    </div>
+    <div class="shoe-shelf-wrap">${shelves}</div>
+  </div>`;
+}
+
   if (!items.length) {
     gridHTML = emptyMsg;
 
   } else if (S.wardrobeCategory !== 'All') {
-    // Filtered: single rod for the active category
-    const cost = catCost(items);
-    const costStr = fmtCost(cost);
-    gridHTML = `<div class="rod-section">
-      <div class="rod-section-header">
-        <span class="rod-section-cat">${S.wardrobeCategory}</span>
-        <span class="rod-section-meta">${items.length} item${items.length===1?'':'s'}${costStr?' · '+costStr:''}</span>
-      </div>
-      <div class="rod-track">
-        <div class="rod-items-inner">
-          ${items.map(hangerHTML).join('')}
+    // Filtered: shelf categories stay on shelves, others get a rod
+    const _SHELF_CONFIG = {
+      Shoes:       ['👠', 'Shoes',         items.length===1?'pair':'pairs',  'shoeRackLevels',        '👠', 'rgba(139,101,56,0.08)'],
+      Bags:        ['👜', 'Bags',           items.length===1?'bag':'bags',    'bagRackLevels',         '👜', 'rgba(110,75,45,0.08)'],
+      Accessories: ['✨', 'Accessories',    items.length===1?'item':'items',  'accessoryRackLevels',   '💍', 'rgba(120,95,175,0.08)'],
+      Sweats:      ['🩳', 'Sweats & Comfy', items.length===1?'item':'items',  'sweatRackLevels',       '🩳', 'rgba(100,130,180,0.08)'],
+    };
+    const _shelfCfg = _SHELF_CONFIG[S.wardrobeCategory];
+    if (_shelfCfg) {
+      gridHTML = shelfSectionHTML(items, ..._shelfCfg);
+    } else {
+      const cost = catCost(items);
+      const costStr = fmtCost(cost);
+      gridHTML = `<div class="rod-section" style="background:rgba(100,90,80,0.05);">
+        <div class="rod-section-header">
+          <span class="rod-section-cat">${S.wardrobeCategory}</span>
+          <span class="rod-section-meta">${items.length} item${items.length===1?'':'s'}${costStr?' · '+costStr:''}</span>
         </div>
-      </div>
-    </div>`;
+        <div class="rod-track">
+          <div class="rod-items-inner">
+            ${items.map(hangerHTML).join('')}
+          </div>
+        </div>
+      </div>`;
+    }
 
   } else {
     // All — hero section first, then getting-dressed category order, shoes as rack
-    const CATEGORY_ORDER = ['Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Accessories','Other'];
+    const CATEGORY_ORDER = ['Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry','Accessories','Other'];
     const grouped = {};
     CATEGORY_ORDER.forEach(c => grouped[c] = []);
     const uncategorized = [];
@@ -9798,56 +9879,16 @@ function viewWardrobe() {
       </div>`;
     }
 
-    // ── Shoe rack renderer ────────────────────────────────────
-    // ── Generic shelf card + section (Shoes, Bags, Accessories) ─
-    function shelfCardHTML(w, fallbackIcon) {
-      const wears = w.wears?.length || 0;
-      const isHero = !!w.isHero;
-      const imgHTML = w.photo
-        ? `<img src="${esc(w.photo)}" class="shoe-card-img" alt="${esc(w.name)}">`
-        : `<span class="shoe-card-emoji">${w.icon || fallbackIcon}</span>`;
-      return `<div class="shoe-card" onclick="openWardrobeItem('${w.id}')">
-        <div class="shoe-card-img-wrap${isHero?' hero':''}">
-          ${imgHTML}
-          ${isHero ? `<div style="position:absolute;bottom:2px;right:3px;font-size:7px;font-weight:800;color:var(--gold-dk);background:rgba(255,255,255,.85);border-radius:3px;padding:1px 3px;">💎</div>` : ''}
-        </div>
-        <div class="shoe-card-name">${esc(w.name)}</div>
-        <div class="shoe-card-wears">${wears}w</div>
-      </div>`;
-    }
-
-    function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackIcon, bg) {
-      const levels = Math.max(1, Math.min(4, S[stateKey] || 2));
-      const perShelf = Math.ceil(catItems.length / levels);
-      const cost = catCost(catItems);
-      const costStr = fmtCost(cost);
-      let shelves = '';
-      for (let i = 0; i < levels; i++) {
-        const batch = catItems.slice(i * perShelf, (i + 1) * perShelf);
-        if (!batch.length) continue;
-        shelves += `<div class="shoe-shelf">${batch.map(w => shelfCardHTML(w, fallbackIcon)).join('')}</div>`;
-      }
-      return `<div class="shoe-rack-section"${bg ? ` style="background:${bg};"` : ''}>
-        <div class="shoe-rack-header">
-          <div class="shoe-rack-title">
-            <span class="shoe-rack-cat">${icon} ${label}</span>
-            <span class="shoe-rack-meta">${catItems.length} ${countLabel}${costStr?' · '+costStr:''}</span>
-          </div>
-          <div class="shoe-rack-controls">
-            <span class="shoe-rack-level-label">${levels===1?'1 shelf':levels+' shelves'}</span>
-            <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();S.${stateKey}=Math.max(1,S.${stateKey}-1);render();" onclick="S.${stateKey}=Math.max(1,S.${stateKey}-1);render()" ${levels<=1?'disabled':''} title="Fewer shelves">−</button>
-            <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();S.${stateKey}=Math.min(4,S.${stateKey}+1);render();" onclick="S.${stateKey}=Math.min(4,S.${stateKey}+1);render()" ${levels>=4?'disabled':''} title="More shelves">+</button>
-          </div>
-        </div>
-        <div class="shoe-shelf-wrap">${shelves}</div>
-      </div>`;
-    }
 
     // ── Regular category rods ─────────────────────────────────
     CATEGORY_ORDER.forEach(cat => {
       const catItems = grouped[cat];
       if (!catItems.length) return;
 
+      if (cat === 'Sweats') {
+        sections += shelfSectionHTML(catItems, '🩳', 'Sweats & Comfy', catItems.length===1?'item':'items', 'sweatRackLevels', '🩳', 'rgba(100,130,180,0.08)');
+        return;
+      }
       if (cat === 'Shoes') {
         sections += shelfSectionHTML(catItems, '👠', 'Shoes', catItems.length===1?'pair':'pairs', 'shoeRackLevels', '👠', 'rgba(139,101,56,0.08)');
         return;
@@ -10638,7 +10679,7 @@ function viewBulkAdd() {
   // ── Review current photo ──────────────────────────────────────
   const current = queue[idx];
   const p = current.preview || {};
-  const cats = ['Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Accessories','Other'];
+  const cats = ['Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry','Accessories','Other'];
   const pct  = Math.round((idx / total) * 100);
   const isLast = idx === total - 1;
 
@@ -10719,9 +10760,27 @@ function viewBulkAdd() {
         </div>
       </div>
       <div>
-        <label class="form-label" style="font-size:10px;margin-bottom:3px;">Notes</label>
+        <label class="form-label" style="font-size:10px;margin-bottom:3px;">Description</label>
         <textarea id="bulk-notes" class="form-textarea" style="min-height:50px;margin:0;"
           placeholder="Color, material, fit…">${esc(p.description||'')}</textarea>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:10px;margin-bottom:3px;">Got it on sale? 🏷️</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:2px;">
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();bulkSyncForm();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.onSale=true;render()"
+            onclick="bulkSyncForm();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.onSale=true;render()"
+            style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${p.onSale===true?'#16A34A':'var(--border)'};background:${p.onSale===true?'#F0FDF4':'var(--surface)'};color:${p.onSale===true?'#15803D':'var(--text-2)'};">🏷️ Yes!</button>
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();bulkSyncForm();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.onSale=false;S.bulkQueue[S.bulkIdx].preview.originalPrice=null;render()"
+            onclick="bulkSyncForm();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.onSale=false;S.bulkQueue[S.bulkIdx].preview.originalPrice=null;render()"
+            style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${p.onSale===false?'var(--gold)':'var(--border)'};background:${p.onSale===false?'var(--gold-bg)':'var(--surface)'};color:${p.onSale===false?'var(--gold-dk)':'var(--text-2)'};">Full price</button>
+        </div>
+        ${p.onSale===true ? `<div style="margin-top:6px;">
+          <label class="form-label" style="font-size:10px;margin-bottom:3px;">Original price (optional)</label>
+          <input id="bulk-orig-price" class="form-input" type="number" min="0" step="0.01" value="${p.originalPrice||''}" oninput="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.originalPrice=this.value" placeholder="0.00" style="margin:0;" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+          ${p.originalPrice && p.price ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:#15803D;">🎉 You saved $${Math.max(0,parseFloat(p.originalPrice)-parseFloat(p.price)).toFixed(0)}!</div>` : ''}
+        </div>` : ''}
       </div>
       <div>
         <label class="form-label" style="font-size:10px;margin-bottom:3px;">When did you get this?</label>
@@ -10735,6 +10794,21 @@ function viewBulkAdd() {
             onclick="bulkSyncForm();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.isNew=false;render()"
             style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${p.isNew===false?'var(--gold)':'var(--border)'};background:${p.isNew===false?'var(--gold-bg)':'var(--surface)'};color:${p.isNew===false?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
         </div>
+        ${p.isNew===false ? `<div style="margin-top:6px;"><div style="font-size:11px;color:var(--text-3);margin-bottom:5px;">About how many years ago?</div><div style="display:flex;flex-wrap:wrap;gap:5px;">${[1,2,3,4,5].map(y=>{const yr=(new Date().getFullYear()-y)+'-01';const act=p.purchasedDate===yr;return '<button ontouchend="if(_touchMoved)return;event.preventDefault();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.purchasedDate=\''+yr+'\';render();" onclick="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.purchasedDate=\''+yr+'\';render()" style="padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid '+(act?'var(--gold)':'var(--border)')+';background:'+(act?'var(--gold-bg)':'var(--surface)')+';color:'+(act?'var(--gold-dk)':'var(--text-2)')+';">'+(y===1?'1 yr':y===5?'5+ yrs':y+' yrs')+'</button>';}).join('')}</div></div>` : ''}
+      </div>
+      <div>
+        <label class="form-label" style="font-size:10px;margin-bottom:3px;">Was this a gift? 💝</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();bulkSyncForm();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.gifted=true;render()"
+            onclick="bulkSyncForm();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.gifted=true;render()"
+            style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${p.gifted===true?'#9B35C8':'var(--border)'};background:${p.gifted===true?'#F5EEFF':'var(--surface)'};color:${p.gifted===true?'#7B35A8':'var(--text-2)'};">💝 Yes!</button>
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();bulkSyncForm();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.gifted=false;render()"
+            onclick="bulkSyncForm();if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.gifted=false;render()"
+            style="padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${p.gifted===false?'var(--gold)':'var(--border)'};background:${p.gifted===false?'var(--gold-bg)':'var(--surface)'};color:${p.gifted===false?'var(--gold-dk)':'var(--text-2)'};">Nope</button>
+        </div>
+        ${p.gifted===true ? `<input class="form-input" type="text" placeholder="Who gave it to you? (optional)" value="${esc(p.giftedBy||'')}" oninput="if(!S.bulkQueue[S.bulkIdx].preview)S.bulkQueue[S.bulkIdx].preview={};S.bulkQueue[S.bulkIdx].preview.giftedBy=this.value" style="margin-top:6px;">` : ''}
       </div>
     </div>
 
@@ -10824,7 +10898,7 @@ function viewReceiptAdd() {
   // ── STEP: preview ────────────────────────────────────────────
   if (rf.step === 'preview' && rf.preview) {
     const p = rf.preview;
-    const cats = ['Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Other','Accessories'];
+    const cats = ['Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry','Other','Accessories'];
     const backAction = isManual ? `navigate('new-piece')` : isPhoto ? `S.receiptFlow.step='input';render()` : `S.receiptFlow.step='input';render()`;
 
     // ── PHOTO MODE: flip card ─────────────────────────────────
@@ -10862,7 +10936,7 @@ function viewReceiptAdd() {
                   <label class="form-label" style="font-size:10px;">Brand</label>
                   <input class="form-input" type="text" value="${esc(p.brand||'')}" oninput="S.receiptFlow.preview.brand=this.value" placeholder="e.g. Zara, ASOS" style="margin:4px 0 0;" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
                   <div>
                     <label class="form-label" style="font-size:10px;">Price paid</label>
                     <input class="form-input" type="number" min="0" step="0.01" value="${p.price||''}" oninput="S.receiptFlow.preview.price=this.value" placeholder="0.00" style="margin:4px 0 0;" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
@@ -10871,6 +10945,20 @@ function viewReceiptAdd() {
                     <label class="form-label" style="font-size:10px;">Size</label>
                     <input class="form-input" type="text" value="${esc(p.size||'')}" oninput="S.receiptFlow.preview.size=this.value" placeholder="S, 28, 8.5…" style="margin:4px 0 0;" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
                   </div>
+                </div>
+                <div style="margin-bottom:11px;">
+                  <label class="form-label" style="font-size:10px;">Got it on sale? 🏷️</label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;">
+                    <button onclick="S.receiptFlow.preview.onSale=true;render()"
+                      style="padding:7px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.onSale===true?'#16A34A':'var(--border)'};background:${p.onSale===true?'#F0FDF4':'var(--surface)'};color:${p.onSale===true?'#15803D':'var(--text-2)'};">🏷️ Yes!</button>
+                    <button onclick="S.receiptFlow.preview.onSale=false;S.receiptFlow.preview.originalPrice=null;render()"
+                      style="padding:7px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.onSale===false?'var(--gold)':'var(--border)'};background:${p.onSale===false?'var(--gold-bg)':'var(--surface)'};color:${p.onSale===false?'var(--gold-dk)':'var(--text-2)'};">Full price</button>
+                  </div>
+                  ${p.onSale===true ? `<div style="margin-top:7px;">
+                    <label class="form-label" style="font-size:10px;">Original price (optional)</label>
+                    <input class="form-input" type="number" min="0" step="0.01" value="${p.originalPrice||''}" oninput="S.receiptFlow.preview.originalPrice=this.value" placeholder="0.00" style="margin:4px 0 0;" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+                    ${p.originalPrice && p.price ? `<div style="margin-top:5px;font-size:11px;font-weight:700;color:#15803D;">🎉 You saved $${Math.max(0,parseFloat(p.originalPrice)-parseFloat(p.price)).toFixed(0)}!</div>` : ''}
+                  </div>` : ''}
                 </div>
                 <div style="margin-bottom:11px;">
                   <label class="form-label" style="font-size:10px;">Category</label>
@@ -10982,6 +11070,20 @@ function viewReceiptAdd() {
           <input class="form-input" type="text" value="${esc(p.size||'')}"
             oninput="S.receiptFlow.preview.size=this.value" placeholder="e.g. S, 28, 8.5…"
             enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Got it on sale? 🏷️</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+            <button onclick="S.receiptFlow.preview.onSale=true;render()"
+              style="padding:10px 0;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.onSale===true?'#16A34A':'var(--border)'};background:${p.onSale===true?'#F0FDF4':'var(--surface)'};color:${p.onSale===true?'#15803D':'var(--text-2)'};">🏷️ Yes!</button>
+            <button onclick="S.receiptFlow.preview.onSale=false;S.receiptFlow.preview.originalPrice=null;render()"
+              style="padding:10px 0;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ${p.onSale===false?'var(--gold)':'var(--border)'};background:${p.onSale===false?'var(--gold-bg)':'var(--surface)'};color:${p.onSale===false?'var(--gold-dk)':'var(--text-2)'};">Full price</button>
+          </div>
+          ${p.onSale===true ? `<div style="margin-top:10px;">
+            <label class="form-label">Original price (optional)</label>
+            <div class="price-wrap"><input class="form-input" type="number" min="0" step="0.01" value="${p.originalPrice||''}" oninput="S.receiptFlow.preview.originalPrice=this.value" placeholder="0.00" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"></div>
+            ${p.originalPrice && p.price ? `<div style="margin-top:6px;font-size:12px;font-weight:700;color:#15803D;">🎉 You saved $${Math.max(0,parseFloat(p.originalPrice)-parseFloat(p.price)).toFixed(0)}!</div>` : ''}
+          </div>` : ''}
         </div>
         <div class="form-group" style="margin-bottom:14px;">
           <label class="form-label">Category</label>
@@ -11159,9 +11261,14 @@ function viewWardrobeItem() {
           <div class="witem-stat-lbl" style="color:var(--gold-dk);">Compliment${complimentCount===1?'':'s'}</div>
         </div>` : ''}
         ${w.price ? `
-        <div class="witem-stat">
-          <div class="witem-stat-val">$${parseFloat(w.price).toFixed(0)}</div>
-          <div class="witem-stat-lbl">Price Paid</div>
+        <div class="witem-stat"${w.onSale ? ' style="background:#F0FDF4;border-color:rgba(22,163,74,0.25);"' : ''}>
+          <div class="witem-stat-val"${w.onSale ? ' style="color:#15803D;"' : ''}>$${parseFloat(w.price).toFixed(0)}</div>
+          <div class="witem-stat-lbl"${w.onSale ? ' style="color:#15803D;"' : ''}>${w.onSale ? '🏷️ Sale Price' : 'Price Paid'}</div>
+        </div>` : ''}
+        ${w.onSale && w.originalPrice && w.price ? `
+        <div class="witem-stat" style="background:#F0FDF4;border-color:rgba(22,163,74,0.25);">
+          <div class="witem-stat-val" style="color:#15803D;">$${Math.max(0,parseFloat(w.originalPrice)-parseFloat(w.price)).toFixed(0)}</div>
+          <div class="witem-stat-lbl" style="color:#15803D;">Saved 🎉</div>
         </div>` : ''}
         ${w.paidOff ? `
         <div class="witem-stat" style="background:#EAFAF1;border-color:rgba(30,132,73,0.2);">
@@ -11328,6 +11435,18 @@ function viewWardrobeItem() {
             onchange="updateWardrobePrice('${w.id}',this.value)">
         </div>
         ${!w.price ? `<p style="font-size:12px;color:var(--text-3);margin-top:8px;">Add the price you paid to see cost per wear.</p>` : ''}
+        <!-- Sale toggle -->
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleWardrobeSale('${w.id}',true)" onclick="toggleWardrobeSale('${w.id}',true)"
+            style="flex:1;padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${w.onSale?'#16A34A':'var(--border)'};background:${w.onSale?'#F0FDF4':'var(--surface)'};color:${w.onSale?'#15803D':'var(--text-2)'};">🏷️ Got it on sale</button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleWardrobeSale('${w.id}',false)" onclick="toggleWardrobeSale('${w.id}',false)"
+            style="flex:1;padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${w.onSale===false?'var(--gold)':'var(--border)'};background:${w.onSale===false?'var(--gold-bg)':'var(--surface)'};color:${w.onSale===false?'var(--gold-dk)':'var(--text-2)'};">Full price</button>
+        </div>
+        ${w.onSale ? `<div style="margin-top:8px;">
+          <label class="form-label" style="font-size:11px;">Original price (optional)</label>
+          <div class="price-wrap"><input class="form-input" type="number" min="0" step="0.01" placeholder="0.00" value="${w.originalPrice||''}" onchange="updateWardrobeOriginalPrice('${w.id}',this.value)" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"></div>
+          ${w.originalPrice && w.price ? `<div style="margin-top:5px;font-size:12px;font-weight:700;color:#15803D;">🎉 You saved $${Math.max(0,parseFloat(w.originalPrice)-parseFloat(w.price)).toFixed(0)} (${Math.round((1-parseFloat(w.price)/parseFloat(w.originalPrice))*100)}% off)!</div>` : ''}
+        </div>` : ''}
         <label style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;">
           <input type="checkbox" id="paidOffCheck" ${w.paidOff?'checked':''} onchange="toggleWardrobePaidOff('${w.id}',this.checked)" style="width:18px;height:18px;accent-color:#1E8449;cursor:pointer;flex-shrink:0;">
           <span style="font-size:13px;font-weight:600;color:#1E8449;">💚 Already paid for itself! (closet staple)</span>
@@ -12597,7 +12716,7 @@ function viewMatchReview() {
                 style="font-size:16px;padding:11px 14px;">
               <select class="form-input" style="font-size:16px;padding:11px 14px;"
                 onchange="S.matchReview.unmatched[${i}].selectedCat=this.value;render()">
-                ${['Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Other','Accessories'].map(c =>
+                ${['Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry','Other','Accessories'].map(c =>
                   `<option value="${c}" ${itemCat===c?'selected':''}>${c}</option>`
                 ).join('')}
               </select>
@@ -13772,7 +13891,7 @@ async function bulkAnalyzeCurrent() {
           { type: 'image', source: { type: 'base64', media_type: imageMime, data: imageData } },
           { type: 'text', text: `You are a fashion expert. Look at this clothing/accessory item and return ONLY valid JSON — no markdown, no code fences.
 
-{"name":"Specific descriptive name e.g. White Leather Sneakers","category":"exactly one of: Tops Jackets Pants Dresses Shoes Bags Jewelry Accessories Other","icon":"single clothing emoji"}
+{"name":"Specific descriptive name e.g. White Leather Sneakers","category":"exactly one of: Tops Jackets Pants Dresses Sweats Shoes Bags Jewelry Accessories Other","icon":"single clothing emoji"}
 
 Do NOT include a brand field unless the brand name is explicitly readable as text in this photo (on a visible label, hangtag, logo, or tag). Never infer or guess the brand from style or appearance.` }
         ]}]
@@ -13821,7 +13940,11 @@ async function bulkSaveAndNext() {
     icon: p.icon || '👕',
     category: cat,
     subCategory: subCategoryFromName(itemName, cat),
-    paidOff: false, retiring: false, gifted: false,
+    paidOff: false, retiring: false,
+    gifted: p.gifted === true,
+    giftedBy: p.gifted === true ? (p.giftedBy || null) : null,
+    onSale: p.onSale === true,
+    originalPrice: p.onSale === true ? (parseFloat(document.getElementById('bulk-orig-price')?.value || p.originalPrice) || null) : null,
     addedAt: new Date().toISOString(),
     wears: [],
     addedVia: 'bulk',
@@ -13859,6 +13982,8 @@ function bulkSyncForm() {
   const c = v('bulk-category'); if (c !== undefined) p.category  = c;
   const nt = document.getElementById('bulk-notes')?.value;
   if (nt !== undefined) p.description = nt;
+  const op = document.getElementById('bulk-orig-price')?.value;
+  if (op !== undefined) p.originalPrice = op;
 }
 
 function bulkAdvance() {
@@ -13924,7 +14049,7 @@ async function analyzeItemPhoto() {
 {
   "name": "Specific descriptive name, e.g. 'Navy Wool Blazer' or 'Ivory Linen Wide-Leg Trousers'",
   "brand": "ONLY if the brand name is explicitly readable as text in this photo (on a label, tag, logo, or packaging). Use empty string if you cannot clearly read the brand name — do NOT guess or infer from style, fabric, or silhouette",
-  "category": "exactly one of: Tops, Jackets, Pants, Dresses, Shoes, Bags, Jewelry, Accessories, Other",
+  "category": "exactly one of: Tops, Jackets, Pants, Dresses, Sweats, Shoes, Bags, Jewelry, Accessories, Other",
   "icon": "single most fitting clothing emoji",
   "description": "Color, material, fit, and notable details in 1-2 sentences"
 }` }
@@ -14050,6 +14175,8 @@ async function confirmReceiptItem() {
     category: cat,
     subCategory: subCategoryFromName(itemName, cat),
     paidOff: false, retiring: false, gifted: p.gifted === true, giftedBy: p.gifted === true ? (p.giftedBy?.trim() || null) : null,
+    onSale: p.onSale === true,
+    originalPrice: p.onSale === true ? (parseFloat(p.originalPrice) || null) : null,
     addedAt: new Date().toISOString(),
     wears: [],
     addedVia: rf.mode === 'manual' ? 'manual' : 'receipt',
@@ -14423,6 +14550,17 @@ async function updateWardrobePrice(id, val) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.price = parseFloat(val)||null;
   await DB.wardrobe.put(w); render(); // S.wardrobe mutated in-place
+}
+async function toggleWardrobeSale(id, onSale) {
+  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
+  w.onSale = onSale;
+  if (!onSale) w.originalPrice = null; // clear original price when switching off
+  await DB.wardrobe.put(w); render();
+}
+async function updateWardrobeOriginalPrice(id, val) {
+  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
+  w.originalPrice = parseFloat(val)||null;
+  await DB.wardrobe.put(w); render();
 }
 async function updateWardrobeName(id, val) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
