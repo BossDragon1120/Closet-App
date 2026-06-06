@@ -5015,94 +5015,102 @@ function featuresMenuHTML() {
   // ── ABOUT CLOSET sub-page ─────────────────────────────────
   const aboutSections = [
     {
-      title: 'Style Portrait',
+      title: 'Portfolio',
       items: [
-        { icon: '✦', text: '<strong>AI Style Portrait</strong> — Claude writes a personal headline and description of your style based on your outfits, wardrobe, and profile (MBTI, zodiac, generation, vibe words).' },
-        { icon: '♥', text: '<strong>Style Journey</strong> — Heart any portrait you love to save it. Your saved portraits stack into a timeline showing how your style evolves.' },
-        { icon: '⟳', text: '<strong>Regenerate Anytime</strong> — Tap Refresh to get a fresh read as your wardrobe and taste change.' },
+        { icon: '✦', text: '<strong>AI Style Portrait</strong> — Claude writes a personal headline and style description based on your outfits, wardrobe, and vibe words. Regenerate anytime as your taste evolves.' },
+        { icon: '♥', text: '<strong>Style Journey</strong> — Heart any portrait to save it. Your saved portraits stack into a timeline so you can watch your style evolve over time.' },
+        { icon: '📖', text: '<strong>Style Playbook</strong> — A living guide to your personal style: your aesthetic identity, what works, what to build next, and how to shop smarter.' },
+        { icon: '✨', text: '<strong>Your Aura</strong> — Personal details (height, eye colour, scent, personality type, nail colour, hairstyle) that help Claude give you the most tailored advice possible.' },
+        { icon: '⭐', text: '<strong>Best Outfits</strong> — All your 8+ rated looks in a swipeable carousel, alongside your Signature Pieces and Hero Pieces in a gold-accented showcase.' },
+        { icon: '⚔️', text: '<strong>Fashion Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best. Results are shared as a full scorecard card.' },
       ],
     },
     {
-      title: 'Outfit Journal',
+      title: 'Fits & Outfit Journal',
       items: [
-        { icon: '📸', text: '<strong>AI Style Rating</strong> — Upload any outfit photo and get an instant 1–10 score with detailed feedback on what\'s working.' },
-        { icon: '🎯', text: '<strong>Occasion-Aware Scoring</strong> — Tell Claude where you\'re wearing it before the analysis. A gym look is judged differently from cocktail attire.' },
+        { icon: '📸', text: '<strong>AI Style Rating</strong> — Upload any outfit photo and get an instant 1–10 score with detailed, honest feedback from Claude.' },
+        { icon: '🎯', text: '<strong>Occasion-Aware Scoring</strong> — Tell Claude the context before analysis. A gym look scores differently from a cocktail event.' },
         { icon: '💪', text: '<strong>Confidence Score</strong> — Log how confident you felt alongside your style rating.' },
-        { icon: '📝', text: '<strong>Auto Occasion Tagging</strong> — Outfits are automatically tagged by occasion from your notes if you skip the picker.' },
-        { icon: '📅', text: '<strong>Style Calendar</strong> — See every logged outfit on a weekly calendar, colour-coded by score.' },
-        { icon: '🔥', text: '<strong>Streak Tracking</strong> — See how many days in a row you\'ve been logging outfits.' },
-      ],
-    },
-    {
-      title: 'Wardrobe Tracker',
-      items: [
-        { icon: '👗', text: '<strong>Auto-add from Outfits</strong> — Claude identifies the pieces in your photo and offers to add them to your wardrobe automatically.' },
-        { icon: '💸', text: '<strong>Cost per Wear</strong> — Track price paid and see your cost-per-wear shrink as you get more use out of each piece.' },
-        { icon: '📧', text: '<strong>Add from Receipt</strong> — Screenshot a shopping confirmation email and Claude parses it into a wardrobe item automatically.' },
-        { icon: '💝', text: '<strong>Gifted Items</strong> — Mark pieces as gifts, note who gave them, and share a style rating with the gifter.' },
-        { icon: '✦', text: '<strong>Compliment Log</strong> — Tap a button whenever someone compliments a piece to track your crowd-pleasers.' },
-        { icon: '🧵', text: '<strong>Tailoring Flag</strong> — Mark items that need alterations and add a note about what needs fixing.' },
-        { icon: '📦', text: '<strong>Retire Items</strong> — Log when pieces leave your closet (worn out or didn\'t work), track where they went, and see what you spent on misses.' },
-        { icon: '🌹', text: '<strong>Memorial Garden</strong> — Memorialize beloved retired pieces with a personal photo and a heartfelt eulogy (with an AI polish option). Visit the Memorial Garden to remember them.' },
-        { icon: '🎨', text: '<strong>Colour Stripes</strong> — Each wardrobe card automatically picks up the piece\'s colour for quick visual scanning.' },
-      ],
-    },
-    {
-      title: 'Home & Trends',
-      items: [
-        { icon: '📊', text: '<strong>Style Stats</strong> — Outfits logged, pieces owned, style score, and average wears per item at a glance.' },
-        { icon: '⭐', text: '<strong>Best Outfits Carousel</strong> — All your 8+ rated outfits in a swipeable carousel at the top of Home.' },
-        { icon: '🏆', text: '<strong>Most Worn Highlight</strong> — See your hardest-working piece with a wear-count dot visualisation and average wear frequency.' },
-        { icon: '📰', text: '<strong>Trend Alert</strong> — Fresh fashion headlines delivered each session, summarised by Claude so you\'re always in the loop.' },
-      ],
-    },
-    {
-      title: 'Dashboard & Insights',
-      items: [
-        { icon: '🔮', text: '<strong>Hidden Gems</strong> — Your wallet already said yes. Surface the pieces your morning routine forgot.' },
-        { icon: '🏷', text: '<strong>Top Brands</strong> — See which labels dominate your most-worn looks.' },
-        { icon: '🎭', text: '<strong>Top Activities</strong> — See which occasions you dress for most, based on your outfit tags.' },
-        { icon: '🙅', text: '<strong>Wasted Spend Tracker</strong> — Items retired because they didn\'t suit you, with total cost — learn from past misses.' },
-        { icon: '⚖️', text: '<strong>Fair Style Score</strong> — Your score is an average-of-averages across occasion types, so 20 casual days don\'t drown out 3 black-tie moments.' },
-      ],
-    },
-    {
-      title: 'Planning & Suggestions',
-      items: [
-        { icon: '✨', text: '<strong>AI Outfit Ideas</strong> — Get three personalised outfit suggestions pulled from your actual wardrobe, with photos of past matches.' },
-        { icon: '🌤', text: '<strong>Weather-Aware</strong> — Suggestions factor in today\'s forecast so you\'re never under- or over-dressed.' },
+        { icon: '📝', text: '<strong>Auto Occasion Tagging</strong> — Outfits are tagged by occasion from your notes automatically if you skip the picker.' },
         { icon: '🪄', text: '<strong>Style it With…</strong> — Tap any outfit item and Claude suggests what to pair it with from your wardrobe.' },
+        { icon: '💌', text: '<strong>Share Your Look</strong> — Share any outfit entry as a styled photo card with your rating and notes included.' },
       ],
     },
     {
-      title: 'Shopping',
+      title: 'Closet & Wardrobe',
       items: [
-        { icon: '🛍', text: '<strong>AI Shopping List</strong> — Claude identifies gaps in your wardrobe and suggests specific pieces to fill them, ignoring what you already own.' },
-        { icon: '🔗', text: '<strong>Live Search Links</strong> — Each suggestion links directly to real product results so you can shop immediately.' },
-        { icon: '💰', text: '<strong>Price Sensitivity Slider</strong> — Tell Claude your current budget mood and it adjusts recommendations from splurge to savvy.' },
+        { icon: '📷', text: '<strong>Add from Photo</strong> — Snap your new piece and Claude identifies it, suggests a name, category, brand, and icon automatically.' },
+        { icon: '📧', text: '<strong>Add from Receipt</strong> — Screenshot a shopping confirmation and Claude parses it into a wardrobe entry in seconds.' },
+        { icon: '📦', text: '<strong>Bulk Photo Upload</strong> — Import multiple pieces at once from your camera roll — Claude analyses each one individually.' },
+        { icon: '💸', text: '<strong>Cost per Wear</strong> — Track what you paid and watch your cost-per-wear shrink as you wear each piece more.' },
+        { icon: '👑', text: '<strong>Hero Pieces</strong> — Flag your standout garments. Share them with a stylist or generate an AI sketch.', action: `S.featureMenuOpen=false;navigate('hero-pieces')` },
+        { icon: '💎', text: '<strong>Signature Pieces</strong> — Choose up to 3 pieces that define your style. Your signatures are showcased on your Portfolio.', action: `S.featureMenuOpen=false;navigate('signature-pieces')` },
+        { icon: '💝', text: '<strong>Gifted Items</strong> — Mark pieces as gifts, note the gifter, and send them a note when you first wear it.' },
+        { icon: '🧵', text: '<strong>Tailoring Flag</strong> — Mark items that need alterations and track what needs fixing.' },
+        { icon: '📦', text: '<strong>Retire & Memorial Garden</strong> — Log when pieces leave your closet. Beloved pieces can be memorialised with a photo and a eulogy.' },
+        { icon: '🔍', text: '<strong>Wardrobe Search</strong> — Search across all your pieces by name, brand, or category instantly.' },
+        { icon: '🎨', text: '<strong>Colour Stripes</strong> — Each wardrobe card picks up the piece\'s colour for fast visual scanning.' },
       ],
     },
     {
-      title: 'Social & Fun',
+      title: 'Plan & Group Fit',
       items: [
-        { icon: '👑', text: '<strong>Hero Pieces</strong> — Flag your standout garments and share them with a stylist for expert advice on how to wear them.', action: `S.featureMenuOpen=false;navigate('hero-pieces')` },
-        { icon: '👯', text: '<strong>Friend\'s Fit Check</strong> — Snap a photo of a friend\'s outfit, get an instant rating, and share it on the spot — never saved to your journal.' },
-        { icon: '⚔️', text: '<strong>Fashion Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best.' },
-        { icon: '💌', text: '<strong>Share Outfits</strong> — Share any outfit entry as a photo card with your rating and notes.' },
+        { icon: '✨', text: '<strong>AI Outfit Ideas</strong> — Describe an event and get personalised outfit suggestions drawn from your actual wardrobe.' },
+        { icon: '🌤', text: '<strong>Weather-Aware</strong> — Suggestions factor in today\'s forecast so you\'re never under- or over-dressed.' },
+        { icon: '👯', text: '<strong>Group Fit</strong> — Create a squad plan for any event: name it, set the vibe and dress code, upload up to 5 looks, and share a Group Fit card with your crew.' },
       ],
     },
     {
-      title: 'Customisation',
+      title: 'Shop & Wish List',
       items: [
-        { icon: '🎭', text: '<strong>Custom Activities</strong> — Edit your occasion list in Settings — add, remove, or reset to defaults. Your list, your life.' },
-        { icon: '🌸', text: '<strong>Cycle Sync</strong> — Optionally track your cycle phase on the calendar for pattern awareness.' },
+        { icon: '🛍', text: '<strong>AI Gap Analysis</strong> — Claude studies your wardrobe and surfaces only what\'s missing — pieces that would unlock more of your existing outfits.' },
+        { icon: '💛', text: '<strong>Wish List</strong> — Save pieces you\'re considering and share your curated list with friends or gift-givers.' },
+        { icon: '🔗', text: '<strong>Live Search Links</strong> — Each recommendation links directly to real product results so you can shop immediately.' },
+        { icon: '💰', text: '<strong>Budget Mode</strong> — Tell Claude your current budget mood and it adjusts from splurge-worthy to budget-savvy.' },
       ],
     },
     {
-      title: 'Privacy',
+      title: 'Discover & Trends',
       items: [
-        { icon: '🔒', text: '<strong>All on your device</strong> — Your photos, outfit history, and wardrobe never leave your phone. Nothing is uploaded or stored externally.' },
-        { icon: '🔑', text: '<strong>Your own API key</strong> — You connect directly to Claude with your own key — no middleman, no subscription on top.' },
+        { icon: '🔥', text: '<strong>What\'s Hot</strong> — Claude curates the top 10 fashion trends each week, broken down by category with styling tips.' },
+        { icon: '💡', text: '<strong>Styling Tips</strong> — Personalised style advice generated from your own wardrobe and aesthetic preferences.' },
+        { icon: '♥', text: '<strong>Saved Trends</strong> — Heart any trend to save it. Your saved trends live in a dedicated carousel you can revisit anytime.' },
+        { icon: '👯', text: '<strong>Friend\'s Fit Check</strong> — Rate a friend\'s outfit instantly — honest, fun, and never saved to your journal.' },
+      ],
+    },
+    {
+      title: 'Fashion Stats',
+      items: [
+        { icon: '📊', text: '<strong>Style Score</strong> — Your overall average rating across all logged outfits, calculated fairly across occasion types.' },
+        { icon: '🔄', text: '<strong>Wear Tracking</strong> — Total wears, average wears per piece, and cost-per-wear across your whole closet.' },
+        { icon: '🏆', text: '<strong>Top Picks</strong> — Most-worn piece, top brand, and top activity surface automatically from your real data.' },
+        { icon: '🔥', text: '<strong>Streak & Logging</strong> — Track how many days in a row you\'ve been logging outfits.' },
+        { icon: '📤', text: '<strong>Shareable Stats Card</strong> — Generate a styled PNG of your fashion stats to share with friends.' },
+      ],
+    },
+    {
+      title: 'Local',
+      items: [
+        { icon: '✦', text: '<strong>Featured Brands</strong> — Spotlight on local and independent brands worth knowing — starting with Neue Terra, San Francisco\'s modern fragrance label.' },
+        { icon: '📍', text: '<strong>Community Tab</strong> — Local storefronts, designers, pop-ups, and fashion events near you are coming soon.' },
+      ],
+    },
+    {
+      title: 'Customise Your Experience',
+      items: [
+        { icon: '🎨', text: '<strong>Your Style Words</strong> — Pick the aesthetic descriptors that feel like you (Minimal, Classic, Bold…) in Settings. Claude uses these to personalise everything.' },
+        { icon: '✨', text: '<strong>Your Aura</strong> — Fill in your physical and personal details for hyper-tailored Claude recommendations.' },
+        { icon: '🎭', text: '<strong>Custom Occasions</strong> — Edit your occasion list in Settings — add, remove, or reset to defaults. Your life, your categories.' },
+        { icon: '🌸', text: '<strong>Cycle Sync</strong> — Optionally track your cycle phase for pattern awareness in your outfit calendar.' },
+        { icon: '🌙', text: '<strong>Dark Mode</strong> — Toggle between light and dark in Settings.' },
+      ],
+    },
+    {
+      title: 'Privacy & Sync',
+      items: [
+        { icon: '☁️', text: '<strong>Cloud Sync</strong> — Your outfit journal and wardrobe metadata sync securely to your personal Firebase account so your data is never lost.' },
+        { icon: '📱', text: '<strong>Photos Stay Local</strong> — Outfit and wardrobe photos are stored on your device only — they\'re never uploaded to the cloud.' },
+        { icon: '🔑', text: '<strong>Your Own API Key</strong> — You connect directly to Claude with your own Anthropic key — no middleman, no subscription on top.' },
       ],
     },
   ];
@@ -5161,9 +5169,9 @@ function featuresMenuHTML() {
           <button class="feat-close" ontouchend="if(_touchMoved)return;event.preventDefault();closeMenu();" onclick="closeMenu()">✕</button>
         </div>
         <div class="feat-body" style="padding:0;">
-          <div style="padding:16px 16px 8px;font-size:12px;color:var(--text-3);line-height:1.6;">Expert help, when you want it — book directly and we'll be in touch.</div>
-          ${serviceRow('🤝', 'Book a Closet Assistant', 'Get hands-on help organizing and editing your wardrobe.', "S.featureMenuOpen=false;S.menuSection=null;S._assistantBooked=null;navigate('closet-assistant')")}
-          ${serviceRow('💼', 'Book a Stylist', 'Work one-on-one with a professional stylist on your look.', "toast('Coming soon — we\\'ll let you know when booking opens! ✨');S.featureMenuOpen=false;S.menuSection=null;render()")}
+          <div style="padding:16px 16px 8px;font-size:12px;color:var(--text-3);line-height:1.6;">Expert help delivered virtually — book a session and we'll be in touch to schedule.</div>
+          ${serviceRow('🤝', 'Virtual Closet Assistant', 'A virtual, hands-on session to organize and edit your wardrobe over video — no travel needed.', "S.featureMenuOpen=false;S.menuSection=null;S._assistantBooked=null;navigate('closet-assistant')")}
+          ${serviceRow('💼', 'Virtual Stylist Session', 'Work one-on-one with a professional stylist on your look, entirely online via video call.', "toast('Coming soon — we\\'ll let you know when booking opens! ✨');S.featureMenuOpen=false;S.menuSection=null;render()")}
         </div>
       </div>`;
   }
@@ -5190,10 +5198,11 @@ function featuresMenuHTML() {
         <button class="feat-close" onclick="closeMenu()">✕</button>
       </div>
       <div class="feat-body" style="padding:0;">
+        ${menuRow('💼', 'Virtual Services', 'Book a virtual Closet Assistant or Stylist session', "S.menuSection='services';render()")}
+        ${menuRow('📊', 'Your Fashion Stats', 'Tiles of your style data — shareable at a tap', "closeMenu();navigate('dashboard')")}
         ${menuRow('✨', 'Onboarding', 'Take the feature tour or set up your style', "closeMenu();S.onboardStep=0;navigate('onboarding')")}
-        ${menuRow('✦', 'About Closet', 'Everything built into your style journal', "S.menuSection='about';render()")}
-        ${menuRow('💼', 'Services', 'Book a Closet Assistant or Stylist', "S.menuSection='services';render()")}
         ${menuRow('⚙️', 'Settings', 'API key, sync, and app preferences', "closeMenu();switchTab('settings')")}
+        ${menuRow('✦', 'About Closet', 'Everything built into your style journal', "S.menuSection='about';render()")}
       </div>
       <div style="padding:12px 16px calc(12px + var(--safe-b));border-top:1px solid var(--border);flex-shrink:0;">
         <button onclick="S.featureMenuOpen=false;S.menuSection=null;signOut();" style="width:100%;background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Sign out</button>
@@ -5260,6 +5269,220 @@ async function signOut() {
    ================================================================ */
 const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','hero-pieces','signature-pieces']);
 
+/* ================================================================
+   FASHION WORD OF THE DAY
+   ================================================================ */
+const FASHION_WORDS = [
+  { word: 'Passementerie', phonetic: '/pas-mahn-tree/', type: 'noun',
+    def: 'Ornamental trimming on garments — braids, fringes, tassels, and cord work applied as decoration.',
+    example: 'The designer\'s couture gown was edged in intricate gold passementerie.' },
+  { word: 'Godet', phonetic: '/goh-DAY/', type: 'noun',
+    def: 'A triangular or bias-cut piece of fabric inserted into a skirt, sleeve, or glove to add fullness or flare.',
+    example: 'Silk godets at the hem gave the skirt a graceful mermaid silhouette.' },
+  { word: 'Brandebourg', phonetic: '/BRAN-deh-borg/', type: 'noun',
+    def: 'An ornamental looped fastening — frog-style closures of braid or cord — originally from Prussian military dress.',
+    example: 'The military-inspired coat featured brandebourg closures all the way down the front.' },
+  { word: 'Toile', phonetic: '/TWAL/', type: 'noun',
+    def: 'A test garment sewn in cheap muslin or cotton to check fit and drape before cutting into expensive fabric.',
+    example: 'Every couture house builds a toile before a single yard of silk is cut.' },
+  { word: 'Jabot', phonetic: '/zhah-BOH/', type: 'noun',
+    def: 'A decorative cascade of ruffled or lace fabric worn at the neckline, falling down the front of a garment.',
+    example: 'She styled the structured blazer with a silk jabot for a modern take on power dressing.' },
+  { word: 'Matelasse', phonetic: '/mat-lah-SAY/', type: 'noun',
+    def: 'A double-woven fabric with a quilted or blistered surface, giving the impression of padded stitching.',
+    example: 'The ivory matelasse jacket had the texture of antique upholstery — effortlessly luxe.' },
+  { word: 'Guimpe', phonetic: '/gimp/', type: 'noun',
+    def: 'A blouse worn under a low-necked dress to fill in the neckline; also, a decorative trim of metallic thread.',
+    example: 'The sundress looked office-ready once she added a crisp guimpe beneath.' },
+  { word: 'Selvedge', phonetic: '/SEL-vij/', type: 'noun',
+    def: 'The self-finished edge of a woven fabric that prevents it from unraveling — prized in selvedge denim for its clean, tight weave.',
+    example: 'Selvedge denim enthusiasts can spot the woven edge from across the room.' },
+  { word: 'Revers', phonetic: '/reh-VAIRZ/', type: 'noun',
+    def: 'The turned-back lapels of a coat or jacket, especially when they form a decorative V at the chest.',
+    example: 'The revers on her vintage blazer were wide enough to frame a brooch beautifully.' },
+  { word: 'Stomacher', phonetic: '/STUM-uh-ker/', type: 'noun',
+    def: 'A decorative triangular panel, often jeweled or embroidered, worn over the chest and stomach in historical dress.',
+    example: 'The costume designer crafted a beaded stomacher to evoke the Tudor court.' },
+  { word: 'Fichu', phonetic: '/FEE-shoo/', type: 'noun',
+    def: 'A light triangular scarf worn over the shoulders and tied or pinned at the chest — 18th century staple, endlessly modern.',
+    example: 'She draped a sheer linen fichu over her strapless dress for an effortless, romantic look.' },
+  { word: 'Broderie Anglaise', phonetic: '/bro-dree ahn-GLEZ/', type: 'noun',
+    def: 'Embroidery worked on fine white cotton with cutout holes, creating lace-like floral or geometric patterns.',
+    example: 'The broderie anglaise hem caught the light at the beach — equal parts girlish and chic.' },
+  { word: 'Foulard', phonetic: '/foo-LARD/', type: 'noun',
+    def: 'A lightweight, soft silk or rayon fabric, often printed in small repeat patterns; also the scarf made from it.',
+    example: 'A printed foulard knotted at the neck is the effortless move every wardrobe needs.' },
+  { word: 'Galloon', phonetic: '/gah-LOON/', type: 'noun',
+    def: 'A narrow braid or ribbon of gold, silver, or silk used to trim uniforms, liveries, and formal garments.',
+    example: 'Military-inspired galloon trim ran along every seam of the structured jacket.' },
+  { word: 'Welt', phonetic: '/welt/', type: 'noun',
+    def: 'A strip of leather or fabric sewn between the shoe upper and sole; also the raised edge of a pocket opening.',
+    example: 'The coat\'s welt pockets were so cleanly finished they were nearly invisible.' },
+  { word: 'Gusset', phonetic: '/GUS-it/', type: 'noun',
+    def: 'A triangular or square piece of fabric inserted at a seam to add ease of movement — found in underarms, crotches, and glove fingers.',
+    example: 'The Japanese work trousers featured a diamond gusset that allowed a full squat without restriction.' },
+  { word: 'Trapunto', phonetic: '/tra-POON-toh/', type: 'noun',
+    def: 'A quilting technique where extra stuffing is added behind a design to create a raised, sculptural surface.',
+    example: 'The bodice was worked in trapunto — swirling vines that seemed to grow from the fabric itself.' },
+  { word: 'Grosgrain', phonetic: '/GROH-grayn/', type: 'noun',
+    def: 'A closely woven ribbed ribbon or fabric with a distinctive horizontal cord texture — often used for hat bands and trim.',
+    example: 'A grosgrain ribbon hatband transforms a basic felt hat into a proper statement.' },
+  { word: 'Charmeuse', phonetic: '/shar-MYOOZ/', type: 'noun',
+    def: 'A soft, lightweight satin-weave fabric with a lustrous face and matte back — drapes like liquid against the body.',
+    example: 'The bias-cut charmeuse slip dress was minimalism at its most seductive.' },
+  { word: 'Dupioni', phonetic: '/doo-pee-OH-nee/', type: 'noun',
+    def: 'A crisp, slightly rough silk woven from two entangled cocoons, producing characteristic irregular slubs throughout the fabric.',
+    example: 'Dupioni silk gives a wedding look an organic, textured quality that\'s far more interesting than plain satin.' },
+  { word: 'Nainsook', phonetic: '/NAYN-sook/', type: 'noun',
+    def: 'A fine, soft cotton muslin, originally from India — lightweight and slightly lustrous, used for delicate blouses and lingerie.',
+    example: 'The heirloom christening gown was sewn in nainsook, almost weightless in hand.' },
+  { word: 'Voile', phonetic: '/voyl/', type: 'noun',
+    def: 'A sheer, fine woven fabric with a crisp hand — lighter than chiffon, more structured than organza.',
+    example: 'Layers of ivory voile gave the prairie blouse an airy, Pre-Raphaelite quality.' },
+  { word: 'Organza', phonetic: '/or-GAN-zah/', type: 'noun',
+    def: 'A thin, stiff sheer fabric woven from silk or synthetic fiber — it holds structure while remaining nearly transparent.',
+    example: 'Voluminous organza sleeves gave the otherwise minimal look its drama.' },
+  { word: 'Petersham', phonetic: '/PEE-ter-sham/', type: 'noun',
+    def: 'A thick, corded ribbon used in millinery and as waistband stiffening — heavier and crisper than grosgrain.',
+    example: 'The milliner anchored the silk roses to a petersham band hidden inside the hat.' },
+  { word: 'Basting', phonetic: '/BAY-sting/', type: 'noun',
+    def: 'Temporary loose stitching used to hold fabric in place during fitting before permanent stitching is applied.',
+    example: 'She basted the hem with white thread so the tailor could see exactly where to take it in.' },
+  { word: 'Scrim', phonetic: '/skrim/', type: 'noun',
+    def: 'An open, loosely woven fabric used as interlining for structure, or in theatrical costume for transparency effects.',
+    example: 'The avant-garde designer layered black scrim over fluorescent lining for a ghostly reveal effect.' },
+  { word: 'Peplum', phonetic: '/PEP-lum/', type: 'noun',
+    def: 'A short flared or gathered extension attached at the waist of a jacket, blouse, or dress.',
+    example: 'A peplum top is one of the smartest silhouette tricks — it creates curves without adding volume below.' },
+  { word: 'Bespoke', phonetic: '/beh-SPOHK/', type: 'adjective',
+    def: 'Made to individual order and specification — the highest standard of tailored clothing, from Savile Row tradition.',
+    example: 'A bespoke suit is shaped entirely to your body; no two are ever quite alike.' },
+  { word: 'Atelier', phonetic: '/ah-tel-YAY/', type: 'noun',
+    def: 'A designer\'s private workshop or studio — the space where haute couture is conceived, draped, and hand-finished.',
+    example: 'Interns at the Parisian atelier learned to sew a button before they were allowed near anything silk.' },
+  { word: 'Draping', phonetic: '/DRAY-ping/', type: 'noun',
+    def: 'The technique of arranging fabric directly on a dress form to create a garment pattern — design and pattern-making in one gesture.',
+    example: 'Madeleine Vionnet\'s genius was pure draping — no flat patterns, just silk and intuition.' },
+  { word: 'Raglan', phonetic: '/RAG-lan/', type: 'adjective',
+    def: 'A sleeve style where the sleeve extends in one piece all the way to the collar, without a shoulder seam.',
+    example: 'Raglan sleeves on a coat read as sportswear-influenced, but they\'re also supremely comfortable.' },
+  { word: 'Princess Seam', phonetic: '/PRIN-ses seem/', type: 'noun',
+    def: 'A vertical seam running from shoulder to hem with no waist seam — shaped to follow the body\'s curves for a fitted silhouette.',
+    example: 'Princess seams gave the coat a clean, structured look without a single dart in sight.' },
+  { word: 'Bias Cut', phonetic: '/BY-us cut/', type: 'noun',
+    def: 'Fabric cut diagonally across the grain at a 45-degree angle, giving it stretch and a fluid drape that follows the body.',
+    example: 'Madeleine Vionnet pioneered bias cutting — her dresses moved like a second skin.' },
+  { word: 'Trompe-l\'oeil', phonetic: '/tromp LOY/', type: 'noun',
+    def: 'French for "deceives the eye" — prints or embellishments that create the optical illusion of structure, texture, or dimension.',
+    example: 'The knitwear\'s trompe-l\'oeil collar print looked like a shirt underneath from across the room.' },
+  { word: 'Smocking', phonetic: '/SMOK-ing/', type: 'noun',
+    def: 'Decorative embroidery worked over gathered fabric, creating elasticity and ornamental texture simultaneously.',
+    example: 'Smocking across the bodice gave the simple cotton dress its heirloom quality.' },
+  { word: 'Ruching', phonetic: '/ROO-shing/', type: 'noun',
+    def: 'Gathered or pleated fabric arranged in parallel rows to create a textured, ruffled effect along a seam or edge.',
+    example: 'Strategic ruching across the hip created the illusion of a more defined waist.' },
+  { word: 'Jacquard', phonetic: '/JAK-ard/', type: 'noun',
+    def: 'A woven fabric with an elaborate, raised pattern built directly into the weave — not printed on, but woven in.',
+    example: 'The jacquard blazer read as texture from afar and as pattern up close — quietly spectacular.' },
+  { word: 'Brocade', phonetic: '/broh-KAYD/', type: 'noun',
+    def: 'A rich, heavy jacquard fabric with a raised design, often in gold or silver thread — historically associated with royalty and ceremony.',
+    example: 'The gold brocade coat over a simple white turtleneck was the whole mood.' },
+  { word: 'Tabard', phonetic: '/TAB-ard/', type: 'noun',
+    def: 'A sleeveless outer tunic, open at the sides — a medieval silhouette that keeps returning in contemporary fashion.',
+    example: 'She wore the linen tabard over wide trousers for an effortlessly architectural look.' },
+  { word: 'Pelisse', phonetic: '/peh-LEES/', type: 'noun',
+    def: 'A long coat or coat-dress, originally fur-lined — the Regency-era answer to both style and warmth.',
+    example: 'A wool pelisse in rich burgundy was the sophisticated alternative to another puffer jacket.' },
+  { word: 'Frog', phonetic: '/frog/', type: 'noun',
+    def: 'An ornamental braided or looped fastener used as a button substitute on coats and military jackets.',
+    example: 'The Mandarin-collar jacket was fastened with silk frogs — zero buttons, all elegance.' },
+  { word: 'Dart', phonetic: '/dart/', type: 'noun',
+    def: 'A folded and sewn tuck of fabric that removes excess material to shape a flat piece of cloth around curves.',
+    example: 'Two well-placed bust darts are the difference between a blouse that fits and one that just covers.' },
+  { word: 'Grosgrain', phonetic: '/GROH-grayn/', type: 'noun',
+    def: 'A closely woven ribbed ribbon or fabric — the horizontal cords give it its distinctive texture and crisp body.',
+    example: 'A grosgrain bow at the collar elevated an otherwise ordinary shirt into something considered.' },
+  { word: 'Crewelwork', phonetic: '/KROO-el-work/', type: 'noun',
+    def: 'Embroidery using wool thread worked in a variety of stitches to create bold, textured, often nature-inspired designs.',
+    example: 'The vintage coat\'s crewelwork cuffs were worth the dry-cleaning bill a hundred times over.' },
+  { word: 'Gilet', phonetic: '/zhee-LAY/', type: 'noun',
+    def: 'A sleeveless jacket — the French term covering everything from padded vests to fine knitwear bodices.',
+    example: 'A silk gilet layered over a shirt reads as polished without being overdressed.' },
+  { word: 'Taffeta', phonetic: '/TAF-ih-tah/', type: 'noun',
+    def: 'A crisp, smooth woven silk or synthetic fabric with a distinctive rustle — it literally whispers when you walk.',
+    example: 'The taffeta skirt made the most satisfying sound with every step down the hallway.' },
+  { word: 'Placket', phonetic: '/PLAK-it/', type: 'noun',
+    def: 'The finished opening at the collar, cuff, or waistband of a garment that allows it to be put on and taken off.',
+    example: 'A concealed placket on a dress shirt hides the buttons entirely — dress it up, dress it down.' },
+  { word: 'Kimono Sleeve', phonetic: '/kih-MOH-noh/', type: 'noun',
+    def: 'A wide, square-cut sleeve cut in one piece with the garment body — inspired by traditional Japanese construction.',
+    example: 'Kimono sleeves on the linen blouse created a beautiful lantern silhouette at the shoulder.' },
+  { word: 'Melton', phonetic: '/MEL-ton/', type: 'noun',
+    def: 'A heavy, dense woolen cloth with a smooth, felted face — almost windproof, used for coats and uniforms.',
+    example: 'The melton peacoat had been her grandfather\'s. It would outlast them both.' },
+  { word: 'Muslin', phonetic: '/MUZ-lin/', type: 'noun',
+    def: 'Plain-woven cotton of varying weights — used for toiles, test garments, and as a base layer in couture construction.',
+    example: 'Three rounds of muslin fittings before they touched the actual fabric. That\'s the difference.' },
+];
+
+function checkWordOfTheDay() {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const last  = localStorage.getItem('closet-wotd-date');
+  if (last === today) return; // already seen today
+  // Deterministic pick: same word all day for all users
+  const idx = Math.abs(today.replace(/-/g,'').split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % FASHION_WORDS.length;
+  S.wordOfDay = FASHION_WORDS[idx];
+}
+
+function dismissWordOfDay() {
+  const today = new Date().toISOString().slice(0, 10);
+  localStorage.setItem('closet-wotd-date', today);
+  S.wordOfDay = null;
+  render();
+}
+
+function wordOfDaySheetHTML() {
+  const w = S.wordOfDay;
+  if (!w) return '';
+  return `
+  <div onclick="dismissWordOfDay()" ontouchend="if(_touchMoved)return;event.preventDefault();dismissWordOfDay()"
+    style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;display:flex;align-items:flex-end;">
+    <div onclick="event.stopPropagation()" ontouchend="event.stopPropagation()"
+      style="width:100%;background:var(--surface);border-radius:24px 24px 0 0;padding:0 0 env(safe-area-inset-bottom,20px);
+             box-shadow:0 -8px 40px rgba(0,0,0,0.18);animation:slideUp .32s cubic-bezier(.22,.68,0,1.2);">
+      <!-- pill handle -->
+      <div style="display:flex;justify-content:center;padding:14px 0 0;">
+        <div style="width:36px;height:4px;border-radius:2px;background:var(--border);"></div>
+      </div>
+      <!-- eyebrow -->
+      <div style="text-align:center;padding:10px 24px 0;">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:2px;">✦ Word of the Day</div>
+      </div>
+      <!-- word -->
+      <div style="text-align:center;padding:8px 24px 0;">
+        <div style="font-size:32px;font-weight:800;color:var(--text-1);letter-spacing:-.02em;line-height:1.1;">${esc(w.word)}</div>
+        <div style="font-size:13px;color:var(--text-3);font-style:italic;margin-top:4px;">${esc(w.phonetic)} &nbsp;·&nbsp; <span style="font-style:normal;font-weight:600;color:var(--text-2);">${esc(w.type)}</span></div>
+      </div>
+      <!-- divider -->
+      <div style="margin:16px 24px;height:1px;background:var(--border);"></div>
+      <!-- definition -->
+      <div style="padding:0 24px;font-size:15px;line-height:1.6;color:var(--text-1);">${esc(w.def)}</div>
+      <!-- example -->
+      <div style="margin:14px 24px 0;padding:12px 14px;background:var(--bg);border-radius:12px;border-left:3px solid var(--gold);">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin-bottom:4px;">In context</div>
+        <div style="font-size:14px;font-style:italic;color:var(--text-2);line-height:1.55;">"${esc(w.example)}"</div>
+      </div>
+      <!-- dismiss -->
+      <div style="padding:20px 24px 8px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissWordOfDay()" onclick="dismissWordOfDay()"
+          style="width:100%;padding:14px;border-radius:14px;border:none;background:var(--gold);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">
+          Got it ✓
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function render() {
   const root = document.getElementById('root');
   let html = '';
@@ -5312,6 +5535,7 @@ function render() {
   // About Me flyout retired — Profile is now its own tab. Kept for safety but never shown.
   // if (S.showAboutMe) html += aboutMeSheetHTML();
   if (S.showShareCard) html += shareCardModalHTML();
+  if (S.wordOfDay) html += wordOfDaySheetHTML();
   if (S.toast) html += `<div class="toast">${esc(S.toast)}</div>`;
   root.innerHTML = html;
   attachListeners();
@@ -5582,7 +5806,41 @@ function viewLocal() {
       </div>
 
       <!-- Divider -->
-      <div style="margin:16px 16px 20px;height:1px;background:var(--border);"></div>
+      <div style="margin:16px 16px 0;height:1px;background:var(--border);"></div>
+
+      <!-- Featured Local Business -->
+      <div style="margin:20px 16px 0;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">✦ Featured Local Brand</div>
+        <div style="border-radius:18px;overflow:hidden;border:1.5px solid var(--border);box-shadow:var(--shadow);">
+          <!-- Header gradient band -->
+          <div style="background:linear-gradient(135deg,#2C1A0E 0%,#5C3317 45%,#3A2010 100%);padding:22px 20px 18px;position:relative;">
+            <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(200,160,0,.18) 0%,transparent 65%);"></div>
+            <div style="position:relative;">
+              <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:6px;">San Francisco · Fragrance</div>
+              <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-.5px;line-height:1.1;margin-bottom:4px;">Neue Terra</div>
+              <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.45;font-style:italic;">A modern fragrance of the American landscape</div>
+            </div>
+          </div>
+          <!-- Body -->
+          <div style="background:var(--surface);padding:16px 20px 18px;">
+            <div style="font-size:13px;color:var(--text-2);line-height:1.65;margin-bottom:14px;">Rooted in the textures of the Pacific Coast, high desert, and redwood groves — Neue Terra makes scent a statement. The right fragrance doesn't just smell great; it completes the look.</div>
+            <!-- Instagram CTA -->
+            <a href="https://www.instagram.com/neueterra/" target="_blank" rel="noopener"
+              ontouchend="if(_touchMoved)return;event.preventDefault();window.open('https://www.instagram.com/neueterra/','_blank')"
+              style="display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,#833ab4,#fd1d1d,#fcb045);border-radius:12px;padding:11px 16px;text-decoration:none;touch-action:manipulation;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1" fill="#fff" stroke="none"/></svg>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:800;color:#fff;">@neueterra</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.8);">Follow on Instagram</div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section label -->
+      <div style="margin:24px 16px 10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">Coming Soon to Local</div>
 
       <!-- Feature cards -->
       <div style="padding:0 16px;display:flex;flex-direction:column;gap:12px;">
@@ -8408,6 +8666,23 @@ function viewAura() {
         ${auraFieldHTML('signatureScent',    'closet-signature-scent',  '🌸', 'Signature Scent',  'e.g. Chanel No. 5, Replica…',     S.signatureScent)}
         ${auraFieldHTML('hairstyle',         'closet-hairstyle',        '💇', 'Hairstyle',        'e.g. Long waves, blunt bob…',     S.hairstyle)}
       </div>
+
+      <!-- Style words read-only display -->
+      ${(() => {
+        const words = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
+        return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;">
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:${words.length?'10':'4'}px;">✦ Style Words</div>
+          ${words.length ? `
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+              ${words.map(w=>`<div style="padding:5px 12px;border-radius:100px;font-size:12px;font-weight:700;background:var(--gold-bg);border:1.5px solid var(--gold);color:var(--gold-dk);">${esc(w)}</div>`).join('')}
+            </div>` :
+            `<div style="font-size:12px;color:var(--text-3);font-style:italic;margin-bottom:10px;">No style words set yet.</div>`}
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();closeMenu();switchTab('settings')"
+            onclick="closeMenu();switchTab('settings')"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">Edit in Settings →</button>
+        </div>`;
+      })()}
     </div>
 
     <div style="height:40px;"></div>
@@ -8792,259 +9067,221 @@ function viewHome() {
    VIEW: DASHBOARD
    ================================================================ */
 function viewDashboard() {
-  if (!S.entries.length) {
-    return `<div class="view">
-      <div class="nav"><span class="nav-logo">Dashboard</span><button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button></div>
-      <div class="empty"><div class="empty-icon">📊</div><h2>No Data Yet</h2><p>Log a few outfits to see your style stats come to life.</p></div>
-    </div>`;
-  }
-
-  // ── Style Trends (avg-of-group-averages, WFH excluded) ────
-  const sortedAll = [...S.entries].sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
-  const avgRating = styleScore(S.entries) || '—';
+  // ── Compute all stats ──────────────────────────────────────
+  const avgRating = styleScore(S.entries);
   const totalWears = S.wardrobe.reduce((s,w)=>s+(w.wears?.length||0),0);
-  const totalVal = S.entries.reduce((s,e)=>s+e.items.reduce((ss,i)=>ss+(parseFloat(i.price)||0),0),0);
-  const totalItems = S.entries.reduce((s,e)=>s+e.items.length,0);
+  const closetValue = S.wardrobe.reduce((s,w)=>s+(parseFloat(w.price)||0),0);
+  const unworn = S.wardrobe.filter(w=>!(w.wears?.length)).length;
+  const gifted = S.wardrobe.filter(w=>w.gifted).length;
+  const tailoring = S.wardrobe.filter(w=>w.tailoringNeeded && !w.retiredFromCloset).length;
+  const retired = S.wardrobe.filter(w=>w.retiredFromCloset).length;
+  const wastedItems = S.wardrobe.filter(w=>w.retiredFromCloset && w.retireReason==='didnt-suit-me' && w.price);
+  const wastedTotal = wastedItems.reduce((s,w)=>s+parseFloat(w.price||0),0);
 
-  // ── Logging Calendar (week strip) ────────────────────────
-  function buildCalendar() {
-    const offset = S.dashCalOffset || 0; // week offset; 0 = current week
-    const today = new Date(); today.setHours(0,0,0,0);
-    const toKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const todayKey = toKey(today);
+  // streak
+  const toKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayKey = toKey(today);
+  const byDay = {};
+  S.entries.forEach(e=>{ const k=toKey(new Date(e.createdAt)); if(!byDay[k])byDay[k]=[]; byDay[k].push(e); });
+  let streak = 0;
+  const si = byDay[todayKey] ? 0 : 1;
+  for (let i = si; i < 365; i++) { const d=new Date(today); d.setDate(d.getDate()-i); if(byDay[toKey(d)])streak++; else break; }
 
-    // Sunday of the week we're viewing
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - today.getDay() + offset * 7);
-    const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
-
-    // Week label e.g. "May 25 – 31" or "May 26 – Jun 1"
-    const fmtShort = d => d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-    const weekLabel = (() => {
-      const s = fmtShort(weekStart), e = fmtShort(weekEnd);
-      const yr = weekEnd.getFullYear() !== new Date().getFullYear() ? ` ${weekEnd.getFullYear()}` : '';
-      return `${s} – ${e}${yr}`;
-    })();
-
-    // Group entries by day
-    const byDay = {};
-    S.entries.forEach(e => {
-      const k = toKey(new Date(e.createdAt));
-      if (!byDay[k]) byDay[k] = [];
-      byDay[k].push(e);
-    });
-
-    // Streak
-    let streak = 0;
-    const si = byDay[todayKey] ? 0 : 1;
-    for (let i = si; i < 365; i++) {
-      const d = new Date(today); d.setDate(d.getDate() - i);
-      if (byDay[toKey(d)]) streak++; else break;
-    }
-
-    const dowLabels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-    const cells = Array.from({length:7}, (_, i) => {
-      const day = new Date(weekStart); day.setDate(weekStart.getDate() + i);
-      const isFuture = day > today;
-      const isToday  = toKey(day) === todayKey;
-      const key = toKey(day);
-      const dayEntries = byDay[key] || [];
-      const phase = cyclePhaseForDate(day);
-      const phaseBar = phase ? `<div class="cal-wc-phase ${CYCLE_PHASES[phase].cls}"></div>` : '';
-      const todayCls = isToday ? ' cal-today' : '';
-      const futureCls = isFuture ? ' cal-future' : '';
-      if (dayEntries.length) {
-        const best = dayEntries.reduce((b,e)=>e.rating>b.rating?e:b, dayEntries[0]);
-        const rCls = best.rating >= 8 ? 'r-high' : best.rating >= 6 ? 'r-mid' : 'r-low';
-        return `<div class="cal-wc logged ${rCls}${todayCls}" onclick="openEntry('${best.id}')">
-          <div class="cal-wc-dow">${dowLabels[i]}</div>
-          <div class="cal-wc-date">${day.getDate()}</div>
-          <div class="cal-wc-score">${best.rating}</div>
-          ${phaseBar}
-        </div>`;
-      } else {
-        return `<div class="cal-wc${futureCls}${todayCls}">
-          <div class="cal-wc-dow">${dowLabels[i]}</div>
-          <div class="cal-wc-date" style="color:var(--text-3);">${day.getDate()}</div>
-          <div class="cal-wc-empty">—</div>
-          ${phaseBar}
-        </div>`;
-      }
-    }).join('');
-
-    const streakTxt = streak > 0
-      ? `🔥 ${streak}-day streak <span>— keep it up!</span>`
-      : `📅 No streak yet <span>— log today's outfit to start!</span>`;
-
-    const todayPhase = S.cycleEnabled ? cyclePhaseForDate(new Date()) : null;
-    const phaseCallout = todayPhase ? (() => {
-      const p = CYCLE_PHASES[todayPhase];
-      return `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
-        <span class="cycle-phase-swatch ${p.sw}" style="width:8px;height:8px;border-radius:2px;flex-shrink:0;"></span>
-        <span style="font-size:11px;color:var(--text-3);"><strong style="color:var(--text-2);">${p.label} phase</strong> — ${p.tip}</span>
-      </div>`;
-    })() : '';
-
-    return `
-      <div class="cal-header">
-        <button class="cal-nav-btn" onclick="S.dashCalOffset=(S.dashCalOffset||0)-1;render()">‹</button>
-        <span class="cal-month-name">${weekLabel}</span>
-        <button class="cal-nav-btn" onclick="S.dashCalOffset=Math.min(0,(S.dashCalOffset||0)+1);render()"${offset>=0?' disabled':''}>›</button>
-      </div>
-      <div class="cal-streak">${streakTxt}</div>
-      <div class="cal-week-row">${cells}</div>
-      <div class="cal-legend" style="margin-top:8px;">
-        <span class="cal-leg-item"><span class="cal-leg-dot r-high"></span>8+</span>
-        <span class="cal-leg-item"><span class="cal-leg-dot r-mid"></span>6–7</span>
-        <span class="cal-leg-item"><span class="cal-leg-dot r-low"></span>≤5</span>
-      </div>
-      ${phaseCallout}`;
-  }
-
-  // ── Most Worn ─────────────────────────────────────────────
-  const mostWorn = [...S.wardrobe]
-    .filter(w=>(w.wears?.length||0)>0)
-    .sort((a,b)=>b.wears.length-a.wears.length)
-    .slice(0,5);
-
-  // ── Hidden Gems (paid for, barely worn, not flagged as paid-off) ─
-  const gems = S.wardrobe
-    .filter(w=>w.price && !w.paidOff && (w.wears?.length||0)<3)
-    .sort((a,b)=>b.price-a.price)
-    .slice(0,4);
-
-  // ── Top Brands ────────────────────────────────────────────
+  // top items
+  const mostWorn = [...S.wardrobe].filter(w=>(w.wears?.length||0)>0).sort((a,b)=>b.wears.length-a.wears.length)[0];
   const brandCounts = {};
   S.wardrobe.forEach(w=>{ if(w.brand) brandCounts[w.brand]=(brandCounts[w.brand]||0)+(w.wears?.length||1); });
-  const topBrands = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-
-  // ── Retiring Soon (old flag, kept for backward compat) ────
-  const retiring = S.wardrobe.filter(w=>w.retiring && !w.retiredFromCloset).slice(0,5);
-
-  // ── Needs Tailoring ───────────────────────────────────────
-  const needsTailoring = S.wardrobe.filter(w=>w.tailoringNeeded && !w.retiredFromCloset);
-
-  // ── Wasted Spend (retired because "didn't suit me") ───────
-  const wastedItems = S.wardrobe.filter(w=>w.retiredFromCloset && w.retireReason==='didnt-suit-me' && w.price);
-  const wastedTotal = wastedItems.reduce((sum,w)=>sum+parseFloat(w.price||0),0);
-
-  // ── Occasion Breakdown ────────────────────────────────────
+  const topBrand = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1])[0];
   const tagCounts = {};
   S.entries.forEach(e=>{ if(e.occasionTag) tagCounts[e.occasionTag]=(tagCounts[e.occasionTag]||0)+1; });
-  const topTags = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  const maxTagCount = topTags[0]?.[1]||1;
+  const topActivity = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1])[0];
+  const costPerWear = totalWears > 0 && closetValue > 0 ? (closetValue/totalWears).toFixed(2) : null;
 
-  // Helper: collapsible section
-  function dashSection(key, titleHTML, contentHTML, extraCardStyle='') {
-    const open = !!S.dashExpanded[key];
-    return `<div class="dash-section">
-      <div class="dash-card" style="${extraCardStyle}">
-        <button class="dash-section-hdr ${open?'open':''}" onclick="S.dashExpanded['${key}']=!S.dashExpanded['${key}'];render()">
-          <div class="dash-section-title">${titleHTML}</div>
-          <span class="dash-chevron">▶</span>
-        </button>
-        ${open ? `<div class="dash-section-body">${contentHTML}</div>` : ''}
+  const noData = !S.entries.length && !S.wardrobe.length;
+
+  // ── Tile builders ──────────────────────────────────────────
+  const tile = (icon, val, label, sub='', accent='') => `
+    <div style="background:var(--surface);border:1.5px solid ${accent||'var(--border)'};border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;gap:2px;">
+      <div style="font-size:20px;line-height:1;margin-bottom:4px;">${icon}</div>
+      <div style="font-size:22px;font-weight:900;color:var(--text);line-height:1.1;">${val}</div>
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);">${label}</div>
+      ${sub ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px;">${sub}</div>` : ''}
+    </div>`;
+
+  const wideTile = (icon, label, val, sub='') => `
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:28px;line-height:1;flex-shrink:0;">${icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin-bottom:3px;">${label}</div>
+        <div style="font-size:16px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${val}</div>
+        ${sub ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${sub}</div>` : ''}
       </div>
     </div>`;
-  }
+
+  const gridTiles = [
+    tile('📊', avgRating || '—', 'Style Score', S.entries.length ? `avg of ${S.entries.length} outfits` : 'no outfits yet', avgRating && avgRating >= 8 ? '#C8A000' : ''),
+    tile('👗', S.entries.length, 'Outfits Logged', streak > 0 ? `🔥 ${streak}-day streak` : 'start a streak!'),
+    tile('🧺', S.wardrobe.length, 'Pieces in Closet', unworn > 0 ? `${unworn} never worn` : S.wardrobe.length ? 'all worn ✓' : 'add your first piece'),
+    tile('🔄', totalWears, 'Total Wears', S.wardrobe.length ? `avg ${(totalWears/Math.max(S.wardrobe.length,1)).toFixed(1)}/piece` : ''),
+    ...(closetValue > 0 ? [tile('💰', '$'+Math.round(closetValue).toLocaleString(), 'Closet Value', costPerWear ? `$${costPerWear}/wear avg` : '')] : []),
+    ...(wastedTotal > 0 ? [tile('💸', '$'+Math.round(wastedTotal), "Didn't Suit Me", `${wastedItems.length} piece${wastedItems.length===1?'':'s'} retired`)] : []),
+    ...(gifted > 0 ? [tile('🎁', gifted, 'Gifted Pieces', `${Math.round(gifted/Math.max(S.wardrobe.length,1)*100)}% of closet`)] : []),
+    ...(tailoring > 0 ? [tile('🪡', tailoring, 'Need Tailoring', 'check your closet', '#C8A8E0')] : []),
+    ...(retired > 0 ? [tile('🪦', retired, 'Retired', 'graduated from the closet')] : []),
+  ];
 
   return `<div class="view">
-    <div class="nav"><span class="nav-logo">Dashboard</span><button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button></div>
-
-    <div class="dash-stats-row">
-      <div class="dash-stat"><div class="dash-stat-val">${avgRating}</div><div class="dash-stat-lbl">Style Score</div></div>
-      <div class="dash-stat"><div class="dash-stat-val">${S.entries.length}</div><div class="dash-stat-lbl">Outfits</div></div>
-      <div class="dash-stat"><div class="dash-stat-val">${totalWears}</div><div class="dash-stat-lbl">Total Wears</div></div>
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(S.tab||'profile')" onclick="navigate(S.tab||'profile')">‹</button>
+      <span class="nav-logo">Fashion Stats</span>
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();shareStatsCard()" onclick="shareStatsCard()" style="font-size:13px;padding:0 10px;">📤 Share</button>
     </div>
+    <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding:16px 16px 80px;">
 
-    ${dashSection('calendar', '📅 Logging Calendar', buildCalendar())}
+      ${noData ? `<div class="empty"><div class="empty-icon">📊</div><h2>No Stats Yet</h2><p>Log outfits and add pieces to see your fashion data here.</p></div>` : `
 
-    ${topBrands.length ? dashSection('brands', '🏷 Top Brands',
-      topBrands.map(([brand,count])=>`
-        <div class="dash-bar-row">
-          <div class="dash-bar-label" style="min-width:90px;">${esc(brand)}</div>
-          <div class="dash-bar-wrap"><div class="dash-bar-fill" style="width:${Math.round((count/topBrands[0][1])*100)}%"></div></div>
-          <div class="dash-bar-count">${count} wear${count===1?'':'s'}</div>
-        </div>`).join('')) : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        ${gridTiles.join('')}
+      </div>
 
-    ${topTags.length ? dashSection('occasions', '🎭 Top Activities',
-      topTags.map(([tag,count])=>`
-        <div class="dash-bar-row">
-          <div class="dash-bar-label">${esc(tag)}</div>
-          <div class="dash-bar-wrap"><div class="dash-bar-fill" style="width:${Math.round((count/maxTagCount)*100)}%"></div></div>
-          <div class="dash-bar-count">${count}</div>
-        </div>`).join('')) : ''}
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${mostWorn ? wideTile('🏆', 'Most Worn Piece', esc(mostWorn.name), `${mostWorn.wears.length} wear${mostWorn.wears.length===1?'':'s'}${mostWorn.price ? ' · $'+(mostWorn.price/mostWorn.wears.length).toFixed(2)+'/wear' : ''}`) : ''}
+        ${topBrand ? wideTile('🏷', 'Top Brand', esc(topBrand[0]), `${topBrand[1]} total wear${topBrand[1]===1?'':'s'}`) : ''}
+        ${topActivity ? wideTile('🎭', 'Top Activity', esc(topActivity[0]), `${topActivity[1]} outfit${topActivity[1]===1?'':'s'} logged`) : ''}
+      </div>
 
-    ${mostWorn.length ? dashSection('worn', '🔥 Most Worn',
-      mostWorn.map((w,i)=>`
-        <div class="dash-item-row" onclick="openWardrobeItem('${w.id}')">
-          <div class="dash-rank">${i+1}</div>
-          <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;">${w.icon||'👕'}</div>
-          <div class="dash-item-info">
-            <div class="dash-item-name">${esc(w.name)}</div>
-            <div class="dash-item-sub">${w.wears.length} wear${w.wears.length===1?'':'s'}${w.price&&w.wears.length?` · $${(w.price/w.wears.length).toFixed(2)}/wear`:''}</div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </div>`).join('')) : ''}
-
-    ${gems.length ? dashSection('gems', '🔮 Hidden Gems — Wear These More!',
-      gems.map(w=>`
-        <div class="dash-item-row" onclick="openWardrobeItem('${w.id}')">
-          <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;">${w.icon||'👕'}</div>
-          <div class="dash-item-info">
-            <div class="dash-item-name">${esc(w.name)}</div>
-            <div class="dash-item-sub">$${parseFloat(w.price).toFixed(0)} paid · worn ${w.wears?.length||0}×${w.price&&(w.wears?.length||0)>0?` · $${(w.price/(w.wears?.length||1)).toFixed(2)}/wear`:''}</div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </div>`).join('')) : ''}
-
-    ${retiring.length ? dashSection('retiring', '🪡 Time to Find a Replacement',
-      retiring.map(w=>`
-        <div class="dash-item-row" onclick="openWardrobeItem('${w.id}')">
-          <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;opacity:0.72;">${w.icon||'👕'}</div>
-          <div class="dash-item-info">
-            <div class="dash-item-name">${esc(w.name)}</div>
-            <div class="dash-item-sub">${w.brand?esc(w.brand)+' · ':''}${w.wears?.length||0} wear${(w.wears?.length||0)===1?'':'s'} total</div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </div>`).join(''),
-      'border-color:#E8C060;background:repeating-linear-gradient(135deg,#FFFDF5,#FFFDF5 10px,#FEF9EC 10px,#FEF9EC 12px);') : ''}
-
-    ${needsTailoring.length ? dashSection('tailoring', `🧵 Needs Tailoring <span style="font-size:11px;font-weight:600;color:#9B60C8;background:#F0E6FF;border-radius:100px;padding:1px 7px;margin-left:4px;">${needsTailoring.length}</span>`,
-      needsTailoring.slice(0,5).map(w=>`
-        <div class="dash-item-row" onclick="openWardrobeItem('${w.id}')">
-          <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;">${w.icon||'👕'}</div>
-          <div class="dash-item-info">
-            <div class="dash-item-name">${esc(w.name)}</div>
-            <div class="dash-item-sub">${w.tailoringNote ? esc(w.tailoringNote) : (w.brand?esc(w.brand)+' · ':'')+'needs alteration'}</div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </div>`).join('') +
-      (needsTailoring.length > 5 ? `
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeTailoringFilter=true;switchTab('closet');render()"
-          onclick="S.wardrobeTailoringFilter=true;switchTab('closet');render()"
-          style="width:100%;padding:10px 14px;background:none;border:none;border-top:1px solid var(--border);font-size:13px;font-weight:700;color:#7B35A8;cursor:pointer;font-family:inherit;text-align:center;touch-action:manipulation;">
-          See all ${needsTailoring.length} items needing tailoring →
-        </button>` : ''),
-      'border-color:#C8A8E0;') : ''}
-
-    ${wastedItems.length ? dashSection('wasted', `💸 Didn't Suit Me — $${wastedTotal % 1 === 0 ? wastedTotal : wastedTotal.toFixed(0)} Spent`,
-      `<p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:10px;">These pieces were retired because they didn't work out. Tracking this helps you shop smarter next time.</p>` +
-      wastedItems.map(w=>`
-        <div class="dash-item-row" onclick="openWardrobeItem('${w.id}')">
-          <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;opacity:0.55;">${w.icon||'👕'}</div>
-          <div class="dash-item-info">
-            <div class="dash-item-name">${esc(w.name)}</div>
-            <div class="dash-item-sub">$${parseFloat(w.price).toFixed(0)} · ${w.wears?.length||0} wear${(w.wears?.length||0)===1?'':'s'} · ${w.retireOutcome||'retired'}</div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </div>`).join(''),
-      'border-color:#C8A8E0;') : ''}
-
-    <div style="height:8px"></div>
+      `}
+    </div>
   </div>`;
 }
+
+async function shareStatsCard() {
+  const avgRating = styleScore(S.entries);
+  const totalWears = S.wardrobe.reduce((s,w)=>s+(w.wears?.length||0),0);
+  const closetValue = S.wardrobe.reduce((s,w)=>s+(parseFloat(w.price)||0),0);
+  const unworn = S.wardrobe.filter(w=>!(w.wears?.length)).length;
+  const brandCounts = {};
+  S.wardrobe.forEach(w=>{ if(w.brand) brandCounts[w.brand]=(brandCounts[w.brand]||0)+(w.wears?.length||1); });
+  const topBrand = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1])[0];
+  const tagCounts = {};
+  S.entries.forEach(e=>{ if(e.occasionTag) tagCounts[e.occasionTag]=(tagCounts[e.occasionTag]||0)+1; });
+  const topActivity = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1])[0];
+  const mostWorn = [...S.wardrobe].filter(w=>(w.wears?.length||0)>0).sort((a,b)=>b.wears.length-a.wears.length)[0];
+
+  const toKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayKey = toKey(today);
+  const byDay = {};
+  S.entries.forEach(e=>{ const k=toKey(new Date(e.createdAt)); if(!byDay[k])byDay[k]=[]; byDay[k].push(e); });
+  let streak = 0;
+  const si = byDay[todayKey] ? 0 : 1;
+  for (let i = si; i < 365; i++) { const d=new Date(today); d.setDate(d.getDate()-i); if(byDay[toKey(d)])streak++; else break; }
+
+  const W = 390, H = 580;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * 2; canvas.height = H * 2;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const bg     = isDark ? '#1A1A1E' : '#FAFAF8';
+  const card   = isDark ? '#252528' : '#FFFFFF';
+  const border = isDark ? '#3A3A3E' : '#E8E6E0';
+  const text1  = isDark ? '#F0EEE8' : '#1A1814';
+  const text3  = isDark ? '#888880' : '#9A9890';
+  const gold   = '#C8A000';
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,W,H);
+
+  const hdrGrad = ctx.createLinearGradient(0,0,W,80);
+  hdrGrad.addColorStop(0, isDark ? '#2A2618' : '#FDF8EE');
+  hdrGrad.addColorStop(1, bg);
+  ctx.fillStyle = hdrGrad;
+  ctx.fillRect(0,0,W,80);
+
+  ctx.fillStyle = gold;
+  ctx.font = '700 11px system-ui, sans-serif';
+  ctx.fillText('MY FASHION STATS', 20, 28);
+
+  const userName = S.displayName || 'Style Snapshot';
+  ctx.fillStyle = text1;
+  ctx.font = '800 22px system-ui, sans-serif';
+  ctx.fillText(userName, 20, 54);
+
+  const dateStr = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  ctx.fillStyle = text3;
+  ctx.font = '500 11px system-ui, sans-serif';
+  ctx.fillText(dateStr, W - 20 - ctx.measureText(dateStr).width, 54);
+
+  function rr(x,y,w,h,r,fill,strokeCol) {
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+    ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+    ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+    ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle=fill; ctx.fill(); }
+    if (strokeCol) { ctx.strokeStyle=strokeCol; ctx.lineWidth=1.5; ctx.stroke(); }
+  }
+
+  function statTile(x,y,w,h,icon,val,label,sub) {
+    rr(x,y,w,h,10,card,border);
+    ctx.fillStyle=text3; ctx.font='500 17px system-ui,sans-serif'; ctx.fillText(icon,x+12,y+27);
+    ctx.fillStyle=text1; ctx.font='800 19px system-ui,sans-serif'; ctx.fillText(String(val),x+12,y+50);
+    ctx.fillStyle=text3; ctx.font='700 9px system-ui,sans-serif'; ctx.fillText(label.toUpperCase(),x+12,y+63);
+    if (sub) { ctx.fillStyle=text3; ctx.font='500 10px system-ui,sans-serif'; ctx.fillText(sub,x+12,y+76); }
+  }
+
+  function wideTileC(x,y,w,h,icon,label,val,sub) {
+    rr(x,y,w,h,10,card,border);
+    ctx.font='500 20px system-ui,sans-serif'; ctx.fillStyle=text3; ctx.fillText(icon,x+14,y+29);
+    ctx.fillStyle=text3; ctx.font='700 9px system-ui,sans-serif'; ctx.fillText(label.toUpperCase(),x+50,y+17);
+    ctx.fillStyle=text1; ctx.font='700 13px system-ui,sans-serif';
+    const maxW=w-68; let v=val;
+    while(ctx.measureText(v).width>maxW && v.length>3) v=v.slice(0,-1);
+    if(v!==val) v+='…';
+    ctx.fillText(v,x+50,y+31);
+    if(sub){ctx.fillStyle=text3;ctx.font='500 10px system-ui,sans-serif';ctx.fillText(sub,x+50,y+44);}
+  }
+
+  const gx=16, gy=90, gw=(W-gx*2-10)/2, gh=86, gap=10;
+  const stats=[
+    ['📊', avgRating||'—', 'Style Score', S.entries.length?`${S.entries.length} outfits`:''],
+    ['👗', S.entries.length, 'Outfits', streak>0?`${streak}-day streak`:''],
+    ['🧺', S.wardrobe.length, 'In Closet', unworn>0?`${unworn} never worn`:''],
+    ['🔄', totalWears, 'Total Wears', S.wardrobe.length?`avg ${(totalWears/Math.max(S.wardrobe.length,1)).toFixed(1)}/pc`:''],
+    ...(closetValue>0?[['💰','$'+Math.round(closetValue).toLocaleString(),'Closet Value',totalWears>0?`$${(closetValue/totalWears).toFixed(2)}/wear`:'']]:[] ),
+    ...(streak>0?[['🔥',streak,'Day Streak','keep it going!']]:[] ),
+  ];
+  stats.forEach(([icon,val,label,sub],i)=>{
+    const col=i%2, row=Math.floor(i/2);
+    statTile(gx+col*(gw+gap), gy+row*(gh+gap), gw, gh, icon, val, label, sub);
+  });
+
+  const rows=Math.ceil(stats.length/2);
+  let wy=gy+rows*(gh+gap)+6;
+
+  if(mostWorn){wideTileC(gx,wy,W-gx*2,50,'🏆','Most Worn',mostWorn.name,`${mostWorn.wears.length} wear${mostWorn.wears.length===1?'':'s'}`);wy+=58;}
+  if(topBrand){wideTileC(gx,wy,W-gx*2,50,'🏷','Top Brand',topBrand[0],`${topBrand[1]} wear${topBrand[1]===1?'':'s'}`);wy+=58;}
+  if(topActivity){wideTileC(gx,wy,W-gx*2,50,'🎭','Top Activity',topActivity[0],`${topActivity[1]} outfit${topActivity[1]===1?'':'s'}`);wy+=58;}
+
+  ctx.fillStyle=text3;
+  ctx.font='600 10px system-ui,sans-serif';
+  const tag='Tracked with Closet by Dana Long';
+  ctx.fillText(tag, W/2-ctx.measureText(tag).width/2, H-14);
+
+  canvas.toBlob(blob=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='fashion-stats.png'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    toast('Stats card saved! 📊');
+  },'image/png');
+}
+
+
 
 /* ================================================================
    SIGNATURE PIECES — TOGGLE, VIEW, SHARE
@@ -9660,17 +9897,17 @@ function viewWardrobe() {
       const firstItemId = nudgeItems[0]?.id || '';
       const isReceiptAdd = !S.giftNudge.entryId;
       const headline = nudgeName
-        ? (isReceiptAdd ? `You added a gift from ${esc(nudgeName)}!` : `This outfit includes a gift from ${esc(nudgeName)}!`)
-        : (isReceiptAdd ? `You added a gifted piece!` : `This outfit includes a gifted piece!`);
+        ? (isReceiptAdd ? `You added a gift from ${esc(nudgeName)}!` : `You logged a gift from ${esc(nudgeName)}! Want to let them know you wore it today?`)
+        : (isReceiptAdd ? `You added a gifted piece!` : `You wore a gifted piece today!`);
       const subtitle = isReceiptAdd
         ? `Want to let them know you're loving it?`
-        : `Want to let them know you wore it today?`;
+        : '';
       return `<div style="margin:0 16px 14px;background:#FDF0FF;border:1.5px solid #C8A0E8;border-radius:var(--r);padding:13px 14px;">
         <div style="display:flex;align-items:flex-start;gap:10px;">
           <span style="font-size:20px;flex-shrink:0;line-height:1.2;">💝</span>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:800;color:#7B35A8;margin-bottom:3px;">${headline}</div>
-            <div style="font-size:12px;color:#9050B8;line-height:1.45;">${subtitle}</div>
+            <div style="font-size:13px;font-weight:800;color:#7B35A8;margin-bottom:${subtitle?'3':'10'}px;">${headline}</div>
+            ${subtitle ? `<div style="font-size:12px;color:#9050B8;line-height:1.45;">${subtitle}</div>` : ''}
             <div style="display:flex;gap:8px;margin-top:10px;">
               <button
                 ontouchend="if(_touchMoved)return;event.preventDefault();shareGiftWear('${firstItemId}')"
@@ -9897,18 +10134,14 @@ function viewNewPiece() {
 function viewOnboarding() {
   const step = S.onboardStep || 0;
 
+  // 9 progress dots (steps 1–7 features, 8 style words, 9 first fit)
   const dots = (cur) => `<div style="display:flex;gap:5px;align-items:center;justify-content:center;margin:14px 0 6px;">
-    ${Array.from({length:8},(_,i)=>`<div style="height:5px;border-radius:100px;transition:all .25s;background:${i===cur-1?'var(--gold)':'var(--border)'};width:${i===cur-1?'18':'5'}px;"></div>`).join('')}
+    ${Array.from({length:9},(_,i)=>`<div style="height:5px;border-radius:100px;transition:all .25s;background:${i===cur-1?'var(--gold)':'var(--border)'};width:${i===cur-1?'20':'5'}px;"></div>`).join('')}
   </div>`;
 
-  const skipBtn = `<button ontouchend="if(_touchMoved)return;event.preventDefault();finishOnboarding()" onclick="finishOnboarding()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;padding:4px 8px;touch-action:manipulation;white-space:nowrap;">Skip all</button>`;
-
+  const skipBtn = `<button ontouchend="if(_touchMoved)return;event.preventDefault();finishOnboarding()" onclick="finishOnboarding()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;padding:4px 8px;touch-action:manipulation;white-space:nowrap;">Skip</button>`;
   const backBtn = (s) => `<button ontouchend="if(_touchMoved)return;event.preventDefault();S.onboardStep=${s};render()" onclick="S.onboardStep=${s};render()" style="background:none;border:none;font-size:22px;color:var(--text-2);cursor:pointer;padding:4px 8px;touch-action:manipulation;line-height:1;">‹</button>`;
-
-  const nextBtn = (label, s) => `<button class="btn btn-primary"
-    ontouchend="if(_touchMoved)return;event.preventDefault();S.onboardStep=${s};render()"
-    onclick="S.onboardStep=${s};render()"
-    style="margin:0;flex:1;">${label}</button>`;
+  const nextBtn = (label, s) => `<button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();S.onboardStep=${s};render()" onclick="S.onboardStep=${s};render()" style="margin:0;flex:1;">${label}</button>`;
 
   // ── Step 0: Welcome ──────────────────────────────────────────
   if (step === 0) {
@@ -9918,75 +10151,79 @@ function viewOnboarding() {
         <span class="nav-title"></span>
         ${skipBtn}
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:20px 28px 0;flex:1;">
-        <div style="width:96px;height:96px;background:linear-gradient(135deg,#2B2318,#1C1A18);border-radius:26px;display:flex;align-items:center;justify-content:center;font-size:50px;margin-bottom:24px;box-shadow:0 8px 32px rgba(184,125,42,.25);">🪞</div>
-        <div style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;margin-bottom:8px;">Welcome${S.profileName?`, ${esc(S.profileName)}`:''}! 👋</div>
-        <div style="font-size:15px;color:var(--text-2);line-height:1.6;margin-bottom:10px;">Your personal style journal,<br>powered by AI.</div>
-        <div style="font-size:13px;color:var(--text-3);line-height:1.65;max-width:270px;margin-bottom:32px;">Let's take a quick tour of everything Closet can do — it only takes a minute.</div>
+      <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px 28px 0;flex:1;">
+        <div style="width:100px;height:100px;background:linear-gradient(135deg,#2B2318 0%,#4A3520 50%,#1C1A18 100%);border-radius:28px;display:flex;align-items:center;justify-content:center;font-size:52px;margin-bottom:28px;box-shadow:0 12px 40px rgba(184,125,42,.3);">🪞</div>
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--gold-dk);margin-bottom:10px;">Your Style. Your Journal.</div>
+        <div style="font-size:30px;font-weight:900;color:var(--text);letter-spacing:-.6px;line-height:1.15;margin-bottom:12px;">Welcome${S.profileName?`, ${esc(S.profileName)}`:''}.</div>
+        <div style="font-size:15px;color:var(--text-2);line-height:1.65;margin-bottom:8px;max-width:280px;">The app that turns your wardrobe into a style practice — powered by AI, built around you.</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;max-width:260px;margin-bottom:36px;">Quick tour? It takes under a minute and covers everything worth knowing.</div>
         <div style="width:100%;display:flex;flex-direction:column;gap:10px;">
           <button class="btn btn-primary"
             ontouchend="if(_touchMoved)return;event.preventDefault();S.onboardStep=1;render()"
             onclick="S.onboardStep=1;render()"
-            style="margin:0;">Let's go →</button>
+            style="margin:0;">Show me around ✦</button>
           <button class="btn btn-secondary"
             ontouchend="if(_touchMoved)return;event.preventDefault();finishOnboarding()"
             onclick="finishOnboarding()"
-            style="margin:0;">Skip tour, take me in</button>
+            style="margin:0;">I'll explore on my own</button>
         </div>
       </div>
-      <div style="height:40px;"></div>
+      <div style="height:48px;"></div>
     </div>`;
   }
 
-  // ── Feature slides 1–6 ───────────────────────────────────────
+  // ── Feature slides 1–7 ───────────────────────────────────────
   const slides = [
-    // 1 — Fits (dark)
-    { nav:'Fits', dark:true,
-      headline:'Get objective fashion advice.',
-      sub:'Rate every outfit, get Claude\'s honest take, and never forget your best looks.',
+
+    // 1 — Fits
+    { label:'Fits', dark:true,
+      headline:'Your daily look,\nobjectively rated.',
+      sub:'Snap your outfit, get Claude\'s honest style feedback, and build a personal log of your best looks over time.',
       mock:`<div style="padding:0 24px;">
-        <div style="background:linear-gradient(150deg,#2B2318,#1C1A18);border-radius:16px;padding:14px;">
-          <div style="background:linear-gradient(160deg,#3B3020,#252018);border-radius:10px;height:128px;position:relative;margin-bottom:12px;display:flex;align-items:flex-end;padding:10px;">
-            <svg width="44" height="90" viewBox="0 0 44 90" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);opacity:.12;" fill="rgba(255,255,255,.9)">
-              <ellipse cx="22" cy="11" rx="9" ry="10"/>
-              <path d="M6 25 Q22 19 38 25 L41 64 Q30 62 22 64 Q14 62 3 64 Z"/>
-              <rect x="12" y="64" width="8" height="24" rx="4"/>
-              <rect x="24" y="64" width="8" height="24" rx="4"/>
-            </svg>
-            <div style="background:rgba(184,125,42,.9);border-radius:100px;padding:5px 14px;z-index:1;display:flex;align-items:baseline;gap:3px;">
-              <span style="font-size:17px;font-weight:900;color:#fff;">8.5</span>
-              <span style="font-size:10px;color:rgba(255,255,255,.65);font-weight:600;">/ 10</span>
+        <div style="background:linear-gradient(150deg,#2B2318,#1C1A18);border-radius:18px;padding:16px;">
+          <div style="background:linear-gradient(160deg,#3B3020,#252018);border-radius:12px;height:136px;position:relative;margin-bottom:14px;display:flex;align-items:flex-end;padding:12px;overflow:hidden;">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.1;">
+              <svg width="60" height="110" viewBox="0 0 44 90" fill="rgba(255,255,255,.9)"><ellipse cx="22" cy="11" rx="9" ry="10"/><path d="M6 25 Q22 19 38 25 L41 64 Q30 62 22 64 Q14 62 3 64 Z"/><rect x="12" y="64" width="8" height="24" rx="4"/><rect x="24" y="64" width="8" height="24" rx="4"/></svg>
             </div>
-            <div style="position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border-radius:100px;padding:3px 9px;">
-              <span style="font-size:9px;color:rgba(255,255,255,.55);font-weight:700;letter-spacing:.04em;">RATED</span>
+            <div style="background:rgba(200,160,0,.92);border-radius:100px;padding:6px 16px;z-index:1;display:flex;align-items:baseline;gap:4px;">
+              <span style="font-size:19px;font-weight:900;color:#fff;">8.5</span>
+              <span style="font-size:10px;color:rgba(255,255,255,.7);font-weight:600;">/ 10</span>
+            </div>
+            <div style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.09);border-radius:100px;padding:3px 10px;">
+              <span style="font-size:9px;color:rgba(255,255,255,.5);font-weight:700;letter-spacing:.05em;">RATED</span>
             </div>
           </div>
-          <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 12px;">
-            <div style="font-size:8px;font-weight:800;color:#C9A84C;letter-spacing:.1em;margin-bottom:5px;">✦ CLAUDE'S TAKE</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.72);line-height:1.55;">Love the tonal palette here. The contrast with the bag elevates the whole look — very polished.</div>
+          <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:11px 14px;">
+            <div style="font-size:8px;font-weight:900;color:#C9A84C;letter-spacing:.12em;margin-bottom:6px;">✦ CLAUDE'S TAKE</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.68);line-height:1.6;">"Strong tonal palette with great proportions. The bag contrast is doing a lot — this is a go-to look."</div>
           </div>
         </div>
       </div>`
     },
-    // 2 — Closet (light)
-    { nav:'Closet', dark:false,
-      headline:'Know what you own.\nStyle what you have.',
-      sub:'Your full wardrobe, always with you. Track wear count, flag hero pieces, and never buy a duplicate.',
+
+    // 2 — Closet
+    { label:'Closet', dark:false,
+      headline:'Everything you own.\nFinally organised.',
+      sub:'Log your full wardrobe, track wears, flag Hero Pieces, crown your Signature style, and surface Hidden Gems you\'ve been sleeping on.',
       mock:`<div style="padding:0 24px;">
-        <div style="background:var(--surface);border-radius:16px;padding:12px;border:1.5px solid var(--border);">
-          <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Your Wardrobe · 47 pieces</div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+        <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div style="font-size:9px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;">Your Wardrobe</div>
+            <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 8px;">47 pieces</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">
             ${[
-              {icon:'👟',name:'White Sneakers',wears:12,badge:'💎'},
-              {icon:'🧥',name:'Camel Coat',wears:8,badge:'✦'},
-              {icon:'👜',name:'Mini Bag',wears:15,badge:''},
-              {icon:'👗',name:'Midi Dress',wears:5,badge:''},
-              {icon:'👕',name:'Linen Tee',wears:22,badge:''},
-              {icon:'👖',name:'Wide Legs',wears:9,badge:''},
-            ].map(w=>`<div style="background:var(--surface-2);border-radius:8px;padding:7px 5px;border:1px solid var(--border);position:relative;">
-              ${w.badge==='✦'?`<div style="position:absolute;top:3px;right:3px;font-size:7px;font-weight:900;color:#9D174D;background:#FFF1F6;border-radius:100px;padding:1px 4px;">✦</div>`:''}
-              ${w.badge==='💎'?`<div style="position:absolute;top:2px;right:3px;font-size:9px;">💎</div>`:''}
-              <div style="font-size:20px;margin-bottom:3px;">${w.icon}</div>
+              {icon:'👟',name:'White Sneakers',wears:14,badge:'hero'},
+              {icon:'🧥',name:'Camel Coat',wears:9,badge:'sig'},
+              {icon:'👜',name:'Mini Bag',wears:17,badge:''},
+              {icon:'👗',name:'Midi Dress',wears:2,badge:'gem'},
+              {icon:'👕',name:'Linen Tee',wears:24,badge:''},
+              {icon:'👖',name:'Wide Legs',wears:11,badge:''},
+            ].map(w=>`<div style="background:var(--surface-2);border-radius:9px;padding:8px 6px;border:1px solid var(--border);position:relative;">
+              ${w.badge==='hero'?`<div style="position:absolute;top:3px;right:3px;font-size:9px;">👑</div>`:''}
+              ${w.badge==='sig'?`<div style="position:absolute;top:3px;right:3px;font-size:9px;">💎</div>`:''}
+              ${w.badge==='gem'?`<div style="position:absolute;top:2px;right:3px;font-size:8px;background:#EFF6FF;border-radius:100px;padding:1px 4px;color:#1D4ED8;font-weight:800;">🔮</div>`:''}
+              <div style="font-size:22px;margin-bottom:4px;">${w.icon}</div>
               <div style="font-size:8px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:2px;">${w.name}</div>
               <div style="font-size:7px;color:var(--text-3);">${w.wears} wears</div>
             </div>`).join('')}
@@ -9994,82 +10231,131 @@ function viewOnboarding() {
         </div>
       </div>`
     },
-    // 3 — Plan (light)
-    { nav:'Plan', dark:false,
-      headline:'Outfits for any occasion,\nright from your closet.',
-      sub:'Describe your event, get a curated outfit suggestion — then save it so you never scramble again.',
-      mock:`<div style="padding:0 24px;">
-        <div style="background:var(--surface);border-radius:16px;padding:14px;border:1.5px solid var(--border);">
-          <div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:10px;padding:11px 13px;margin-bottom:12px;">
-            <div style="font-size:9px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">📅 This Saturday</div>
-            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:1px;">Garden Party</div>
-            <div style="font-size:11px;color:var(--text-2);">Smart casual · Outdoor · Sunny</div>
-          </div>
-          <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px;">✦ Claude's Suggestion</div>
-          <div style="display:flex;gap:5px;">
-            ${['👗 Floral Midi','👡 Block Heels','🌿 Rattan Bag'].map(i=>`<div style="flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:7px 4px;text-align:center;font-size:9px;font-weight:600;color:var(--text-2);line-height:1.4;">${i}</div>`).join('')}
-          </div>
-        </div>
-      </div>`
-    },
-    // 4 — Shop (light)
-    { nav:'Shop', dark:false,
-      headline:'Spend with confidence —\nCloset knows what you need.',
-      sub:'Claude spots the gaps in your wardrobe and links you to exactly the right pieces to shop.',
-      mock:`<div style="padding:0 24px;">
-        <div style="background:var(--surface);border-radius:16px;padding:14px;border:1.5px solid var(--border);">
-          <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px;">Claude's Recs for You</div>
-          ${[{icon:'👟',name:'White Leather Sneakers',ct:'×3 outfits'},{icon:'🎒',name:'Structured Leather Tote',ct:'×5 outfits'}].map(i=>`<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:8px;margin-bottom:6px;">
-            <div style="width:34px;height:34px;border-radius:7px;background:var(--gold-bg);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">${i.icon}</div>
-            <div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:var(--text);">${i.name}</div><div style="font-size:10px;color:var(--text-3);">${i.ct}</div></div>
-            <div style="width:14px;height:14px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;"></div>
-          </div>`).join('')}
-          <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;background:var(--gold);border-radius:8px;margin-top:2px;">
-            <span style="font-size:12px;font-weight:800;color:#fff;">🛍 Shop it on Google</span>
-          </div>
-        </div>
-      </div>`
-    },
-    // 5 — What's Hot (dark)
-    { nav:"What's Hot", dark:true,
-      headline:'Stay ahead of trends\nwithout losing your style.',
-      sub:"Claude curates the top 10 fashion trends each week and shows you how to make them yours.",
-      mock:`<div style="padding:0 24px;">
-        <div style="background:#1C1A18;border-radius:16px;padding:14px;">
-          <div style="font-size:9px;font-weight:700;color:rgba(201,168,76,.65);letter-spacing:.1em;text-transform:uppercase;margin-bottom:11px;">This Week's Trends</div>
-          ${[{n:1,t:'Quiet Luxury',d:'Understated elegance, impeccable basics'},{n:2,t:'Coastal Grandmother',d:'Linen, whites & relaxed sophistication'},{n:3,t:'Dopamine Dressing',d:'Bold colour as your mood-booster'}].map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);">
-            <div style="width:22px;height:22px;border-radius:100px;background:rgba(201,168,76,.14);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <span style="font-size:10px;font-weight:900;color:#C9A84C;">${r.n}</span>
-            </div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:12px;font-weight:700;color:#fff;">${r.t}</div>
-              <div style="font-size:10px;color:rgba(255,255,255,.38);margin-top:1px;">${r.d}</div>
-            </div>
-          </div>`).join('')}
-        </div>
-      </div>`
-    },
-    // 6 — Me (light)
-    { nav:'Me', dark:false,
+
+    // 3 — Portfolio
+    { label:'Portfolio', dark:true,
       headline:'Your style story,\nbeautifully told.',
-      sub:`${S.profileName?`${esc(S.profileName)}'s`:"Your"} Dash is your personal style command centre — battles, stats, signature pieces, and more.`,
+      sub:'Portfolio is your command centre — best outfits, Signature Pieces, fashion battle wins, style identity, and a stat snapshot that grows with you.',
       mock:`<div style="padding:0 24px;">
-        <div style="background:var(--surface);border-radius:16px;padding:14px;border:1.5px solid var(--border);">
-          <div style="font-size:17px;font-weight:900;color:var(--text);margin-bottom:1px;">${S.profileName?`${esc(S.profileName)}'s Dash`:"Dana's Dash"}</div>
-          <div style="font-size:10px;color:var(--text-3);margin-bottom:12px;">Style portrait · Battles · Stats</div>
-          <div style="font-size:10px;font-weight:800;color:#9D174D;margin-bottom:7px;">💎 Signature Pieces</div>
-          <div style="display:flex;gap:7px;">
-            ${[{icon:'🧥',name:'Camel Coat'},{icon:'👜',name:'Mini Bag'},{empty:true}].map(p=>p.empty
-              ?`<div style="flex:1;background:#FFF8FA;border:2px dashed #E8B4C8;border-radius:8px;height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;"><div style="font-size:12px;color:#9D174D;">✦</div><div style="font-size:7px;font-weight:800;color:#9D174D;text-align:center;line-height:1.3;">This is<br>SO me</div></div>`
-              :`<div style="flex:1;background:#FFF1F6;border:2px solid #E8B4C8;border-radius:8px;height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;"><div style="font-size:20px;">${p.icon}</div><div style="font-size:8px;font-weight:700;color:#9D174D;">${p.name}</div></div>`
-            ).join('')}
+        <div style="background:linear-gradient(150deg,#2B2318,#1C1A18);border-radius:18px;padding:16px;">
+          <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:2px;">${S.profileName?`${esc(S.profileName)}'s`:"Your"} Portfolio</div>
+          <div style="font-size:10px;color:rgba(201,168,76,.7);margin-bottom:14px;">Style identity · Best looks · Battles</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            ${[['📊','Style Score','8.4'],['👗','Outfits','32'],['🔄','Total Wears','148'],['🏆','Battles Won','7']].map(([ic,lb,v])=>`
+              <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:9px 10px;border:1px solid rgba(255,255,255,.08);">
+                <div style="font-size:14px;margin-bottom:2px;">${ic}</div>
+                <div style="font-size:15px;font-weight:900;color:#fff;">${v}</div>
+                <div style="font-size:8px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;">${lb}</div>
+              </div>`).join('')}
+          </div>
+          <div style="background:rgba(200,160,0,.12);border:1px solid rgba(200,160,0,.25);border-radius:10px;padding:8px 12px;">
+            <div style="font-size:8px;font-weight:900;color:#C9A84C;letter-spacing:.1em;margin-bottom:3px;">✦ STYLE IDENTITY</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.65);">Effortless Minimalist with an edge</div>
+          </div>
+        </div>
+      </div>`
+    },
+
+    // 4 — Plan
+    { label:'Plan', dark:false,
+      headline:'Never scramble\nbefore an event again.',
+      sub:'Tell Claude your occasion and it builds an outfit from your actual wardrobe. Going with friends? Create a Group Fit and plan together.',
+      mock:`<div style="padding:0 24px;">
+        <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
+          <div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:11px;padding:12px 14px;margin-bottom:12px;">
+            <div style="font-size:9px;font-weight:800;color:var(--gold-dk);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">📅 Saturday · Rooftop Dinner</div>
+            <div style="font-size:15px;font-weight:900;color:var(--text);margin-bottom:2px;">Smart Casual · Warm Evening</div>
+            <div style="font-size:11px;color:var(--text-2);">Dress to impress, not to overheat</div>
+          </div>
+          <div style="font-size:9px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">✦ Claude's Build</div>
+          <div style="display:flex;gap:6px;margin-bottom:10px;">
+            ${['👗 Silk Slip Dress','👡 Strappy Heels','✨ Gold Cuff'].map(i=>`<div style="flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:7px 4px;text-align:center;font-size:9px;font-weight:700;color:var(--text-2);line-height:1.5;">${i}</div>`).join('')}
+          </div>
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:14px;">👯</span>
+            <div style="font-size:11px;font-weight:700;color:var(--text);">Group Fit · 3 people planned</div>
+          </div>
+        </div>
+      </div>`
+    },
+
+    // 5 — Shop
+    { label:'Shop', dark:false,
+      headline:'Spend with intention.\nClose the gaps.',
+      sub:'Claude studies your actual wardrobe and surfaces only what\'s missing — then links you straight to shop it. Build a Wish List so nothing slips away.',
+      mock:`<div style="padding:0 24px;">
+        <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
+          <div style="font-size:9px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">✦ Your Closet Gaps</div>
+          ${[
+            {icon:'👟',name:'White Leather Sneakers',fits:'Works in 4 saved looks',urg:'High'},
+            {icon:'🎒',name:'Structured Tote',fits:'Missing from 6 outfits',urg:'Medium'},
+          ].map(i=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:9px;margin-bottom:7px;">
+            <div style="width:36px;height:36px;border-radius:8px;background:var(--gold-bg);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${i.icon}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:800;color:var(--text);">${i.name}</div>
+              <div style="font-size:10px;color:var(--text-3);margin-top:1px;">${i.fits}</div>
+            </div>
+            <div style="font-size:8px;font-weight:800;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 7px;white-space:nowrap;">${i.urg}</div>
+          </div>`).join('')}
+          <div style="background:var(--gold);border-radius:9px;padding:10px;text-align:center;">
+            <span style="font-size:12px;font-weight:900;color:#fff;">🛍 Shop it now</span>
+          </div>
+        </div>
+      </div>`
+    },
+
+    // 6 — Discover
+    { label:'Discover', dark:true,
+      headline:'Stay ahead of trends\nwithout losing yourself.',
+      sub:'Weekly AI-curated trend reports, personalised style tips, and Saved Trends you can heart and come back to.',
+      mock:`<div style="padding:0 24px;">
+        <div style="background:#1C1A18;border-radius:18px;padding:16px;">
+          <div style="font-size:9px;font-weight:800;color:rgba(201,168,76,.65);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;">This Week's Top Trends</div>
+          ${[
+            {n:1,e:'🤍',t:'Quiet Luxury',d:'Understated basics, impeccable cuts'},
+            {n:2,e:'🌊',t:'Coastal Cool',d:'Linen, texture & effortless ease'},
+            {n:3,e:'🎨',t:'Dopamine Dressing',d:'Bold colour as your mood-booster'},
+          ].map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+            <div style="width:24px;height:24px;border-radius:100px;background:rgba(201,168,76,.14);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <span style="font-size:11px;font-weight:900;color:#C9A84C;">${r.n}</span>
+            </div>
+            <div style="font-size:16px;flex-shrink:0;">${r.e}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:800;color:#fff;">${r.t}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px;">${r.d}</div>
+            </div>
+            <div style="font-size:14px;color:rgba(255,255,255,.2);">♡</div>
+          </div>`).join('')}
+        </div>
+      </div>`
+    },
+
+    // 7 — Local
+    { label:'Local', dark:false,
+      headline:'Style is local.\nCommunity is everything.',
+      sub:'Discover the best brands near you, follow local designers, find pop-ups and fashion events — and book a virtual styling session when you\'re ready.',
+      mock:`<div style="padding:0 24px;">
+        <div style="border-radius:18px;overflow:hidden;border:1.5px solid var(--border);">
+          <div style="background:linear-gradient(135deg,#2C1A0E 0%,#5C3317 50%,#3A2010 100%);padding:16px 18px 14px;position:relative;">
+            <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(200,160,0,.15) 0%,transparent 65%);"></div>
+            <div style="position:relative;">
+              <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:5px;">✦ Featured Local Brand</div>
+              <div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-.3px;">Neue Terra</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.6);font-style:italic;margin-top:2px;">A modern fragrance of the American landscape</div>
+            </div>
+          </div>
+          <div style="background:var(--surface);padding:12px 16px;">
+            <div style="font-size:11px;color:var(--text-2);line-height:1.6;margin-bottom:10px;">The right scent completes the look. Rooted in the Pacific Coast, Neue Terra is San Francisco's fragrance story.</div>
+            <div style="display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,#833ab4,#fd1d1d,#fcb045);border-radius:9px;padding:8px 12px;">
+              <span style="font-size:12px;font-weight:800;color:#fff;">@neueterra · Follow on Instagram</span>
+            </div>
           </div>
         </div>
       </div>`
     },
   ];
 
-  if (step >= 1 && step <= 6) {
+  if (step >= 1 && step <= 7) {
     const sl = slides[step - 1];
     return `<div class="view view-notab" style="background:var(--bg);">
       <div class="nav" style="border-bottom:none;position:absolute;top:0;left:0;right:0;z-index:10;background:transparent;">
@@ -10078,85 +10364,87 @@ function viewOnboarding() {
         ${skipBtn}
       </div>
 
-      <!-- Illustration -->
-      <div style="background:${sl.dark?'#1C1A18':'var(--surface-2)'};padding:56px 0 24px;min-height:230px;display:flex;align-items:center;">
+      <!-- Illustration area -->
+      <div style="background:${sl.dark?'linear-gradient(180deg,#1C1A18 0%,#242018 100%)':'var(--surface-2)'};padding:58px 0 26px;min-height:240px;display:flex;align-items:center;">
         ${sl.mock}
       </div>
 
       <!-- Content -->
-      <div style="padding:22px 24px 12px;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:7px;">${sl.nav}</div>
-        <div style="font-size:22px;font-weight:900;color:var(--text);line-height:1.25;letter-spacing:-.3px;margin-bottom:9px;">${sl.headline.replace(/\n/g,'<br>')}</div>
-        <div style="font-size:13px;color:var(--text-2);line-height:1.65;">${sl.sub}</div>
+      <div style="padding:22px 24px 10px;">
+        <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:var(--gold-dk);margin-bottom:8px;">${sl.label}</div>
+        <div style="font-size:22px;font-weight:900;color:var(--text);line-height:1.25;letter-spacing:-.3px;margin-bottom:10px;white-space:pre-wrap;">${sl.headline.replace(/\n/g,'<br>')}</div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.7;">${sl.sub}</div>
       </div>
 
       <!-- Dots + Nav -->
-      <div style="padding:0 24px 24px;">
+      <div style="padding:0 24px 28px;">
         ${dots(step)}
         <div style="display:flex;gap:8px;margin-top:10px;">
           ${backBtn(step - 1)}
-          ${nextBtn(step === 6 ? 'Almost done →' : 'Next →', step + 1)}
+          ${nextBtn(step === 7 ? 'Almost there →' : 'Next →', step + 1)}
         </div>
       </div>
     </div>`;
   }
 
-  // ── Step 7: Style words ──────────────────────────────────────
-  if (step === 7) {
-    const opts = ['Minimal','Classic','Bold','Romantic','Edgy','Preppy','Boho','Sporty','Vintage','Maximalist'];
-    const sel = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
-    return `<div class="view view-notab" style="background:var(--bg);">
-      <div class="nav" style="border-bottom:none;">
-        ${backBtn(6)}
-        <span class="nav-title"></span>
-        ${skipBtn}
-      </div>
-      <div style="padding:16px 24px 0;">
-        <div style="font-size:24px;font-weight:900;color:var(--text);letter-spacing:-.3px;margin-bottom:8px;">How would you describe your style?</div>
-        <div style="font-size:14px;color:var(--text-2);line-height:1.6;margin-bottom:22px;">Pick a few that feel like you — Claude uses these to personalise everything.</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;">
-          ${opts.map(o=>{
-            const on=sel.includes(o);
-            return `<button
-              ontouchend="if(_touchMoved)return;event.preventDefault();toggleOnboardStyle('${o}')"
-              onclick="toggleOnboardStyle('${o}')"
-              style="padding:9px 17px;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:all .15s;border:1.5px solid ${on?'var(--gold)':'var(--border)'};background:${on?'var(--gold-bg)':'var(--surface)'};color:${on?'var(--gold-dk)':'var(--text-2)'};">${o}</button>`;
-          }).join('')}
-        </div>
-      </div>
-      <div style="padding:0 24px 24px;">
-        ${dots(7)}
-        <div style="display:flex;gap:8px;margin-top:10px;">
-          ${backBtn(6)}
-          ${nextBtn('Next →', 8)}
-        </div>
-      </div>
-    </div>`;
-  }
-
-  // ── Step 8: Log your first fit ───────────────────────────────
+  // ── Step 8: Style words ──────────────────────────────────────
   if (step === 8) {
+    const opts = ['Minimal','Classic','Bold','Romantic','Edgy','Preppy','Boho','Sporty','Vintage','Maximalist','Streetwear','Elevated Casual'];
+    const sel = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
     return `<div class="view view-notab" style="background:var(--bg);">
       <div class="nav" style="border-bottom:none;">
         ${backBtn(7)}
         <span class="nav-title"></span>
         ${skipBtn}
       </div>
-      <div style="padding:16px 24px 0;">
-        <div style="font-size:24px;font-weight:900;color:var(--text);letter-spacing:-.3px;margin-bottom:8px;">Log your first fit! 📸</div>
-        <div style="font-size:14px;color:var(--text-2);line-height:1.65;margin-bottom:24px;">Snap what you're wearing right now — Claude will rate it and give you honest style feedback.</div>
-        <div style="background:var(--surface);border:2px dashed var(--gold);border-radius:var(--r);padding:36px 20px;text-align:center;cursor:pointer;margin-bottom:8px;"
-          ontouchend="if(_touchMoved)return;event.preventDefault();finishOnboardingAndUpload()"
-          onclick="finishOnboardingAndUpload()">
-          <div style="font-size:52px;margin-bottom:12px;">📷</div>
-          <div style="font-size:15px;font-weight:700;color:var(--gold-dk);margin-bottom:5px;">Take or upload a photo</div>
-          <div style="font-size:12px;color:var(--text-3);line-height:1.5;">Get your first style rating from Claude</div>
+      <div style="padding:20px 24px 0;">
+        <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:var(--gold-dk);margin-bottom:10px;">Your Style</div>
+        <div style="font-size:24px;font-weight:900;color:var(--text);letter-spacing:-.4px;margin-bottom:8px;line-height:1.2;">How would you describe your style?</div>
+        <div style="font-size:14px;color:var(--text-2);line-height:1.65;margin-bottom:22px;">Pick everything that feels like you — Claude uses these to make every recommendation personal.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;">
+          ${opts.map(o=>{
+            const on=sel.includes(o);
+            return `<button
+              ontouchend="if(_touchMoved)return;event.preventDefault();toggleOnboardStyle('${o}')"
+              onclick="toggleOnboardStyle('${o}')"
+              style="padding:10px 18px;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:all .15s;border:1.5px solid ${on?'var(--gold)':'var(--border)'};background:${on?'var(--gold-bg)':'var(--surface)'};color:${on?'var(--gold-dk)':'var(--text-2)'};">${on?'✓ ':''} ${o}</button>`;
+          }).join('')}
         </div>
       </div>
-      <div style="padding:0 24px 24px;">
+      <div style="padding:0 24px 28px;">
         ${dots(8)}
         <div style="display:flex;gap:8px;margin-top:10px;">
           ${backBtn(7)}
+          ${nextBtn('Next →', 9)}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ── Step 9: Log your first fit ───────────────────────────────
+  if (step === 9) {
+    return `<div class="view view-notab" style="background:var(--bg);">
+      <div class="nav" style="border-bottom:none;">
+        ${backBtn(8)}
+        <span class="nav-title"></span>
+        ${skipBtn}
+      </div>
+      <div style="padding:20px 24px 0;">
+        <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:var(--gold-dk);margin-bottom:10px;">First Look</div>
+        <div style="font-size:24px;font-weight:900;color:var(--text);letter-spacing:-.4px;margin-bottom:10px;line-height:1.2;">Log your first fit. 📸</div>
+        <div style="font-size:14px;color:var(--text-2);line-height:1.65;margin-bottom:24px;">Snap what you're wearing right now — Claude rates your look and gives you real, honest style feedback.</div>
+        <div style="background:var(--surface);border:2px dashed var(--gold);border-radius:16px;padding:36px 20px;text-align:center;cursor:pointer;margin-bottom:8px;"
+          ontouchend="if(_touchMoved)return;event.preventDefault();finishOnboardingAndUpload()"
+          onclick="finishOnboardingAndUpload()">
+          <div style="font-size:52px;margin-bottom:14px;">📷</div>
+          <div style="font-size:15px;font-weight:800;color:var(--gold-dk);margin-bottom:6px;">Take or upload a photo</div>
+          <div style="font-size:12px;color:var(--text-3);line-height:1.55;">Get your first style score from Claude</div>
+        </div>
+      </div>
+      <div style="padding:0 24px 28px;">
+        ${dots(9)}
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          ${backBtn(8)}
           <button class="btn btn-secondary"
             ontouchend="if(_touchMoved)return;event.preventDefault();finishOnboarding()"
             onclick="finishOnboarding()"
@@ -10169,6 +10457,7 @@ function viewOnboarding() {
   finishOnboarding();
   return '';
 }
+
 
 function toggleOnboardStyle(word) {
   const list = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
@@ -12780,6 +13069,23 @@ function viewSettings() {
       </div>
     </div>
 
+    <!-- ── YOUR STYLE ────────────────────────────── -->
+    <div class="settings-group-label">Your Style</div>
+    <div class="settings-section">
+      <div class="settings-row">
+        <div class="settings-hint" style="margin-bottom:12px;">How would you describe your aesthetic? Claude uses these to personalise every recommendation and style suggestion.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${['Minimal','Classic','Bold','Romantic','Edgy','Preppy','Boho','Sporty','Vintage','Maximalist','Streetwear','Elevated Casual'].map(o => {
+            const on = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean).includes(o);
+            return `<button
+              ontouchend="if(_touchMoved)return;event.preventDefault();toggleOnboardStyle('${o}')"
+              onclick="toggleOnboardStyle('${o}')"
+              style="padding:9px 16px;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${on?'var(--gold)':'var(--border)'};background:${on?'var(--gold-bg)':'var(--surface)'};color:${on?'var(--gold-dk)':'var(--text-2)'};">${on?'✓ ':''}${o}</button>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
     <!-- ── OCCASIONS ─────────────────────────────── -->
     <div class="settings-group-label">Occasions</div>
     <div class="settings-section">
@@ -14663,6 +14969,11 @@ auth.onAuthStateChanged(async (user) => {
   render();
   if (S.apiKey) initNewsFlash();
   initWeatherPin();
+  // Word of the Day — show once per calendar day, after a brief settle delay
+  setTimeout(() => {
+    checkWordOfTheDay();
+    if (S.wordOfDay) render();
+  }, 1500);
 });
 </script>
 </body>
