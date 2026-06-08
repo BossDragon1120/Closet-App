@@ -557,14 +557,14 @@ body {
 
 /* ── UPLOAD ZONE ─────────────────────────────────────────── */
 .upload-zone {
-  margin: 20px; border: 2px dashed var(--border); border-radius: var(--r-lg);
+  margin: 20px; border: 2px solid var(--gold); border-radius: var(--r-lg);
   padding: 52px 32px; text-align: center; cursor: pointer;
-  background: var(--surface); transition: border-color .2s, background .2s;
+  background: var(--gold-bg); transition: border-color .2s, background .2s, opacity .15s;
 }
-.upload-zone:active, .upload-zone.dragover { border-color: var(--gold); background: var(--gold-bg); }
+.upload-zone:active, .upload-zone.dragover { opacity: .82; }
 .upload-zone-icon { font-size: 52px; margin-bottom: 16px; }
-.upload-zone h3 { font-size: 18px; margin-bottom: 8px; }
-.upload-zone p { font-size: 14px; color: var(--text-2); line-height: 1.55; }
+.upload-zone h3 { font-size: 18px; margin-bottom: 8px; color: var(--gold-dk); }
+.upload-zone p { font-size: 14px; color: var(--gold-dk); opacity: .75; line-height: 1.55; }
 
 /* ── PHOTO PREVIEW ───────────────────────────────────────── */
 .photo-preview-wrap { position: relative; margin: 16px 20px 0; }
@@ -1216,12 +1216,7 @@ body {
 }
 .fr-mode-btn:active { opacity: .75; }
 .fr-mode-btn:hover { border-color: var(--gold); color: var(--gold); }
-.fr-mode-btn.battle {
-  background: linear-gradient(135deg,#1C1A18,#2a2520);
-  border: 1.5px solid rgba(255,255,255,.1); color: rgba(255,255,255,.85);
-  border-style: solid;
-}
-.fr-mode-btn.battle:hover { border-color: var(--gold); color: #fff; }
+.fr-mode-btn.battle:hover { border-color: var(--gold); color: var(--gold); }
 .carousel-dots { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 0 0 20px; }
 .carousel-dot {
   height: 6px; border-radius: 3px; background: var(--border);
@@ -6331,6 +6326,7 @@ function render() {
     case 'home':         html = viewHome();         break;
     case 'profile':      html = viewProfile();      break;
     case 'aura':              html = viewAura();              break;
+    case 'saved-tips':        html = viewSavedTips();         break;
     case 'closet-assistant':  html = viewClosetAssistant();   break;
     case 'assistant-book':    html = viewAssistantBook();     break;
     case 'dashboard':    html = viewDashboard();    break;
@@ -8089,7 +8085,9 @@ function viewShop() {
       <span class="nav-logo">Shop</span>
       ${src === 'spotted'
         ? `<button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openSpottedCapture();" onclick="openSpottedCapture()">＋ Capture</button>`
-        : `<button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openWishShareSheet();" onclick="openWishShareSheet()">🎁 Share List</button>`
+        : src === 'wishlist'
+        ? `<button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openWishShareSheet();" onclick="openWishShareSheet()">🎁 Share List</button>`
+        : ``
       }
     </div>
 
@@ -8246,19 +8244,16 @@ function viewShop() {
               </button>` : ''}
 
             <!-- Fields -->
-            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:8px;">
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
               <input class="form-input" placeholder="Item name (e.g. Cream linen blazer)" value="${esc(cap.name)}" oninput="S._spottedCapture.name=this.value" style="margin:0;">
               <input class="form-input" placeholder="Brand (optional)" value="${esc(cap.brand)}" oninput="S._spottedCapture.brand=this.value" style="margin:0;">
               <input class="form-input" placeholder="Price (optional — e.g. $148)" value="${esc(cap.price)}" oninput="S._spottedCapture.price=this.value" style="margin:0;">
               <input class="form-input" placeholder="Notes — size tried, color, etc." value="${esc(cap.notes)}" oninput="S._spottedCapture.notes=this.value" style="margin:0;">
             </div>
-            <div style="height:4px;"></div>
-          </div>
 
-          <!-- Sticky save -->
-          <div style="flex-shrink:0;padding:12px 20px max(20px,env(safe-area-inset-bottom,20px));border-top:1px solid var(--border);background:var(--surface);">
+            <!-- Save button — inside scroll area so keyboard never covers it -->
             <button ontouchend="if(_touchMoved)return;event.preventDefault();saveSpottedItem();" onclick="saveSpottedItem()"
-              style="width:100%;background:var(--gold);color:#fff;border:none;border-radius:var(--r-sm);padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              style="width:100%;background:var(--gold);color:#fff;border:none;border-radius:var(--r-sm);padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:max(16px,env(safe-area-inset-bottom,16px));">
               📌 Save to Spotted
             </button>
           </div>
@@ -8459,48 +8454,155 @@ function viewPlan() {
     ${planMode === 'group' ? `
       <div style="padding:0 16px 16px;">${squadSectionHTML}</div>
     ` : `
+      <!-- SOLO SUB-MODE PICKER -->
+      ${!p.soloMode ? `
+        <div style="padding:0 16px 16px;display:flex;gap:10px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode='event';render();" onclick="S.plan.soloMode='event';render();"
+            style="flex:1;padding:20px 12px;border-radius:var(--r);border:2px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:center;touch-action:manipulation;">
+            <div style="font-size:28px;margin-bottom:8px;">🗓</div>
+            <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;">Event</div>
+            <div style="font-size:11px;color:var(--text-3);line-height:1.4;">Dinner, party, interview — get a one-look recommendation</div>
+          </button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode='trip';render();" onclick="S.plan.soloMode='trip';render();"
+            style="flex:1;padding:20px 12px;border-radius:var(--r);border:2px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:center;touch-action:manipulation;">
+            <div style="font-size:28px;margin-bottom:8px;">✈️</div>
+            <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;">Trip</div>
+            <div style="font-size:11px;color:var(--text-3);line-height:1.4;">Pack smart — day-by-day outfits + what to buy</div>
+          </button>
+        </div>
+      ` : ''}
+
       <!-- SOLO EVENT FLOW -->
-      <div class="plan-card">
-        <div class="plan-card-title">Describe your event</div>
-        <textarea class="plan-textarea" rows="3"
-          placeholder="e.g. birthday rooftop dinner in NYC in July, job interview at a creative agency, casual brunch on Sunday…"
-          oninput="S.plan.eventDesc=this.value">${esc(p.eventDesc)}</textarea>
-      </div>
+      ${p.soloMode === 'event' ? `
+        <div style="padding:0 16px 4px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode=null;S.plan.suggestion=null;render();" onclick="S.plan.soloMode=null;S.plan.suggestion=null;render();"
+            style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:4px;">
+            ← Back
+          </button>
+        </div>
+        <div class="plan-card">
+          <div class="plan-card-title">Describe your event</div>
+          <textarea class="plan-textarea" rows="3"
+            placeholder="e.g. birthday rooftop dinner in NYC in July, job interview at a creative agency, casual brunch on Sunday…"
+            oninput="S.plan.eventDesc=this.value">${esc(p.eventDesc)}</textarea>
+        </div>
 
-      <div style="padding:0 20px 16px;">
-        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();doSuggestOutfits();" onclick="doSuggestOutfits()" style="margin:0;touch-action:manipulation;${p.loadingSuggest?'opacity:.65;':''}"
-          ${p.loadingSuggest?'disabled':''}>
-          ${p.loadingSuggest ? '✨ Claude is thinking…' : '✨ Get Recommendation'}
-        </button>
-      </div>
+        <div style="padding:0 20px 16px;">
+          <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();doSuggestOutfits();" onclick="doSuggestOutfits()" style="margin:0;touch-action:manipulation;${p.loadingSuggest?'opacity:.65;':''}"
+            ${p.loadingSuggest?'disabled':''}>
+            ${p.loadingSuggest ? '✨ Claude is thinking…' : '✨ Get Recommendation'}
+          </button>
+        </div>
 
-      ${p.suggestion ? `
-        <!-- RECOMMENDATION CARD -->
-        <div class="plan-rec-card">
-          <div class="plan-rec-header">
-            <span class="plan-rec-label">✨ Recommendation</span>
-            <span style="font-size:11px;color:var(--text-3);font-style:italic;">${esc(autoTitle(p.eventDesc))}</span>
-          </div>
-          <div class="plan-rec-body">
-            <div class="plan-rec-items">
-              ${(p.suggestion.items||[]).map(it=>`<span class="plan-rec-chip">${esc(it)}</span>`).join('')}
+        ${p.suggestion ? `
+          <!-- RECOMMENDATION CARD -->
+          <div class="plan-rec-card">
+            <div class="plan-rec-header">
+              <span class="plan-rec-label">✨ Recommendation</span>
+              <span style="font-size:11px;color:var(--text-3);font-style:italic;">${esc(autoTitle(p.eventDesc))}</span>
             </div>
-            ${p.suggestion.reasoning ? `<div class="plan-rec-reasoning">${esc(p.suggestion.reasoning)}</div>` : ''}
-            ${p.suggestion.weatherNote ? `<div style="font-size:12px;color:var(--gold-dk);font-weight:600;margin-top:6px;">🌤 ${esc(p.suggestion.weatherNote)}</div>` : ''}
+            <div class="plan-rec-body">
+              <div class="plan-rec-items">
+                ${(p.suggestion.items||[]).map(it=>`<span class="plan-rec-chip">${esc(it)}</span>`).join('')}
+              </div>
+              ${p.suggestion.reasoning ? `<div class="plan-rec-reasoning">${esc(p.suggestion.reasoning)}</div>` : ''}
+              ${p.suggestion.weatherNote ? `<div style="font-size:12px;color:var(--gold-dk);font-weight:600;margin-top:6px;">🌤 ${esc(p.suggestion.weatherNote)}</div>` : ''}
+            </div>
+
+            <!-- Action buttons -->
+            <div style="display:flex;gap:8px;padding:12px 16px 14px;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();saveEventStandalone();" onclick="saveEventStandalone()"
+                style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                💾 Save Event
+              </button>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();toast('✈️ Trip collections coming soon!');" onclick="toast('✈️ Trip collections coming soon!');"
+                style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;opacity:.7;">
+                ✈️ Add to Trip
+              </button>
+            </div>
+          </div>
+        ` : ''}
+      ` : ''}
+
+      <!-- TRIP PLANNING FLOW -->
+      ${p.soloMode === 'trip' ? `
+        <div style="padding:0 16px 4px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode=null;S.plan.tripSuggestions=null;S.plan.tripGaps=null;render();" onclick="S.plan.soloMode=null;S.plan.tripSuggestions=null;S.plan.tripGaps=null;render();"
+            style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:4px;">
+            ← Back
+          </button>
+        </div>
+
+        <div class="plan-card">
+          <div class="plan-card-title">Plan my trip ✈️</div>
+
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label">Destination</label>
+            <input class="form-input" style="margin:0;" placeholder="e.g. Paris, Cabo, New York City"
+              value="${esc(p.tripDestination)}"
+              oninput="S.plan.tripDestination=this.value">
           </div>
 
-          <!-- Action buttons -->
-          <div style="display:flex;gap:8px;padding:12px 16px 14px;">
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();saveEventStandalone();" onclick="saveEventStandalone()"
-              style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-              💾 Save Event
-            </button>
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();toast('✈️ Trip collections coming soon!');" onclick="toast('✈️ Trip collections coming soon!');"
-              style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;opacity:.7;">
-              ✈️ Add to Trip
-            </button>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Number of days</label>
+            <div style="display:flex;align-items:center;gap:14px;margin-top:6px;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.tripDays=Math.max(1,(S.plan.tripDays||5)-1);render();" onclick="S.plan.tripDays=Math.max(1,(S.plan.tripDays||5)-1);render();"
+                style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text);touch-action:manipulation;font-family:inherit;">−</button>
+              <div style="font-size:24px;font-weight:900;color:var(--text);min-width:30px;text-align:center;">${p.tripDays||5}</div>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.tripDays=Math.min(14,(S.plan.tripDays||5)+1);render();" onclick="S.plan.tripDays=Math.min(14,(S.plan.tripDays||5)+1);render();"
+                style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text);touch-action:manipulation;font-family:inherit;">+</button>
+              <div style="font-size:13px;color:var(--text-3);">day${(p.tripDays||5)===1?'':'s'}</div>
+            </div>
           </div>
         </div>
+
+        <div style="padding:0 20px 16px;">
+          <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();doSuggestTripOutfits();" onclick="doSuggestTripOutfits()" style="margin:0;touch-action:manipulation;${p.loadingTrip?'opacity:.65;':''}"
+            ${p.loadingTrip?'disabled':''}>
+            ${p.loadingTrip ? '✨ Packing your bags…' : '✨ Plan My Trip'}
+          </button>
+        </div>
+
+        ${p.tripSuggestions?.length ? `
+          <!-- TRIP RESULT — day-by-day -->
+          <div style="padding:0 16px;">
+            <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">📅 Your ${p.tripDays||p.tripSuggestions.length}-Day Wardrobe Plan</div>
+            ${p.tripSuggestions.map((day,i) => `
+              <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                  <div style="background:var(--gold);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:100px;">Day ${i+1}</div>
+                  ${day.occasion ? `<div style="font-size:12px;color:var(--text-2);font-weight:600;">${esc(day.occasion)}</div>` : ''}
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:${day.reasoning||day.packingTip?'10px':'0'};">
+                  ${(day.items||[]).map(it=>`<span class="plan-rec-chip">${esc(it)}</span>`).join('')}
+                </div>
+                ${day.reasoning ? `<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:${day.packingTip?'6px':'0'};">${esc(day.reasoning)}</div>` : ''}
+                ${day.packingTip ? `<div style="font-size:11px;color:var(--gold-dk);font-weight:600;margin-top:4px;">💡 ${esc(day.packingTip)}</div>` : ''}
+              </div>
+            `).join('')}
+
+            ${p.tripGaps?.length ? `
+              <!-- WHAT TO BUY -->
+              <div style="margin-top:6px;margin-bottom:16px;">
+                <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">🛍 What to Buy</div>
+                ${p.tripGaps.map(g => `
+                  <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:13px 16px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px;">
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;">${esc(g.item)}</div>
+                      <div style="font-size:12px;color:var(--text-2);line-height:1.4;">${esc(g.reason)}</div>
+                    </div>
+                    ${g.searchQuery ? `
+                      <a href="https://www.google.com/search?q=${encodeURIComponent(g.searchQuery)}&tbm=shop" target="_blank"
+                        style="flex-shrink:0;padding:7px 13px;border-radius:100px;border:1.5px solid var(--border);background:var(--bg);font-size:12px;font-weight:700;color:var(--accent);text-decoration:none;white-space:nowrap;">
+                        🛍 Shop
+                      </a>
+                    ` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
       ` : ''}
 
       <!-- Post-trip-save success nudge -->
@@ -8641,32 +8743,51 @@ async function doSuggestTripOutfits() {
   const dest = S.plan.tripDestination.trim();
   if (!dest) { toast('Enter a destination ✈️'); return; }
   if (!S.apiKey.trim()) { navigate('settings'); toast('Add your API key first!'); return; }
-  const ds = S.plan.tripDateStart; const de = S.plan.tripDateEnd;
-  const days = (ds && de && ds <= de) ? generateDateRange(ds, de) : [];
-  const numDays = days.length || 3;
-  S.plan.loadingTrip = true; S.plan.tripSuggestions = null; render();
+  const numDays = Math.min(14, Math.max(1, S.plan.tripDays || 5));
+  const outfitDays = Math.min(numDays, 7);
+  S.plan.loadingTrip = true; S.plan.tripSuggestions = null; S.plan.tripGaps = null; render();
   try {
-    const wItems = S.wardrobe.filter(w=>!w.retiredFromCloset).slice(0,40)
-      .map(w=>`${w.icon||''}${w.name}${w.brand?' ('+w.brand+')':''}`).join(', ');
-    const dayList = days.length ? days.map((d,i)=>`Day ${i+1}: ${d.date}`).join(', ') : `${numDays} days`;
+    const wItems = S.wardrobe.filter(w=>!w.retiredFromCloset).slice(0,50)
+      .map(w=>`${w.icon||''}${w.name}${w.brand?' ('+w.brand+')':''}${w.category?' ['+w.category+']':''}`).join(', ');
     const prompt = `You are a personal stylist planning a trip wardrobe.
-Destination: ${dest}${ds?' | Dates: '+ds+(de&&de!==ds?' to '+de:''):''}
-${S.plan.tripNotes ? 'Agenda/activities: '+S.plan.tripNotes : ''}
-${days.length ? 'Day breakdown: '+dayList : 'Trip length: ~'+numDays+' days'}
-Wardrobe available: ${wItems||'not specified — suggest versatile pieces'}
+Destination: ${dest}
+Trip length: ${numDays} day${numDays===1?'':'s'}
+User's wardrobe: ${wItems||'not provided — suggest versatile pieces that work for this destination'}
 
-Plan ${Math.min(numDays,7)} outfit${numDays>1?'s':''}, one per day. Maximise re-use of pieces across days.
-Return ONLY a JSON array: [{"day":"Day 1","date":"${ds||''}","occasion":"Arrival / exploring","items":["White linen shirt","Dark jeans","White sneakers"],"reasoning":"Comfortable for travel, versatile for dinner","packingTip":"This shirt doubles as beachwear tomorrow"}]`;
+Plan ${outfitDays} outfits (one per day, maximise re-use of pieces). Consider the destination's climate, culture, and likely activities.
+Also identify up to 4 wardrobe GAPS — items the user should buy for this trip that they likely don't own, based on the destination and wardrobe list.
+
+Return ONLY a valid JSON object (no markdown):
+{
+  "outfits": [
+    {"day":"Day 1","occasion":"Arrival / exploring","items":["White linen shirt","Dark jeans","White sneakers"],"reasoning":"Comfortable for travel, transitions to dinner","packingTip":"This shirt doubles as a beach cover-up"}
+  ],
+  "gaps": [
+    {"item":"Lightweight rain jacket","reason":"Edinburgh weather is unpredictable — essential for outdoor sightseeing","searchQuery":"lightweight packable rain jacket women"}
+  ]
+}`;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST',
       headers:{'x-api-key':S.apiKey,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:2000, messages:[{role:'user',content:prompt}] })
+      body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:2500, messages:[{role:'user',content:prompt}] })
     });
     const data = await resp.json();
     const txt = data.content?.[0]?.text || '';
-    const match = txt.match(/\[[\s\S]*\]/);
-    S.plan.tripSuggestions = match ? JSON.parse(match[0]).slice(0,7) : null;
-    if (!S.plan.tripSuggestions) toast('Could not parse trip plan — try again');
+    // Try to parse the JSON object
+    const objMatch = txt.match(/\{[\s\S]*\}/);
+    if (objMatch) {
+      try {
+        const parsed = JSON.parse(objMatch[0]);
+        S.plan.tripSuggestions = (parsed.outfits || []).slice(0, 7);
+        S.plan.tripGaps = (parsed.gaps || []).slice(0, 4);
+      } catch(e) {
+        // Fallback: try old array format
+        const arrMatch = txt.match(/\[[\s\S]*\]/);
+        S.plan.tripSuggestions = arrMatch ? JSON.parse(arrMatch[0]).slice(0,7) : null;
+        S.plan.tripGaps = [];
+      }
+    }
+    if (!S.plan.tripSuggestions?.length) toast('Could not parse trip plan — try again');
   } catch(e) { console.error(e); toast('Trip planning failed — try again'); }
   S.plan.loadingTrip = false; render();
 }
@@ -9177,9 +9298,7 @@ function viewProfile() {
   const html = `<div class="view">
     <div class="nav">
       <span class="nav-logo">✦ My Style Portfolio</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();S.battleMode=true;navigate('upload')" onclick="S.battleMode=true;navigate('upload')" style="touch-action:manipulation;">
-        ⚔️ Battle
-      </button>
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload')" onclick="navigate('upload')" style="touch-action:manipulation;">${iconPlus()} New Outfit</button>
     </div>
 
     <!-- ══ ZONE 1: You at a glance ══ -->
@@ -9331,6 +9450,47 @@ function viewProfile() {
     <!-- ══ Divider ══ -->
     <div style="height:1px;background:var(--border);margin:20px 16px;"></div>
 
+    <!-- ══ Saved Styling Tips + Fashion Stats ══ -->
+    <div style="margin:0 16px;display:flex;flex-direction:column;gap:10px;">
+      ${(()=>{
+        const tips = [];
+        S.entries.forEach(e => {
+          if (!e.recReactions) return;
+          if (e.stylingTips?.length) {
+            e.stylingTips.forEach((r, i) => { if (e.recReactions[String(i)] === 'liked') tips.push(r); });
+          } else {
+            (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') tips.push(r); });
+          }
+        });
+        const count = tips.length;
+        return `<button
+          ontouchend="if(_touchMoved)return;event.preventDefault();navigate('saved-tips')"
+          onclick="navigate('saved-tips')"
+          style="width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;box-sizing:border-box;">
+          <div style="width:40px;height:40px;border-radius:12px;background:rgba(100,74,138,0.1);border:1px solid rgba(100,74,138,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">✂️</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:1px;">Saved Styling Tips</div>
+            <div style="font-size:12px;color:var(--text-3);">${count > 0 ? count+' tip'+(count===1?'':'s')+' saved from your fit checks' : 'Like tips from your fit checks to save them here'}</div>
+          </div>
+          <div style="font-size:18px;color:var(--text-3);">›</div>
+        </button>`;
+      })()}
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('dashboard')"
+        onclick="navigate('dashboard')"
+        style="width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;box-sizing:border-box;">
+        <div style="width:40px;height:40px;border-radius:12px;background:var(--gold-bg);border:1px solid rgba(184,125,42,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">📊</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:1px;">Fashion Stats</div>
+          <div style="font-size:12px;color:var(--text-3);">Cost per wear, wardrobe breakdown, style score &amp; more</div>
+        </div>
+        <div style="font-size:18px;color:var(--text-3);">›</div>
+      </button>
+    </div>
+
+    <!-- ══ Divider ══ -->
+    <div style="height:1px;background:var(--border);margin:20px 16px;"></div>
+
     <!-- ══ ZONE 3: Your Identity — Style Portrait + Aura grouped ══ -->
     <div style="margin:0 16px 16px;background:rgba(100,74,138,0.05);border:1.5px solid rgba(100,74,138,0.15);border-radius:16px;padding:14px 14px 14px;">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(100,74,138,0.45);margin-bottom:12px;">✨ Your Identity</div>
@@ -9346,34 +9506,6 @@ function viewProfile() {
           <div style="font-size:18px;color:var(--text-3);">›</div>
         </button>
       </div>
-      ${(()=>{
-        const tips = [];
-        S.entries.forEach(e => {
-          if (!e.recReactions) return;
-          if (e.stylingTips?.length) {
-            e.stylingTips.forEach((r, i) => { if (e.recReactions[String(i)] === 'liked') tips.push({ text: r, entry: e }); });
-          } else {
-            (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') tips.push({ text: r, entry: e }); });
-          }
-        });
-        if (!tips.length) return '';
-        const rows = tips.slice(0, 5).map(({text, entry}) => `
-          <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')" onclick="openEntry('${entry.id}')"
-            style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(100,74,138,0.1);cursor:pointer;touch-action:manipulation;">
-            ${entry.photo
-              ? `<img src="${esc(entry.photo)}" style="width:34px;height:34px;border-radius:7px;object-fit:cover;object-position:top;flex-shrink:0;border:1px solid rgba(100,74,138,0.15);">`
-              : `<div style="width:34px;height:34px;border-radius:7px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;">👗</div>`}
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:12px;color:var(--text);line-height:1.45;">${esc(text)}</div>
-              <div style="font-size:10px;color:rgba(100,74,138,0.5);margin-top:2px;">${entry.rating != null ? `⭐ ${entry.rating}` : ''} ${entry.occasionTag ? '· '+esc(entry.occasionTag) : '· '+fmtDate(entry.createdAt)}</div>
-            </div>
-          </div>`).join('');
-        return `<div style="margin-top:14px;">
-          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(100,74,138,0.45);margin-bottom:2px;">✂️ Style Playbook</div>
-          <div>${rows}</div>
-          ${tips.length > 5 ? `<div style="font-size:11px;color:rgba(100,74,138,0.45);text-align:center;margin-top:6px;">+${tips.length - 5} more saved</div>` : ''}
-        </div>`;
-      })()}
     </div>
 
     <!-- 📦 Past Looks + 🌹 Memorial Garden — grouped as "Looking Back" -->
@@ -9430,21 +9562,6 @@ function viewProfile() {
         ${gardenHTML}
       </div>`;
     })()}
-
-    <!-- Fashion Stats link -->
-    <div style="margin:20px 16px 0;">
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('dashboard')"
-        onclick="navigate('dashboard')"
-        style="width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
-        <div style="width:40px;height:40px;border-radius:12px;background:var(--gold-bg);border:1px solid rgba(184,125,42,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">📊</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:1px;">Fashion Stats</div>
-          <div style="font-size:12px;color:var(--text-3);">Cost per wear, wardrobe breakdown, style score &amp; more</div>
-        </div>
-        <div style="font-size:18px;color:var(--text-3);">›</div>
-      </button>
-    </div>
 
     <div style="height:40px;"></div>
   </div>`;
@@ -9758,6 +9875,58 @@ function viewAssistantBook() {
       '<div style="height:32px;"></div>' +
     '</div>' +
   '</div>';
+}
+
+/* ================================================================
+   VIEW: SAVED STYLING TIPS
+   ================================================================ */
+function viewSavedTips() {
+  const tips = [];
+  S.entries.forEach(e => {
+    if (!e.recReactions) return;
+    if (e.stylingTips?.length) {
+      e.stylingTips.forEach((r, i) => {
+        if (e.recReactions[String(i)] === 'liked') tips.push({ text: r, entry: e });
+      });
+    } else {
+      (e.recommendations||[]).forEach(r => {
+        if (e.recReactions[r] === 'liked') tips.push({ text: r, entry: e });
+      });
+    }
+  });
+  // Most recent outfit first
+  tips.sort((a,b) => new Date(b.entry.createdAt) - new Date(a.entry.createdAt));
+
+  const rows = tips.length ? tips.map(({text, entry}) => `
+    <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')" onclick="openEntry('${entry.id}')"
+      style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;cursor:pointer;touch-action:manipulation;">
+      ${entry.photo
+        ? `<img src="${esc(entry.photo)}" style="width:44px;height:44px;border-radius:9px;object-fit:cover;object-position:top;flex-shrink:0;border:1px solid var(--border);">`
+        : `<div style="width:44px;height:44px;border-radius:9px;background:rgba(100,74,138,0.08);border:1px solid rgba(100,74,138,0.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">👗</div>`}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:5px;">${esc(text)}</div>
+        <div style="font-size:11px;color:var(--text-3);">
+          ${entry.rating != null ? `⭐ ${entry.rating}` : ''}${entry.occasionTag ? (entry.rating!=null?' · ':'')+esc(entry.occasionTag) : ''} · ${fmtDate(entry.createdAt)}
+        </div>
+      </div>
+    </div>`).join('') : `
+    <div style="padding:40px 20px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px;">✂️</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">No saved tips yet</div>
+      <div style="font-size:13px;color:var(--text-3);line-height:1.5;">After a fit check, tap ♥ on any styling tip to save it here.</div>
+    </div>`;
+
+  return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">${iconBack()} Portfolio</button>
+      <span class="nav-title">Saved Styling Tips</span>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+      ${tips.length ? `<div style="font-size:12px;color:var(--text-3);padding:0 2px 4px;">${tips.length} tip${tips.length===1?'':'s'} saved — tap any to open the outfit</div>` : ''}
+      ${rows}
+    </div>
+    <div style="height:40px;"></div>
+  </div>`;
 }
 
 /* ================================================================
