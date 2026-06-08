@@ -1826,6 +1826,17 @@ body {
   0%   { transform: translateY(-10px) rotate(0deg); opacity: 1; }
   100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
 }
+@keyframes emojiPop {
+  0%   { transform: translateY(0) translateX(0) scale(0.4); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateY(-160px) translateX(var(--drift)) scale(1); opacity: 0; }
+}
+@keyframes celebBadgeAnim {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.08); opacity: 1; }
+  80%  { transform: scale(0.97); }
+  100% { transform: scale(1); opacity: 1; }
+}
 
 /* ── SHOPPING LIST ───────────────────────────────────────── */
 .shop-list { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 0; }
@@ -2757,7 +2768,7 @@ const S = {
   cycleLength:     parseInt(localStorage.getItem('closet-cycle-len') || '28'),
   cyclePeriodDays: parseInt(localStorage.getItem('closet-cycle-pdur') || '5'),
   battleDraft: null, // { photo, person1, person2, verdict, winner }
-  plan: { eventDesc: '', suggestion: null, loadingSuggest: false, tripPickerOpen: false, activeTripId: null, savedSuccess: false },
+  plan: { eventDesc: '', suggestion: null, loadingSuggest: false, tripPickerOpen: false, activeTripId: null, savedSuccess: false, soloMode: null, tripDestination: '', tripDays: 5, tripSuggestions: null, tripGaps: null, loadingTrip: false },
   eventBoard: JSON.parse(localStorage.getItem('closet-event-board') || '[]'), // [{id, desc, suggestion, tripId, addedAt}]
   eventTrips: JSON.parse(localStorage.getItem('closet-event-trips') || '[]'), // [{id, name, createdAt}]
   _tripFlow: null, // { step:'naming', name:'' } — inline trip creation
@@ -2773,6 +2784,7 @@ const S = {
   retireFlow: null,  // { id, step: 'reason'|'outcome', reason, outcome, salePrice }
   featureMenuOpen: false, menuSection: null,
   outfitLinker: null, // { mode:'from-wardrobe'|'from-outfit', wardrobeId?, entryId?, selected:{[id]:bool} }
+  outfitBuilder: null, // { wardrobeId, occasion, loading, result }
   wardrobePickerFor: null, // { unmatchedIdx } — wardrobe item picker in match review
   receiptFlow: null, // { step:'input'|'parsing'|'preview', imageData, imageMime, pasteText, preview:{name,brand,price,description,category,icon} }
   _flipCardFlipped: false, // tracks flip card side so render() doesn't snap it back
@@ -5185,7 +5197,7 @@ function featuresMenuHTML() {
         { icon: '♥', text: '<strong>Style Journey</strong> — Heart any portrait to save it. Your saved portraits stack into a timeline so you can watch your style evolve over time.' },
         { icon: '📖', text: '<strong>Style Playbook</strong> — A living guide to your personal style: your aesthetic identity, what works, what to build next, and how to shop smarter.' },
         { icon: '✨', text: '<strong>Your Aura</strong> — Personal details (height, eye colour, scent, personality type, nail colour, hairstyle) that help Claude give you the most tailored advice possible.' },
-        { icon: '⭐', text: '<strong>Best Outfits</strong> — All your 8+ rated looks in a swipeable carousel, alongside your Signature Pieces and Hero Pieces in a gold-accented showcase.' },
+        { icon: '⭐', text: '<strong>Best Outfits</strong> — All your 8+ rated looks in a swipeable carousel, alongside your 💎 Gem Pieces in a gold-accented showcase.' },
         { icon: '⚔️', text: '<strong>Fashion Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best. Results are shared as a full scorecard card.' },
       ],
     },
@@ -5207,8 +5219,7 @@ function featuresMenuHTML() {
         { icon: '📧', text: '<strong>Add from Receipt</strong> — Screenshot a shopping confirmation and Claude parses it into a wardrobe entry in seconds.' },
         { icon: '📦', text: '<strong>Bulk Photo Upload</strong> — Import multiple pieces at once from your camera roll — Claude analyses each one individually.' },
         { icon: '💸', text: '<strong>Cost per Wear</strong> — Track what you paid and watch your cost-per-wear shrink as you wear each piece more.' },
-        { icon: '👑', text: '<strong>Hero Pieces</strong> — Flag your standout garments. Share them with a stylist or generate an AI sketch.', action: `S.featureMenuOpen=false;navigate('hero-pieces')` },
-        { icon: '💎', text: '<strong>Signature Pieces</strong> — Choose up to 3 pieces that define your style. Your signatures are showcased on your Portfolio.', action: `S.featureMenuOpen=false;navigate('signature-pieces')` },
+        { icon: '💎', text: '<strong>Gems</strong> — Mark the pieces that are unmistakably you. Your Gems shine in your Portfolio carousel and get a 💎 badge in your wardrobe.', action: `S.featureMenuOpen=false;switchTab('wardrobe')` },
         { icon: '💝', text: '<strong>Gifted Items</strong> — Mark pieces as gifts, note the gifter, and send them a note when you first wear it.' },
         { icon: '🧵', text: '<strong>Tailoring Flag</strong> — Mark items that need alterations and track what needs fixing.' },
         { icon: '📦', text: '<strong>Retire & Memorial Garden</strong> — Log when pieces leave your closet. Beloved pieces can be memorialised with a photo and a eulogy.' },
@@ -5431,7 +5442,7 @@ async function signOut() {
 /* ================================================================
    RENDER ROUTER
    ================================================================ */
-const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','hero-pieces','signature-pieces']);
+const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local']);
 
 /* ================================================================
    FASHION WORD OF THE DAY
@@ -5949,6 +5960,280 @@ async function doImportItems() {
 }
 
 /* ================================================================
+   VIEW: OUTFIT BUILDER — "Build an Outfit Around This"
+   ================================================================ */
+function viewOutfitBuilder() {
+  const ob = S.outfitBuilder;
+  if (!ob) { navigate('wardrobe'); return ''; }
+  const w = S.wardrobe.find(i => i.id === ob.wardrobeId);
+  if (!w) { navigate('wardrobe'); return ''; }
+
+  const occasions = ['Everyday','Work','Going Out','Date Night','Vacation','Weekend'];
+  const result = ob.result;
+
+  // ── Result view ──────────────────────────────────────────────────────────────
+  if (result) {
+    const picks = (result.picks || []).map(p => {
+      const match = S.wardrobe.find(wi =>
+        wi.name.toLowerCase().trim() === (p.name || '').toLowerCase().trim()
+      );
+      return { ...p, wardrobeItem: match || null };
+    });
+    const gaps = result.gaps || [];
+    const budgetLabel = {1:'budget',2:'mid-range',3:'luxury'}[S.shopBudget] || 'mid-range';
+
+    return `<div class="view view-notab">
+      <div class="nav">
+        <button class="nav-back"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder={wardrobeId:'${w.id}',occasion:ob.occasion,loading:false,result:null};render()"
+          onclick="S.outfitBuilder={wardrobeId:'${w.id}',occasion:ob.occasion,loading:false,result:null};render()">
+          ${iconBack()} Rebuild
+        </button>
+        <span class="nav-title">Your Outfit</span>
+        <button class="nav-btn"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+          onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" style="font-size:18px;touch-action:manipulation;">✕</button>
+      </div>
+
+      <!-- Occasion pill + stylist note -->
+      <div style="padding:16px 20px 10px;">
+        ${result.occasion ? `<div style="display:inline-block;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);color:#fff;border-radius:100px;padding:4px 12px;font-size:11px;font-weight:700;margin-bottom:10px;">${esc(result.occasion)}</div>` : ''}
+        ${result.stylistNote ? `<p style="font-size:14px;color:var(--text-2);line-height:1.55;margin:0;font-style:italic;">"${esc(result.stylistNote)}"</p>` : ''}
+      </div>
+
+      <!-- Anchor piece -->
+      <div style="padding:0 20px 6px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:8px;">Start with</div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:linear-gradient(135deg,rgba(108,62,191,0.08),rgba(155,95,224,0.05));border:1.5px solid rgba(108,62,191,0.25);border-radius:var(--r);"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+          onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')">
+          ${w.photo
+            ? `<img src="${esc(w.photo)}" style="width:56px;height:74px;object-fit:cover;object-position:top;border-radius:8px;flex-shrink:0;">`
+            : `<div style="width:56px;height:74px;border-radius:8px;background:rgba(108,62,191,0.1);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">${w.icon||'👕'}</div>`}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:800;color:#6C3EBF;">${esc(w.name)}</div>
+            ${w.brand ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(w.brand)}</div>` : ''}
+            ${w.category ? `<div style="font-size:11px;color:var(--text-3);">${esc(w.category)}</div>` : ''}
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(108,62,191,0.5)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      <!-- Wardrobe picks -->
+      ${picks.length ? `
+      <div style="padding:16px 20px 6px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Pair with from your closet</div>
+        <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+          ${picks.map(p => {
+            const wi = p.wardrobeItem;
+            return `<div style="flex-shrink:0;width:110px;"
+              ${wi ? `ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${wi.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${wi.id}';navigate('wardrobe-item')"` : ''}>
+              <div style="width:110px;height:147px;border-radius:10px;overflow:hidden;background:var(--surface-2);border:${wi ? '1.5px solid rgba(108,62,191,0.3)' : '1.5px dashed var(--border)'};position:relative;${wi ? 'cursor:pointer;' : ''}">
+                ${wi?.photo
+                  ? `<img src="${esc(wi.photo)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                  : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${wi?.icon||'👕'}</div>`}
+                ${wi ? `<div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,rgba(0,0,0,.5) 100%);pointer-events:none;"></div>` : ''}
+              </div>
+              <div style="font-size:11px;font-weight:700;color:${wi?'var(--text)':'var(--text-3)'};margin-top:5px;line-height:1.3;">${esc(wi ? wi.name : p.name)}</div>
+              <div style="font-size:10px;color:var(--text-3);margin-top:2px;line-height:1.35;">${esc(p.reason)}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : ''}
+
+      <!-- Gap items / complete the look -->
+      ${gaps.length ? `
+      <div style="padding:16px 20px 6px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Complete the look</div>
+        ${gaps.map(g => {
+          const q = encodeURIComponent(g.searchQuery || g.item);
+          return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--gold-bg);border:1.5px solid rgba(184,125,42,0.3);border-radius:var(--r-sm);margin-bottom:8px;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(g.item)}</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.4;">${esc(g.reason)}</div>
+            </div>
+            <a href="https://www.google.com/search?tbm=shop&q=${q}" target="_blank" rel="noopener"
+              style="flex-shrink:0;padding:7px 13px;background:var(--gold);color:#fff;border-radius:100px;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;touch-action:manipulation;"
+              ontouchend="event.stopPropagation()">
+              🛍 Shop
+            </a>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+
+      <div style="height:36px;"></div>
+    </div>`;
+  }
+
+  // ── Loading view ─────────────────────────────────────────────────────────────
+  if (ob.loading) {
+    return `<div class="view view-notab">
+      <div class="nav">
+        <span style="width:72px;"></span>
+        <span class="nav-title">Building Outfit…</span>
+        <span style="width:72px;"></span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;padding:20px;text-align:center;">
+        <div style="font-size:48px;">✨</div>
+        <div style="font-size:17px;font-weight:800;color:var(--text);">Styling your look…</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.5;">Claude is browsing your closet and putting together something great.</div>
+      </div>
+    </div>`;
+  }
+
+  // ── Input view (default) ─────────────────────────────────────────────────────
+  return `<div class="view view-notab">
+    <div class="nav">
+      <button class="nav-back"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+        onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')">${iconBack()} Back</button>
+      <span class="nav-title">Build an Outfit</span>
+      <span style="width:72px;"></span>
+    </div>
+
+    <!-- Anchor piece header -->
+    <div style="padding:20px 20px 0;display:flex;align-items:center;gap:14px;">
+      ${w.photo
+        ? `<img src="${esc(w.photo)}" style="width:64px;height:85px;object-fit:cover;object-position:top;border-radius:10px;flex-shrink:0;border:1.5px solid rgba(108,62,191,0.25);">`
+        : `<div style="width:64px;height:85px;border-radius:10px;background:rgba(108,62,191,0.08);display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;">${w.icon||'👕'}</div>`}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(108,62,191,0.7);margin-bottom:3px;">Anchor piece</div>
+        <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.25;">${esc(w.name)}</div>
+        ${w.brand ? `<div style="font-size:12px;color:var(--text-3);margin-top:2px;">${esc(w.brand)}</div>` : ''}
+      </div>
+    </div>
+
+    <!-- Occasion picker -->
+    <div style="padding:24px 20px 0;">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">What's the occasion? <span style="font-weight:400;color:var(--text-3);">(optional)</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;">
+        ${occasions.map(occ => {
+          const active = ob.occasion === occ;
+          return `<button
+            ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder.occasion='${active ? '' : occ}';render()"
+            onclick="S.outfitBuilder.occasion='${active ? '' : occ}';render()"
+            style="padding:8px 16px;border-radius:100px;border:1.5px solid ${active ? 'rgba(108,62,191,0.7)' : 'var(--border)'};background:${active ? 'rgba(108,62,191,0.1)' : 'var(--surface)'};color:${active ? '#6C3EBF' : 'var(--text-2)'};font-size:13px;font-weight:${active ? '700' : '500'};cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            ${occ}
+          </button>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Wardrobe count note -->
+    <div style="padding:20px 20px 0;">
+      <p style="font-size:12px;color:var(--text-3);margin:0;line-height:1.5;">
+        Claude will browse your ${S.wardrobe.filter(wi => !wi.retiredFromCloset && wi.id !== w.id).length} other wardrobe pieces and pick what works best${ob.occasion ? ` for ${ob.occasion.toLowerCase()}` : ''}.
+      </p>
+    </div>
+
+    <div style="padding:24px 20px 0;">
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();doOutfitBuild()"
+        onclick="doOutfitBuild()"
+        style="width:100%;padding:16px;border-radius:var(--r);cursor:pointer;font-family:inherit;
+          border:none;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);
+          color:#fff;font-size:15px;font-weight:800;
+          display:flex;align-items:center;justify-content:center;gap:8px;
+          box-shadow:0 3px 16px rgba(108,62,191,0.32);touch-action:manipulation;">
+        ✨ Build My Outfit
+      </button>
+    </div>
+    <div style="height:36px;"></div>
+  </div>`;
+}
+
+// ── Outfit Builder — Claude call ─────────────────────────────────────────────
+async function doOutfitBuild() {
+  const ob = S.outfitBuilder;
+  if (!ob) return;
+  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+
+  const anchor = S.wardrobe.find(i => i.id === ob.wardrobeId);
+  if (!anchor) return;
+
+  const pool = S.wardrobe.filter(w => !w.retiredFromCloset && w.id !== anchor.id);
+  if (!pool.length) { toast('Add more pieces to your wardrobe first!'); return; }
+
+  S.outfitBuilder.loading = true;
+  render();
+
+  try {
+    const wardrobeList = pool.map(w => {
+      const parts = [w.name];
+      if (w.brand) parts.push(w.brand);
+      if (w.category) parts.push(w.category);
+      if (w.description) parts.push(w.description);
+      return `- ${parts.join(', ')}`;
+    }).join('\n');
+
+    const anchorDesc = [
+      anchor.name,
+      anchor.brand,
+      anchor.category,
+      anchor.description,
+    ].filter(Boolean).join(', ');
+
+    const budgetLabel = {1:'budget / under $50',2:'mid-range / $50–$200',3:'luxury / $200+'}[S.shopBudget] || 'mid-range';
+    const occasionLine = ob.occasion ? `Occasion: ${ob.occasion}` : 'Occasion: everyday / versatile';
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': S.apiKey.trim(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: `You are a personal stylist. Build a complete outfit around this anchor piece using items from the wardrobe below.
+
+ANCHOR PIECE: ${anchorDesc}
+${occasionLine}
+Budget for any gaps: ${budgetLabel}
+
+WARDROBE (use EXACT names from this list for picks):
+${wardrobeList}
+
+Return ONLY valid JSON (no markdown):
+{
+  "occasion": "one short occasion label, e.g. Smart Casual Friday",
+  "stylistNote": "One sentence describing the overall look and vibe",
+  "picks": [
+    { "name": "exact name from wardrobe list", "reason": "one short phrase why it works" }
+  ],
+  "gaps": [
+    { "item": "descriptive item name", "reason": "what it adds to the look", "searchQuery": "retail-ready search query" }
+  ]
+}
+
+Rules:
+- picks: 2–4 items, EXACT names from the wardrobe list only
+- gaps: 0–2 items, only for genuinely missing pieces (shoes, bag, etc.) the wardrobe doesn't cover
+- do not include the anchor piece in picks`
+        }]
+      })
+    });
+
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const data = await res.json();
+    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+    const result = JSON.parse(text);
+
+    S.outfitBuilder = { ...ob, loading: false, result };
+    render();
+  } catch(e) {
+    console.error('doOutfitBuild error', e);
+    S.outfitBuilder = { ...ob, loading: false, result: null };
+    render();
+    toast('Couldn\'t build the outfit — check your API key and try again.');
+  }
+}
+
+/* ================================================================
    VIEW: MY BRANDS
    ================================================================ */
 function viewBrands() {
@@ -6068,10 +6353,11 @@ function render() {
     case 'squad':        html = viewSquadDetail();  break;
     case 'hot':          html = viewHot();          break;
     case 'local':        html = viewLocal();        break;
-    case 'hero-pieces':       html = viewHeroPieces();        break;
-    case 'signature-pieces':  html = viewSignaturePieces();   break;
+    case 'hero-pieces':       navigate('wardrobe'); return; // merged into Gems
+    case 'signature-pieces':  navigate('wardrobe'); return; // merged into Gems
     case 'brands':            html = viewBrands();            break;
     case 'import':            html = viewImport();            break;
+    case 'outfit-builder':    html = viewOutfitBuilder();     break;
   }
   // Inject tab bar right after the .nav block on every tab view
   if (TAB_VIEWS.has(S.view)) {
@@ -6674,7 +6960,27 @@ function setTrendReaction(trendId, reaction) {
 }
 
 /* ================================================================
-   HERO PIECES — TOGGLE, SHARE, VIEW
+   GEMS — helper, toggle
+   ================================================================ */
+function isGemPiece(w) {
+  // Backward compat: items previously marked isHero or isSignature also count
+  return !!(w.isGem || w.isHero || w.isSignature);
+}
+
+async function toggleGem(id) {
+  const w = S.wardrobe.find(i => i.id === id);
+  if (!w) return;
+  const wasGem = isGemPiece(w);
+  w.isGem = !wasGem;
+  // Clear legacy flags on toggle to avoid double-counting
+  if (wasGem) { delete w.isHero; delete w.isSignature; delete w.signatureNote; }
+  await DB.wardrobe.put(w);
+  toast(w.isGem ? '💎 Added to your Gems!' : 'Removed from Gems');
+  render();
+}
+
+/* ================================================================
+   HERO PIECES — TOGGLE, SHARE, VIEW (legacy — kept for share cards)
    ================================================================ */
 async function toggleHeroPiece(id) {
   const w = S.wardrobe.find(i => i.id === id);
@@ -7924,7 +8230,7 @@ function viewShop() {
                     style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;">✕</button>
                 </div>` : `
                 <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;box-sizing:border-box;padding:28px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;background:var(--bg);">
-                  <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="spottedPickPhoto(this)">
+                  <input type="file" accept="image/*" style="display:none;" onchange="spottedPickPhoto(this)">
                   <div style="font-size:32px;margin-bottom:8px;">📷</div>
                   <div style="font-size:13px;color:var(--text-2);font-weight:600;">Tap to upload photo</div>
                   <div style="font-size:11px;color:var(--text-3);margin-top:3px;">Camera or photo library</div>
@@ -8928,79 +9234,33 @@ function viewProfile() {
         </div>
       </div>` : '';
 
-      const signaturesHTML = (()=>{
-        const sigs = S.wardrobe.filter(w => w.isSignature && !w.retiredFromCloset);
-        const full = sigs.length === SIG_MAX;
-        const slots = Array.from({length: SIG_MAX}, (_, i) => {
-          const w = sigs[i];
-          if (w) {
-            return `<div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
-              style="flex:0 0 70px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
-              <div style="width:100%;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:2px solid var(--sig-border);background:var(--surface-2);display:flex;align-items:center;justify-content:center;position:relative;">
-                ${w.photo ? `<img src="${w.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">` : `<div style="font-size:28px;">${w.icon||'👕'}</div>`}
-                <div style="position:absolute;top:4px;right:4px;background:var(--gold);border-radius:100px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;">
-                  <span style="font-size:8px;">💎</span>
+      const gemsCarouselHTML = (()=>{
+        const gems = S.wardrobe.filter(w => isGemPiece(w) && !w.retiredFromCloset);
+        if (!gems.length) return '';
+        return `<div style="margin:16px 0 0;">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;padding:0 14px;">💎 Your Gems</div>
+          <div style="display:flex;gap:10px;overflow-x:auto;padding:0 14px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+            ${gems.map(w => `
+              <div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+                style="flex-shrink:0;width:88px;scroll-snap-align:start;cursor:pointer;touch-action:manipulation;">
+                <div style="width:88px;height:117px;border-radius:12px;overflow:hidden;position:relative;background:var(--surface-2);border:1.5px solid rgba(184,125,42,.3);">
+                  ${w.photo
+                    ? `<img src="${esc(w.photo)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${w.icon||'👕'}</div>`}
+                  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,rgba(0,0,0,.6) 100%);pointer-events:none;"></div>
+                  <div style="position:absolute;top:5px;right:5px;font-size:12px;line-height:1;">💎</div>
                 </div>
-              </div>
-              <div style="font-size:10px;font-weight:700;color:var(--sig-dk);text-align:center;line-height:1.3;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 2px;">${esc(w.name)}</div>
-            </div>`;
-          } else {
-            return `<div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')"
-              style="flex:0 0 70px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;">
-              <div style="width:100%;aspect-ratio:3/4;border-radius:10px;border:2px dashed var(--sig-border);background:linear-gradient(135deg,#F8F4EE,#F0E9DC);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;">
-                <div style="font-size:20px;">💎</div>
-                <div style="font-size:9px;font-weight:800;color:var(--sig-dk);text-align:center;line-height:1.4;">This is<br>SO me</div>
-              </div>
-              <div style="font-size:10px;color:var(--text-3);text-align:center;line-height:1.3;">Add piece</div>
-            </div>`;
-          }
-        }).join('');
-        return `<div style="margin:14px 0 0;padding:0 14px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">💎 Signature Pieces</div>
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('signature-pieces')" onclick="navigate('signature-pieces')"
-              style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.85;touch-action:manipulation;">${full ? 'Share ›' : 'Manage ›'}</button>
+                <div style="font-size:10px;font-weight:700;color:var(--text);margin-top:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px;">${esc(w.name)}</div>
+                ${w.brand ? `<div style="font-size:9px;color:var(--text-3);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px;">${esc(w.brand)}</div>` : ''}
+              </div>`).join('')}
           </div>
-          <div style="display:flex;gap:10px;justify-content:center;">${slots}</div>
-        </div>`;
-      })();
-
-      const heroHTML = (()=>{
-        const heroes = S.wardrobe.filter(w => w.isHero && !w.retiredFromCloset);
-        if (!heroes.length) {
-          return `<div style="margin:14px 14px 0;background:var(--gold-bg);border:1.5px dashed rgba(184,125,42,.3);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;gap:12px;"
-            ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')">
-            <span style="font-size:22px;flex-shrink:0;">💎</span>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:800;color:var(--gold-dk);margin-bottom:1px;">Hero Pieces</div>
-              <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Flag standout garments — the bold blazer, the bag everyone asks about.</div>
-            </div>
-            <span style="font-size:12px;font-weight:700;color:var(--gold-dk);opacity:.7;flex-shrink:0;">Add ›</span>
-          </div>`;
-        }
-        const thumbs = heroes.slice(0,5).map(w =>
-          w.photo
-            ? `<img src="${esc(w.photo)}" style="width:56px;height:56px;border-radius:10px;object-fit:cover;border:1.5px solid rgba(184,125,42,.25);">`
-            : `<div style="width:56px;height:56px;border-radius:10px;background:var(--gold-bg);border:1.5px solid rgba(184,125,42,.25);display:flex;align-items:center;justify-content:center;font-size:24px;">${w.icon||'💎'}</div>`
-        ).join('');
-        const extra = heroes.length > 5
-          ? `<div style="width:56px;height:56px;border-radius:10px;background:var(--gold-bg);border:1.5px solid rgba(184,125,42,.25);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--gold-dk);">+${heroes.length-5}</div>`
-          : '';
-        return `<div style="margin:14px 0 0;padding:0 14px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);">👑 Hero Pieces</div>
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')"
-              style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;opacity:.7;touch-action:manipulation;">${heroes.length} piece${heroes.length===1?'':'s'} ›</button>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('hero-pieces')" onclick="navigate('hero-pieces')">${thumbs}${extra}</div>
         </div>`;
       })();
 
       return `<div style="margin:16px 16px 0;background:rgba(184,125,42,0.05);border:1.5px solid rgba(184,125,42,0.18);border-radius:16px;padding:14px 0 14px;">
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(184,125,42,0.45);margin-bottom:12px;padding:0 14px;">✦ Your Best</div>
         ${bestOutfitsHTML}
-        ${signaturesHTML}
-        ${heroHTML}
+        ${gemsCarouselHTML}
       </div>`;
     })()}
 
@@ -9170,6 +9430,21 @@ function viewProfile() {
         ${gardenHTML}
       </div>`;
     })()}
+
+    <!-- Fashion Stats link -->
+    <div style="margin:20px 16px 0;">
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('dashboard')"
+        onclick="navigate('dashboard')"
+        style="width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
+        <div style="width:40px;height:40px;border-radius:12px;background:var(--gold-bg);border:1px solid rgba(184,125,42,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">📊</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:1px;">Fashion Stats</div>
+          <div style="font-size:12px;color:var(--text-3);">Cost per wear, wardrobe breakdown, style score &amp; more</div>
+        </div>
+        <div style="font-size:18px;color:var(--text-3);">›</div>
+      </button>
+    </div>
 
     <div style="height:40px;"></div>
   </div>`;
@@ -9992,12 +10267,13 @@ function viewDashboard() {
   const noData = !S.entries.length && !S.wardrobe.length;
 
   // ── Tile builders ──────────────────────────────────────────
-  const tile = (icon, val, label, sub='', accent='') => `
-    <div style="background:var(--surface);border:1.5px solid ${accent||'var(--border)'};border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;gap:2px;">
+  const tile = (icon, val, label, sub='', accent='', action='') => `
+    <div ${action ? `ontouchend="if(_touchMoved)return;event.preventDefault();${action}" onclick="${action}" style="background:var(--surface);border:1.5px solid ${accent||'var(--border)'};border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;gap:2px;cursor:pointer;touch-action:manipulation;"` : `style="background:var(--surface);border:1.5px solid ${accent||'var(--border)'};border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;gap:2px;"`}>
       <div style="font-size:20px;line-height:1;margin-bottom:4px;">${icon}</div>
       <div style="font-size:22px;font-weight:900;color:var(--text);line-height:1.1;">${val}</div>
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);">${label}</div>
       ${sub ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px;">${sub}</div>` : ''}
+      ${action ? `<div style="font-size:10px;color:var(--accent);margin-top:4px;font-weight:700;">See all →</div>` : ''}
     </div>`;
 
   const wideTile = (icon, label, val, sub='') => `
@@ -10020,7 +10296,7 @@ function viewDashboard() {
     ...(gifted > 0 ? [tile('🎁', gifted, 'Gifted Pieces', `${Math.round(gifted/Math.max(S.wardrobe.length,1)*100)}% of closet`)] : []),
     ...(saleItems.length > 0 ? [tile('🏷️', saleItems.length, 'Bought on Sale', `${Math.round(saleItems.length/Math.max(S.wardrobe.length,1)*100)}% of closet`, '#16A34A')] : []),
     ...(totalSaved > 0 ? [tile('💚', '$'+Math.round(totalSaved).toLocaleString(), 'Total Saved', 'on sale purchases', '#16A34A')] : []),
-    ...(tailoring > 0 ? [tile('🪡', tailoring, 'Need Tailoring', 'check your closet', '#C8A8E0')] : []),
+    ...(tailoring > 0 ? [tile('🪡', tailoring, 'Need Tailoring', `piece${tailoring===1?'':'s'} to repair`, '#C8A8E0', `S.wardrobeTailoringFilter=true;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';switchTab('wardrobe')`)] : []),
     ...(retired > 0 ? [tile('🪦', retired, 'Retired', 'graduated from the closet')] : []),
   ];
 
@@ -10483,9 +10759,9 @@ function viewWardrobe() {
     items = items.filter(w => w.tailoringNeeded);
   }
 
-  // Apply hero filter
+  // Apply gem filter
   if (S._wardrobeHeroFilter) {
-    items = items.filter(w => w.isHero);
+    items = items.filter(w => isGemPiece(w));
   }
 
   // Apply maybe pile filter
@@ -10540,24 +10816,32 @@ function viewWardrobe() {
         const active = S.wardrobeCategory === c && !S._wardrobeHeroFilter && !S._wardrobeMaybePileFilter;
         const isCustom = (S.customCategories || []).includes(c);
         return `<div class="filter-chip ${active?'active':''} ${empty?'filter-chip-empty':''}" style="${isCustom&&!active?'border-style:dashed;':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'&&!S._wardrobeHeroFilter?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()"
-          onclick="S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()">${c}${badge}</div>`;
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'&&!S._wardrobeHeroFilter?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()"
+          onclick="S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()">${c}${badge}</div>`;
       }).join('')}
       ${(() => {
-        const heroCount = activeWardrobe.filter(w => w.isHero).length;
+        const gemCount = activeWardrobe.filter(w => isGemPiece(w)).length;
         const heroActive = S._wardrobeHeroFilter;
-        const heroEmpty = heroCount === 0;
+        const heroEmpty = gemCount === 0;
         return `<div class="filter-chip ${heroActive?'active':''} ${heroEmpty?'filter-chip-empty':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=!S._wardrobeHeroFilter;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
-          onclick="S._wardrobeHeroFilter=!S._wardrobeHeroFilter;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">👑 Hero<span class="cat-count-badge">${heroCount}</span></div>`;
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=!S._wardrobeHeroFilter;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
+          onclick="S._wardrobeHeroFilter=!S._wardrobeHeroFilter;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">💎 Gems<span class="cat-count-badge">${gemCount}</span></div>`;
+      })()}
+      ${(() => {
+        const tailorCount = activeWardrobe.filter(w => w.tailoringNeeded).length;
+        const tailorActive = S.wardrobeTailoringFilter;
+        const tailorEmpty = tailorCount === 0;
+        return `<div class="filter-chip ${tailorActive?'active':''} ${tailorEmpty?'filter-chip-empty':''}"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeTailoringFilter=!S.wardrobeTailoringFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
+          onclick="S.wardrobeTailoringFilter=!S.wardrobeTailoringFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">✂️ Tailor<span class="cat-count-badge">${tailorCount}</span></div>`;
       })()}
       ${(() => {
         const mpCount = activeWardrobe.filter(w => w.inMaybePile).length;
         const mpActive = S._wardrobeMaybePileFilter;
         const mpEmpty = mpCount === 0;
         return `<div class="filter-chip ${mpActive?'active':''} ${mpEmpty?'filter-chip-empty':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
-          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">🤔 Maybe Pile<span class="cat-count-badge">${mpCount}</span></div>`;
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
+          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">🤔 Maybe Pile<span class="cat-count-badge">${mpCount}</span></div>`;
       })()}
       ${S._addingShelf ? `
         <div style="display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1.5px solid var(--gold);border-radius:100px;padding:4px 6px 4px 12px;">
@@ -10969,8 +11253,7 @@ function wardrobeGridCellHTML(w) {
   const cellClass = w.retiredFromCloset ? ' wgc-retired' : (w.retiring ? ' retiring' : '');
   return `<div class="wardrobe-grid-cell${cellClass}" onclick="openWardrobeItem('${w.id}')" style="position:relative;">
     ${stripeEl}
-    ${w.isHero ? `<div class="hero-badge" style="position:absolute;top:5px;left:5px;z-index:5;font-size:8px;padding:2px 5px;">💎 Hero</div>` : ''}
-    ${w.isSignature ? `<div style="position:absolute;top:5px;right:5px;z-index:5;font-size:8px;font-weight:800;color:var(--sig-dk);background:var(--sig-bg);border:1px solid var(--sig-border);border-radius:100px;padding:2px 5px;letter-spacing:.02em;">✦</div>` : ''}
+    ${isGemPiece(w) ? `<div class="hero-badge" style="position:absolute;top:5px;left:5px;z-index:5;font-size:8px;padding:2px 5px;">💎</div>` : ''}
     <div class="wgc-info" style="${w.isHero ? 'padding-top:6px;' : ''}">
       <div class="wgc-name">${esc(w.name)}</div>
       ${metaParts.length ? `<div class="wgc-meta">${metaParts.join(' · ')}</div>` : ''}
@@ -10997,7 +11280,7 @@ function wardrobeCardHTML(w) {
     ontouchend="wLongPressCancel()"
     ontouchmove="wLongPressCancel()"
     style="position:relative;user-select:none;-webkit-user-select:none;${wSel ? 'border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);background:var(--gold-bg);' : ''}">
-    ${w.isHero ? `<div class="hero-badge">💎 Hero</div>` : ''}
+    ${isGemPiece(w) ? `<div class="hero-badge">💎</div>` : ''}
     ${S._wardrobeSelectMode ? `<div style="position:absolute;top:50%;right:14px;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:${wSel ? 'var(--gold)' : 'var(--surface)'};border:2px solid ${wSel ? 'var(--gold)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;z-index:5;flex-shrink:0;">${wSel ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>` : ''}
     <div class="wardrobe-icon" style="${wSel ? 'opacity:0.65;' : ''}">${w.icon||'👕'}</div>
     <div class="wardrobe-info" style="${S._wardrobeSelectMode ? 'padding-right:34px;' : ''}">
@@ -12252,6 +12535,20 @@ function viewWardrobeItem() {
       </div>
     </div>
 
+    <!-- ✨ Build an Outfit Around This -->
+    <div style="padding:0 20px;margin-bottom:12px;">
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};navigate('outfit-builder')"
+        onclick="S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};navigate('outfit-builder')"
+        style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
+          border:none;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);
+          color:#fff;font-size:14px;font-weight:700;
+          display:flex;align-items:center;justify-content:center;gap:8px;
+          box-shadow:0 2px 14px rgba(108,62,191,0.28);touch-action:manipulation;">
+        ✨ Build an Outfit Around This
+      </button>
+    </div>
+
     <div style="padding:0 20px;margin-bottom:20px;">
       <button onclick="logCompliment('${w.id}')" style="
         width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
@@ -12290,79 +12587,34 @@ function viewWardrobeItem() {
       </div>
     </div>` : ''}
 
-    <!-- Hero Piece toggle -->
+    <!-- 💎 Gem toggle -->
     <div style="padding:0 20px;margin-bottom:16px;">
-      <div class="hero-toggle-box ${w.isHero ? 'active' : ''}">
+      <div class="${isGemPiece(w) ? 'sig-toggle-box active' : 'hero-toggle-box'}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">
-              👑 Hero Piece
+            <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;color:${isGemPiece(w)?'var(--gold-dk)':'var(--text)'};">
+              💎 Gem Piece
             </div>
             <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
-              ${w.isHero
-                ? 'This is a standout piece that anchors your outfits. Share it with a stylist for advice on how to wear it.'
-                : 'A standout garment your whole outfit is built around — a great coat, a bold blazer, the bag everyone asks about.'}
+              ${isGemPiece(w)
+                ? 'This piece shines in your wardrobe — it shows up in your Portfolio and can anchor any outfit.'
+                : 'A piece that\'s unmistakably you — the bold blazer, the bag everyone asks about, the thing you reach for first.'}
             </div>
           </div>
-          <button class="toggle ${w.isHero ? 'on' : ''}" style="${w.isHero ? 'background:#B8860B;flex-shrink:0;' : 'flex-shrink:0;'}"
-            ontouchend="if(_touchMoved)return;event.preventDefault();toggleHeroPiece('${w.id}')"
-            onclick="toggleHeroPiece('${w.id}')"></button>
+          <button class="toggle ${isGemPiece(w) ? 'on' : ''}" style="${isGemPiece(w) ? 'background:var(--gold);flex-shrink:0;' : 'flex-shrink:0;'}"
+            ontouchend="if(_touchMoved)return;event.preventDefault();toggleGem('${w.id}')"
+            onclick="toggleGem('${w.id}')"></button>
         </div>
-        ${w.isHero ? `
+        ${isGemPiece(w) ? `
         <div style="margin-top:12px;display:flex;gap:8px;">
           <button class="hero-share-btn" style="flex:1;padding:11px;"
             ontouchend="if(_touchMoved)return;event.preventDefault();shareHeroPiece('${w.id}')"
             onclick="shareHeroPiece('${w.id}')">
             📤 Share with Stylist
           </button>
-          <button onclick="navigate('hero-pieces')"
-            style="flex-shrink:0;padding:11px 14px;border-radius:var(--r);border:1.5px solid var(--gold);background:none;color:var(--gold-dk);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            View All
-          </button>
         </div>` : ''}
       </div>
     </div>
-
-    <!-- Signature Piece toggle -->
-    ${(()=>{
-      const sigCount = S.wardrobe.filter(i => i.isSignature).length;
-      const atLimit = !w.isSignature && sigCount >= SIG_MAX;
-      return `<div style="padding:0 20px;margin-bottom:16px;">
-        <div class="sig-toggle-box ${w.isSignature ? 'active' : ''}">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-            <div style="flex:1;min-width:0;">
-              <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;color:${w.isSignature?'var(--sig-dk)':'var(--text)'};">
-                💎 Signature Piece
-                <span style="font-size:11px;font-weight:600;color:var(--text-3);font-style:normal;">${w.isSignature ? `(${sigCount} of ${SIG_MAX})` : atLimit ? `${SIG_MAX}/${SIG_MAX} chosen` : `${sigCount} of ${SIG_MAX} used`}</span>
-              </div>
-              <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
-                ${w.isSignature
-                  ? 'People remember you for this piece. It\'s unmistakably you.'
-                  : atLimit
-                    ? `You've chosen all ${SIG_MAX} signature pieces. Open one to remove it first.`
-                    : 'The pieces that are unmistakably you — what people say "that\'s so you" about.'}
-              </div>
-            </div>
-            <button class="toggle ${w.isSignature ? 'on' : ''}"
-              style="${w.isSignature ? 'background:var(--sig);flex-shrink:0;' : atLimit ? 'opacity:.4;flex-shrink:0;' : 'flex-shrink:0;'}"
-              ontouchend="if(_touchMoved)return;event.preventDefault();${atLimit ? "toast('Remove a signature piece first — you can only have 3.')" : `toggleSignaturePiece('${w.id}')`}"
-              onclick="${atLimit ? "toast('Remove a signature piece first — you can only have 3.')" : `toggleSignaturePiece('${w.id}')`}"></button>
-          </div>
-          ${w.isSignature ? `
-          <div style="margin-top:12px;">
-            <div style="font-size:11px;font-weight:700;color:var(--sig-dk);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Why is this a signature piece for you?</div>
-            <textarea class="form-input" placeholder='e.g. "I\'ve worn this to every big moment for six years."' style="min-height:52px;resize:vertical;font-size:13px;border-color:var(--sig-border);font-style:italic;" onchange="saveSignatureNote('${w.id}',this.value)">${esc(w.signatureNote||'')}</textarea>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:10px;">
-            <button class="sig-share-btn" style="flex:1;padding:11px;font-size:13px;"
-              ontouchend="if(_touchMoved)return;event.preventDefault();navigate('signature-pieces')"
-              onclick="navigate('signature-pieces')">
-              View All Signature Pieces
-            </button>
-          </div>` : ''}
-        </div>
-      </div>`;
-    })()}
 
     <!-- ══ MAYBE PILE toggle ══ -->
     <div style="padding:0 20px;margin-bottom:16px;">
@@ -14700,6 +14952,47 @@ function launchConfetti() {
   setTimeout(()=>wrap.remove(), 5000);
 }
 
+function celebrateOutfitSave() {
+  const celebrations = [
+    { emoji: '🎉', label: 'Outfit saved!',    burst: ['🎉','✨','🎊','💫','🌟'] },
+    { emoji: '👏', label: 'Looking good!',    burst: ['👏','👏','👏','✨','💃'] },
+    { emoji: '🥂', label: 'Cheers to that!', burst: ['🥂','✨','🎊','💛','🌟'] },
+    { emoji: '✨', label: 'Serving looks!',   burst: ['✨','💫','⭐','🌟','✨'] },
+    { emoji: '💃', label: 'Werk!',            burst: ['💃','🔥','✨','🎶','👑'] },
+    { emoji: '🌟', label: 'Star look!',       burst: ['🌟','⭐','💫','✨','🎉'] },
+  ];
+  const c = celebrations[Math.floor(Math.random() * celebrations.length)];
+
+  // Emoji burst particles
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:599;overflow:hidden;';
+  for (let i = 0; i < 18; i++) {
+    const p = document.createElement('div');
+    const em = c.burst[Math.floor(Math.random() * c.burst.length)];
+    const x = 20 + Math.random() * 60; // spread across middle 60% of screen
+    const delay = Math.random() * 0.5;
+    const dur   = 1.2 + Math.random() * 0.8;
+    const size  = 18 + Math.floor(Math.random() * 18);
+    const drift = (Math.random() - 0.5) * 80;
+    p.style.cssText = `position:absolute;bottom:30%;left:${x}%;font-size:${size}px;opacity:0;animation:emojiPop ${dur}s ${delay}s ease-out forwards;--drift:${drift}px;`;
+    p.textContent = em;
+    wrap.appendChild(p);
+  }
+  document.body.appendChild(wrap);
+
+  // Brief centre badge
+  const badge = document.createElement('div');
+  badge.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:600;pointer-events:none;';
+  badge.innerHTML = `<div style="background:var(--surface);border:2px solid var(--gold);border-radius:24px;padding:18px 28px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.18);animation:celebBadgeAnim .4s cubic-bezier(.34,1.56,.64,1) forwards;">
+    <div style="font-size:38px;line-height:1;">${c.emoji}</div>
+    <div style="font-size:15px;font-weight:800;color:var(--text);margin-top:6px;">${c.label}</div>
+  </div>`;
+  document.body.appendChild(badge);
+
+  launchConfetti();
+  setTimeout(() => { wrap.remove(); badge.remove(); }, 2200);
+}
+
 // ── Style it with… ───────────────────────────────────────────────────────────
 async function doStyleWith(entryId, need) {
   if (!need?.trim()) return;
@@ -15668,7 +15961,7 @@ async function doConfirmMatchReview() {
   S.matchReview = null;
   switchTab('closet');
   checkStreakCelebration();
-  toast('Outfit saved! ✨');
+  celebrateOutfitSave();
 
   // Gift nudge check (in-memory wardrobe is already up to date)
   const giftedFirstWear = S.wardrobe.filter(w =>
@@ -15688,7 +15981,7 @@ async function doConfirmMatchReview() {
   }
 }
 
-function skipMatchReview() { S.matchReview = null; switchTab('closet'); checkStreakCelebration(); toast('Outfit saved! ✨'); }
+function skipMatchReview() { S.matchReview = null; switchTab('closet'); checkStreakCelebration(); celebrateOutfitSave(); }
 
 function toggleMatch(i) {
   if (!S.matchReview) return;
