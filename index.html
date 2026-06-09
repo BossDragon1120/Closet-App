@@ -2811,6 +2811,9 @@ const S = {
   wardrobePickerFor: null, // { unmatchedIdx } — wardrobe item picker in match review
   receiptFlow: null, // { step:'input'|'parsing'|'preview', imageData, imageMime, pasteText, preview:{name,brand,price,description,category,icon} }
   _flipCardFlipped: false, // tracks flip card side so render() doesn't snap it back
+  _pendingWitemPhoto: null, // { wId, data } — preview before explicit save
+  _pendingWearPhoto: null,  // { wId, data } — preview before explicit save
+  _savingPhoto: false,      // true while DB.wardrobe.put is running for photo save
   bulkQueue: [], bulkIdx: 0, bulkSaved: 0, bulkAnalyzing: false, bulkSaving: false,
   onboardStep: 0,
   styleWith: null, // { entryId, need:'', loading:false, result:{recommendation,reasoning,searchQuery,altQuery} }
@@ -13867,9 +13870,11 @@ function viewWardrobeItem() {
     <div class="witem-hero">
       ${(() => {
         const isFlipped = S._wearFlipped.has(w.id);
-        const showWear = isFlipped && w.wearPhoto;
-        const displaySrc = showWear ? w.wearPhoto : w.photo;
-        const hasBoth = w.photo && w.wearPhoto;
+        const showWear = isFlipped && (S._pendingWearPhoto?.wId === w.id ? S._pendingWearPhoto.data : w.wearPhoto);
+        const pendingItem = S._pendingWitemPhoto?.wId === w.id ? S._pendingWitemPhoto.data : null;
+        const pendingWear = S._pendingWearPhoto?.wId === w.id ? S._pendingWearPhoto.data : null;
+        const displaySrc = showWear ? (pendingWear || w.wearPhoto) : (pendingItem || w.photo);
+        const hasBoth = (pendingItem || w.photo) && (pendingWear || w.wearPhoto);
         const toggle = hasBoth ? `
           <div style="display:flex;justify-content:center;gap:4px;margin-bottom:10px;">
             <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wearFlipped.delete('${w.id}');render();" onclick="S._wearFlipped.delete('${w.id}');render();"
@@ -13899,9 +13904,28 @@ function viewWardrobeItem() {
 
       <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
         <input id="witemPhotoInput" type="file" accept="image/*" style="display:none;"
-          onchange="uploadWardrobeItemPhoto('${w.id}', this)">
+          onchange="stageWardrobeItemPhoto('${w.id}', this)">
         <input id="witemWearPhotoInput" type="file" accept="image/*" style="display:none;"
-          onchange="uploadWardrobeWearPhoto('${w.id}', this)">
+          onchange="stageWardrobeWearPhoto('${w.id}', this)">
+        ${S._pendingWitemPhoto?.wId === w.id ? `
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();saveWardrobeItemPhoto('${w.id}')" onclick="saveWardrobeItemPhoto('${w.id}')"
+          style="background:var(--gold);border:none;color:#fff;border-radius:100px;padding:7px 18px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;${S._savingPhoto?'opacity:0.6;':''}">
+          ${S._savingPhoto ? '⏳ Saving…' : '💾 Save item photo'}
+        </button>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._pendingWitemPhoto=null;render()" onclick="S._pendingWitemPhoto=null;render()"
+          style="background:none;border:1.5px solid var(--border);color:var(--text-2);border-radius:100px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          ✕ Cancel
+        </button>
+        ` : S._pendingWearPhoto?.wId === w.id ? `
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();saveWardrobeWearPhoto('${w.id}')" onclick="saveWardrobeWearPhoto('${w.id}')"
+          style="background:var(--gold);border:none;color:#fff;border-radius:100px;padding:7px 18px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;${S._savingPhoto?'opacity:0.6;':''}">
+          ${S._savingPhoto ? '⏳ Saving…' : '💾 Save worn photo'}
+        </button>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._pendingWearPhoto=null;S._wearFlipped.delete('${w.id}');render()" onclick="S._pendingWearPhoto=null;S._wearFlipped.delete('${w.id}');render()"
+          style="background:none;border:1.5px solid var(--border);color:var(--text-2);border-radius:100px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          ✕ Cancel
+        </button>
+        ` : `
         <button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witemPhotoInput').click()" onclick="document.getElementById('witemPhotoInput').click()"
           style="background:none;border:1.5px solid var(--gold);color:var(--gold-dk);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
           📸 ${w.photo ? 'Replace item photo' : 'Add item photo'}
@@ -13910,14 +13934,15 @@ function viewWardrobeItem() {
           style="background:none;border:1.5px solid var(--gold);color:var(--gold-dk);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
           🧍 ${w.wearPhoto ? 'Replace worn photo' : 'Add worn photo'}
         </button>
+        ${(w.photo || w.wearPhoto) ? `
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:6px;flex-wrap:wrap;width:100%;">
+          ${w.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();removeWardrobeItemPhoto('${w.id}')" onclick="removeWardrobeItemPhoto('${w.id}')"
+            style="background:none;border:1.5px solid var(--border);color:var(--text-3);border-radius:100px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕ Remove item photo</button>` : ''}
+          ${w.wearPhoto ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();removeWardrobeWearPhoto('${w.id}')" onclick="removeWardrobeWearPhoto('${w.id}')"
+            style="background:none;border:1.5px solid var(--border);color:var(--text-3);border-radius:100px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕ Remove worn photo</button>` : ''}
+        </div>` : ''}
+        `}
       </div>
-      ${(w.photo || w.wearPhoto) ? `
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:6px;flex-wrap:wrap;">
-        ${w.photo ? `<button onclick="removeWardrobeItemPhoto('${w.id}')"
-          style="background:none;border:1.5px solid var(--border);color:var(--text-3);border-radius:100px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕ Remove item photo</button>` : ''}
-        ${w.wearPhoto ? `<button onclick="removeWardrobeWearPhoto('${w.id}')"
-          style="background:none;border:1.5px solid var(--border);color:var(--text-3);border-radius:100px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕ Remove worn photo</button>` : ''}
-      </div>` : ''}
 
       <div class="witem-stats">
         <div class="witem-stat">
@@ -16527,20 +16552,64 @@ async function selectItemPhoto(wId, url) {
   toast('Photo saved! ✨');
 }
 
-async function uploadWardrobeItemPhoto(wId, input) {
+// Stage (preview only) — does NOT save yet
+async function stageWardrobeItemPhoto(wId, input) {
   const file = input.files[0]; if (!file) return;
   input.value = '';
-  const { data } = await compressImage(file);
-  const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
-  w.photo = data; // optimistic update — show new photo immediately
-  render();
   try {
+    const { data } = await compressImage(file);
+    S._pendingWitemPhoto = { wId, data };
+    S._pendingWearPhoto = null; // clear any pending wear
+    render();
+  } catch(e) { toast('Could not load photo — try again.'); }
+}
+
+async function stageWardrobeWearPhoto(wId, input) {
+  const file = input.files[0]; if (!file) return;
+  input.value = '';
+  try {
+    const { data } = await compressImage(file);
+    S._pendingWearPhoto = { wId, data };
+    S._pendingWitemPhoto = null; // clear any pending item
+    S._wearFlipped.add(wId); // flip to wear side so preview is visible
+    render();
+  } catch(e) { toast('Could not load photo — try again.'); }
+}
+
+// Explicit save after user taps Save button
+async function saveWardrobeItemPhoto(wId) {
+  const pending = S._pendingWitemPhoto;
+  if (!pending || pending.wId !== wId || S._savingPhoto) return;
+  const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
+  S._savingPhoto = true; render();
+  try {
+    w.photo = pending.data;
     await DB.wardrobe.put(w);
-    toast('Photo saved ✓');
+    S._pendingWitemPhoto = null;
+    toast('📸 Item photo saved ✓');
   } catch(e) {
-    console.error('uploadWardrobeItemPhoto:', e);
-    toast('Couldn\'t save photo — try again.');
+    console.error('saveWardrobeItemPhoto:', e);
+    toast('Couldn\'t save — check your connection and try again.');
   }
+  S._savingPhoto = false; render();
+}
+
+async function saveWardrobeWearPhoto(wId) {
+  const pending = S._pendingWearPhoto;
+  if (!pending || pending.wId !== wId || S._savingPhoto) return;
+  const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
+  S._savingPhoto = true; render();
+  try {
+    w.wearPhoto = pending.data;
+    await DB.wardrobe.put(w);
+    S._pendingWearPhoto = null;
+    S._wearFlipped.add(wId);
+    toast('🧍 Worn photo saved ✓');
+  } catch(e) {
+    console.error('saveWardrobeWearPhoto:', e);
+    toast('Couldn\'t save — check your connection and try again.');
+  }
+  S._savingPhoto = false; render();
 }
 
 async function removeWardrobeItemPhoto(wId) {
@@ -16549,23 +16618,6 @@ async function removeWardrobeItemPhoto(wId) {
   await DB.wardrobe.put(w);
   render();
   toast('Photo removed');
-}
-
-async function uploadWardrobeWearPhoto(wId, input) {
-  const file = input.files[0]; if (!file) return;
-  input.value = '';
-  const { data } = await compressImage(file);
-  const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
-  w.wearPhoto = data;
-  S._wearFlipped.add(wId); // auto-flip to show the new wear photo
-  render(); // optimistic update — show new photo immediately
-  try {
-    await DB.wardrobe.put(w);
-    toast('Worn photo saved ✓');
-  } catch(e) {
-    console.error('uploadWardrobeWearPhoto:', e);
-    toast('Couldn\'t save photo — try again.');
-  }
 }
 
 async function removeWardrobeWearPhoto(wId) {
