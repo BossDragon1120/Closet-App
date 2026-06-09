@@ -2703,17 +2703,20 @@ const DB = {
       const snap = await userCol('wardrobe').get();
       const items = snap.docs.map(d => d.data());
       // Restore photos — three-tier fallback for iOS reliability:
-      // 1. IndexedDB (highest quality, same device)
-      // 2. Firebase Storage URL (cross-device sync)
-      // 3. photoThumb (small JPEG stored directly in Firestore — always available)
+      // 1. IndexedDB (highest quality, same device — but Safari aggressively evicts it)
+      // 2. photoThumb (small JPEG in Firestore — ALWAYS reflects the latest upload)
+      // 3. Firebase Storage URL (cross-device sync — may be stale if upload failed)
+      // NOTE: photoThumb MUST come before photoUrl because iOS Safari evicts IDB on refresh
+      // and if a Storage upload failed silently, photoUrl points to the OLD photo while
+      // photoThumb was already updated from the new data.
       await Promise.all(items.map(async item => {
         const idbPhoto = await PhotoDB.get(item.id);
         if (idbPhoto) {
           item.photo = idbPhoto;           // same device: best quality
-        } else if (item.photoUrl) {
-          item.photo = item.photoUrl;      // cross-device: Storage URL
         } else if (item.photoThumb) {
-          item.photo = item.photoThumb;    // last resort: Firestore-stored thumb
+          item.photo = item.photoThumb;    // always latest — generated on every upload
+        } else if (item.photoUrl) {
+          item.photo = item.photoUrl;      // cross-device: Storage URL (may be stale)
         }
       }));
       return items;
@@ -7433,7 +7436,6 @@ function viewFun() {
       </div>`;
     return giftedItems.map(w => {
       const giverName = w.giftedBy ? esc(w.giftedBy) : 'someone special';
-      const msg = encodeURIComponent(`Hey! I just wanted to say thank you for the ${w.name} — I absolutely love it and it's become one of my favorites. You have great taste! 💛`);
       return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
         <div style="font-size:28px;line-height:1;flex-shrink:0;">${w.icon||'🎁'}</div>
         <div style="flex:1;min-width:0;">
@@ -7441,8 +7443,8 @@ function viewFun() {
           <div style="font-size:11px;color:var(--text-3);">From ${giverName}</div>
         </div>
         <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();navigator.share?navigator.share({title:'Thank You!',text:decodeURIComponent('${msg}')}):navigator.clipboard?.writeText(decodeURIComponent('${msg}')).then(()=>toast('Copied to clipboard ✓'))"
-          onclick="navigator.share?navigator.share({title:'Thank You!',text:decodeURIComponent('${msg}')}):navigator.clipboard?.writeText(decodeURIComponent('${msg}')).then(()=>toast('Copied to clipboard ✓'))"
+          ontouchend="if(_touchMoved)return;event.preventDefault();thankGifter('${w.id}')"
+          onclick="thankGifter('${w.id}')"
           style="flex-shrink:0;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:7px 14px;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
           💌 Thank ${w.giftedBy ? esc(w.giftedBy.split(' ')[0]) : 'them'}
         </button>
@@ -9237,8 +9239,6 @@ function viewShop() {
     ${S._spottedCapture ? (() => {
       const cap = S._spottedCapture;
       const hasContent = cap.photo || cap.url.trim();
-      const cx = cap._cropX !== undefined ? cap._cropX : 50;
-      const cy = cap._cropY !== undefined ? cap._cropY : 50;
       return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
           ontouchend="if(_touchMoved)return;event.preventDefault();${cap._cropSrc ? 'cancelSpottedCrop()' : 'closeSpottedCapture()'};" onclick="${cap._cropSrc ? 'cancelSpottedCrop()' : 'closeSpottedCapture()'}">
         <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:92dvh;display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.2);"
@@ -9255,14 +9255,18 @@ function viewShop() {
           </div>
 
           ${cap._cropSrc ? `
-          <!-- ── Crop UI ── -->
-          <div style="font-size:11px;color:var(--text-3);text-align:center;padding:0 0 8px;flex-shrink:0;">Drag to reposition</div>
-          <div id="spottedCropWrap"
-            style="margin:0 20px 12px;border-radius:14px;overflow:hidden;aspect-ratio:3/4;max-height:calc(92dvh - 180px);background:#000;touch-action:none;flex-shrink:0;cursor:grab;"
-            ontouchstart="_scStart(event)"
-            ontouchmove="_scMove(event)"
-            ontouchend="_scEnd(event)">
-            <img src="${esc(cap._cropSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:${cx}% ${cy}%;pointer-events:none;display:block;user-select:none;">
+          <!-- ── Crop UI — same box-select approach as outfit crop ── -->
+          <div style="font-size:11px;color:var(--text-3);text-align:center;padding:0 0 8px;flex-shrink:0;">Drag the box to reposition · Drag corners to resize</div>
+          <div class="crop-wrap" id="spottedCropWrap" style="margin:0 20px 12px;border-radius:14px;max-height:calc(92dvh - 200px);flex-shrink:0;">
+            <img id="spottedCropImg" class="crop-img-full" src="${esc(cap._cropSrc)}" alt="Crop your photo" draggable="false">
+            <div class="crop-box" id="spottedCropBox">
+              <div class="crop-rule-v"></div><div class="crop-rule-v"></div>
+              <div class="crop-rule-h"></div><div class="crop-rule-h"></div>
+              <div class="crop-handle" data-handle="tl"></div>
+              <div class="crop-handle" data-handle="tr"></div>
+              <div class="crop-handle" data-handle="bl"></div>
+              <div class="crop-handle" data-handle="br"></div>
+            </div>
           </div>
           <div style="display:flex;gap:10px;padding:12px 20px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0;border-top:1px solid var(--border);">
             <button ontouchend="if(_touchMoved)return;event.preventDefault();cancelSpottedCrop();" onclick="cancelSpottedCrop();"
@@ -12301,16 +12305,16 @@ function viewWardrobe() {
 // ── Generic shelf card + section (Shoes, Bags, Accessories) ─
 function shelfCardHTML(w, fallbackIcon, _siblings) {
   const wears = w.wears?.length || 0;
-  const isHero = !!w.isHero;
+  const isGem = isGemPiece(w);
   const imgHTML = w.photo
     ? `<img src="${esc(w.photo)}" class="shoe-card-img" alt="${esc(w.name)}">`
     : `<span class="shoe-card-emoji">${w.icon || fallbackIcon}</span>`;
   return `<div class="shoe-card"
     ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
     onclick="openWardrobeItem('${w.id}')">
-    <div class="shoe-card-img-wrap${isHero?' hero':''}">
+    <div class="shoe-card-img-wrap${isGem?' hero':''}">
       ${imgHTML}
-      ${isHero ? `<div style="position:absolute;bottom:2px;right:3px;font-size:7px;font-weight:800;color:var(--gold-dk);background:rgba(255,255,255,.85);border-radius:3px;padding:1px 3px;">💎</div>` : ''}
+      ${isGem ? `<div style="position:absolute;bottom:2px;right:3px;font-size:7px;font-weight:800;color:var(--gold-dk);background:rgba(255,255,255,.85);border-radius:3px;padding:1px 3px;">💎</div>` : ''}
     </div>
     <div class="shoe-card-name">${esc(w.name)}</div>
     <div class="shoe-card-wears">${wears}w</div>
@@ -12559,8 +12563,8 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
             ${subtitle ? `<div style="font-size:12px;color:#9050B8;line-height:1.45;">${subtitle}</div>` : ''}
             <div style="display:flex;gap:8px;margin-top:10px;">
               <button
-                ontouchend="if(_touchMoved)return;event.preventDefault();shareGiftWear('${firstItemId}')"
-                onclick="shareGiftWear('${firstItemId}')"
+                ontouchend="if(_touchMoved)return;event.preventDefault();thankGifter('${firstItemId}')"
+                onclick="thankGifter('${firstItemId}')"
                 style="flex:1;padding:8px 0;background:#9050B8;color:#fff;border:none;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
                 💌 Send a note
               </button>
@@ -12657,7 +12661,7 @@ function wardrobeGridCellHTML(w) {
     onclick="openWardrobeItem('${w.id}')" style="position:relative;">
     ${stripeEl}
     ${isGemPiece(w) ? `<div class="hero-badge" style="position:absolute;top:5px;left:5px;z-index:5;font-size:8px;padding:2px 5px;">💎</div>` : ''}
-    <div class="wgc-info" style="${w.isHero ? 'padding-top:6px;' : ''}">
+    <div class="wgc-info" style="${isGemPiece(w) ? 'padding-top:6px;' : ''}">
       <div class="wgc-name">${esc(w.name)}</div>
       ${metaParts.length ? `<div class="wgc-meta">${metaParts.join(' · ')}</div>` : ''}
     </div>
@@ -12729,8 +12733,7 @@ function closetLightboxHTML() {
 
   const pages = items.map((w, i) => {
     const wears = w.wears?.length || 0;
-    const heroStyle = w.isHero  ? 'border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,125,42,.4);' : '';
-    const sigStyle  = w.isSignature ? 'border-color:var(--sig-border);' : '';
+    const gemStyle  = isGemPiece(w) ? 'border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,125,42,.4);' : '';
     const imgBlock  = w.photo
       ? `<img src="${esc(w.photo)}" style="width:100%;height:100%;object-fit:contain;border-radius:18px;display:block;" alt="${esc(w.name)}">`
       : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:96px;border-radius:18px;">${w.icon||'👕'}</div>`;
@@ -12738,14 +12741,13 @@ function closetLightboxHTML() {
     return `<div style="flex-shrink:0;width:100%;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px 24px 32px;box-sizing:border-box;height:100%;overflow:hidden;">
 
       <!-- Image / emoji -->
-      <div style="width:min(280px,72vw);height:min(340px,48vh);background:#fff;border-radius:18px;overflow:hidden;border:2px solid rgba(255,255,255,.15);${heroStyle}${sigStyle}flex-shrink:0;margin-bottom:20px;">
+      <div style="width:min(280px,72vw);height:min(340px,48vh);background:#fff;border-radius:18px;overflow:hidden;border:2px solid rgba(255,255,255,.15);${gemStyle}flex-shrink:0;margin-bottom:20px;">
         ${imgBlock}
       </div>
 
       <!-- Badges -->
       <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;min-height:20px;">
-        ${w.isHero      ? `<span style="background:linear-gradient(135deg,#B8860B,#D4A017);color:#fff;border-radius:100px;padding:2px 10px;font-size:10px;font-weight:800;letter-spacing:.04em;">👑 Hero</span>` : ''}
-        ${w.isSignature ? `<span style="background:var(--sig-bg);color:var(--sig-dk);border:1px solid var(--sig-border);border-radius:100px;padding:2px 10px;font-size:10px;font-weight:800;">✦ Signature</span>` : ''}
+        ${isGemPiece(w) ? `<span style="background:linear-gradient(135deg,#B8860B,#D4A017);color:#fff;border-radius:100px;padding:2px 10px;font-size:10px;font-weight:800;letter-spacing:.04em;">💎 Gem</span>` : ''}
         ${w.onSale      ? `<span style="background:#F0FDF4;color:#15803D;border-radius:100px;padding:2px 10px;font-size:10px;font-weight:700;">🏷️ Sale</span>` : ''}
       </div>
 
@@ -12825,7 +12827,7 @@ function hangerHTML(w, _siblings) {
     ontouchmove="wLongPressCancel()"
     style="user-select:none;-webkit-user-select:none;">
     ${hangerSVG}
-    <div class="hanger-card" style="${w.isHero ? 'border-color:var(--gold);box-shadow:0 2px 10px rgba(184,125,42,0.18);' : ''}${hSel ? 'border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);' : ''}position:relative;">
+    <div class="hanger-card" style="${isGemPiece(w) ? 'border-color:var(--gold);box-shadow:0 2px 10px rgba(184,125,42,0.18);' : ''}${hSel ? 'border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);' : ''}position:relative;">
       ${stripeEl}
       ${displayPhoto
         ? `<img src="${esc(displayPhoto)}" class="hanger-img" alt="${esc(w.name)}" style="${hSel ? 'opacity:0.7;' : ''}">`
@@ -12834,8 +12836,7 @@ function hangerHTML(w, _siblings) {
       <div class="hanger-name">${esc(w.name)}</div>
       ${w.size ? `<div class="hanger-brand" style="color:var(--text-2);font-weight:600;text-transform:none;letter-spacing:0;">${esc(w.size)}</div>` : ''}
       <div class="hanger-wears">${wears}w</div>
-      ${w.isHero ? `<div style="font-size:9px;font-weight:700;color:var(--gold-dk);margin-top:3px;letter-spacing:.02em;">💎 Hero</div>` : ''}
-      ${w.isSignature ? `<div style="font-size:9px;font-weight:800;color:var(--sig-dk);margin-top:2px;letter-spacing:.02em;">💎 Signature</div>` : ''}
+      ${isGemPiece(w) ? `<div style="font-size:9px;font-weight:700;color:var(--gold-dk);margin-top:3px;letter-spacing:.02em;">💎 Gem</div>` : ''}
       ${S._wardrobeSelectMode ? `<div style="position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:50%;background:${hSel ? 'var(--gold)' : 'rgba(255,255,255,0.85)'};border:2px solid ${hSel ? 'var(--gold)' : '#ccc'};display:flex;align-items:center;justify-content:center;z-index:5;">${hSel ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>` : ''}
       ${!S._wardrobeSelectMode && w.wearPhoto ? `
         <button
@@ -13027,7 +13028,7 @@ function viewOnboarding() {
     // 3 — Portfolio
     { label:'Portfolio', dark:true,
       headline:'Your style story,\nbeautifully told.',
-      sub:'Portfolio is your command centre — best outfits, Signature Pieces, fashion battle wins, style identity, and a stat snapshot that grows with you.',
+      sub:'Portfolio is your command centre — best outfits, Gem Pieces, fashion battle wins, style identity, and a stat snapshot that grows with you.',
       mock:`<div style="padding:0 24px;">
         <div style="background:linear-gradient(150deg,#2B2318,#1C1A18);border-radius:18px;padding:16px;">
           <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:2px;">${S.profileName?`${esc(S.profileName)}'s`:"Your"} Portfolio</div>
@@ -13880,8 +13881,7 @@ function viewWardrobeItem() {
       <div class="witem-name">${esc(w.name)}</div>
       ${w.brand ? `<div style="font-size:14px;color:var(--text-3);margin-top:-6px;font-weight:500;">${esc(w.brand)}</div>` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px;">
-        ${w.isHero ? `<div style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#FFFAED,#FFF5D0);color:#8B6010;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;border:1px solid rgba(184,125,42,.35);letter-spacing:.03em;">👑 Hero Piece</div>` : ''}
-        ${w.isSignature ? `<div class="sig-badge">💎 Signature</div>` : ''}
+        ${isGemPiece(w) ? `<div style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#FFFAED,#FFF5D0);color:#8B6010;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;border:1px solid rgba(184,125,42,.35);letter-spacing:.03em;">💎 Gem Piece</div>` : ''}
         ${w.retiredFromCloset ? `<div class="retired-chip">📦 Retired</div>` : ''}
         ${w.tailoringNeeded && !w.retiredFromCloset ? `<div class="tailoring-chip">🧵 Needs tailoring</div>` : ''}
         ${w.retiring && !w.retiredFromCloset ? `<div class="retiring-chip">🪡 Flagged for replacement</div>` : ''}
@@ -13974,24 +13974,18 @@ function viewWardrobeItem() {
       </div>`}
     </div>
 
-    ${w.gifted && outfits.length ? `
+    ${w.gifted ? `
     <div style="padding:0 20px;margin-bottom:20px;">
-      <button onclick="shareGiftWear('${w.id}')" style="
-        width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
-        border:1.5px solid #C8A0E8;background:#FDF0FF;
-        color:#7B35A8;font-size:14px;font-weight:700;
-        display:flex;align-items:center;justify-content:center;gap:8px;
-        transition:background .15s,transform .1s;
-      " onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform=''">
-        💝 Tell ${w.giftedBy ? esc(w.giftedBy) : 'them'} you're wearing it!
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();thankGifter('${w.id}')"
+        onclick="thankGifter('${w.id}')"
+        style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;touch-action:manipulation;
+        border:1.5px solid #C8A0E8;background:#FDF0FF;color:#7B35A8;font-size:14px;font-weight:700;
+        display:flex;align-items:center;justify-content:center;gap:8px;">
+        💌 Thank ${w.giftedBy ? esc(w.giftedBy.trim().split(' ')[0]) : 'the gifter'}
       </button>
       <div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:6px;">
-        Share your latest outfit rating with the person who gifted this piece
-      </div>
-    </div>` : w.gifted ? `
-    <div style="padding:0 20px;margin-bottom:20px;">
-      <div style="background:#FDF0FF;border:1px dashed #C8A0E8;border-radius:var(--r);padding:14px 16px;text-align:center;">
-        <div style="font-size:13px;color:#7B35A8;font-weight:600;">💝 Log an outfit wearing this gift to share a rating with ${w.giftedBy ? esc(w.giftedBy) : 'the gifter'}!</div>
+        Opens share sheet with a ready-to-send thank you note
       </div>
     </div>` : ''}
 
@@ -17636,74 +17630,131 @@ function spottedPickPhoto(input) {
     if (!S._spottedCapture) return;
     // Route through crop UI before committing photo
     S._spottedCapture._cropSrc = data;
-    S._spottedCapture._cropX = 50;
-    S._spottedCapture._cropY = 50;
+    spottedCropState = null; // reset — initSpottedCrop() will set up after render
     render();
   }).catch(() => toast('Could not load photo.'));
 }
 
+// ── Spotted crop — same box-select approach as the outfit crop ─────────────
+let spottedCropState = null, _spottedCropCleanup = null;
+
 function cancelSpottedCrop() {
+  if (_spottedCropCleanup) _spottedCropCleanup();
+  spottedCropState = null;
   if (S._spottedCapture) { S._spottedCapture._cropSrc = null; render(); }
 }
 
 function applySpottedCrop() {
   const cap = S._spottedCapture;
-  if (!cap || !cap._cropSrc) return;
+  if (!cap || !cap._cropSrc || !spottedCropState) return;
+  const img = document.getElementById('spottedCropImg');
   const wrap = document.getElementById('spottedCropWrap');
-  const containerAspect = wrap ? (wrap.offsetWidth / wrap.offsetHeight) : (3 / 4);
-  const img = new Image();
-  img.onload = () => {
-    const imgW = img.naturalWidth, imgH = img.naturalHeight;
-    const imgAspect = imgW / imgH;
-    let visW, visH; // how many source pixels are visible
-    if (imgAspect > containerAspect) {
-      visH = imgH; visW = imgH * containerAspect;
-    } else {
-      visW = imgW; visH = imgW / containerAspect;
-    }
-    const cropX = cap._cropX !== undefined ? cap._cropX : 50;
-    const cropY = cap._cropY !== undefined ? cap._cropY : 50;
-    const srcX = (cropX / 100) * (imgW - visW);
-    const srcY = (cropY / 100) * (imgH - visH);
-    const canvas = document.createElement('canvas');
-    canvas.width = 800; canvas.height = Math.round(800 / containerAspect);
-    canvas.getContext('2d').drawImage(img, srcX, srcY, visW, visH, 0, 0, canvas.width, canvas.height);
-    cap.photo = canvas.toDataURL('image/jpeg', 0.78);
-    cap._cropSrc = null;
-    render();
-  };
-  img.src = cap._cropSrc;
+  if (!img || !wrap) return;
+  const scaleX = img.naturalWidth / wrap.offsetWidth;
+  const scaleY = img.naturalHeight / img.offsetHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.round(spottedCropState.w * scaleX);
+  canvas.height = Math.round(spottedCropState.h * scaleY);
+  canvas.getContext('2d').drawImage(img,
+    Math.round(spottedCropState.x * scaleX), Math.round(spottedCropState.y * scaleY),
+    canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+  cap.photo = canvas.toDataURL('image/jpeg', 0.85);
+  cap._cropSrc = null;
+  if (_spottedCropCleanup) _spottedCropCleanup();
+  spottedCropState = null;
+  render();
 }
 
-// Crop pan — direct DOM manipulation during touch for smooth panning, no re-render needed
-let _sc_sX = 0, _sc_sY = 0, _sc_bX = 50, _sc_bY = 50;
-function _scStart(e) {
-  e.preventDefault();
-  const t = e.touches[0];
-  _sc_sX = t.clientX; _sc_sY = t.clientY;
-  _sc_bX = (S._spottedCapture && S._spottedCapture._cropX !== undefined) ? S._spottedCapture._cropX : 50;
-  _sc_bY = (S._spottedCapture && S._spottedCapture._cropY !== undefined) ? S._spottedCapture._cropY : 50;
-}
-function _scMove(e) {
-  e.preventDefault();
-  if (!e.touches.length) return;
-  const t = e.touches[0];
+function initSpottedCrop() {
+  const img = document.getElementById('spottedCropImg');
   const wrap = document.getElementById('spottedCropWrap');
-  if (!wrap) return;
-  const dx = t.clientX - _sc_sX, dy = t.clientY - _sc_sY;
-  const newX = Math.max(0, Math.min(100, _sc_bX - (dx / wrap.offsetWidth)  * 100));
-  const newY = Math.max(0, Math.min(100, _sc_bY - (dy / wrap.offsetHeight) * 100));
-  const imgEl = wrap.querySelector('img');
-  if (imgEl) imgEl.style.objectPosition = `${newX}% ${newY}%`;
-}
-function _scEnd(e) {
-  const wrap = document.getElementById('spottedCropWrap');
-  if (!wrap || !S._spottedCapture) return;
-  const imgEl = wrap.querySelector('img');
-  if (imgEl) {
-    const m = imgEl.style.objectPosition.match(/([\d.]+)%\s+([\d.]+)%/);
-    if (m) { S._spottedCapture._cropX = parseFloat(m[1]); S._spottedCapture._cropY = parseFloat(m[2]); }
+  if (!img || !wrap) return;
+  function setup() {
+    const cW = wrap.offsetWidth, cH = img.offsetHeight;
+    let bW = Math.min(cW * 0.9, cH * (3/4) * 0.9);
+    let bH = bW * (4/3);
+    if (bH > cH * 0.9) { bH = cH * 0.9; bW = bH * (3/4); }
+    spottedCropState = {
+      x: Math.round((cW - bW) / 2), y: Math.round((cH - bH) / 2),
+      w: Math.round(bW), h: Math.round(bH),
+      containerW: cW, containerH: cH,
+      dragging: false, resizing: null
+    };
+    updateSpottedCropBox();
+    setupSpottedCropListeners();
   }
+  if (img.complete && img.naturalWidth) setup(); else img.onload = setup;
+}
+
+function updateSpottedCropBox() {
+  const box = document.getElementById('spottedCropBox');
+  if (!box || !spottedCropState) return;
+  box.style.left   = spottedCropState.x + 'px';
+  box.style.top    = spottedCropState.y + 'px';
+  box.style.width  = spottedCropState.w + 'px';
+  box.style.height = spottedCropState.h + 'px';
+}
+
+function setupSpottedCropListeners() {
+  if (_spottedCropCleanup) _spottedCropCleanup();
+  const box = document.getElementById('spottedCropBox');
+  if (!box) return;
+  function wr() { const w = document.getElementById('spottedCropWrap'); return w ? w.getBoundingClientRect() : {left:0,top:0}; }
+  function onDown(e) {
+    e.preventDefault();
+    const pt = e.touches ? e.touches[0] : e, r = wr();
+    const px = pt.clientX - r.left, py = pt.clientY - r.top;
+    const hdl = e.target.dataset?.handle;
+    if (hdl) {
+      spottedCropState.resizing = hdl;
+      spottedCropState._px0 = px; spottedCropState._py0 = py;
+      spottedCropState._x0 = spottedCropState.x; spottedCropState._y0 = spottedCropState.y;
+      spottedCropState._w0 = spottedCropState.w; spottedCropState._h0 = spottedCropState.h;
+    } else {
+      spottedCropState.dragging = true;
+      spottedCropState._ox = px - spottedCropState.x;
+      spottedCropState._oy = py - spottedCropState.y;
+    }
+  }
+  function onMove(e) {
+    if (!spottedCropState || (!spottedCropState.dragging && !spottedCropState.resizing)) return;
+    if (e.cancelable) e.preventDefault();
+    const pt = e.touches ? e.touches[0] : e, r = wr();
+    const px = pt.clientX - r.left, py = pt.clientY - r.top;
+    if (spottedCropState.dragging) {
+      spottedCropState.x = Math.round(Math.max(0, Math.min(spottedCropState.containerW - spottedCropState.w, px - spottedCropState._ox)));
+      spottedCropState.y = Math.round(Math.max(0, Math.min(spottedCropState.containerH - spottedCropState.h, py - spottedCropState._oy)));
+    } else {
+      doSpottedCropResize(px - spottedCropState._px0, py - spottedCropState._py0);
+    }
+    updateSpottedCropBox();
+  }
+  function onUp() { if (spottedCropState) { spottedCropState.dragging = false; spottedCropState.resizing = null; } }
+  box.addEventListener('mousedown', onDown); box.addEventListener('touchstart', onDown, {passive:false});
+  document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
+  document.addEventListener('touchmove', onMove, {passive:false}); document.addEventListener('touchend', onUp);
+  _spottedCropCleanup = () => {
+    box.removeEventListener('mousedown', onDown); box.removeEventListener('touchstart', onDown);
+    document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onUp);
+    _spottedCropCleanup = null;
+  };
+}
+
+function doSpottedCropResize(dx, dy) {
+  const h = spottedCropState.resizing, R = 4/3, MIN = 80;
+  const {_x0:sx, _y0:sy, _w0:sw, _h0:sh} = spottedCropState;
+  let nw, nx, ny;
+  if (h==='br')     { nw=sw+dx; nx=sx; ny=sy; }
+  else if(h==='bl') { nw=sw-dx; nx=sx+(sw-nw); ny=sy; }
+  else if(h==='tr') { nw=sw+dx; nx=sx; ny=sy+sh-nw*R; }
+  else              { nw=sw-dx; nx=sx+(sw-nw); ny=sy+sh-nw*R; }
+  nw = Math.max(MIN, nw); let nh = nw * R;
+  if(nx<0){nw+=nx;nh=nw*R;nx=0;} if(ny<0){ny=0;}
+  if(nx+nw>spottedCropState.containerW){nw=spottedCropState.containerW-nx;nh=nw*R;}
+  if(ny+nh>spottedCropState.containerH){nh=spottedCropState.containerH-ny;nw=nh/R;}
+  spottedCropState.x=Math.round(nx); spottedCropState.y=Math.round(ny);
+  spottedCropState.w=Math.round(Math.max(MIN,nw)); spottedCropState.h=Math.round(Math.max(MIN*R,nh));
 }
 
 async function analyzeSpottedItem() {
@@ -17983,10 +18034,16 @@ async function unretireItem(id) {
 async function toggleGifted(id, checked) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.gifted = checked;
-  if (!checked) { delete w.giftedBy; }
-  if (checked) { w.price = null; w.paidOff = false; }
+  if (!checked) { delete w.giftedBy; S.giftNudge = null; }
+  if (checked)  { w.price = null; w.paidOff = false; }
   await DB.wardrobe.put(w); render();
-  toast(checked ? '\u{1F497} Marked as gifted!' : 'Gift flag removed.');
+  if (checked) {
+    // Surface the thank-you nudge so it's waiting on the Closet tab
+    S.giftNudge = { entryId: null, items: [w] };
+    toast('💝 Marked as gifted! Send a thank you when you\'re ready.');
+  } else {
+    toast('Gift flag removed.');
+  }
 }
 
 async function updateGiftedBy(id, name) {
@@ -17995,39 +18052,55 @@ async function updateGiftedBy(id, name) {
   await DB.wardrobe.put(w);
 }
 
-async function shareGiftWear(id) {
-  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
-  const outfits = (w.wears||[])
+async function thankGifter(wId) {
+  const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
+  const firstName = w.giftedBy ? w.giftedBy.trim().split(' ')[0] : null;
+  const greeting  = firstName ? ('Hey ' + firstName + '! \u{1F497}') : 'Hey! \u{1F497}';
+
+  // Optional: pull in most-recent outfit rating for a richer message
+  const outfits = (w.wears || [])
     .map(wr => S.entries.find(e => e.id === wr.outfitId))
     .filter(Boolean)
-    .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const latest = outfits[0];
-  if (!latest) { toast('Log an outfit wearing this piece first!'); return; }
-  const gifterName = w.giftedBy || 'you';
-  const rating = latest.rating;
-  const ratingLine = rating ? `It got a ${rating}/10 style rating from my AI stylist!` : '';
-  const caption = [`Hey ${gifterName}! \u{1F497}`,
-    `Just wanted to let you know I’m wearing the ${w.name} you gifted me today.`,
-    ratingLine, `Thanks for the amazing gift! \u{1F64F}`].filter(Boolean).join(' ');
+  const ratingLine = latest && latest.rating
+    ? ('I even got a ' + latest.rating + '/10 from my AI stylist when I wore it! ⭐')
+    : '';
+
+  const text = [
+    greeting,
+    'Just wanted to say thank you for the ' + w.name + ' — I absolutely love it. You have amazing taste! \u{1F64F}',
+    ratingLine,
+  ].filter(Boolean).join('\n\n');
+
+  // Try sharing with outfit photo if available
   try {
-    if (latest.photo && navigator.canShare) {
+    if (latest && latest.photo && navigator.canShare) {
       const blob = await (await fetch(latest.photo)).blob();
       const file = new File([blob], 'outfit.jpg', { type: blob.type });
       if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ title: 'Wearing your gift!', text: caption, files: [file] });
-        return;
+        await navigator.share({ title: 'Thanks for the ' + w.name + '!', text: text, files: [file] });
+        S.giftNudge = null; render(); return;
       }
     }
     if (navigator.share) {
-      await navigator.share({ title: 'Wearing your gift!', text: caption });
-      return;
+      await navigator.share({ title: 'Thanks for the ' + w.name + '!', text: text });
+      S.giftNudge = null; render(); return;
     }
-  } catch(e) { if (e.name === 'AbortError') return; }
+  } catch(shareErr) { if (shareErr.name === 'AbortError') return; }
+
+  // Clipboard fallback
   try {
-    await navigator.clipboard.writeText(caption);
-    toast('Message copied to clipboard — paste it to share! \u{1F497}');
-  } catch { toast('Shared!'); }
+    await navigator.clipboard.writeText(text);
+    toast('\u{1F48C} Message copied — paste it anywhere to send!');
+  } catch(clipErr) {
+    toast('\u{1F48C} Copied!');
+  }
+  S.giftNudge = null; render();
 }
+
+// Keep old name as alias so any stale references still work
+const shareGiftWear = thankGifter;
 
 async function logCompliment(id) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
@@ -18192,6 +18265,7 @@ function attachListeners() {
   const fi = document.getElementById('fileInput');
   if (fi) fi.onchange = handleFile;
   if (S.view === 'crop') initCrop();
+  if (S._spottedCapture && S._spottedCapture._cropSrc) initSpottedCrop();
   // Filter bar fade edges
   ['fbw-closet','fbw-wcat','fbw-wsub','fbw-wsort'].forEach(initFilterFade);
   // News flash swipe-to-dismiss
