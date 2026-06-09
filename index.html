@@ -2726,17 +2726,20 @@ const DB = {
       const { photo: _ph, ...firestoreItem } = w;
       if (photo) {
         if (photo.startsWith('data:')) {
-          // New upload — push to Firebase Storage for cross-device sync
-          const url = await uploadPhotoToStorage(w.id, photo);
-          if (url) {
-            firestoreItem.photoUrl = url; // store URL in Firestore
-          }
-          // Cache locally in IndexedDB (fast offline access)
+          // 1. Cache locally in IndexedDB immediately (fast, offline-capable)
           try { await PhotoDB.put(w.id, photo); } catch(e) {}
-          // Also store a small thumbnail directly in Firestore —
-          // this survives IDB eviction AND Storage upload failures (belt + suspenders for iOS)
+          // 2. Thumbnail stored directly in Firestore — survives IDB eviction,
+          //    works cross-device without waiting for Storage upload
           const thumb = await makePhotoThumb(photo);
           if (thumb) firestoreItem.photoThumb = thumb;
+          // 3. Firebase Storage upload runs in the BACKGROUND — never blocks the save.
+          //    When it completes it patches photoUrl into the existing Firestore doc.
+          //    This avoids iOS hangs where ref.put() stalls on a slow connection.
+          uploadPhotoToStorage(w.id, photo).then(url => {
+            if (url) {
+              try { userCol('wardrobe').doc(String(w.id)).update({ photoUrl: url }); } catch(e) {}
+            }
+          }).catch(() => {});
         } else if (photo.startsWith('http')) {
           // Already a Firebase Storage URL — preserve it
           firestoreItem.photoUrl = photo;
@@ -16576,40 +16579,38 @@ async function stageWardrobeWearPhoto(wId, input) {
   } catch(e) { toast('Could not load photo — try again.'); }
 }
 
-// Explicit save after user taps Save button
-async function saveWardrobeItemPhoto(wId) {
+// Explicit save after user taps Save button — optimistic: update state + render instantly, save in background
+function saveWardrobeItemPhoto(wId) {
   const pending = S._pendingWitemPhoto;
-  if (!pending || pending.wId !== wId || S._savingPhoto) return;
+  if (!pending || pending.wId !== wId) return;
   const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
-  S._savingPhoto = true; render();
-  try {
-    w.photo = pending.data;
-    await DB.wardrobe.put(w);
-    S._pendingWitemPhoto = null;
-    toast('📸 Item photo saved ✓');
-  } catch(e) {
-    console.error('saveWardrobeItemPhoto:', e);
-    toast('Couldn\'t save — check your connection and try again.');
-  }
-  S._savingPhoto = false; render();
+  // Update state immediately so photo sticks and Save/Cancel buttons disappear
+  w.photo = pending.data;
+  S._pendingWitemPhoto = null;
+  render();
+  toast('📸 Photo saved ✓');
+  // Background sync — never blocks UI
+  DB.wardrobe.put(w).catch(e => {
+    console.error('saveWardrobeItemPhoto bg save:', e);
+    toast('Saved locally — will sync when connection improves.');
+  });
 }
 
-async function saveWardrobeWearPhoto(wId) {
+function saveWardrobeWearPhoto(wId) {
   const pending = S._pendingWearPhoto;
-  if (!pending || pending.wId !== wId || S._savingPhoto) return;
+  if (!pending || pending.wId !== wId) return;
   const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
-  S._savingPhoto = true; render();
-  try {
-    w.wearPhoto = pending.data;
-    await DB.wardrobe.put(w);
-    S._pendingWearPhoto = null;
-    S._wearFlipped.add(wId);
-    toast('🧍 Worn photo saved ✓');
-  } catch(e) {
-    console.error('saveWardrobeWearPhoto:', e);
-    toast('Couldn\'t save — check your connection and try again.');
-  }
-  S._savingPhoto = false; render();
+  // Update state immediately
+  w.wearPhoto = pending.data;
+  S._pendingWearPhoto = null;
+  S._wearFlipped.add(wId);
+  render();
+  toast('🧍 Worn photo saved ✓');
+  // Background sync
+  DB.wardrobe.put(w).catch(e => {
+    console.error('saveWardrobeWearPhoto bg save:', e);
+    toast('Saved locally — will sync when connection improves.');
+  });
 }
 
 async function removeWardrobeItemPhoto(wId) {
@@ -17127,26 +17128,26 @@ async function confirmReceiptItem() {
     photo: (rf.imageData && rf.mode === 'photo') ? `data:${rf.imageMime};base64,${rf.imageData}` : undefined,
   };
 
-  S.loading = true; S.loadingMsg = 'Saving to your closet…'; render();
-  try {
-    await DB.wardrobe.put(newItem);
-    S.wardrobe.push(newItem); // update in-memory — skip getAll() round-trip
-    S.loading = false; S.loadingMsg = '';
-    S.receiptFlow = null;
-    S._flipCardFlipped = false;
-    if (newItem.gifted) {
-      S.giftNudge = { entryId: null, items: [newItem] };
-      switchTab('closet');
-    } else {
-      S.selectedWardrobeId = newItem.id;
-      navigate('wardrobe-item');
-    }
-    toast(`${newItem.icon} ${newItem.name} added to wardrobe! ✨`);
-  } catch(e) {
-    S.loading = false; S.loadingMsg = ''; render();
-    console.error('confirmReceiptItem:', e);
-    toast('Couldn\'t save — check your connection and try again.');
+  // Optimistic: navigate immediately so the user never waits on a spinner.
+  // DB.wardrobe.put is fast now (Storage upload is fire-and-forget in the background).
+  S.wardrobe.push(newItem);
+  S.receiptFlow = null;
+  S._flipCardFlipped = false;
+  if (newItem.gifted) {
+    S.giftNudge = { entryId: null, items: [newItem] };
+    switchTab('closet');
+  } else {
+    S.selectedWardrobeId = newItem.id;
+    navigate('wardrobe-item');
   }
+  toast(`${newItem.icon} ${newItem.name} added! Syncing…`);
+  // Background save — resolves quickly, Storage upload is async inside put()
+  DB.wardrobe.put(newItem)
+    .then(() => toast(`${newItem.icon} ${newItem.name} saved ✓`))
+    .catch(e => {
+      console.error('confirmReceiptItem save failed:', e);
+      toast('Saved locally — will sync when connection improves.');
+    });
 }
 
 async function quickRenameItem(id) {
@@ -17643,20 +17644,22 @@ async function toggleWardrobeRetiring(id) {
   if (w.retiring) toast('🪡 Flagged — time to find its successor!');
 }
 
-async function toggleMaybePile(id) {
+function toggleMaybePile(id) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.inMaybePile = !w.inMaybePile;
   w.maybePileAt = w.inMaybePile ? new Date().toISOString() : null;
-  await DB.wardrobe.put(w); render();
+  render(); // immediate visual update
   toast(w.inMaybePile ? '🤔 Added to your Maybe Pile — we\'ll check in if it goes unworn.' : 'Removed from Maybe Pile.');
+  DB.wardrobe.put(w).catch(e => { console.error('toggleMaybePile save failed:', e); toast('Sync failed — check your connection.'); });
 }
 
-async function rescueFromMaybePile(id) {
+function rescueFromMaybePile(id) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.inMaybePile = false;
   w.maybePileAt = null;
-  await DB.wardrobe.put(w); render();
+  render(); // immediate visual update
   toast(`✨ ${w.name} rescued! It's earned its place.`);
+  DB.wardrobe.put(w).catch(e => { console.error('rescueFromMaybePile save failed:', e); toast('Sync failed — check your connection.'); });
 }
 
 async function addCustomCategory(name) {
