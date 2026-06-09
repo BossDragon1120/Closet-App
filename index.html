@@ -412,6 +412,7 @@ body {
   display: flex; flex-direction: column; align-items: center;
   width: 72px; flex-shrink: 0; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .shoe-card-img-wrap {
   width: 68px; height: 54px;
@@ -2701,15 +2702,14 @@ const DB = {
     getAll: async () => {
       const snap = await userCol('wardrobe').get();
       const items = snap.docs.map(d => d.data());
-      // Restore photos: prefer Firebase Storage URL (cross-device), fall back to IndexedDB (local)
+      // Restore photos: IndexedDB first (most recent upload on this device),
+      // fall back to Firebase Storage URL (cross-device sync)
       await Promise.all(items.map(async item => {
-        if (item.photoUrl) {
-          // Firebase Storage URL — works on every device
-          item.photo = item.photoUrl;
-        } else if (!item.photo) {
-          // Legacy: try IndexedDB (only works on the device that uploaded)
-          const photo = await PhotoDB.get(item.id);
-          if (photo) item.photo = photo;
+        const idbPhoto = await PhotoDB.get(item.id);
+        if (idbPhoto) {
+          item.photo = idbPhoto; // local upload always wins — prevents revert after failed Storage upload
+        } else if (item.photoUrl) {
+          item.photo = item.photoUrl; // cross-device: use Firebase Storage URL
         }
       }));
       return items;
@@ -11907,10 +11907,9 @@ function shelfCardHTML(w, fallbackIcon, _siblings) {
   const imgHTML = w.photo
     ? `<img src="${esc(w.photo)}" class="shoe-card-img" alt="${esc(w.name)}">`
     : `<span class="shoe-card-emoji">${w.icon || fallbackIcon}</span>`;
-  const _sibIds = JSON.stringify(_siblings?_siblings.map(s=>String(s.id)):[]);
   return `<div class="shoe-card"
-    ontouchend="if(_touchMoved)return;event.preventDefault();openClosetLightbox('${w.id}',${_sibIds})"
-    onclick="openClosetLightbox('${w.id}',${_sibIds})">
+    ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
+    onclick="openWardrobeItem('${w.id}')">
     <div class="shoe-card-img-wrap${isHero?' hero':''}">
       ${imgHTML}
       ${isHero ? `<div style="position:absolute;bottom:2px;right:3px;font-size:7px;font-weight:800;color:var(--gold-dk);background:rgba(255,255,255,.85);border-radius:3px;padding:1px 3px;">💎</div>` : ''}
