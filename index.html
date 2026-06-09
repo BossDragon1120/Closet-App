@@ -6406,13 +6406,15 @@ function render() {
     case 'outfit-builder':    html = viewOutfitBuilder();     break;
   }
   // Inject tab bar right after the .nav block on every tab view
-  if (TAB_VIEWS.has(S.view)) {
+  // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
+  const isNotabForm = html.includes('view-notab');
+  if (TAB_VIEWS.has(S.view) && !isNotabForm) {
     html = html.replace(/<div class="nav">[\s\S]*?<\/div>/, m => m + tabBarHTML());
   }
   if (S.loading) {
     html += `<div class="loading-overlay"><div class="spinner"></div><h3>${esc(S.loadingMsg)}</h3><p>Sit tight — Claude is on it</p></div>`;
   }
-  if (TAB_VIEWS.has(S.view)) html += bottomBarHTML();
+  if (TAB_VIEWS.has(S.view) && !isNotabForm) html += bottomBarHTML();
   if (S.featureMenuOpen) html += featuresMenuHTML();
   // About Me flyout retired — Profile is now its own tab. Kept for safety but never shown.
   // if (S.showAboutMe) html += aboutMeSheetHTML();
@@ -12895,7 +12897,8 @@ function viewNewPiece() {
         </button>
 
         <!-- Manual entry -->
-        <button onclick="S.receiptFlow={step:'preview',mode:'manual',imageData:'',imageMime:'',pasteText:'',preview:{name:'',brand:'',price:'',category:'Tops',description:'',icon:'👕',isNew:true}};navigate('receipt-add')"
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S.receiptFlow={step:'preview',mode:'manual',imageData:'',imageMime:'',pasteText:'',preview:{name:'',brand:'',price:'',category:'Tops',description:'',icon:'👕',isNew:true}};navigate('receipt-add')"
+          onclick="S.receiptFlow={step:'preview',mode:'manual',imageData:'',imageMime:'',pasteText:'',preview:{name:'',brand:'',price:'',category:'Tops',description:'',icon:'👕',isNew:true}};navigate('receipt-add')"
           style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
           <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">✏️</div>
           <div style="flex:1;min-width:0;">
@@ -13559,8 +13562,8 @@ function viewReceiptAdd() {
               <div class="flip-card-face back">
                 <div style="font-size:15px;font-weight:800;margin-bottom:14px;color:var(--text);">${esc(p.icon||'👕')} Details</div>
                 <div style="margin-bottom:11px;">
-                  <label class="form-label" style="font-size:10px;">Name</label>
-                  <input class="form-input" type="text" value="${esc(p.name||'')}" oninput="S.receiptFlow.preview.name=this.value" placeholder="e.g. Navy Linen Blazer" style="margin:4px 0 0;" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+                  <label class="form-label" style="font-size:10px;${p._nameError?'color:#c0392b;':''}">Name${p._nameError?` <span style="font-weight:700;">← required</span>`:''}</label>
+                  <input class="form-input" type="text" value="${esc(p.name||'')}" oninput="S.receiptFlow.preview.name=this.value;if(S.receiptFlow.preview._nameError)delete S.receiptFlow.preview._nameError;" placeholder="e.g. Navy Linen Blazer" style="margin:4px 0 0;${p._nameError?'border-color:#c0392b;background:#fff8f8;':''}" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
                 </div>
                 <div style="margin-bottom:11px;">
                   <label class="form-label" style="font-size:10px;">Brand</label>
@@ -13656,7 +13659,7 @@ function viewReceiptAdd() {
     // ── MANUAL / RECEIPT MODE: standard form ─────────────────
     return `<div class="view view-notab">
       <div class="nav">
-        <button class="nav-back" onclick="${backAction}">${iconBack()} Back</button>
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();${backAction}" onclick="${backAction}">${iconBack()} Back</button>
         <span class="nav-title">${isManual ? 'New Piece' : 'Confirm Item'}</span>
         <span style="width:72px"></span>
       </div>
@@ -13676,9 +13679,11 @@ function viewReceiptAdd() {
              ${rf.imageData ? `<img src="data:${rf.imageMime};base64,${rf.imageData}" style="width:100%;max-height:180px;object-fit:contain;border-radius:var(--r-sm);margin-bottom:20px;border:1px solid var(--border);">` : ''}`}
 
         <div class="form-group" style="margin-bottom:14px;">
-          <label class="form-label">Item Name</label>
+          <label class="form-label" style="${p._nameError?'color:#c0392b;':''}">Item Name${p._nameError?` <span style="font-weight:700;">← required</span>`:''}</label>
           <input class="form-input" type="text" value="${esc(p.name||'')}"
-            oninput="S.receiptFlow.preview.name=this.value" placeholder="e.g. Silk Midi Dress"
+            oninput="S.receiptFlow.preview.name=this.value;if(S.receiptFlow.preview._nameError)delete S.receiptFlow.preview._nameError;"
+            placeholder="e.g. Silk Midi Dress"
+            style="${p._nameError?'border-color:#c0392b;background:#fff8f8;':''}"
             enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
         </div>
         <div class="form-group" style="margin-bottom:14px;">
@@ -17030,7 +17035,18 @@ async function confirmReceiptItem() {
   const p = rf.preview;
 
   const itemName = (p.name || '').trim();
-  if (!itemName) { toast('Please enter an item name.'); return; }
+  if (!itemName) {
+    rf.preview._nameError = true;
+    render();
+    // Scroll name field into view and focus it
+    requestAnimationFrame(() => {
+      const el = document.querySelector('input[placeholder="e.g. Silk Midi Dress"]') ||
+                 document.querySelector('input[placeholder="e.g. Navy Linen Blazer"]');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
+    });
+    return;
+  }
+  if (rf.preview._nameError) rf.preview._nameError = false;
 
   const cat = normalizeCat(p.category || 'Tops');
   const _today = new Date();
