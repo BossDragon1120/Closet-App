@@ -2702,14 +2702,18 @@ const DB = {
     getAll: async () => {
       const snap = await userCol('wardrobe').get();
       const items = snap.docs.map(d => d.data());
-      // Restore photos: IndexedDB first (most recent upload on this device),
-      // fall back to Firebase Storage URL (cross-device sync)
+      // Restore photos — three-tier fallback for iOS reliability:
+      // 1. IndexedDB (highest quality, same device)
+      // 2. Firebase Storage URL (cross-device sync)
+      // 3. photoThumb (small JPEG stored directly in Firestore — always available)
       await Promise.all(items.map(async item => {
         const idbPhoto = await PhotoDB.get(item.id);
         if (idbPhoto) {
-          item.photo = idbPhoto; // local upload always wins — prevents revert after failed Storage upload
+          item.photo = idbPhoto;           // same device: best quality
         } else if (item.photoUrl) {
-          item.photo = item.photoUrl; // cross-device: use Firebase Storage URL
+          item.photo = item.photoUrl;      // cross-device: Storage URL
+        } else if (item.photoThumb) {
+          item.photo = item.photoThumb;    // last resort: Firestore-stored thumb
         }
       }));
       return items;
@@ -2724,8 +2728,12 @@ const DB = {
           if (url) {
             firestoreItem.photoUrl = url; // store URL in Firestore
           }
-          // Also cache locally in IndexedDB (fast offline access)
+          // Cache locally in IndexedDB (fast offline access)
           try { await PhotoDB.put(w.id, photo); } catch(e) {}
+          // Also store a small thumbnail directly in Firestore —
+          // this survives IDB eviction AND Storage upload failures (belt + suspenders for iOS)
+          const thumb = await makePhotoThumb(photo);
+          if (thumb) firestoreItem.photoThumb = thumb;
         } else if (photo.startsWith('http')) {
           // Already a Firebase Storage URL — preserve it
           firestoreItem.photoUrl = photo;
@@ -3018,6 +3026,26 @@ function compressImage(file) {
       img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
+  });
+}
+
+// Creates a small ~320×427 thumbnail suitable for direct Firestore storage.
+// Used as belt-and-suspenders fallback when IDB is evicted and Storage upload fails.
+function makePhotoThumb(dataUrl) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const maxW = 320, maxH = 427;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      res(c.toDataURL('image/jpeg', 0.5));
+    };
+    img.onerror = () => res(null);
+    img.src = dataUrl;
   });
 }
 
@@ -9209,22 +9237,45 @@ function viewShop() {
     ${S._spottedCapture ? (() => {
       const cap = S._spottedCapture;
       const hasContent = cap.photo || cap.url.trim();
+      const cx = cap._cropX !== undefined ? cap._cropX : 50;
+      const cy = cap._cropY !== undefined ? cap._cropY : 50;
       return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
-          ontouchend="if(_touchMoved)return;event.preventDefault();closeSpottedCapture();" onclick="closeSpottedCapture()">
-        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:88dvh;display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.2);"
+          ontouchend="if(_touchMoved)return;event.preventDefault();${cap._cropSrc ? 'cancelSpottedCrop()' : 'closeSpottedCapture()'};" onclick="${cap._cropSrc ? 'cancelSpottedCrop()' : 'closeSpottedCapture()'}">
+        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:92dvh;display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.2);"
           ontouchend="event.stopPropagation();" onclick="event.stopPropagation()">
 
           <!-- Header -->
           <div style="padding:14px 20px 10px;flex-shrink:0;">
             <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>
             <div style="display:flex;align-items:center;justify-content:space-between;">
-              <div style="font-size:18px;font-weight:900;">${cap.editId ? '✏️ Edit Spotted' : '📌 Capture a Look'}</div>
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();closeSpottedCapture();" onclick="closeSpottedCapture()"
+              <div style="font-size:18px;font-weight:900;">${cap._cropSrc ? '✂️ Crop Photo' : (cap.editId ? '✏️ Edit Spotted' : '📌 Capture a Look')}</div>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();${cap._cropSrc ? 'cancelSpottedCrop()' : 'closeSpottedCapture()'};" onclick="${cap._cropSrc ? 'cancelSpottedCrop()' : 'closeSpottedCapture()'}"
                 style="background:none;border:none;font-size:20px;color:var(--text-3);cursor:pointer;padding:0 4px;font-family:inherit;touch-action:manipulation;">✕</button>
             </div>
           </div>
 
-          <!-- Scrollable body -->
+          ${cap._cropSrc ? `
+          <!-- ── Crop UI ── -->
+          <div style="font-size:11px;color:var(--text-3);text-align:center;padding:0 0 8px;flex-shrink:0;">Drag to reposition</div>
+          <div id="spottedCropWrap"
+            style="margin:0 20px 12px;border-radius:14px;overflow:hidden;aspect-ratio:3/4;max-height:calc(92dvh - 180px);background:#000;touch-action:none;flex-shrink:0;cursor:grab;"
+            ontouchstart="_scStart(event)"
+            ontouchmove="_scMove(event)"
+            ontouchend="_scEnd(event)">
+            <img src="${esc(cap._cropSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:${cx}% ${cy}%;pointer-events:none;display:block;user-select:none;">
+          </div>
+          <div style="display:flex;gap:10px;padding:12px 20px;padding-bottom:max(12px,env(safe-area-inset-bottom));flex-shrink:0;border-top:1px solid var(--border);">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();cancelSpottedCrop();" onclick="cancelSpottedCrop();"
+              style="flex:1;padding:13px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              Cancel
+            </button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();applySpottedCrop();" onclick="applySpottedCrop();"
+              style="flex:2;padding:13px;border-radius:100px;border:none;background:var(--gold);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              ✓ Use Photo
+            </button>
+          </div>
+          ` : `
+          <!-- ── Normal form ── -->
           <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:0 20px 4px;">
 
             <!-- Type toggle -->
@@ -9258,7 +9309,7 @@ function viewShop() {
                   <button ontouchend="if(_touchMoved)return;event.preventDefault();S._spottedCapture.photo=null;render();" onclick="S._spottedCapture.photo=null;render();"
                     style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;">✕</button>
                 </div>` : `
-                <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;box-sizing:border-box;padding:28px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;background:var(--bg);">
+                <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;box-sizing:border-box;padding:28px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;background:var(--bg);touch-action:manipulation;">
                   <input type="file" accept="image/*" style="display:none;" onchange="spottedPickPhoto(this)">
                   <div style="font-size:32px;margin-bottom:8px;">📷</div>
                   <div style="font-size:13px;color:var(--text-2);font-weight:600;">Tap to upload photo</div>
@@ -9275,19 +9326,22 @@ function viewShop() {
               </button>` : ''}
 
             <!-- Fields -->
-            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:8px;">
               <input class="form-input" placeholder="Item name (e.g. Cream linen blazer)" value="${esc(cap.name)}" oninput="S._spottedCapture.name=this.value" style="margin:0;">
               <input class="form-input" placeholder="Brand (optional)" value="${esc(cap.brand)}" oninput="S._spottedCapture.brand=this.value" style="margin:0;">
               <input class="form-input" placeholder="Price (optional — e.g. $148)" value="${esc(cap.price)}" oninput="S._spottedCapture.price=this.value" style="margin:0;">
               <input class="form-input" placeholder="Notes — size tried, color, etc." value="${esc(cap.notes)}" oninput="S._spottedCapture.notes=this.value" style="margin:0;">
             </div>
+          </div>
 
-            <!-- Save button — inside scroll area so keyboard never covers it -->
+          <!-- Sticky save button — always visible outside scroll area -->
+          <div style="padding:12px 20px;padding-bottom:max(16px,env(safe-area-inset-bottom));flex-shrink:0;border-top:1px solid var(--border);">
             <button ontouchend="if(_touchMoved)return;event.preventDefault();saveSpottedItem();" onclick="saveSpottedItem()"
-              style="width:100%;background:var(--gold);color:#fff;border:none;border-radius:var(--r-sm);padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:max(16px,env(safe-area-inset-bottom,16px));">
+              style="width:100%;background:var(--gold);color:#fff;border:none;border-radius:var(--r-sm);padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">
               📌 Save to Spotted
             </button>
           </div>
+          `}
         </div>
       </div>`;
     })() : ''}
@@ -17578,9 +17632,78 @@ function closeSpottedCapture() { S._spottedCapture = null; render(); }
 
 function spottedPickPhoto(input) {
   if (!input.files || !input.files[0]) return;
-  const reader = new FileReader();
-  reader.onload = e => { if (S._spottedCapture) { S._spottedCapture.photo = e.target.result; render(); } };
-  reader.readAsDataURL(input.files[0]);
+  compressImage(input.files[0]).then(({ data }) => {
+    if (!S._spottedCapture) return;
+    // Route through crop UI before committing photo
+    S._spottedCapture._cropSrc = data;
+    S._spottedCapture._cropX = 50;
+    S._spottedCapture._cropY = 50;
+    render();
+  }).catch(() => toast('Could not load photo.'));
+}
+
+function cancelSpottedCrop() {
+  if (S._spottedCapture) { S._spottedCapture._cropSrc = null; render(); }
+}
+
+function applySpottedCrop() {
+  const cap = S._spottedCapture;
+  if (!cap || !cap._cropSrc) return;
+  const wrap = document.getElementById('spottedCropWrap');
+  const containerAspect = wrap ? (wrap.offsetWidth / wrap.offsetHeight) : (3 / 4);
+  const img = new Image();
+  img.onload = () => {
+    const imgW = img.naturalWidth, imgH = img.naturalHeight;
+    const imgAspect = imgW / imgH;
+    let visW, visH; // how many source pixels are visible
+    if (imgAspect > containerAspect) {
+      visH = imgH; visW = imgH * containerAspect;
+    } else {
+      visW = imgW; visH = imgW / containerAspect;
+    }
+    const cropX = cap._cropX !== undefined ? cap._cropX : 50;
+    const cropY = cap._cropY !== undefined ? cap._cropY : 50;
+    const srcX = (cropX / 100) * (imgW - visW);
+    const srcY = (cropY / 100) * (imgH - visH);
+    const canvas = document.createElement('canvas');
+    canvas.width = 800; canvas.height = Math.round(800 / containerAspect);
+    canvas.getContext('2d').drawImage(img, srcX, srcY, visW, visH, 0, 0, canvas.width, canvas.height);
+    cap.photo = canvas.toDataURL('image/jpeg', 0.78);
+    cap._cropSrc = null;
+    render();
+  };
+  img.src = cap._cropSrc;
+}
+
+// Crop pan — direct DOM manipulation during touch for smooth panning, no re-render needed
+let _sc_sX = 0, _sc_sY = 0, _sc_bX = 50, _sc_bY = 50;
+function _scStart(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  _sc_sX = t.clientX; _sc_sY = t.clientY;
+  _sc_bX = (S._spottedCapture && S._spottedCapture._cropX !== undefined) ? S._spottedCapture._cropX : 50;
+  _sc_bY = (S._spottedCapture && S._spottedCapture._cropY !== undefined) ? S._spottedCapture._cropY : 50;
+}
+function _scMove(e) {
+  e.preventDefault();
+  if (!e.touches.length) return;
+  const t = e.touches[0];
+  const wrap = document.getElementById('spottedCropWrap');
+  if (!wrap) return;
+  const dx = t.clientX - _sc_sX, dy = t.clientY - _sc_sY;
+  const newX = Math.max(0, Math.min(100, _sc_bX - (dx / wrap.offsetWidth)  * 100));
+  const newY = Math.max(0, Math.min(100, _sc_bY - (dy / wrap.offsetHeight) * 100));
+  const imgEl = wrap.querySelector('img');
+  if (imgEl) imgEl.style.objectPosition = `${newX}% ${newY}%`;
+}
+function _scEnd(e) {
+  const wrap = document.getElementById('spottedCropWrap');
+  if (!wrap || !S._spottedCapture) return;
+  const imgEl = wrap.querySelector('img');
+  if (imgEl) {
+    const m = imgEl.style.objectPosition.match(/([\d.]+)%\s+([\d.]+)%/);
+    if (m) { S._spottedCapture._cropX = parseFloat(m[1]); S._spottedCapture._cropY = parseFloat(m[2]); }
+  }
 }
 
 async function analyzeSpottedItem() {
