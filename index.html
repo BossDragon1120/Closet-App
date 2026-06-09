@@ -12036,11 +12036,14 @@ async function shareSignaturePieces() {
    WARDROBE SELECT MODE — long-press bulk delete
    ================================================================ */
 let _wLongPressTimer = null;
+let _wLongPressFired = false;
 
 function wLongPressStart(id, e) {
   wLongPressCancel();
+  _wLongPressFired = false;
   _wLongPressTimer = setTimeout(() => {
     if (_touchMoved) return;
+    _wLongPressFired = true;
     if (navigator.vibrate) navigator.vibrate(40);
     S._wardrobeSelectMode = true;
     if (!S._wardrobeSelected.includes(id)) S._wardrobeSelected = [id];
@@ -12825,7 +12828,7 @@ function hangerHTML(w, _siblings) {
   return `<div class="hanger"
     onclick="${S._wardrobeSelectMode ? `toggleWardrobeSelect('${w.id}')` : `openWardrobeItem('${w.id}')`}"
     ontouchstart="wLongPressStart('${w.id}',event)"
-    ontouchend="wLongPressCancel()"
+    ontouchend="if(_touchMoved)return;event.preventDefault();wLongPressCancel();if(!_wLongPressFired){${S._wardrobeSelectMode ? `toggleWardrobeSelect('${w.id}')` : `openWardrobeItem('${w.id}')`}}"
     ontouchmove="wLongPressCancel()"
     style="user-select:none;-webkit-user-select:none;">
     ${hangerSVG}
@@ -13846,7 +13849,7 @@ function viewWardrobeItem() {
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate('wardrobe')">${iconBack()} Wardrobe</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')">${iconBack()} Wardrobe</button>
       <span class="nav-title"></span>
       <div style="display:flex;align-items:center;gap:2px;">
         <button class="nav-btn" ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witem-edit-section')?.scrollIntoView({behavior:'smooth',block:'start'})" onclick="document.getElementById('witem-edit-section')?.scrollIntoView({behavior:'smooth',block:'start'})" title="Edit details" style="touch-action:manipulation;">
