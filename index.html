@@ -2778,6 +2778,11 @@ const S = {
   plan: { eventDesc: '', suggestion: null, loadingSuggest: false, tripPickerOpen: false, activeTripId: null, savedSuccess: false, soloMode: null, tripDestination: '', tripDays: 5, tripSuggestions: null, tripGaps: null, loadingTrip: false },
   eventBoard: JSON.parse(localStorage.getItem('closet-event-board') || '[]'), // [{id, desc, suggestion, tripId, addedAt}]
   eventTrips: JSON.parse(localStorage.getItem('closet-event-trips') || '[]'), // [{id, name, createdAt}]
+  sellListings: JSON.parse(localStorage.getItem('closet-sell-listings') || '[]'), // [{id,photo,wornPhoto,name,brand,category,size,condition,description,price,status,createdAt}]
+  returnItems: JSON.parse(localStorage.getItem('closet-return-items') || '[]'),   // [{id,photo,store,channel,deadline,notes,createdAt}]
+  sellTab: 'listings', // 'listings' | 'returns'
+  _sellForm: null,   // active listing form state
+  _returnForm: null, // active return form state
   _tripFlow: null, // { step:'naming', name:'' } — inline trip creation
   newsFlash: null, // { headline, summary, url, source, fetchedAt }
   _newsFlashDismissed: false, // session-only dismiss flag
@@ -6722,67 +6727,406 @@ function viewLocal() {
    VIEW: SELL
    ================================================================ */
 function viewSell() {
-  const sellFeatures = [
-    { icon:'📸', title:'List with a Photo', desc:'Snap your item and Claude will suggest a title, description, and price based on brand, condition, and style.' },
-    { icon:'💰', title:'Smart Pricing', desc:'Get AI-powered price suggestions based on brand, wear history, and current resale market trends.' },
-    { icon:'🏪', title:'Multi-Platform Posting', desc:'Push your listing to Depop, Poshmark, eBay, and Mercari — all from one place.' },
-    { icon:'📦', title:'Track Your Sales', desc:'See what\'s sold, what\'s pending, and how much you\'ve made from your closet.' },
-  ];
+  const tab = S.sellTab || 'listings';
+  const sf = S._sellForm;
+  const rf = S._returnForm;
+
+  // ── Countdown helpers ──────────────────────────────────────
+  const today = new Date(); today.setHours(0,0,0,0);
+  function daysLeft(deadline) {
+    if (!deadline) return null;
+    const d = new Date(deadline + 'T23:59:59');
+    return Math.ceil((d - today) / 86400000);
+  }
+  function returnUrgency(dl) {
+    if (dl === null) return 'none';
+    if (dl < 0)  return 'expired';
+    if (dl <= 2) return 'urgent';
+    if (dl <= 6) return 'soon';
+    return 'ok';
+  }
+  const urgencyColor  = { expired:'#DC2626', urgent:'#DC2626', soon:'#D97706', ok:'#16A34A', none:'var(--text-3)' };
+  const urgencyBg     = { expired:'#FEF2F2', urgent:'#FEF2F2', soon:'#FFFBEB', ok:'#F0FDF4', none:'var(--surface)' };
+  const urgencyBorder = { expired:'#FCA5A5', urgent:'#FCA5A5', soon:'#FCD34D', ok:'#86EFAC', none:'var(--border)' };
+
+  const returnsWithDays = (S.returnItems || []).map(r => ({ ...r, dl: daysLeft(r.deadline) }))
+    .sort((a,b) => (a.dl??999) - (b.dl??999));
+  const urgentCount = returnsWithDays.filter(r => r.dl !== null && r.dl <= 6 && r.dl >= 0).length;
+  const activeListings = (S.sellListings || []).filter(l => l.status !== 'sold');
+  const soldListings   = (S.sellListings || []).filter(l => l.status === 'sold');
+
+  // ── Sell listing form ──────────────────────────────────────
+  if (sf) {
+    const catOptions = ['Tops','Bottoms','Outerwear','Dresses','Shoes','Bags','Accessories','Sweats','Other'];
+    const condOptions = [
+      { val:'new-tags',  label:'New with tags' },
+      { val:'like-new',  label:'Like new' },
+      { val:'good',      label:'Good' },
+      { val:'fair',      label:'Fair' },
+      { val:'poor',      label:'Poor' },
+    ];
+    return `<div class="view view-notab">
+      <div class="nav">
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();S._sellForm=null;render()" onclick="S._sellForm=null;render()">${iconBack()} Back</button>
+        <span class="nav-title">${sf.id ? 'Edit Listing' : 'New Listing'}</span>
+        <div style="width:72px"></div>
+      </div>
+      <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding:16px 16px 100px;">
+
+        <!-- Two photo slots -->
+        <div style="display:flex;gap:10px;margin-bottom:20px;">
+          <!-- Item photo -->
+          <div style="flex:1;">
+            <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Item Photo</div>
+            <label style="display:block;width:100%;aspect-ratio:3/4;border-radius:14px;overflow:hidden;background:var(--surface);border:2px dashed var(--border);cursor:pointer;position:relative;touch-action:manipulation;">
+              ${sf.photo
+                ? `<img src="${sf.photo}" style="width:100%;height:100%;object-fit:cover;display:block;">`
+                : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;"><span style="font-size:28px;">📸</span><span style="font-size:11px;color:var(--text-3);font-weight:600;">Add photo</span></div>`}
+              <input type="file" accept="image/*" style="display:none;" onchange="uploadSellListingPhoto('photo',this)">
+            </label>
+            ${sf.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();S._sellForm.photo=null;render()" onclick="S._sellForm.photo=null;render()" style="width:100%;margin-top:6px;background:none;border:none;font-size:11px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove</button>` : ''}
+          </div>
+          <!-- Worn photo -->
+          <div style="flex:1;">
+            <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Worn Photo</div>
+            <label style="display:block;width:100%;aspect-ratio:3/4;border-radius:14px;overflow:hidden;background:var(--surface);border:2px dashed var(--border);cursor:pointer;position:relative;touch-action:manipulation;">
+              ${sf.wornPhoto
+                ? `<img src="${sf.wornPhoto}" style="width:100%;height:100%;object-fit:cover;display:block;">`
+                : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;"><span style="font-size:28px;">🧍</span><span style="font-size:11px;color:var(--text-3);font-weight:600;">Add worn photo</span></div>`}
+              <input type="file" accept="image/*" style="display:none;" onchange="uploadSellListingPhoto('wornPhoto',this)">
+            </label>
+            ${sf.wornPhoto ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();S._sellForm.wornPhoto=null;render()" onclick="S._sellForm.wornPhoto=null;render()" style="width:100%;margin-top:6px;background:none;border:none;font-size:11px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove</button>` : ''}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Item Name *</label>
+          <input class="form-input" placeholder='e.g. Levi\'s 501 Jeans' value="${esc(sf.name||'')}" oninput="S._sellForm.name=this.value">
+        </div>
+        <div style="display:flex;gap:10px;">
+          <div class="form-group" style="flex:1;margin-bottom:14px;">
+            <label class="form-label">Brand</label>
+            <input class="form-input" style="margin:0;" placeholder="e.g. Zara" value="${esc(sf.brand||'')}" oninput="S._sellForm.brand=this.value">
+          </div>
+          <div class="form-group" style="flex:1;margin-bottom:14px;">
+            <label class="form-label">Size</label>
+            <input class="form-input" style="margin:0;" placeholder="e.g. S, 28, 7.5" value="${esc(sf.size||'')}" oninput="S._sellForm.size=this.value">
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <div class="form-group" style="flex:1;margin-bottom:14px;">
+            <label class="form-label">Category</label>
+            <select class="form-input" style="margin:0;" onchange="S._sellForm.category=this.value">
+              <option value="">— pick —</option>
+              ${catOptions.map(c=>`<option value="${c}" ${sf.category===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;margin-bottom:14px;">
+            <label class="form-label">Condition</label>
+            <select class="form-input" style="margin:0;" onchange="S._sellForm.condition=this.value">
+              <option value="">— pick —</option>
+              ${condOptions.map(c=>`<option value="${c.val}" ${sf.condition===c.val?'selected':''}>${c.label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Asking Price ($)</label>
+          <input class="form-input" type="number" min="0" step="0.01" placeholder="0.00" value="${sf.price||''}" oninput="S._sellForm.price=this.value">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="plan-textarea" rows="3" placeholder="Condition details, measurements, styling notes…" oninput="S._sellForm.description=this.value">${esc(sf.description||'')}</textarea>
+        </div>
+
+        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();saveSellListing()" onclick="saveSellListing()" style="margin:4px 0 0;touch-action:manipulation;">
+          ${sf.id ? '✓ Save Changes' : '📦 Add to Listings'}
+        </button>
+      </div>
+    </div>`;
+  }
+
+  // ── Return item form ───────────────────────────────────────
+  if (rf) {
+    return `<div class="view view-notab">
+      <div class="nav">
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();S._returnForm=null;render()" onclick="S._returnForm=null;render()">${iconBack()} Back</button>
+        <span class="nav-title">${rf.id ? 'Edit Return' : 'New Return'}</span>
+        <div style="width:72px"></div>
+      </div>
+      <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding:16px 16px 100px;">
+
+        <!-- Item photo -->
+        <div style="margin-bottom:20px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Photo <span style="font-weight:400;text-transform:none;">(optional)</span></div>
+          <label style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1.5px dashed var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;touch-action:manipulation;">
+            ${rf.photo
+              ? `<img src="${rf.photo}" style="width:64px;height:64px;object-fit:cover;border-radius:10px;flex-shrink:0;">`
+              : `<div style="width:64px;height:64px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">📸</div>`}
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:700;color:var(--text);">${rf.photo ? 'Change photo' : 'Add a photo'}</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Helps you remember what to bring back</div>
+            </div>
+            <input type="file" accept="image/*" style="display:none;" onchange="uploadReturnPhoto(this)">
+          </label>
+          ${rf.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();S._returnForm.photo=null;render()" onclick="S._returnForm.photo=null;render()" style="margin-top:6px;background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove photo</button>` : ''}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Item Name *</label>
+          <input class="form-input" placeholder='e.g. Black blazer' value="${esc(rf.name||'')}" oninput="S._returnForm.name=this.value">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Store *</label>
+          <input class="form-input" placeholder='e.g. Zara, ASOS, Nordstrom' value="${esc(rf.store||'')}" oninput="S._returnForm.store=this.value">
+        </div>
+
+        <!-- Online vs In-store -->
+        <div class="form-group">
+          <label class="form-label">How to return</label>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            ${['online','in-store'].map(ch=>`
+              <button
+                ontouchend="if(_touchMoved)return;event.preventDefault();S._returnForm.channel='${ch}';render()"
+                onclick="S._returnForm.channel='${ch}';render()"
+                style="flex:1;padding:10px 0;border-radius:var(--r-sm);border:${rf.channel===ch?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${rf.channel===ch?'var(--gold-bg)':'var(--surface)'};font-size:13px;font-weight:${rf.channel===ch?'800':'600'};color:${rf.channel===ch?'var(--gold-dk)':'var(--text-2)'};cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                ${ch==='online'?'🌐 Online':'🏪 In-Store'}
+              </button>`).join('')}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Return deadline *</label>
+          <input class="form-input" type="date" value="${esc(rf.deadline||'')}" onchange="S._returnForm.deadline=this.value">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
+          <input class="form-input" placeholder='e.g. need original tags, receipt in email' value="${esc(rf.notes||'')}" oninput="S._returnForm.notes=this.value">
+        </div>
+
+        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();saveReturnItem()" onclick="saveReturnItem()" style="margin:4px 0 0;touch-action:manipulation;">
+          ${rf.id ? '✓ Save Changes' : '🔄 Add Return'}
+        </button>
+      </div>
+    </div>`;
+  }
+
+  // ── Main sell page ─────────────────────────────────────────
+  const tabBar = `
+    <div style="display:flex;gap:8px;padding:12px 16px 4px;">
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.sellTab='listings';render()"
+        onclick="S.sellTab='listings';render()"
+        style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${tab==='listings'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${tab==='listings'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
+        <div style="font-size:18px;margin-bottom:4px;">📦</div>
+        <div style="font-size:12px;font-weight:${tab==='listings'?'800':'600'};color:${tab==='listings'?'var(--gold-dk)':'var(--text-2)'};">For Sale${activeListings.length?` (${activeListings.length})`:''}</div>
+      </button>
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.sellTab='returns';render()"
+        onclick="S.sellTab='returns';render()"
+        style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${tab==='returns'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${tab==='returns'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;position:relative;">
+        <div style="font-size:18px;margin-bottom:4px;">🔄</div>
+        <div style="font-size:12px;font-weight:${tab==='returns'?'800':'600'};color:${tab==='returns'?'var(--gold-dk)':'var(--text-2)'};">Returns${returnsWithDays.length?` (${returnsWithDays.length})`:''}</div>
+        ${urgentCount>0&&tab!=='returns'?`<div style="position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#DC2626;"></div>`:''}
+      </button>
+    </div>`;
+
+  // ── Listings tab ───────────────────────────────────────────
+  const listingsTab = (() => {
+    if (!activeListings.length && !soldListings.length) {
+      return `<div style="padding:40px 24px;text-align:center;">
+        <div style="font-size:48px;margin-bottom:16px;">🏷️</div>
+        <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">Nothing listed yet</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:24px;">Snap a photo of what you want to sell — add the details and it's ready to share.</div>
+        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm()" onclick="openSellForm()" style="margin:0;touch-action:manipulation;">+ New Listing</button>
+      </div>`;
+    }
+    const condLabel = { 'new-tags':'New with tags','like-new':'Like new','good':'Good','fair':'Fair','poor':'Poor' };
+    const listingCard = (l, isSold) => {
+      const priceStr = l.price ? `$${parseFloat(l.price).toFixed(0)}` : '';
+      return `<div style="display:flex;gap:12px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:12px;${isSold?'opacity:.55;':''}margin-bottom:10px;">
+        <!-- Photos -->
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
+          <div style="width:64px;height:80px;border-radius:10px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border);">
+            ${l.photo?`<img src="${l.photo}" style="width:100%;height:100%;object-fit:cover;">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22px;">📸</div>`}
+          </div>
+          ${l.wornPhoto?`<div style="width:64px;height:48px;border-radius:8px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border);"><img src="${l.wornPhoto}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`:''}
+        </div>
+        <!-- Info -->
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;line-height:1.2;">${esc(l.name)}</div>
+          ${l.brand?`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">${esc(l.brand)}</div>`:''}
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+            ${l.size?`<span style="font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:2px 7px;color:var(--text-2);font-weight:600;">${esc(l.size)}</span>`:''}
+            ${l.condition?`<span style="font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:2px 7px;color:var(--text-2);font-weight:600;">${condLabel[l.condition]||l.condition}</span>`:''}
+            ${isSold?`<span style="font-size:10px;background:#F0FDF4;border:1px solid #86EFAC;border-radius:100px;padding:2px 7px;color:#15803D;font-weight:700;">✓ Sold</span>`:''}
+          </div>
+          ${priceStr?`<div style="font-size:18px;font-weight:900;color:var(--gold-dk);margin-bottom:8px;">${priceStr}</div>`:''}
+          ${!isSold?`<div style="display:flex;gap:6px;">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm('${l.id}')" onclick="openSellForm('${l.id}')"
+              style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✏️ Edit</button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();markSellListingSold('${l.id}')" onclick="markSellListingSold('${l.id}')"
+              style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Sold</button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteSellListing('${l.id}')" onclick="deleteSellListing('${l.id}')"
+              style="padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:#DC2626;cursor:pointer;font-family:inherit;touch-action:manipulation;">🗑</button>
+          </div>`:`<button ontouchend="if(_touchMoved)return;event.preventDefault();deleteSellListing('${l.id}')" onclick="deleteSellListing('${l.id}')"
+            style="padding:6px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:11px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove</button>`}
+        </div>
+      </div>`;
+    };
+    return `<div style="padding:12px 16px 0;">
+      ${activeListings.map(l=>listingCard(l,false)).join('')}
+      ${soldListings.length?`<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin:16px 0 10px;">✓ Sold</div>${soldListings.map(l=>listingCard(l,true)).join('')}`:''}
+      <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm()" onclick="openSellForm()" style="margin:8px 0 0;touch-action:manipulation;">+ New Listing</button>
+    </div>`;
+  })();
+
+  // ── Returns tab ────────────────────────────────────────────
+  const returnsTab = (() => {
+    if (!returnsWithDays.length) {
+      return `<div style="padding:40px 24px;text-align:center;">
+        <div style="font-size:48px;margin-bottom:16px;">🔄</div>
+        <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">No returns tracked</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:24px;">Add items you need to return and get a countdown so you never miss the window.</div>
+        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm()" onclick="openReturnForm()" style="margin:0;touch-action:manipulation;">+ Add Return</button>
+      </div>`;
+    }
+    return `<div style="padding:12px 16px 0;">
+      ${returnsWithDays.map(r => {
+        const urg = returnUrgency(r.dl);
+        const dlLabel = r.dl === null ? 'No deadline' : r.dl < 0 ? `Expired ${Math.abs(r.dl)}d ago` : r.dl === 0 ? '⚠️ Due today!' : r.dl === 1 ? '⚠️ Due tomorrow!' : `${r.dl} days left`;
+        const fmtDeadline = r.deadline ? new Date(r.deadline+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+        return `<div style="display:flex;gap:12px;background:${urgencyBg[urg]};border:1.5px solid ${urgencyBorder[urg]};border-radius:16px;padding:12px;margin-bottom:10px;">
+          <!-- Photo -->
+          <div style="width:58px;height:72px;border-radius:10px;overflow:hidden;background:var(--surface);border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+            ${r.photo?`<img src="${r.photo}" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:24px;">🛍</span>`}
+          </div>
+          <!-- Info -->
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;">${esc(r.name||'Unnamed item')}</div>
+            <div style="font-size:12px;color:var(--text-2);margin-bottom:4px;">${esc(r.store||'')}${r.channel?` · ${r.channel==='online'?'🌐 Online':'🏪 In-store'}`:''}</div>
+            <div style="font-size:13px;font-weight:800;color:${urgencyColor[urg]};margin-bottom:${r.notes?'4':'8'}px;">${dlLabel}${fmtDeadline?' · '+fmtDeadline:''}</div>
+            ${r.notes?`<div style="font-size:11px;color:var(--text-3);margin-bottom:8px;line-height:1.4;">${esc(r.notes)}</div>`:''}
+            <div style="display:flex;gap:6px;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm('${r.id}')" onclick="openReturnForm('${r.id}')"
+                style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✏️ Edit</button>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteReturnItem('${r.id}')" onclick="deleteReturnItem('${r.id}')"
+                style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:#16A34A;cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Returned</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+      <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm()" onclick="openReturnForm()" style="margin:8px 0 0;touch-action:manipulation;">+ Add Return</button>
+    </div>`;
+  })();
+
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">🏷️ Sell</span>
     </div>
-    <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding-bottom:80px;">
-
-      <!-- Hero -->
-      <div style="margin:24px 16px 0;border-radius:20px;overflow:hidden;background:linear-gradient(135deg,#1A1A1A 0%,#2A2010 50%,#1A1410 100%);padding:28px 22px 26px;position:relative;">
-        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 30%,rgba(184,125,42,0.22) 0%,transparent 60%);pointer-events:none;"></div>
-        <div style="position:relative;">
-          <div style="font-size:36px;margin-bottom:12px;line-height:1;">🏷️</div>
-          <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-.5px;line-height:1.15;margin-bottom:8px;">Turn your closet<br>into cash.</div>
-          <div style="font-size:14px;color:rgba(255,255,255,.65);line-height:1.55;margin-bottom:18px;">List what you no longer wear and earn money for pieces you'll actually love.</div>
-          <div style="display:inline-flex;align-items:center;gap:6px;background:var(--gold);border-radius:100px;padding:8px 18px;">
-            <span style="font-size:13px;font-weight:800;color:#fff;letter-spacing:.02em;">Coming Soon</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Features -->
-      <div style="margin:24px 16px 0;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">What's Coming</div>
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          ${sellFeatures.map(f=>`
-            <div style="display:flex;align-items:flex-start;gap:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;">
-              <div style="width:44px;height:44px;border-radius:12px;background:var(--gold-bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">${f.icon}</div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;">${f.title}</div>
-                <div style="font-size:12px;color:var(--text-3);line-height:1.55;">${f.desc}</div>
-              </div>
-            </div>`).join('')}
-        </div>
-      </div>
-
-      <!-- Maybe Pile CTA -->
-      <div style="margin:24px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:18px;">
-        <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px;">Start with your Maybe Pile</div>
-        <div style="font-size:13px;color:var(--text-3);line-height:1.55;margin-bottom:14px;">Not sure what to sell? Your Maybe Pile is a great starting point — items you flagged as on the fence.</div>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('closet')" onclick="switchTab('closet')"
-          style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:9px 18px;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          Browse Closet →
-        </button>
-      </div>
-
-      <!-- Notify me -->
-      <div style="margin:20px 16px 28px;padding:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;display:flex;align-items:flex-start;gap:12px;">
-        <div style="font-size:20px;flex-shrink:0;">✉️</div>
-        <div>
-          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;">Want early access?</div>
-          <div style="font-size:12px;color:var(--text-3);line-height:1.55;">We're building Sell around what our community needs. Got ideas? Drop us a note.</div>
-        </div>
-      </div>
-
+    ${tabBar}
+    <div style="overflow-y:auto;height:calc(100% - 56px - 86px);-webkit-overflow-scrolling:touch;padding-bottom:80px;">
+      ${tab === 'listings' ? listingsTab : returnsTab}
     </div>
   </div>`;
+}
+
+/* ================================================================
+   SELL PAGE HELPERS
+   ================================================================ */
+
+function openSellForm(id) {
+  if (id) {
+    const existing = S.sellListings.find(l => l.id === id);
+    S._sellForm = existing ? { ...existing } : null;
+  } else {
+    S._sellForm = { id: null, photo: null, wornPhoto: null, name: '', brand: '', category: '', size: '', condition: '', description: '', price: '', status: 'active' };
+  }
+  render();
+}
+
+function saveSellListing() {
+  const sf = S._sellForm;
+  if (!sf) return;
+  if (!sf.name || !sf.name.trim()) { toast('Please add an item name.'); return; }
+  const now = new Date().toISOString();
+  if (sf.id) {
+    const idx = S.sellListings.findIndex(l => l.id === sf.id);
+    if (idx !== -1) S.sellListings[idx] = { ...sf };
+  } else {
+    S.sellListings.unshift({ ...sf, id: uid(), createdAt: now, status: 'active' });
+  }
+  localStorage.setItem('closet-sell-listings', JSON.stringify(S.sellListings));
+  S._sellForm = null;
+  toast(sf.id ? 'Listing updated!' : 'Added to listings!');
+  render();
+}
+
+function deleteSellListing(id) {
+  S.sellListings = S.sellListings.filter(l => l.id !== id);
+  localStorage.setItem('closet-sell-listings', JSON.stringify(S.sellListings));
+  render();
+}
+
+function markSellListingSold(id) {
+  const idx = S.sellListings.findIndex(l => l.id === id);
+  if (idx !== -1) {
+    S.sellListings[idx].status = S.sellListings[idx].status === 'sold' ? 'active' : 'sold';
+    localStorage.setItem('closet-sell-listings', JSON.stringify(S.sellListings));
+    render();
+  }
+}
+
+function uploadSellListingPhoto(type, input) {
+  if (!input.files || !input.files[0]) return;
+  compressImage(input.files[0]).then(data => {
+    if (!S._sellForm) return;
+    S._sellForm[type] = data;
+    render();
+  }).catch(() => toast('Could not load photo.'));
+}
+
+function openReturnForm(id) {
+  if (id) {
+    const existing = S.returnItems.find(r => r.id === id);
+    S._returnForm = existing ? { ...existing } : null;
+  } else {
+    S._returnForm = { id: null, photo: null, name: '', store: '', channel: 'online', deadline: '', notes: '' };
+  }
+  render();
+}
+
+function saveReturnItem() {
+  const rf = S._returnForm;
+  if (!rf) return;
+  if (!rf.name || !rf.name.trim()) { toast('Please add an item name.'); return; }
+  if (!rf.store || !rf.store.trim()) { toast('Please add the store name.'); return; }
+  if (!rf.deadline) { toast('Please set a return deadline.'); return; }
+  const now = new Date().toISOString();
+  if (rf.id) {
+    const idx = S.returnItems.findIndex(r => r.id === rf.id);
+    if (idx !== -1) S.returnItems[idx] = { ...rf };
+  } else {
+    S.returnItems.unshift({ ...rf, id: uid(), createdAt: now });
+  }
+  localStorage.setItem('closet-return-items', JSON.stringify(S.returnItems));
+  S._returnForm = null;
+  toast(rf.id ? 'Return updated!' : 'Return added!');
+  render();
+}
+
+function deleteReturnItem(id) {
+  S.returnItems = S.returnItems.filter(r => r.id !== id);
+  localStorage.setItem('closet-return-items', JSON.stringify(S.returnItems));
+  render();
+}
+
+function uploadReturnPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  compressImage(input.files[0]).then(data => {
+    if (!S._returnForm) return;
+    S._returnForm.photo = data;
+    render();
+  }).catch(() => toast('Could not load photo.'));
 }
 
 /* ================================================================
