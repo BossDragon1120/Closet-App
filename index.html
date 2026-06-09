@@ -6023,9 +6023,13 @@ function viewOutfitBuilder() {
   // ── Result view ──────────────────────────────────────────────────────────────
   if (result) {
     const picks = (result.picks || []).map(p => {
-      const match = S.wardrobe.find(wi =>
-        wi.name.toLowerCase().trim() === (p.name || '').toLowerCase().trim()
-      );
+      const pName = (p.name || '').toLowerCase().trim();
+      // Exact match first, then fuzzy (one contains the other)
+      let match = S.wardrobe.find(wi => wi.name.toLowerCase().trim() === pName);
+      if (!match) match = S.wardrobe.find(wi => {
+        const wn = wi.name.toLowerCase().trim();
+        return wn.includes(pName) || pName.includes(wn);
+      });
       return { ...p, wardrobeItem: match || null };
     });
     const gaps = result.gaps || [];
@@ -6034,9 +6038,9 @@ function viewOutfitBuilder() {
     return `<div class="view view-notab">
       <div class="nav">
         <button class="nav-back"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder={wardrobeId:'${w.id}',occasion:ob.occasion,loading:false,result:null};render()"
-          onclick="S.outfitBuilder={wardrobeId:'${w.id}',occasion:ob.occasion,loading:false,result:null};render()">
-          ${iconBack()} Rebuild
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder={wardrobeId:'${w.id}',occasion:S.outfitBuilder.occasion,loading:false,result:null};render()"
+          onclick="S.outfitBuilder={wardrobeId:'${w.id}',occasion:S.outfitBuilder.occasion,loading:false,result:null};render()">
+          ${iconBack()} Back
         </button>
         <span class="nav-title">Your Outfit</span>
         <button class="nav-btn"
@@ -6078,8 +6082,8 @@ function viewOutfitBuilder() {
             return `<div style="flex-shrink:0;width:110px;"
               ${wi ? `ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${wi.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${wi.id}';navigate('wardrobe-item')"` : ''}>
               <div style="width:110px;height:147px;border-radius:10px;overflow:hidden;background:var(--surface-2);border:${wi ? '1.5px solid rgba(108,62,191,0.3)' : '1.5px dashed var(--border)'};position:relative;${wi ? 'cursor:pointer;' : ''}">
-                ${wi?.photo
-                  ? `<img src="${esc(wi.photo)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                ${(wi?.photo || wi?.photoThumb)
+                  ? `<img src="${esc(wi.photo || wi.photoThumb)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
                   : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${wi?.icon||'👕'}</div>`}
                 ${wi ? `<div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,rgba(0,0,0,.5) 100%);pointer-events:none;"></div>` : ''}
               </div>
@@ -6109,6 +6113,19 @@ function viewOutfitBuilder() {
           </div>`;
         }).join('')}
       </div>` : ''}
+
+      <!-- Rebuild button -->
+      <div style="padding:16px 20px 0;">
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();doOutfitBuild()"
+          onclick="doOutfitBuild()"
+          style="width:100%;padding:13px;border-radius:var(--r);cursor:pointer;font-family:inherit;
+            border:1.5px solid rgba(108,62,191,0.4);background:rgba(108,62,191,0.07);
+            color:#6C3EBF;font-size:14px;font-weight:700;
+            display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation;">
+          🔄 Try a different outfit
+        </button>
+      </div>
 
       <div style="height:36px;"></div>
     </div>`;
@@ -7048,7 +7065,7 @@ function viewSell() {
             <div style="display:flex;gap:6px;">
               <button ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm('${r.id}')" onclick="openReturnForm('${r.id}')"
                 style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✏️ Edit</button>
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteReturnItem('${r.id}')" onclick="deleteReturnItem('${r.id}')"
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();markReturned('${r.id}')" onclick="markReturned('${r.id}')"
                 style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:#16A34A;cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Returned</button>
             </div>
           </div>
@@ -7149,6 +7166,7 @@ function saveReturnItem() {
   }
   localStorage.setItem('closet-return-items', JSON.stringify(S.returnItems));
   S._returnForm = null;
+  S.sellTab = 'returns'; // land on Returns tab so the user sees their new item
   toast(rf.id ? 'Return updated!' : 'Return added!');
   render();
 }
@@ -7157,6 +7175,44 @@ function deleteReturnItem(id) {
   S.returnItems = S.returnItems.filter(r => r.id !== id);
   localStorage.setItem('closet-return-items', JSON.stringify(S.returnItems));
   render();
+}
+
+function markReturned(id) {
+  // Celebrate first, then delete
+  celebrateReturn();
+  toast('💸 Money back in your pocket!');
+  S.returnItems = S.returnItems.filter(r => r.id !== id);
+  localStorage.setItem('closet-return-items', JSON.stringify(S.returnItems));
+  render();
+}
+
+function celebrateReturn() {
+  const emojis = ['💰','💵','💸','🤑','💴','💶'];
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;';
+  document.body.appendChild(container);
+  const count = 28;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const left = 5 + Math.random() * 90; // % across screen
+    const drift = (Math.random() - 0.5) * 80; // px sideways drift
+    const delay = Math.random() * 0.6; // s stagger
+    const dur = 1.1 + Math.random() * 0.7; // s duration
+    const size = 20 + Math.random() * 18; // px font size
+    el.textContent = emoji;
+    el.style.cssText = `
+      position:absolute;
+      left:${left}%;
+      bottom:${10 + Math.random() * 30}%;
+      font-size:${size}px;
+      --drift:${drift}px;
+      animation:emojiPop ${dur}s ease-out ${delay}s forwards;
+      opacity:0;
+    `;
+    container.appendChild(el);
+  }
+  setTimeout(() => container.remove(), 2200);
 }
 
 function uploadReturnPhoto(input) {
@@ -7260,13 +7316,13 @@ async function generateRoulette() {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 350,
+        max_tokens: 600,
         messages: [{ role: 'user', content: `You are a personal stylist. Pick a complete, stylish outfit from this person's actual wardrobe items. Be specific and enthusiastic. ${weather}
 
 Wardrobe:
 ${itemList}
 
-Return ONLY valid JSON:
+Return ONLY valid JSON with no markdown or extra text:
 {"outfit":[{"item":"exact item name from list","emoji":"emoji","reason":"why this piece"}],"vibe":"2-4 word vibe e.g. Effortlessly Cool","hype":"one punchy sentence hyping this look"}` }],
       }),
     });
@@ -7370,61 +7426,155 @@ Return ONLY valid JSON — no markdown:
   _restoreBookCarousel();
 }
 
-async function generatePalette() {
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
-  if (S._funPaletteLoading) return;
-  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
-  if (!activeWardrobe.length) { toast('Add some wardrobe items first!'); return; }
-  S._funPaletteLoading = true;
-  S.funPalette = null;
-  render();
-  const itemList = activeWardrobe.map(w =>
-    [w.name, w.brand, w.description].filter(Boolean).join(' ')
-  ).join('\n');
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 600,
-        messages: [{ role: 'user', content: `You are a fashion color consultant. Analyze these wardrobe items and identify the person's color palette.
+// ── Color palette: fully client-side, no API key needed ──────────────────────
+const _COLOR_MAP = [
+  // Sorted longest-first so multi-word colors match before single words
+  ['off-white','#FAF0E6'],['rose gold','#B76E79'],['dusty rose','#DCAE96'],
+  ['royal blue','#4169E1'],['sky blue','#87CEEB'],['baby blue','#89CFF0'],
+  ['powder blue','#B0E2FF'],['ice blue','#B0E2FF'],['burnt orange','#CC5500'],
+  ['army green','#4B5320'],['dark green','#1B5E20'],['hot pink','#FF69B4'],
+  ['light pink','#FFB6C1'],['dark grey','#424242'],['light grey','#BDBDBD'],
+  ['dark gray','#424242'],['light gray','#BDBDBD'],['forest green','#1B5E20'],
+  ['midnight blue','#191970'],['navy blue','#1B2A4A'],['jet black','#0A0A0A'],
+  ['olive green','#556B2F'],['sage green','#9CAF88'],['dark brown','#4E342E'],
+  ['light brown','#A1887F'],['warm beige','#D4B896'],['cool grey','#90A4AE'],
+  ['black','#1A1A1A'],['white','#F8F8F8'],['cream','#FFF8E7'],
+  ['ivory','#FFFFF0'],['beige','#C8AD90'],['tan','#D2B48C'],
+  ['camel','#C19A6B'],['sand','#C2B280'],['khaki','#BDB76B'],
+  ['grey','#9E9E9E'],['gray','#9E9E9E'],['charcoal','#36454F'],
+  ['silver','#C0C0C0'],['slate','#708090'],['ash','#B2BEB5'],
+  ['brown','#795548'],['chocolate','#3E2723'],['mocha','#967259'],
+  ['coffee','#6F4E37'],['cognac','#9A463D'],['rust','#B7410E'],
+  ['terracotta','#E2725B'],['clay','#B66A50'],['sienna','#A0522D'],
+  ['blue','#1565C0'],['navy','#1B2A4A'],['cobalt','#0047AB'],
+  ['teal','#00796B'],['turquoise','#00BCD4'],['aqua','#00BCD4'],
+  ['indigo','#3949AB'],['denim','#1560BD'],['cornflower','#6495ED'],
+  ['periwinkle','#CCCCFF'],['midnight','#191970'],['ocean','#006994'],
+  ['green','#388E3C'],['olive','#808000'],['sage','#9CAF88'],
+  ['forest','#228B22'],['emerald','#50C878'],['mint','#98FB98'],
+  ['hunter','#355E3B'],['lime','#8BC34A'],['moss','#8A9A5B'],
+  ['eucalyptus','#9FAFA0'],['red','#C62828'],['crimson','#DC143C'],
+  ['burgundy','#800020'],['wine','#722F37'],['bordeaux','#5C2028'],
+  ['maroon','#800000'],['oxblood','#4A0404'],['cherry','#B71C1C'],
+  ['scarlet','#FF2400'],['pink','#E91E8C'],['blush','#FFCDD2'],
+  ['rose','#E91E63'],['mauve','#C48793'],['fuchsia','#E040FB'],
+  ['magenta','#E040FB'],['coral','#FF7043'],['salmon','#FA8072'],
+  ['peach','#FFCCBC'],['nude','#D4A276'],['purple','#7B1FA2'],
+  ['violet','#7B1FA2'],['lavender','#CE93D8'],['lilac','#CE93D8'],
+  ['plum','#8E4585'],['orchid','#BA68C8'],['eggplant','#614051'],
+  ['yellow','#F9A825'],['mustard','#F57F17'],['gold','#FFC107'],
+  ['caramel','#C68642'],['amber','#FF8F00'],['ochre','#CC7722'],
+  ['lemon','#FFF176'],['butter','#FFFDE7'],['orange','#E65100'],
+  ['copper','#B87333'],['apricot','#FFAB91'],['metallic','#B0BEC5'],
+  ['bronze','#CD7F32'],['platinum','#E0E0E0'],
+];
 
-Items:
-${itemList}
-
-Return ONLY valid JSON — no markdown, no commentary:
-{
-  "owned": [
-    {"color": "readable color name e.g. Navy Blue", "hex": "#1B2A4A", "count": 4, "items": ["item name 1","item name 2"]},
-    ...up to 8 most common colors
-  ],
-  "explore": [
-    {"color": "readable color name", "hex": "#RRGGBB", "why": "one sentence on why this would complement their palette"},
-    ...exactly 4 suggestions
-  ],
-  "insight": "Two sentences: first describes their current palette personality (e.g. 'You gravitate toward a cool, neutral palette anchored in navy and grey.'). Second gives one specific styling observation."
+function _paletteIsNeutral(name) {
+  return /black|white|grey|gray|cream|beige|ivory|charcoal|sand|tan|nude|camel|silver|ash/.test(name);
+}
+function _paletteIsCool(name) {
+  return /blue|navy|teal|cobalt|indigo|slate|aqua|mint|sage|violet|purple|lavender|lilac|grey|gray|silver|midnight|periwinkle/.test(name);
+}
+function _paletteIsWarm(name) {
+  return /red|orange|brown|rust|terracotta|coral|peach|gold|mustard|amber|camel|tan|cognac|mocha|burgundy|wine|pink|rose|blush|salmon|caramel|ochre/.test(name);
 }
 
-Rules: hex codes must be accurate for the named color. Only include colors you can actually identify from the item names/descriptions. Sort owned by count descending.` }],
-      }),
-    });
-    if (!res.ok) throw new Error(`API ${res.status}`);
-    const data = await res.json();
-    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('No JSON');
-    S.funPalette = JSON.parse(m[0]);
-  } catch(e) {
-    console.error('generatePalette:', e);
-    toast('Couldn\'t analyze — try again.');
+function _paletteExplore(owned) {
+  const names = owned.map(c => c.color.toLowerCase()).join(' ');
+  const neutralPct = owned.filter(c => _paletteIsNeutral(c.color.toLowerCase())).length / Math.max(owned.length, 1);
+  const coolCount  = owned.filter(c => _paletteIsCool(c.color.toLowerCase())).length;
+  const warmCount  = owned.filter(c => _paletteIsWarm(c.color.toLowerCase())).length;
+
+  let pool;
+  if (neutralPct > 0.65) {
+    pool = [
+      { color:'Emerald',    hex:'#50C878', why:'A rich emerald adds instant life to a neutral wardrobe.' },
+      { color:'Burgundy',   hex:'#800020', why:'Deep burgundy pairs with everything you already own.' },
+      { color:'Cobalt',     hex:'#0047AB', why:'A bold cobalt makes neutral outfits feel intentional.' },
+      { color:'Mustard',    hex:'#F57F17', why:'Mustard brings warmth without committing to full colour.' },
+    ];
+  } else if (coolCount > warmCount) {
+    pool = [
+      { color:'Camel',      hex:'#C19A6B', why:'Warm camel bridges your cool tones beautifully.' },
+      { color:'Burnt Orange', hex:'#CC5500', why:'This earthy accent pops against your cool palette.' },
+      { color:'Cream',      hex:'#FFF8E7', why:'Cream softens cool tones and adds luxurious warmth.' },
+      { color:'Dusty Rose', hex:'#DCAE96', why:'A muted pink adds softness without clashing with cool hues.' },
+    ];
+  } else if (warmCount > coolCount) {
+    pool = [
+      { color:'Navy',       hex:'#1B2A4A', why:'Navy grounds warm tones and adds polish to any look.' },
+      { color:'Sage Green', hex:'#9CAF88', why:'Muted sage cools a warm palette in the most elegant way.' },
+      { color:'Denim Blue', hex:'#1560BD', why:'Classic denim effortlessly balances warm wardrobe tones.' },
+      { color:'Charcoal',   hex:'#36454F', why:'Deep charcoal anchors your warm pieces with quiet strength.' },
+    ];
+  } else {
+    pool = [
+      { color:'Olive',      hex:'#808000', why:'Olive bridges warm and cool tones effortlessly.' },
+      { color:'Terracotta', hex:'#E2725B', why:'Earthy terracotta adds texture and depth to a mixed palette.' },
+      { color:'Blush',      hex:'#FFCDD2', why:'A soft blush is universally flattering and easy to style.' },
+      { color:'Slate',      hex:'#708090', why:'Cool slate works as a sophisticated neutral for any mix.' },
+    ];
   }
-  S._funPaletteLoading = false;
+  // Remove any colours the user already has
+  return pool.filter(s => !names.includes(s.color.toLowerCase().split(' ')[0])).slice(0, 4);
+}
+
+function _paletteInsight(owned) {
+  if (!owned.length) return '';
+  const neutralPct = owned.filter(c => _paletteIsNeutral(c.color.toLowerCase())).length / owned.length;
+  let persona;
+  if (neutralPct > 0.7)      persona = 'classic minimalist who lets fit and texture do the talking';
+  else if (neutralPct > 0.4) persona = 'versatile dresser who balances neutrals with thoughtful colour';
+  else                       persona = 'colour-confident dresser who isn\'t afraid to make a statement';
+  const top = owned[0].color, second = owned[1]?.color;
+  const anchor = second
+    ? `${top} and ${second} are your anchor colours — lean into them for a cohesive look.`
+    : `${top} is your anchor colour — a strong foundation for any outfit.`;
+  return `You're a ${persona}. ${anchor}`;
+}
+
+function analyzePalette() {
+  const active = S.wardrobe.filter(w => !w.retiredFromCloset);
+  if (!active.length) { toast('Add some wardrobe items first!'); return; }
+
+  const counts = {}; // key → { hex, items[], count }
+  active.forEach(w => {
+    const text = [w.name, w.description, w.notes, w.brand].filter(Boolean).join(' ').toLowerCase();
+    const matched = new Set();
+    for (const [word, hex] of _COLOR_MAP) {
+      if (!text.includes(word)) continue;
+      // Prefer longer matches — skip if a longer phrase already covers this word
+      let dominated = false;
+      for (const m of matched) { if (m.includes(word) && m !== word) { dominated = true; break; } }
+      if (dominated) continue;
+      // Remove shorter matches that are subsets of this one
+      for (const m of matched) { if (word.includes(m) && m !== word) matched.delete(m); }
+      matched.add(word);
+    }
+    matched.forEach(word => {
+      const hex = Object.fromEntries(_COLOR_MAP)[word];
+      const label = word.replace(/\b\w/g, l => l.toUpperCase()); // Title Case
+      if (!counts[label]) counts[label] = { hex, items: [], count: 0 };
+      counts[label].items.push(w.name);
+      counts[label].count++;
+    });
+  });
+
+  const owned = Object.entries(counts)
+    .map(([color, d]) => ({ color, hex: d.hex, count: d.count, items: d.items.slice(0, 4) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  if (!owned.length) {
+    toast('No colour words found yet — add colours to item names or descriptions (e.g. "navy blazer", "cream blouse").');
+    return;
+  }
+
+  S.funPalette = {
+    owned,
+    explore: _paletteExplore(owned),
+    insight: _paletteInsight(owned),
+  };
   render();
 }
 
@@ -7698,49 +7848,53 @@ function viewFun() {
           </div>
         </div>
         ${(()=>{
-          if (S._funPaletteLoading) return `<div style="display:flex;align-items:center;gap:10px;padding:16px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Reading your wardrobe colors…</span></div>`;
-          if (!S.funPalette) return !S.apiKey ? `
-            <div style="margin-top:14px;background:var(--surface-2);border:1px dashed var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
-              <span style="font-size:18px;flex-shrink:0;">🔑</span>
-              <div style="font-size:12px;color:var(--text-3);line-height:1.4;flex:1;">Needs your Claude API key — <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('settings')" onclick="navigate('settings')" style="background:none;border:none;color:var(--gold-dk);font-weight:700;cursor:pointer;font-family:inherit;font-size:12px;padding:0;touch-action:manipulation;">add it in Settings →</button></div>
-            </div>` : `<button
-            ontouchend="if(_touchMoved)return;event.preventDefault();generatePalette()"
-            onclick="generatePalette()"
+          if (!S.funPalette) return `<button
+            ontouchend="if(_touchMoved)return;event.preventDefault();analyzePalette()"
+            onclick="analyzePalette()"
             style="margin-top:14px;width:100%;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:10px;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            🎨 Analyze my palette
+            🎨 Scan my colours
           </button>`;
           const p = S.funPalette;
-          const swatchSize = '42px';
+          const total = (p.owned||[]).reduce((s,c)=>s+c.count,0)||1;
           return `<div style="margin-top:16px;">
-            ${p.insight ? `<div style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px;padding:12px 14px;background:var(--surface-2);border-radius:12px;border-left:3px solid var(--gold);">${esc(p.insight)}</div>` : ''}
+            ${p.insight ? `<div style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:14px;padding:12px 14px;background:var(--surface-2);border-radius:12px;border-left:3px solid var(--gold);">${esc(p.insight)}</div>` : ''}
 
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Your Colors</div>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+            <!-- Colour DNA bar -->
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">Colour DNA</div>
+            <div style="display:flex;height:18px;border-radius:100px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 6px rgba(0,0,0,0.15);">
+              ${(p.owned||[]).map(c=>`<div style="flex:${c.count};background:${esc(c.hex)};transition:flex 0.3s;" title="${esc(c.color)}"></div>`).join('')}
+            </div>
+
+            <!-- Swatches -->
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Your Colours</div>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
               ${(p.owned||[]).map(c=>`
-                <div style="display:flex;flex-direction:column;align-items:center;gap:5px;min-width:52px;">
-                  <div style="width:${swatchSize};height:${swatchSize};border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.18);border:2px solid rgba(255,255,255,0.12);flex-shrink:0;"></div>
-                  <div style="font-size:10px;font-weight:700;color:var(--text-2);text-align:center;line-height:1.2;max-width:60px;">${esc(c.color)}</div>
-                  <div style="font-size:10px;color:var(--text-3);">${c.count}×</div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;">
+                  <div style="width:44px;height:44px;border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2.5px solid var(--surface);flex-shrink:0;"></div>
+                  <div style="font-size:10px;font-weight:700;color:var(--text-2);text-align:center;line-height:1.25;">${esc(c.color)}</div>
+                  <div style="font-size:10px;color:var(--text-3);">${c.count} item${c.count!==1?'s':''}</div>
                 </div>`).join('')}
             </div>
 
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Colors to Try</div>
+            <!-- Colours to try -->
+            ${(p.explore||[]).length ? `
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Colours to Try</div>
             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
               ${(p.explore||[]).map(c=>`
                 <div style="display:flex;align-items:center;gap:12px;">
-                  <div style="width:${swatchSize};height:${swatchSize};border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.18);border:2px solid rgba(255,255,255,0.12);flex-shrink:0;"></div>
+                  <div style="width:44px;height:44px;border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2.5px solid var(--surface);flex-shrink:0;"></div>
                   <div style="flex:1;min-width:0;">
                     <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${esc(c.color)}</div>
                     <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(c.why)}</div>
                   </div>
                 </div>`).join('')}
-            </div>
+            </div>` : ''}
 
             <button
-              ontouchend="if(_touchMoved)return;event.preventDefault();generatePalette()"
-              onclick="generatePalette()"
+              ontouchend="if(_touchMoved)return;event.preventDefault();S.funPalette=null;analyzePalette()"
+              onclick="S.funPalette=null;analyzePalette()"
               style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:2px 0;">
-              ↻ Re-analyze
+              ↻ Re-scan
             </button>
           </div>`;
         })()}
