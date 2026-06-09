@@ -7111,7 +7111,7 @@ function markSellListingSold(id) {
 
 function uploadSellListingPhoto(type, input) {
   if (!input.files || !input.files[0]) return;
-  compressImage(input.files[0]).then(data => {
+  compressImage(input.files[0]).then(({ data }) => {
     if (!S._sellForm) return;
     S._sellForm[type] = data;
     render();
@@ -7155,7 +7155,7 @@ function deleteReturnItem(id) {
 
 function uploadReturnPhoto(input) {
   if (!input.files || !input.files[0]) return;
-  compressImage(input.files[0]).then(data => {
+  compressImage(input.files[0]).then(({ data }) => {
     if (!S._returnForm) return;
     S._returnForm.photo = data;
     render();
@@ -9259,7 +9259,7 @@ function viewShop() {
           ${cap._cropSrc ? `
           <!-- ── Crop UI — same box-select approach as outfit crop ── -->
           <div style="font-size:11px;color:var(--text-3);text-align:center;padding:0 0 8px;flex-shrink:0;">Drag the box to reposition · Drag corners to resize</div>
-          <div class="crop-wrap" id="spottedCropWrap" style="margin:0 20px 12px;border-radius:14px;max-height:calc(92dvh - 200px);flex-shrink:0;">
+          <div class="crop-wrap" id="spottedCropWrap" style="margin:0 20px 12px;border-radius:14px;flex:1 1 0;min-height:100px;">
             <img id="spottedCropImg" class="crop-img-full" src="${esc(cap._cropSrc)}" alt="Crop your photo" draggable="false">
             <div class="crop-box" id="spottedCropBox">
               <div class="crop-rule-v"></div><div class="crop-rule-v"></div>
@@ -13902,11 +13902,11 @@ function viewWardrobeItem() {
           onchange="uploadWardrobeItemPhoto('${w.id}', this)">
         <input id="witemWearPhotoInput" type="file" accept="image/*" style="display:none;"
           onchange="uploadWardrobeWearPhoto('${w.id}', this)">
-        <button onclick="document.getElementById('witemPhotoInput').click()"
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witemPhotoInput').click()" onclick="document.getElementById('witemPhotoInput').click()"
           style="background:none;border:1.5px solid var(--gold);color:var(--gold-dk);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
           📸 ${w.photo ? 'Replace item photo' : 'Add item photo'}
         </button>
-        <button onclick="document.getElementById('witemWearPhotoInput').click()"
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witemWearPhotoInput').click()" onclick="document.getElementById('witemWearPhotoInput').click()"
           style="background:none;border:1.5px solid var(--gold);color:var(--gold-dk);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
           🧍 ${w.wearPhoto ? 'Replace worn photo' : 'Add worn photo'}
         </button>
@@ -17075,9 +17075,11 @@ async function confirmReceiptItem() {
     photo: (rf.imageData && rf.mode === 'photo') ? `data:${rf.imageMime};base64,${rf.imageData}` : undefined,
   };
 
+  S.loading = true; S.loadingMsg = 'Saving to your closet…'; render();
   try {
     await DB.wardrobe.put(newItem);
     S.wardrobe.push(newItem); // update in-memory — skip getAll() round-trip
+    S.loading = false; S.loadingMsg = '';
     S.receiptFlow = null;
     S._flipCardFlipped = false;
     if (newItem.gifted) {
@@ -17089,6 +17091,7 @@ async function confirmReceiptItem() {
     }
     toast(`${newItem.icon} ${newItem.name} added to wardrobe! ✨`);
   } catch(e) {
+    S.loading = false; S.loadingMsg = ''; render();
     console.error('confirmReceiptItem:', e);
     toast('Couldn\'t save — check your connection and try again.');
   }
@@ -17689,7 +17692,7 @@ function initSpottedCrop() {
   const wrap = document.getElementById('spottedCropWrap');
   if (!img || !wrap) return;
   function setup() {
-    const cW = wrap.offsetWidth, cH = img.offsetHeight;
+    const cW = wrap.offsetWidth, cH = Math.min(img.offsetHeight, wrap.offsetHeight);
     let bW = Math.min(cW * 0.9, cH * (3/4) * 0.9);
     let bH = bW * (4/3);
     if (bH > cH * 0.9) { bH = cH * 0.9; bW = bH * (3/4); }
@@ -17751,11 +17754,11 @@ function setupSpottedCropListeners() {
   function onUp() { if (spottedCropState) { spottedCropState.dragging = false; spottedCropState.resizing = null; } }
   box.addEventListener('mousedown', onDown); box.addEventListener('touchstart', onDown, {passive:false});
   document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
-  document.addEventListener('touchmove', onMove, {passive:false}); document.addEventListener('touchend', onUp);
+  document.addEventListener('touchmove', onMove, {passive:false}); document.addEventListener('touchend', onUp, true);
   _spottedCropCleanup = () => {
     box.removeEventListener('mousedown', onDown); box.removeEventListener('touchstart', onDown);
     document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
-    document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onUp);
+    document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onUp, true);
     _spottedCropCleanup = null;
   };
 }
