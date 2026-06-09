@@ -7158,6 +7158,44 @@ function viewFun() {
               style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:100px;padding:10px 20px;font-size:13px;font-weight:700;color:rgba(255,255,255,.75);cursor:pointer;font-family:inherit;touch-action:manipulation;">
               👯 Friend's Fit Check
             </button>
+
+            ${(()=>{
+              // Battle record — compact W/L stats + mini carousel
+              const bEntries = S.entries.filter(e => e.battleId);
+              if (!bEntries.length) return '';
+              const seen = new Set(); let bWins=0,bLosses=0,bTies=0;
+              bEntries.forEach(e => {
+                if (seen.has(e.battleId)) return; seen.add(e.battleId);
+                const partner = S.entries.find(p => p.battleId===e.battleId && p.id!==e.id);
+                const tie = partner && !e.battleWon && !partner.battleWon;
+                if (tie) bTies++; else if (e.battleWon) bWins++; else bLosses++;
+              });
+              const seenC = new Set(); const pastBattles = [];
+              [...S.entries].filter(e=>e.battleId&&e.photo).reverse().forEach(e=>{
+                if (seenC.has(e.battleId)) return; seenC.add(e.battleId);
+                const partner = S.entries.find(p=>p.battleId===e.battleId&&p.id!==e.id);
+                const tie = partner && !e.battleWon && !partner.battleWon;
+                pastBattles.push({id:e.id,photo:e.photo,won:e.battleWon,tie});
+              });
+              return `<div style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.1);padding-top:14px;">
+                <div style="display:flex;align-items:center;gap:0;margin-bottom:${pastBattles.length?'12px':'0'};">
+                  <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);flex:1;">Battle Record</div>
+                  <div style="display:flex;gap:12px;align-items:center;">
+                    <span style="font-size:13px;font-weight:900;color:#6BBF8E;">${bWins}W</span>
+                    <span style="font-size:13px;font-weight:900;color:#C07070;">${bLosses}L</span>
+                    ${bTies?`<span style="font-size:13px;font-weight:900;color:var(--gold);">${bTies}T</span>`:''}
+                  </div>
+                </div>
+                ${pastBattles.length ? `<div style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px;">
+                  ${pastBattles.slice(0,10).map(b=>`
+                    <div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedId='${b.id}';navigate('battle-replay')" onclick="S.selectedId='${b.id}';navigate('battle-replay')"
+                      style="flex-shrink:0;width:58px;cursor:pointer;position:relative;touch-action:manipulation;">
+                      <img src="${esc(b.photo)}" style="width:58px;height:78px;object-fit:cover;object-position:top;border-radius:8px;display:block;border:2px solid ${b.tie?'var(--gold)':b.won?'#6BBF8E':'#C07070'};">
+                      <div style="position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:12px;">${b.tie?'🤝':b.won?'🏆':'🥈'}</div>
+                    </div>`).join('')}
+                </div>` : ''}
+              </div>`;
+            })()}
           </div>
         </div>
       </div>
@@ -7197,7 +7235,7 @@ function viewFun() {
         </div>
         ${(()=>{
           const recentEntries = [...S.entries]
-            .filter(e => !e.isBattle)
+            .filter(e => !e.battleId)
             .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
             .slice(0, 12);
           if (!recentEntries.length) return `<div style="text-align:center;padding:16px 0;color:var(--text-3);font-size:13px;">Log some outfits first, then come back!</div>`;
@@ -9123,10 +9161,14 @@ function viewPlan() {
 
       <!-- SOLO EVENT FLOW -->
       ${p.soloMode === 'event' ? `
-        <div style="padding:0 16px 4px;">
+        <div style="padding:0 16px 4px;display:flex;align-items:center;justify-content:space-between;">
           <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode=null;S.plan.suggestion=null;render();" onclick="S.plan.soloMode=null;S.plan.suggestion=null;render();"
-            style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:4px;">
+            style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:4px;touch-action:manipulation;">
             ← Back
+          </button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode='trip';S.plan.suggestion=null;render();" onclick="S.plan.soloMode='trip';S.plan.suggestion=null;render();"
+            style="background:none;border:none;font-size:13px;color:var(--accent);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
+            ✈️ Plan a trip instead →
           </button>
         </div>
         <div class="plan-card">
@@ -9159,7 +9201,7 @@ function viewPlan() {
             </div>
 
             <!-- Action buttons -->
-            <div style="display:flex;gap:8px;padding:12px 16px 14px;">
+            <div style="display:flex;gap:8px;padding:12px 16px 10px;">
               <button ontouchend="if(_touchMoved)return;event.preventDefault();saveEventStandalone();" onclick="saveEventStandalone()"
                 style="flex:1;padding:11px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
                 💾 Save Event
@@ -9169,16 +9211,26 @@ function viewPlan() {
                 ✈️ Add to Trip
               </button>
             </div>
+            <div style="padding:0 16px 14px;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.suggestion=null;doSuggestOutfits();" onclick="S.plan.suggestion=null;doSuggestOutfits();"
+                style="width:100%;padding:11px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                🔄 Get Another Recommendation
+              </button>
+            </div>
           </div>
         ` : ''}
       ` : ''}
 
       <!-- TRIP PLANNING FLOW -->
       ${p.soloMode === 'trip' ? `
-        <div style="padding:0 16px 4px;">
+        <div style="padding:0 16px 4px;display:flex;align-items:center;justify-content:space-between;">
           <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode=null;S.plan.tripSuggestions=null;S.plan.tripGaps=null;render();" onclick="S.plan.soloMode=null;S.plan.tripSuggestions=null;S.plan.tripGaps=null;render();"
-            style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:4px;">
+            style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:4px;touch-action:manipulation;">
             ← Back
+          </button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode='event';S.plan.tripSuggestions=null;S.plan.tripGaps=null;render();" onclick="S.plan.soloMode='event';S.plan.tripSuggestions=null;S.plan.tripGaps=null;render();"
+            style="background:none;border:none;font-size:13px;color:var(--accent);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
+            🗓 Plan an event instead →
           </button>
         </div>
 
@@ -10903,16 +10955,18 @@ function viewHome() {
   // ── Sub-tab pill bar ──────────────────────────────────────
   const dTab = S.discoverTab || 'trends';
   const subTabPills = `
-    <div style="display:flex;gap:6px;padding:10px 16px 2px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+    <div style="display:flex;gap:8px;padding:12px 16px 4px;">
       ${[
-        { key:'trends', label:'🔥 Trends' },
-        { key:'brands', label:'✨ Brands' },
-        { key:'local',  label:'📍 Local'  },
+        { key:'trends', icon:'🔥', label:'Trends'  },
+        { key:'brands', icon:'✨', label:'Brands'  },
+        { key:'local',  icon:'📍', label:'Local'   },
       ].map(t => `<button
         ontouchend="if(_touchMoved)return;event.preventDefault();S.discoverTab='${t.key}';render()"
         onclick="S.discoverTab='${t.key}';render()"
-        style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:1.5px solid ${dTab===t.key?'var(--gold)':'var(--border)'};background:${dTab===t.key?'var(--gold-bg)':'transparent'};color:${dTab===t.key?'var(--gold-dk)':'var(--text-2)'};"
-        >${t.label}</button>`).join('')}
+        style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${dTab===t.key?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${dTab===t.key?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
+        <div style="font-size:18px;margin-bottom:4px;">${t.icon}</div>
+        <div style="font-size:12px;font-weight:${dTab===t.key?'800':'600'};color:${dTab===t.key?'var(--gold-dk)':'var(--text-2)'};">${t.label}</div>
+      </button>`).join('')}
     </div>`;
 
   // ── Trends tab content ─────────────────────────────────
@@ -10994,19 +11048,7 @@ function viewHome() {
       </div>`;
     })()}
 
-    ${gems.length ? homeSection('gems','🔮 Hidden Gems',
-      `<div style="font-size:12px;color:var(--text-3);line-height:1.5;padding:2px 0 10px;font-style:italic;">Your wallet already said yes — your morning routine just forgot.</div>` +
-      gems.map(w=>`
-        <div class="dash-item-row"
-          ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
-          onclick="openWardrobeItem('${w.id}')">
-          <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;">${w.icon||'👕'}</div>
-          <div class="dash-item-info">
-            <div class="dash-item-name">${esc(w.name)}</div>
-            <div class="dash-item-sub">$${parseFloat(w.price).toFixed(0)} paid · worn ${w.wears?.length||0}×</div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </div>`).join('')) : ''}`;
+`;
 
   // ── Brands tab content ─────────────────────────────────
   const brandsContent = `
@@ -12143,6 +12185,40 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
     </div>` : ''}
     ${catBar}${subCatBar}${maybePileNudge}${sortBar}${gridHTML}
     ${retiredSectionHTML}
+
+    ${(()=>{
+      const hiddenGems = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile && w.price && !w.paidOff && (w.wears?.length||0) < 3)
+        .sort((a,b) => b.price - a.price).slice(0, 5);
+      if (!hiddenGems.length) return '';
+      const isOpen = !!S._hiddenGemsExpanded;
+      return `<div style="margin:4px 16px 8px;">
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._hiddenGemsExpanded=!S._hiddenGemsExpanded;render()"
+          onclick="S._hiddenGemsExpanded=!S._hiddenGemsExpanded;render()"
+          style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:${isOpen?'var(--r) var(--r) 0 0':'var(--r)'};padding:12px 16px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          <span style="font-weight:600;font-size:13px;color:var(--text-2);">🔮 Hidden Gems (${hiddenGems.length})</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;color:var(--text-3);font-style:italic;">paid for, rarely worn</span>
+            <span style="font-size:12px;color:var(--text-3);transform:${isOpen?'rotate(90deg)':'none'};transition:transform .15s;">▶</span>
+          </div>
+        </button>
+        ${isOpen ? `<div style="background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--r) var(--r);overflow:hidden;padding:4px 0;">
+          ${hiddenGems.map(w => `
+            <div class="dash-item-row"
+              ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
+              onclick="openWardrobeItem('${w.id}')"
+              style="padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
+              <div class="wardrobe-icon" style="width:40px;height:40px;font-size:20px;border-radius:10px;flex-shrink:0;">${w.icon||'👕'}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
+                <div style="font-size:11px;color:var(--text-3);">$${parseFloat(w.price).toFixed(0)} paid · worn ${w.wears?.length||0}×</div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </div>`).join('')}
+        </div>` : ''}
+      </div>`;
+    })()}
+
     <div style="height:${S._wardrobeSelectMode ? '100px' : '8px'}"></div>
   </div>
   ${S._wardrobeSelectMode ? `
@@ -13896,68 +13972,7 @@ function viewUpload() {
   const navTitle = isFriend ? "Friend's Fit Check" : isBattle ? '⚔️ Fashion Battle' : 'New Outfit';
   const backAction = `navigate(S.activeTab);clearPending();S.friendRatingMode=false;S.battleMode=false;`;
 
-  // ── Battle history (only computed when needed) ────────────────
-  let battleStatsHTML = '';
-  let battleCarouselHTML = '';
-  if (isBattle && !hasPhoto) {
-    const bEntries = S.entries.filter(e => e.battleId);
-    const seenB = new Set(); let bWins = 0, bLosses = 0, bTies = 0;
-    bEntries.forEach(e => {
-      if (seenB.has(e.battleId)) return; seenB.add(e.battleId);
-      const partner = S.entries.find(p => p.battleId === e.battleId && p.id !== e.id);
-      const tie = partner && !e.battleWon && !partner.battleWon;
-      if (tie) bTies++; else if (e.battleWon) bWins++; else bLosses++;
-    });
-    const bTotal = seenB.size;
-    if (bTotal > 0) {
-      const winPct = Math.round(bWins / bTotal * 100);
-      battleStatsHTML = `
-        <div style="margin:12px 20px 0;background:linear-gradient(135deg,#1C1A18,#23201A);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:0;">
-          <div style="flex:1;text-align:center;">
-            <div style="font-size:22px;font-weight:900;color:#6BBF8E;line-height:1;">${bWins}</div>
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);margin-top:2px;">Wins</div>
-          </div>
-          <div style="width:1px;height:32px;background:rgba(255,255,255,.1);flex-shrink:0;"></div>
-          <div style="flex:1;text-align:center;">
-            <div style="font-size:22px;font-weight:900;color:#C07070;line-height:1;">${bLosses}</div>
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);margin-top:2px;">Losses</div>
-          </div>
-          ${bTies > 0 ? `<div style="width:1px;height:32px;background:rgba(255,255,255,.1);flex-shrink:0;"></div>
-          <div style="flex:1;text-align:center;">
-            <div style="font-size:22px;font-weight:900;color:var(--gold);line-height:1;">${bTies}</div>
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);margin-top:2px;">Ties</div>
-          </div>` : ''}
-          <div style="width:1px;height:32px;background:rgba(255,255,255,.1);flex-shrink:0;"></div>
-          <div style="flex:1;text-align:center;">
-            <div style="font-size:14px;font-weight:900;color:var(--gold);line-height:1;">${winPct}%</div>
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);margin-top:2px;">Win Rate</div>
-          </div>
-        </div>`;
-
-      // Past battles carousel
-      const seenC = new Set(); const pastBattles = [];
-      [...S.entries].filter(e => e.battleId && e.photo).reverse().forEach(e => {
-        if (seenC.has(e.battleId)) return; seenC.add(e.battleId);
-        const partner = S.entries.find(p => p.battleId === e.battleId && p.id !== e.id);
-        const tie = partner && !e.battleWon && !partner.battleWon;
-        pastBattles.push({ id: e.id, photo: e.photo, won: e.battleWon, tie });
-      });
-      if (pastBattles.length) {
-        const cards = pastBattles.slice(0, 10).map(b =>
-          `<div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedId='${b.id}';navigate('battle-replay')" onclick="S.selectedId='${b.id}';navigate('battle-replay')"
-            style="flex-shrink:0;width:72px;cursor:pointer;position:relative;touch-action:manipulation;">
-            <img src="${esc(b.photo)}" style="width:72px;height:96px;object-fit:cover;object-position:top;border-radius:10px;display:block;border:2px solid ${b.tie ? 'var(--gold)' : b.won ? '#6BBF8E' : '#C07070'};">
-            <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:14px;">${b.tie ? '🤝' : b.won ? '🏆' : '🥈'}</div>
-          </div>`
-        ).join('');
-        battleCarouselHTML = `
-          <div style="margin-top:20px;">
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);padding:0 20px;margin-bottom:10px;">Past Battles</div>
-            <div style="display:flex;gap:8px;overflow-x:auto;padding:0 20px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">${cards}</div>
-          </div>`;
-      }
-    }
-  }
+  // (Battle history now lives on the Fun page)
   return `<div class="view view-notab">
     <div class="nav">
       <button class="nav-back" onclick="${backAction}">${iconBack()} Back</button>
@@ -14010,7 +14025,6 @@ function viewUpload() {
         ontouchend="if(_touchMoved)return;event.preventDefault();${backAction}"
         onclick="${backAction}">Cancel</button>
     ` : `
-      ${battleStatsHTML}
       <div style="padding:0 20px 0;margin-top:12px;">
         <p style="font-size:14px;color:var(--text-2);line-height:1.65;margin:0;">${
           isFriend ? "Take or upload a photo of your friend's outfit — Claude will rate it and you can share the result instantly."
@@ -14050,7 +14064,6 @@ function viewUpload() {
           📸 My Fit Check
         </button>
       </div>
-      ${battleCarouselHTML}
       ` : ''}
     `}
     <div style="padding:0 20px;margin-top:16px;">
