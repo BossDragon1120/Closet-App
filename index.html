@@ -2431,7 +2431,7 @@ function styleScore(entries) {
    WARDROBE CATEGORIES
    Edit this list to add or rename item categories.
    ================================================================ */
-const WARDROBE_CATEGORIES = ['All','Tops','Jackets','Bottoms','Dresses','Sweats','Shoes','Bags','Jewelry','Other','Accessories'];
+const WARDROBE_CATEGORIES = ['All','Tops','Jackets','Bottoms','Dresses','Sweats','Shoes','Bags','Jewelry','Intimates','Other','Accessories'];
 
 const WARDROBE_SUBCATEGORIES = {
   Tops:        ['All','Camis','Tees','Long Sleeve','Blouses & Shirts','Sweaters','Bodysuits'],
@@ -2443,6 +2443,7 @@ const WARDROBE_SUBCATEGORIES = {
   Bags:        ['All','Handbags','Totes','Crossbody','Clutches','Backpacks'],
   Jewelry:     ['All','Necklaces','Earrings','Rings','Bracelets','Watches'],
   Other:       ['All','Swimwear','Activewear','Loungewear','Undergarments'],
+  Intimates:   ['All','Bras','Bralettes','Sports Bras','Wireless','Underwear','Shapewear','Camisoles','Bodysuits'],
   Accessories: ['All','Scarves','Belts','Hats','Sunglasses','Hair Accessories'],
 };
 
@@ -2456,6 +2457,7 @@ function normalizeCat(cat) {
   if (cat === 'Outerwear') return 'Jackets';
   if (cat === 'Bottoms')   return 'Pants';
   if (cat === 'Comfy' || cat === 'Loungewear' || cat === 'Athleisure') return 'Sweats';
+  if (cat === 'Undergarments' || cat === 'Lingerie') return 'Intimates';
   return cat || 'Other';
 }
 
@@ -2488,6 +2490,17 @@ function subCategoryFromName(name, category) {
     if (/jumpsuit|romper|playsuit/.test(n)) return 'Jumpsuits';
     if (/formal|evening|gown|cocktail|midi|maxi|mini/.test(n)) return 'Dressy';
     return 'Casual';
+  }
+  if (cat === 'Intimates') {
+    if (/bralette/.test(n)) return 'Bralettes';
+    if (/sport|athletic|gym/.test(n)) return 'Sports Bras';
+    if (/wireless|no.?wire|wire.?free/.test(n)) return 'Wireless';
+    if (/bra/.test(n)) return 'Bras';
+    if (/underwear|brief|thong|panty|panties|boxer/.test(n)) return 'Underwear';
+    if (/shaper|shapewear|bodyshaper/.test(n)) return 'Shapewear';
+    if (/cami|camisole/.test(n)) return 'Camisoles';
+    if (/bodysuit/.test(n)) return 'Bodysuits';
+    return 'Bras';
   }
   if (cat === 'Other') {
     if (/swim|bikini|bathing|one.?piece|boardshort/.test(n)) return 'Swimwear';
@@ -2651,7 +2664,7 @@ async function saveProfileToFirestore() {
       styleAvatar: S.styleAvatar || null,
       signatureScent: S.signatureScent, scentHistory: S.scentHistory,
       hairstyle: S.hairstyle, hairstyleHistory: S.hairstyleHistory,
-      signatureNailColor: S.signatureNailColor, braSize: S.braSize, eyeColor: S.eyeColor,
+      signatureNailColor: S.signatureNailColor, braSize: S.braSize, braStyle: S.braStyle, braFitNotes: S.braFitNotes, eyeColor: S.eyeColor,
       shopBudget: S.shopBudget,
       shopBlocked: [...S.shopBlocked],
       purchased: [...S.purchasedQueries],
@@ -2691,6 +2704,8 @@ async function loadProfileFromFirestore() {
     applyStr('hairstyle',         'closet-hairstyle');
     applyStr('signatureNailColor','closet-nail-color');
     applyStr('braSize',           'closet-bra-size');
+    applyStr('braStyle',          'closet-bra-style');
+    applyStr('braFitNotes',       'closet-bra-fit-notes');
     applyStr('eyeColor',          'closet-eye-color');
     if (p.cycleEnabled  != null) { S.cycleEnabled    = !!p.cycleEnabled;                    localStorage.setItem('closet-cycle-on',   S.cycleEnabled); }
     if (p.cycleStartDay != null) { S.cycleStartDay   = p.cycleStartDay;                     localStorage.setItem('closet-cycle-day',  p.cycleStartDay); }
@@ -2785,6 +2800,17 @@ const DB = {
 /* ================================================================
    STATE
    ================================================================ */
+// Pre-built static strings for perf
+const _HANGER_SVG = `<svg width="76" height="30" viewBox="0 0 76 30" fill="none"
+      style="display:block;overflow:visible;flex-shrink:0;">
+    <path d="M38 20 L38 11 Q38 2 43.5 2 Q49 2 49 8 Q49 13 44 14"
+          stroke="#B07828" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="M38 20 Q22 24 5 30"
+          stroke="#B07828" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <path d="M38 20 Q54 24 71 30"
+          stroke="#B07828" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  </svg>`;
+
 const S = {
   view:       'loading',
   activeTab:  'closet',
@@ -2867,7 +2893,7 @@ const S = {
   loading: false, loadingMsg: '', error: null,
   filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeForSaleFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
   _marketplaceListings: null, _marketplaceLoading: false, _viewSellerUid: null,
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), wardrobeExpanded: false, wardrobeRetiredExpanded: false,
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
   // Style Persona
@@ -2893,6 +2919,8 @@ const S = {
   _trendsLoading:     false,
   brandDiscovery:     JSON.parse(localStorage.getItem('closet-brand-discovery') || 'null'),
   _brandDiscoveryLoading: false,
+  wardrobePulse:          JSON.parse(localStorage.getItem('closet-wardrobe-pulse') || 'null'),
+  _wardrobePulseLoading:  false,
   _brandsExpanded:        false,
   _brandSort:             'count', // 'count' | 'az'
   // Custom shelves
@@ -2918,6 +2946,8 @@ const S = {
   hairstyleHistory:   JSON.parse(localStorage.getItem('closet-hairstyle-history') || '[]'),
   signatureNailColor: localStorage.getItem('closet-nail-color') || '',
   braSize:            localStorage.getItem('closet-bra-size') || '',
+  braStyle:           localStorage.getItem('closet-bra-style') || '',
+  braFitNotes:        localStorage.getItem('closet-bra-fit-notes') || '',
   eyeColor:           localStorage.getItem('closet-eye-color') || '',
   _auraEdit:          null,
   _expandedEvents:    {},
@@ -2941,6 +2971,9 @@ const S = {
   _syncLastPull:      parseInt(localStorage.getItem('closet-sync-last-pull') || '0'),
   _syncPushing:       false,
   _syncPulling:       false,
+  // Quick Memorials (standalone — not tied to wardrobe items)
+  quickMemorials:     JSON.parse(localStorage.getItem('closet-quick-memorials') || '[]'),
+  _quickMemorialForm: null, // { photo, mime, name, note } while composing
   // Squad Plans
   squadPlans:         JSON.parse(localStorage.getItem('closet-squad-plans') || '[]'),
   selectedSquadId:    null,
@@ -5263,7 +5296,10 @@ function toast(msg) {
 }
 function navigate(view) { S.view = view; S.error = null; render(); window.scrollTo(0,0); }
 function switchTab(tab)  {
-  S.activeTab = tab; navigate(tab);
+  S.activeTab = tab;
+  S.view = tab;
+  // Paint the tab-bar active state immediately, then do the heavy render next frame
+  requestAnimationFrame(() => render());
 }
 
 /* ================================================================
@@ -8588,6 +8624,97 @@ Rules: exactly 10 trends (2 per category). Pick real, current trends that feel r
 }
 
 /* ================================================================
+   WARDROBE PULSE — personalized trend analysis
+   ================================================================ */
+async function generateWardrobePulse() {
+  if (S._wardrobePulseLoading) return;
+  if (!S.apiKey.trim()) { switchTab('settings'); toast('Add your API key first!'); return; }
+
+  // 3-day cache (personalized, so refresh more often than general trends)
+  const cached = S.wardrobePulse;
+  if (cached?.updated) {
+    const age = Date.now() - new Date(cached.updated).getTime();
+    if (age < 3 * 24 * 3600 * 1000) {
+      toast('Pulse is fresh — check back in a few days ✦');
+      return;
+    }
+  }
+
+  const items = S.wardrobe.filter(w => !w.retired && !w.memorial).slice(0, 60).map(w => ({
+    id: w.id,
+    name: w.name,
+    brand: w.brand || '',
+    category: w.category || '',
+    subcategory: w.subcategory || '',
+    colors: w.colors ? w.colors.join(', ') : (w.color || ''),
+    icon: w.icon || '',
+  }));
+
+  if (items.length < 3) {
+    toast('Add a few more items to your wardrobe first!');
+    return;
+  }
+
+  S._wardrobePulseLoading = true;
+  render();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const prompt = `You are a fashion trend analyst. Today is ${today}. A user has shared their wardrobe inventory. Based on current fashion trends, identify which items are trending UP (gaining fashion relevance) and which are fading OUT (becoming outdated).
+
+Wardrobe items:
+${JSON.stringify(items, null, 2)}
+
+Return a JSON object (no markdown, no explanation) with this exact shape:
+{
+  "updated": "${today}",
+  "rising": [
+    {"id":"<item id from list>","name":"<item name>","reason":"<why it's trending, max 15 words>","badge":"<one trendy label e.g. 'Quiet Luxury' or 'Mob Wife' or 'Coastal Grandmother'>"},
+    {"id":"...","name":"...","reason":"...","badge":"..."},
+    {"id":"...","name":"...","reason":"...","badge":"..."}
+  ],
+  "fading": [
+    {"id":"<item id from list>","name":"<item name>","reason":"<why it's fading, max 15 words>","tip":"<one gentle styling tip to modernize it, max 12 words>"},
+    {"id":"...","name":"...","reason":"...","tip":"..."},
+    {"id":"...","name":"...","reason":"...","tip":"..."}
+  ]
+}
+Rules: pick exactly 3 rising and 3 fading. Only reference items from the provided list — use their exact id and name. Be specific to fashion cycles in ${today}. Return only the JSON object.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': S.apiKey.trim(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!resp.ok) throw new Error(`API ${resp.status}`);
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text || '';
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON in response');
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed.rising) || !Array.isArray(parsed.fading)) throw new Error('Bad shape');
+    S.wardrobePulse = parsed;
+    localStorage.setItem('closet-wardrobe-pulse', JSON.stringify(parsed));
+    toast('Wardrobe Pulse updated ✦');
+  } catch (err) {
+    console.error('generateWardrobePulse error', err);
+    toast('Couldn\'t analyze trends — check your API key');
+  } finally {
+    S._wardrobePulseLoading = false;
+    render();
+  }
+}
+
+/* ================================================================
    BRAND FEATURES — Map, Discovery, Instagram
    ================================================================ */
 
@@ -11769,10 +11896,10 @@ function viewAura() {
   };
 
   const filledCount = [
-    S.profileZodiac, S.profileMBTI, S.profileHeight, S.braSize,
-    S.profileWeight, S.signatureNailColor, S.signatureScent, S.hairstyle, S.eyeColor
+    S.profileZodiac, S.profileMBTI, S.profileHeight, S.braSize, S.braStyle,
+    S.profileWeight, S.signatureNailColor, S.signatureScent, S.hairstyle, S.eyeColor, S.braFitNotes
   ].filter(v => v && v.trim()).length;
-  const total = 9;
+  const total = 11;
 
   return `<div class="view">
     <div class="nav">
@@ -11792,12 +11919,43 @@ function viewAura() {
         ${auraFieldHTML('profileMBTI',       'closet-profile-mbti',     '🧠', 'Personality',      'e.g. ENFP, INTJ…',                S.profileMBTI)}
         ${auraFieldHTML('profileHeight',     'closet-profile-height',   '📏', 'Height',           'e.g. 5\'7", 170cm…',              S.profileHeight)}
         ${auraFieldHTML('braSize',           'closet-bra-size',         '🩱', 'Bra Size',         'e.g. 32C, 34B…',                  S.braSize)}
+        ${auraFieldHTML('braStyle',          'closet-bra-style',        '✨', 'Bra Style',        'e.g. Wireless, Bralette, Balconette…',S.braStyle)}
         ${auraFieldHTML('profileWeight',     'closet-profile-weight',   '⚖️', 'Weight',           'e.g. 130 lbs, 58kg…',             S.profileWeight)}
         ${auraFieldHTML('eyeColor',          'closet-eye-color',        '👁️', 'Eye Color',        'e.g. Hazel, Blue-green…',         S.eyeColor)}
         ${auraFieldHTML('signatureNailColor','closet-nail-color',       '💅', 'Signature Nail',   'e.g. Bordeaux, OPI Bubble Bath…', S.signatureNailColor)}
         ${auraFieldHTML('signatureScent',    'closet-signature-scent',  '🌸', 'Signature Scent',  'e.g. Chanel No. 5, Replica…',     S.signatureScent)}
         ${auraFieldHTML('hairstyle',         'closet-hairstyle',        '💇', 'Hairstyle',        'e.g. Long waves, blunt bob…',     S.hairstyle)}
       </div>
+
+      <!-- Intimates fit notes -->
+      ${(() => {
+        const isEditing = S._auraEdit === 'braFitNotes';
+        return `<div style="background:var(--surface);border:1.5px solid ${isEditing?'var(--gold)':'var(--border)'};border-radius:12px;padding:12px 14px;margin-bottom:8px;">
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:8px;">🩱 Fit Notes <span style="font-weight:500;text-transform:none;letter-spacing:0;margin-left:6px;font-size:10px;color:var(--text-3);">Private — helps Claude style you better</span></div>
+          ${isEditing ? `
+            <textarea id="aura-braFitNotes" rows="3" placeholder="e.g. Underwire bothers me · Need full coverage · 32C in Natori · Backless need adhesive…"
+              style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;color:var(--text);resize:none;font-family:inherit;line-height:1.5;">${esc(S.braFitNotes)}</textarea>
+            <div style="display:flex;gap:6px;margin-top:6px;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();saveAuraField('braFitNotes','closet-bra-fit-notes',document.getElementById('aura-braFitNotes').value)"
+                onclick="saveAuraField('braFitNotes','closet-bra-fit-notes',document.getElementById('aura-braFitNotes').value)"
+                style="flex:1;padding:7px 0;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">Save</button>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();S._auraEdit=null;render()"
+                onclick="S._auraEdit=null;render()"
+                style="padding:7px 12px;background:none;border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);touch-action:manipulation;">✕</button>
+            </div>` : `
+            <div ontouchend="if(_touchMoved)return;event.preventDefault();S._auraEdit='braFitNotes';render()"
+              onclick="S._auraEdit='braFitNotes';render()" style="cursor:pointer;min-height:42px;">
+              ${S.braFitNotes
+                ? `<div style="font-size:13px;color:var(--text);line-height:1.55;">${esc(S.braFitNotes)}</div>`
+                : `<div style="font-size:12px;color:var(--text-3);font-style:italic;">Tap to add fit notes, go-to brands, sizing quirks…</div>`}
+            </div>
+            <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeCategory='Intimates';switchTab('wardrobe')"
+                onclick="S.wardrobeCategory='Intimates';switchTab('wardrobe')"
+                style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">View my Intimates shelf →</button>
+            </div>`}
+        </div>`;
+      })()}
 
       <!-- Style words read-only display -->
       ${(() => {
@@ -12131,6 +12289,79 @@ function viewHome() {
           }).join('')}
         </div>
         ${trends.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right;">AI-curated · ${(() => { const d = Math.floor((Date.now()-new Date(trends.updated).getTime())/86400000); return d===0?'Updated today':d===1?'Updated yesterday':'Updated '+d+' days ago'; })()}</div>` : ''}
+      </div>`;
+    })()}
+
+    ${(()=>{
+      const pulse = S.wardrobePulse;
+      const pulseLoading = S._wardrobePulseLoading;
+      const hasWardrobe = S.wardrobe.filter(w => !w.retired && !w.memorial).length >= 3;
+
+      if (!hasWardrobe) return '';
+
+      if (pulseLoading) return `<div class="home-section">
+        <div class="home-section-label" style="margin-bottom:6px;">💓 Your Wardrobe Pulse</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+          <div class="spinner" style="width:18px;height:18px;border-width:2px;"></div>
+          <span style="font-size:13px;color:var(--text-3);">Reading your closet's pulse…</span>
+        </div>
+      </div>`;
+
+      if (!pulse?.rising?.length) return `<div class="home-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div>
+            <div class="home-section-label" style="margin-bottom:2px;">💓 Your Wardrobe Pulse</div>
+            <div style="font-size:11px;color:var(--text-3);">See which of your pieces are trending — and which to restyle.</div>
+          </div>
+        </div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();generateWardrobePulse()" onclick="generateWardrobePulse()"
+          style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          ✦ Analyze my wardrobe
+        </button>
+      </div>`;
+
+      const risingCards = (pulse.rising || []).slice(0,3).map(item => {
+        const w = S.wardrobe.find(x => x.id === item.id);
+        return `<div style="display:flex;align-items:flex-start;gap:11px;background:rgba(30,132,73,0.07);border:1.5px solid rgba(30,132,73,0.2);border-radius:14px;padding:12px 13px;">
+          <div style="font-size:24px;line-height:1;flex-shrink:0;">${w?.icon||'👗'}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;">
+              <span style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(item.name)}</span>
+              ${item.badge ? `<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;background:rgba(30,132,73,0.15);color:#1E8449;border-radius:100px;padding:2px 7px;flex-shrink:0;">${esc(item.badge)}</span>` : ''}
+            </div>
+            <div style="font-size:12px;color:var(--text-2);line-height:1.4;">${esc(item.reason)}</div>
+          </div>
+          <div style="font-size:18px;flex-shrink:0;">📈</div>
+        </div>`;
+      }).join('');
+
+      const fadingCards = (pulse.fading || []).slice(0,3).map(item => {
+        const w = S.wardrobe.find(x => x.id === item.id);
+        return `<div style="display:flex;align-items:flex-start;gap:11px;background:rgba(255,255,255,0.03);border:1.5px solid var(--border);border-radius:14px;padding:12px 13px;">
+          <div style="font-size:24px;line-height:1;flex-shrink:0;">${w?.icon||'👗'}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:3px;line-height:1.2;">${esc(item.name)}</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.4;margin-bottom:5px;">${esc(item.reason)}</div>
+            ${item.tip ? `<div style="font-size:11px;color:var(--gold-dk);font-weight:600;background:var(--gold-bg);border-radius:6px;padding:4px 8px;line-height:1.4;display:inline-block;">💡 ${esc(item.tip)}</div>` : ''}
+          </div>
+          <div style="font-size:18px;flex-shrink:0;">📉</div>
+        </div>`;
+      }).join('');
+
+      return `<div class="home-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div>
+            <div class="home-section-label" style="margin-bottom:2px;">💓 Your Wardrobe Pulse</div>
+            <div style="font-size:11px;color:var(--text-3);">Personalized to your closet.</div>
+          </div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();generateWardrobePulse()" onclick="generateWardrobePulse()"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
+        </div>
+        <div style="margin-bottom:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#1E8449;">📈 On the Rise</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">${risingCards}</div>
+        <div style="margin-bottom:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">📉 Fading Out</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">${fadingCards}</div>
+        ${pulse.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:8px;text-align:right;">${(() => { const d = Math.floor((Date.now()-new Date(pulse.updated).getTime())/86400000); return d===0?'Updated today':d===1?'Updated yesterday':'Updated '+d+' days ago'; })()}</div>` : ''}
       </div>`;
     })()}
 
@@ -12870,6 +13101,22 @@ async function deleteSelectedItems() {
    VIEW: WARDROBE
    ================================================================ */
 function viewWardrobe() {
+  // Memoization: skip expensive rebuild if wardrobe state hasn't changed
+  const _vwKey = [
+    S.wardrobeCategory, S.wardrobeSubCategory, S.wardrobeSort, S.wardrobeSearch,
+    S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0,
+    S.wardrobeTailoringFilter?1:0, S._wardrobeForSaleFilter?1:0,
+    S.wardrobeExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0,
+    S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels, S.sweatRackLevels, S.intRackLevels,
+    S.weatherPin ? S.weatherPin.city+S.weatherPin.tempF : '',
+    (S._wardrobeSelected||[]).join(','),
+    (S._wearFlipped ? [...S._wearFlipped].sort().join(',') : ''),
+    S.wardrobe.map(w=>w.id+'|'+(w.wears?.length||0)+'|'+(w.inMaybePile?1:0)+'|'+(w.tailoringNeeded?1:0)+'|'+(w.retiredFromCloset?1:0)+'|'+(!!w.photo?1:0)+'|'+(!!w.wearPhoto?1:0)+'|'+(w.name||'')+'|'+(w.category||'')+'|'+(w.brand||'')+'|'+(w.isGem?1:0)).join(';'),
+    (S.sellListings||[]).map(l=>l.id+':'+l.status).join(','),
+    (S.customCategories||[]).join(','),
+  ].join('§');
+  if (S._vwCache && S._vwCache.key === _vwKey) return S._vwCache.html;
+
   // Separate retired items from active wardrobe
   const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
   const retiredWardrobe = S.wardrobe.filter(w => w.retiredFromCloset);
@@ -13115,7 +13362,7 @@ function shelfCardHTML(w, fallbackIcon, _siblings) {
   const wears = w.wears?.length || 0;
   const isGem = isGemPiece(w);
   const imgHTML = w.photo
-    ? `<img src="${esc(w.photo)}" class="shoe-card-img" alt="${esc(w.name)}">`
+    ? `<img src="${esc(w.photo)}" class="shoe-card-img" alt="${esc(w.name)}" loading="lazy">`
     : `<span class="shoe-card-emoji">${w.icon || fallbackIcon}</span>`;
   return `<div class="shoe-card"
     ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
@@ -13131,7 +13378,7 @@ function shelfCardHTML(w, fallbackIcon, _siblings) {
 
 function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackIcon, bg) {
   const levels = Math.max(1, Math.min(4, S[stateKey] || 2));
-  const _lsKey = {'shoeRackLevels':'closet-shoe-shelves','bagRackLevels':'closet-bag-shelves','accessoryRackLevels':'closet-acc-shelves','sweatRackLevels':'closet-sweat-shelves'}[stateKey];
+  const _lsKey = {'shoeRackLevels':'closet-shoe-shelves','bagRackLevels':'closet-bag-shelves','accessoryRackLevels':'closet-acc-shelves','sweatRackLevels':'closet-sweat-shelves','intRackLevels':'closet-int-shelves'}[stateKey];
   const _saveShelfLevel = (v) => { if (_lsKey) localStorage.setItem(_lsKey, v); };
   const perShelf = Math.ceil(catItems.length / levels);
   const cost = catCost(catItems);
@@ -13168,6 +13415,7 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
       Bags:        ['👜', 'Bags',           items.length===1?'bag':'bags',    'bagRackLevels',         '👜', 'rgba(110,75,45,0.08)'],
       Accessories: ['✨', 'Accessories',    items.length===1?'item':'items',  'accessoryRackLevels',   '💍', 'rgba(120,95,175,0.08)'],
       Sweats:      ['🩳', 'Sweats & Comfy', items.length===1?'item':'items',  'sweatRackLevels',       '🩳', 'rgba(100,130,180,0.08)'],
+      Intimates:   ['🩱', 'Intimates',       items.length===1?'item':'items',  'intRackLevels',         '🩱', 'rgba(255,180,200,0.08)'],
     };
     const _shelfCfg = _SHELF_CONFIG[S.wardrobeCategory];
     if (_shelfCfg) {
@@ -13190,7 +13438,7 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
 
   } else {
     // All — hero section first, then getting-dressed category order, shoes as rack
-    const CATEGORY_ORDER = ['Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry','Accessories','Other'];
+    const CATEGORY_ORDER = ['Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry','Intimates','Accessories','Other'];
     const grouped = {};
     CATEGORY_ORDER.forEach(c => grouped[c] = []);
     const uncategorized = [];
@@ -13220,6 +13468,10 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
 
       if (cat === 'Sweats') {
         sections += shelfSectionHTML(catItems, '🩳', 'Sweats & Comfy', catItems.length===1?'item':'items', 'sweatRackLevels', '🩳', 'rgba(100,130,180,0.08)');
+        return;
+      }
+      if (cat === 'Intimates') {
+        sections += shelfSectionHTML(catItems, '🩱', 'Intimates', catItems.length===1?'item':'items', 'intRackLevels', '🩱', 'rgba(255,180,200,0.08)');
         return;
       }
       if (cat === 'Shoes') {
@@ -13325,7 +13577,7 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
   // Track visible IDs so "Select All" knows what's currently shown
   S._wardrobeVisibleIds = items.map(w => w.id);
 
-  return `<div class="view">
+  const _vwHtml = `<div class="view">
     <div class="nav">
       ${S._wardrobeSelectMode ? `
         <button ontouchend="if(_touchMoved)return;event.preventDefault();exitWardrobeSelectMode()" onclick="exitWardrobeSelectMode()" style="font-size:14px;font-weight:700;color:var(--text-2);background:none;border:none;cursor:pointer;padding:4px 8px;font-family:inherit;touch-action:manipulation;">Cancel</button>
@@ -13463,6 +13715,8 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
       🗑 Delete${S._wardrobeSelected.length ? ` (${S._wardrobeSelected.length})` : ''}
     </button>
   </div>` : ''}`;
+  S._vwCache = {key: _vwKey, html: _vwHtml};
+  return _vwHtml;
 }
 
 function wardrobeGridCellHTML(w) {
@@ -13632,19 +13886,7 @@ function hangerHTML(w, _siblings) {
   const stripeEl = stripeColor
     ? `<div class="hanger-color-strip" style="background:${stripeColor};"></div>`
     : '';
-  // SVG hanger: hook + two arms, matching rod color palette
-  const hangerSVG = `<svg width="76" height="30" viewBox="0 0 76 30" fill="none"
-      style="display:block;overflow:visible;flex-shrink:0;">
-    <!-- hook neck -->
-    <path d="M38 20 L38 11 Q38 2 43.5 2 Q49 2 49 8 Q49 13 44 14"
-          stroke="#B07828" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    <!-- left shoulder arm -->
-    <path d="M38 20 Q22 24 5 30"
-          stroke="#B07828" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-    <!-- right shoulder arm -->
-    <path d="M38 20 Q54 24 71 30"
-          stroke="#B07828" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  </svg>`;
+  const hangerSVG = _HANGER_SVG;
   const hSel = S._wardrobeSelectMode && S._wardrobeSelected.includes(w.id);
   const isWearFlipped = (S._wearFlipped || new Set()).has(w.id);
   const displayPhoto = isWearFlipped && w.wearPhoto ? w.wearPhoto : (w.photo || null);
@@ -13660,7 +13902,7 @@ function hangerHTML(w, _siblings) {
     <div class="hanger-card${S._newlyPaidOff===w.id?' paid-off-glow':''}" style="${isGemPiece(w) ? 'border-color:var(--gold);box-shadow:0 2px 10px rgba(184,125,42,0.18);' : ''}${hSel ? 'border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);' : ''}position:relative;">
       ${stripeEl}
       ${displayPhoto
-        ? `<img src="${esc(displayPhoto)}" class="hanger-img" alt="${esc(w.name)}" style="${hSel ? 'opacity:0.7;' : ''}">`
+        ? `<img src="${esc(displayPhoto)}" class="hanger-img" alt="${esc(w.name)}" loading="lazy" style="${hSel ? 'opacity:0.7;' : ''}">`
         : `<div class="hanger-icon" style="${hSel ? 'opacity:0.7;' : ''}">${w.icon || '👕'}</div>`}
       ${w.brand ? `<div class="hanger-brand">${esc(w.brand)}</div>` : ''}
       <div class="hanger-name">${esc(w.name)}</div>
@@ -14336,6 +14578,12 @@ function viewReceiptAdd() {
             ontouchend="if(_touchMoved)return;event.preventDefault();analyzeItemPhoto()"
             onclick="analyzeItemPhoto()" style="margin-bottom:10px;">
             ✨ Identify this piece
+          </button>
+          <button class="btn btn-secondary"
+            ontouchend="if(_touchMoved)return;event.preventDefault();S.receiptFlow.preview={name:'',brand:'',category:'',icon:'👕',description:'',price:'',size:'',isNew:true,purchasedDate:'',_manualFallback:true};S.receiptFlow.step='preview';render()"
+            onclick="S.receiptFlow.preview={name:'',brand:'',category:'',icon:'👕',description:'',price:'',size:'',isNew:true,purchasedDate:'',_manualFallback:true};S.receiptFlow.step='preview';render()"
+            style="margin-bottom:10px;">
+            Fill in manually
           </button>` : ''}
 
         <div style="font-size:12px;color:var(--text-3);text-align:center;margin-top:8px;line-height:1.6;">
@@ -14376,6 +14624,7 @@ function viewReceiptAdd() {
           <span class="nav-title">New Piece</span>
           <span style="width:72px"></span>
         </div>
+        ${p._manualFallback ? `<div style="margin:12px 16px 0;padding:10px 14px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:10px;font-size:12px;color:var(--text-2);line-height:1.5;">📝 Couldn't auto-detect — fill in the details below. Your photo is saved.</div>` : ''}
         <div style="padding:16px 16px 0;">
           <div class="flip-card-wrap${S._flipCardFlipped ? ' flipped' : ''}" id="flipCardWrap">
             <div class="flip-card-inner">
@@ -17868,9 +18117,11 @@ async function analyzeItemPhoto() {
     render();
   } catch(e) {
     console.error('analyzeItemPhoto error:', e);
-    S.receiptFlow.step = 'input';
+    // Don't strand the user — skip to manual entry with photo already attached
+    S.receiptFlow.preview = { name: '', brand: '', category: '', icon: '👕', description: '', price: '', size: '', isNew: true, purchasedDate: '', _manualFallback: true };
+    S.receiptFlow.step = 'preview';
     render();
-    toast('Couldn\'t identify the item — try a clearer photo.');
+    toast('Couldn\'t auto-detect — fill in the details below.');
   }
 }
 
@@ -18852,14 +19103,10 @@ function viewRIP() {
   const memorialized = S.wardrobe.filter(w => w.memorial).sort((a,b) => {
     return new Date(b.memorialDate||0) - new Date(a.memorialDate||0);
   });
+  const qm = (S.quickMemorials || []).slice().sort((a,b) => new Date(b.addedAt||0) - new Date(a.addedAt||0));
+  const qf = S._quickMemorialForm;
 
-  const emptyState = `<div class="rip-empty">
-    <div class="rip-empty-icon">🌹</div>
-    <div class="rip-empty-title">No memorials yet</div>
-    <div class="rip-empty-sub">When you retire a beloved piece from your wardrobe, you can memorialize it here with a photo and a few words.</div>
-  </div>`;
-
-  const cards = memorialized.map(w => {
+  const wardrobeCards = memorialized.map(w => {
     const outcomeLabel = {donated:'Donated',sold:'Sold',tossed:'Tossed'}[w.retireOutcome] || 'Retired';
     const dateStr = w.memorialDate ? fmtDate(w.memorialDate) : (w.retiredAt ? fmtDate(w.retiredAt) : '');
     const wears = w.wears?.length || 0;
@@ -18878,7 +19125,72 @@ function viewRIP() {
         </div>
       </div>
     </div>`;
-  }).join('');
+  });
+
+  const quickCards = qm.map(m => {
+    const dateStr = m.addedAt ? fmtDate(m.addedAt) : '';
+    return `<div class="rip-card">
+      ${m.photo
+        ? `<img class="rip-card-photo" src="data:${esc(m.mime||'image/jpeg')};base64,${m.photo}" alt="${esc(m.name||'Memory')}" style="object-fit:cover;">`
+        : `<div class="rip-card-photo-empty">📸</div>`}
+      <div class="rip-card-body">
+        <div class="rip-card-label">Memory · ${dateStr}</div>
+        <div class="rip-card-name">${esc(m.name||'Untitled memory')}</div>
+        ${m.note ? `<div class="rip-card-note">"${esc(m.note)}"</div>` : ''}
+        <div class="rip-card-footer">
+          <span class="rip-card-epitaph">Loved &amp; remembered</span>
+          <button class="rip-card-view-btn" style="color:rgba(255,80,80,0.8);" ontouchend="if(_touchMoved)return;event.preventDefault();deleteQuickMemorial('${m.id}')" onclick="deleteQuickMemorial('${m.id}')">Remove</button>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  const allCards = [...quickCards, ...wardrobeCards].join('');
+  const totalCount = memorialized.length + qm.length;
+
+  const emptyState = `<div class="rip-empty">
+    <div class="rip-empty-icon">🌹</div>
+    <div class="rip-empty-title">No memorials yet</div>
+    <div class="rip-empty-sub">Tap "Add a Memory" to save a photo of a favourite piece, or retire a wardrobe item to memorialize it here.</div>
+  </div>`;
+
+  const quickForm = qf ? `
+    <div style="margin:0 16px 20px;border-radius:16px;border:1px solid rgba(147,112,219,0.35);background:rgba(147,112,219,0.08);padding:18px 16px;">
+      <div style="font-size:14px;font-weight:700;color:#C39BD3;margin-bottom:14px;">📸 Add a Memory</div>
+
+      ${qf.photo
+        ? `<img src="data:${qf.mime||'image/jpeg'};base64,${qf.photo}" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-bottom:14px;">`
+        : `<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(147,112,219,0.12);border:2px dashed rgba(147,112,219,0.4);border-radius:12px;padding:28px 16px;margin-bottom:14px;cursor:pointer;">
+            <span style="font-size:32px;">📷</span>
+            <span style="font-size:13px;color:rgba(255,255,255,0.6);">Tap to choose a photo</span>
+            <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleQuickMemPhoto(this)">
+          </label>`}
+
+      ${qf.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('qmPhotoSwap').click()" onclick="document.getElementById('qmPhotoSwap').click()" style="background:none;border:none;color:rgba(147,112,219,0.8);font-size:12px;padding:0;margin-bottom:12px;cursor:pointer;">Change photo</button>
+      <input id="qmPhotoSwap" type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleQuickMemPhoto(this)">` : ''}
+
+      <input type="text" id="qmName" placeholder="Label (e.g. My favourite denim jacket)" value="${esc(qf.name||'')}"
+        style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;font-size:14px;color:#fff;margin-bottom:10px;">
+
+      <textarea id="qmNote" placeholder="A few words about it... (optional)" rows="3"
+        style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;font-size:14px;color:#fff;resize:none;margin-bottom:14px;">${esc(qf.note||'')}</textarea>
+
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1;"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._quickMemorialForm=null;render()"
+          onclick="S._quickMemorialForm=null;render()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;background:linear-gradient(135deg,#9B59B6,#7D3C98);border-color:transparent;"
+          ontouchend="if(_touchMoved)return;event.preventDefault();saveQuickMemorial()"
+          onclick="saveQuickMemorial()">🌹 Save to Garden</button>
+      </div>
+    </div>` : `
+    <div style="padding:0 16px 20px;">
+      <button class="btn btn-secondary" style="width:100%;border-color:rgba(147,112,219,0.4);color:#C39BD3;"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S._quickMemorialForm={photo:null,mime:null,name:'',note:''};render()"
+        onclick="S._quickMemorialForm={photo:null,mime:null,name:'',note:''};render()">
+        📸 Add a Memory
+      </button>
+    </div>`;
 
   return `<div class="view view-notab" style="background:linear-gradient(180deg,#0F0D0C 0%,var(--bg) 320px);">
     <div class="nav" style="background:rgba(15,13,12,0.9);">
@@ -18892,9 +19204,56 @@ function viewRIP() {
       <div class="rip-header-sub">A quiet place for the pieces that made you feel something.</div>
     </div>
     <div style="padding-top:20px;">
-      ${memorialized.length ? cards : emptyState}
+      ${quickForm}
+      ${totalCount ? allCards : emptyState}
     </div>
   </div>`;
+}
+
+function handleQuickMemPhoto(input) {
+  const file = input.files?.[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    const dataUrl = evt.target.result;
+    const comma = dataUrl.indexOf(',');
+    // Capture current form text before re-render
+    const nameEl = document.getElementById('qmName');
+    const noteEl = document.getElementById('qmNote');
+    if (!S._quickMemorialForm) S._quickMemorialForm = {photo:null,mime:null,name:'',note:''};
+    if (nameEl) S._quickMemorialForm.name = nameEl.value;
+    if (noteEl) S._quickMemorialForm.note = noteEl.value;
+    S._quickMemorialForm.photo = dataUrl.slice(comma + 1);
+    S._quickMemorialForm.mime = file.type || 'image/jpeg';
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveQuickMemorial() {
+  const qf = S._quickMemorialForm; if (!qf) return;
+  // Capture latest text from DOM
+  const nameEl = document.getElementById('qmName');
+  const noteEl = document.getElementById('qmNote');
+  const name = (nameEl ? nameEl.value : qf.name || '').trim();
+  const note = (noteEl ? noteEl.value : qf.note || '').trim();
+  if (!name && !qf.photo) { toast('Add a photo or label first.'); return; }
+  const entry = { id: uid(), photo: qf.photo || null, mime: qf.mime || null, name, note, addedAt: new Date().toISOString() };
+  if (!S.quickMemorials) S.quickMemorials = [];
+  S.quickMemorials.push(entry);
+  localStorage.setItem('closet-quick-memorials', JSON.stringify(S.quickMemorials));
+  try { await fsSet('quickMemorials', S.quickMemorials); } catch(e) { console.warn('quickMemorials cloud save failed', e); }
+  S._quickMemorialForm = null;
+  render();
+  toast('Saved to your Memorial Garden 🌹');
+}
+
+async function deleteQuickMemorial(id) {
+  if (!S.quickMemorials) return;
+  S.quickMemorials = S.quickMemorials.filter(m => m.id !== id);
+  localStorage.setItem('closet-quick-memorials', JSON.stringify(S.quickMemorials));
+  try { await fsSet('quickMemorials', S.quickMemorials); } catch(e) { console.warn('quickMemorials cloud delete failed', e); }
+  render();
+  toast('Memory removed.');
 }
 
 function handleMemorialPhoto(id, input) {
