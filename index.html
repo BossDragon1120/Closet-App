@@ -2817,6 +2817,12 @@ const S = {
   _funBookOutfitId: null,   // selected outfit id
   _funBookHistory: [],      // titles already recommended — avoid repeats
   _funBookCarouselScroll: 0, // preserved scroll position across renders
+  funDrink: null,           // { outfitId, drink, naVersion, vibe, why, perfectMoment }
+  _funDrinkLoading: false,
+  _funDrinkOutfitId: null,
+  _funDrinkHistory: [],
+  _funDrinkCarouselScroll: 0,
+  _funDrinkNA: localStorage.getItem('closet-drink-na') === 'true',
   plan: { eventDesc: '', suggestion: null, loadingSuggest: false, tripPickerOpen: false, activeTripId: null, savedSuccess: false, soloMode: null, tripDestination: '', tripDays: 5, tripSuggestions: null, tripGaps: null, loadingTrip: false },
   eventBoard: JSON.parse(localStorage.getItem('closet-event-board') || '[]'), // [{id, desc, suggestion, tripId, addedAt}]
   eventTrips: JSON.parse(localStorage.getItem('closet-event-trips') || '[]'), // [{id, name, createdAt}]
@@ -7373,6 +7379,18 @@ function listWardrobeItemForSale(wId) {
   render();
 }
 
+function shareClosetApp() {
+  const url = location.origin + location.pathname;
+  const text = 'I've been using this app to organize my closet — it's so good! 🧥✨';
+  if (navigator.share) {
+    navigator.share({ title: 'Closet App', text, url }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => toast('Link copied! Send it to a friend. 🎉'));
+  } else {
+    prompt('Copy this link to share:', url);
+  }
+}
+
 function shareMyListings() {
   if (!currentUser) return;
   const url = `${location.origin}${location.pathname}?seller=${currentUser.uid}`;
@@ -7668,6 +7686,92 @@ Return ONLY valid JSON — no markdown:
   S._funBookLoading = false;
   render();
   _restoreBookCarousel();
+}
+
+function _restoreDrinkCarousel() {
+  setTimeout(() => {
+    const el = document.getElementById('drink-picker-carousel');
+    if (el && S._funDrinkCarouselScroll) el.scrollLeft = S._funDrinkCarouselScroll;
+  }, 30);
+}
+
+async function generateDrinkRec(entryId) {
+  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (S._funDrinkLoading) return;
+  const entry = S.entries.find(e => e.id === entryId);
+  if (!entry) return;
+
+  const carousel = document.getElementById('drink-picker-carousel');
+  if (carousel) S._funDrinkCarouselScroll = carousel.scrollLeft;
+
+  S._funDrinkOutfitId = entryId;
+  S._funDrinkLoading = true;
+  S.funDrink = null;
+  render();
+  _restoreDrinkCarousel();
+
+  const outfitDesc = [
+    entry.occasionTag ? `Occasion: ${entry.occasionTag}` : null,
+    entry.rating ? `Style rating: ${entry.rating}/10` : null,
+    entry.items?.length ? `Items: ${entry.items.map(i=>i.name||i).join(', ')}` : null,
+    entry.note ? `Notes: ${entry.note}` : null,
+    entry.weatherDesc ? `Weather: ${entry.weatherDesc}` : null,
+  ].filter(Boolean).join('. ');
+
+  const naMode = S._funDrinkNA;
+  const avoidList = S._funDrinkHistory.length
+    ? `\n\nDrinks already recommended — do NOT suggest these again:\n${S._funDrinkHistory.map(d=>`- ${d}`).join('\n')}`
+    : '';
+
+  const naInstruction = naMode
+    ? 'IMPORTANT: The user does NOT drink alcohol. Suggest ONLY non-alcoholic drinks — sparkling waters, mocktails, specialty teas, coffees, shrubs, sodas, or other NA options. Do NOT mention any alcoholic version.'
+    : 'You may suggest any drink — cocktails, wine, beer, sparkling water, tea, coffee, mocktails, etc. If you suggest an alcoholic drink, also include a great non-alcoholic alternative in the "naVersion" field.';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: `You are a creative beverage curator who pairs drinks with fashion moments. Given this outfit, suggest the perfect drink to have while wearing it. Be specific and evocative — this should feel like a delightful, apt pairing.
+
+${naInstruction}${avoidList}
+
+Outfit details: ${outfitDesc}
+
+Return ONLY valid JSON — no markdown:
+{
+  "drink": "Specific drink name e.g. 'Aperol Spritz' or 'Yuzu Sparkling Water'",
+  "naVersion": "Non-alcoholic alternative if your main pick is alcoholic, otherwise null",
+  "vibe": "3-5 words e.g. 'Effortlessly Continental'",
+  "why": "2-3 sentences explaining exactly why this drink matches this outfit. Reference the specific pieces and mood.",
+  "perfectMoment": "One short sentence — when and where to enjoy this e.g. 'On a sun-drenched terrace at 6pm'"
+}` }],
+      }),
+    });
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const data = await res.json();
+    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('No JSON');
+    const drink = JSON.parse(m[0]);
+    S.funDrink = { outfitId: entryId, ...drink };
+    if (drink.drink) {
+      S._funDrinkHistory = [...new Set([...S._funDrinkHistory, drink.drink])].slice(-20);
+    }
+  } catch(e) {
+    console.error('generateDrinkRec:', e);
+    toast('Couldn\'t generate — try again.');
+  }
+  S._funDrinkLoading = false;
+  render();
+  _restoreDrinkCarousel();
 }
 
 // ── Color palette: fully client-side, no API key needed ──────────────────────
@@ -8044,8 +8148,11 @@ function viewFun() {
         </div>
       </div>
 
+      <!-- ── GROUP 1: YOUR STYLE ─────────────────────────── -->
+      <div style="margin:20px 16px 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);">✦ Your Style</div>
+
       <!-- Style Roulette -->
-      <div style="margin:16px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
+      <div style="margin:8px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px;">
           <div style="font-size:32px;line-height:1;">🎲</div>
           <div style="flex:1;">
@@ -8068,8 +8175,135 @@ function viewFun() {
         ${rouletteResultHTML}
       </div>
 
+      <!-- Color Palette Analyzer -->
+      <div style="margin:10px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px;">
+          <div style="font-size:32px;line-height:1;">🎨</div>
+          <div style="flex:1;">
+            <div style="font-size:16px;font-weight:800;color:var(--text);">Color Palette</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">See the colors you wear most — and discover what you should try next.</div>
+          </div>
+        </div>
+        ${(()=>{
+          if (!S.funPalette) return `<button
+            ontouchend="if(_touchMoved)return;event.preventDefault();analyzePalette()"
+            onclick="analyzePalette()"
+            style="margin-top:14px;width:100%;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:10px;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            🎨 Scan my colours
+          </button>`;
+          const p = S.funPalette;
+          return `<div style="margin-top:16px;">
+            ${p.insight ? `<div style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:14px;padding:12px 14px;background:var(--surface-2);border-radius:12px;border-left:3px solid var(--gold);">${esc(p.insight)}</div>` : ''}
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">Colour DNA</div>
+            <div style="display:flex;height:18px;border-radius:100px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 6px rgba(0,0,0,0.15);">
+              ${(p.owned||[]).map(c=>`<div style="flex:${c.count};background:${esc(c.hex)};transition:flex 0.3s;" title="${esc(c.color)}"></div>`).join('')}
+            </div>
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Your Colours</div>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+              ${(p.owned||[]).map(c=>`
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;">
+                  <div style="width:44px;height:44px;border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2.5px solid var(--surface);flex-shrink:0;"></div>
+                  <div style="font-size:10px;font-weight:700;color:var(--text-2);text-align:center;line-height:1.25;">${esc(c.color)}</div>
+                  <div style="font-size:10px;color:var(--text-3);">${c.count} item${c.count!==1?'s':''}</div>
+                </div>`).join('')}
+            </div>
+            ${(p.explore||[]).length ? `
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Colours to Try</div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
+              ${(p.explore||[]).map(c=>`
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div style="width:44px;height:44px;border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2.5px solid var(--surface);flex-shrink:0;"></div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${esc(c.color)}</div>
+                    <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(c.why)}</div>
+                  </div>
+                </div>`).join('')}
+            </div>` : ''}
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();S.funPalette=null;analyzePalette()"
+              onclick="S.funPalette=null;analyzePalette()"
+              style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:2px 0;">
+              ↻ Re-scan
+            </button>
+          </div>`;
+        })()}
+      </div>
+
+      <!-- ── GROUP 2: PAIRINGS ──────────────────────────────── -->
+      <div style="margin:24px 16px 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);">✦ Pairings</div>
+
+      <!-- Outfit × Drink Pairing -->
+      <div style="margin:8px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+          <div style="font-size:32px;line-height:1;">🥂</div>
+          <div style="flex:1;">
+            <div style="font-size:16px;font-weight:800;color:var(--text);">Outfit × Drink Pairing</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Pick an outfit — Claude suggests the perfect drink to have while wearing it.</div>
+          </div>
+          <!-- NA toggle -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;">
+            <button class="toggle ${S._funDrinkNA?'on':'off'}" style="${S._funDrinkNA?'background:#3B82F6;flex-shrink:0;':'flex-shrink:0;'}"
+              ontouchend="if(_touchMoved)return;event.preventDefault();S._funDrinkNA=!S._funDrinkNA;localStorage.setItem('closet-drink-na',S._funDrinkNA);S.funDrink=null;render()"
+              onclick="S._funDrinkNA=!S._funDrinkNA;localStorage.setItem('closet-drink-na',S._funDrinkNA);S.funDrink=null;render()"></button>
+            <div style="font-size:9px;font-weight:700;color:${S._funDrinkNA?'#3B82F6':'var(--text-3)'};white-space:nowrap;">NA only</div>
+          </div>
+        </div>
+        ${(()=>{
+          const recentEntries = [...S.entries]
+            .filter(e => !e.battleId)
+            .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 12);
+          if (!recentEntries.length) return `<div style="text-align:center;padding:16px 0;color:var(--text-3);font-size:13px;">Log some outfits first, then come back!</div>`;
+
+          const pickerHTML = `
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">Pick an outfit</div>
+            <div id="drink-picker-carousel" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:14px;">
+              ${recentEntries.map(e => {
+                const isSel = S._funDrinkOutfitId === e.id;
+                return `<div
+                  ontouchend="if(_touchMoved)return;event.preventDefault();generateDrinkRec('${e.id}')"
+                  onclick="generateDrinkRec('${e.id}')"
+                  style="flex-shrink:0;scroll-snap-align:start;width:80px;cursor:pointer;touch-action:manipulation;">
+                  <div style="width:80px;height:106px;border-radius:10px;overflow:hidden;position:relative;background:#111;border:2px solid ${isSel?'var(--gold)':'transparent'};transition:border-color .15s;box-shadow:${isSel?'0 0 0 3px var(--gold-bg)':'none'};">
+                    ${e.photo
+                      ? `<img src="${e.photo}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;">`
+                      : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:30px;">👗</div>`}
+                    ${e.rating ? `<div style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.7);border-radius:6px;padding:2px 5px;font-size:10px;font-weight:800;color:#fff;">⭐${e.rating}</div>` : ''}
+                  </div>
+                  ${e.occasionTag ? `<div style="font-size:9px;color:var(--text-3);margin-top:4px;text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.occasionTag)}</div>` : ''}
+                </div>`;
+              }).join('')}
+            </div>`;
+
+          const loadingHTML = S._funDrinkLoading
+            ? `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Pouring something perfect…</span></div>`
+            : '';
+
+          const resultHTML = (!S._funDrinkLoading && S.funDrink) ? (() => {
+            const d = S.funDrink;
+            return `<div style="background:linear-gradient(135deg,#0f1a12 0%,#1a2c1a 100%);border-radius:16px;padding:18px;position:relative;overflow:hidden;">
+              <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 80% 20%,rgba(184,125,42,0.12) 0%,transparent 60%);pointer-events:none;"></div>
+              <div style="position:relative;">
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:4px;">${esc(d.vibe||'')}</div>
+                <div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:10px;">🥂 ${esc(d.drink||'')}</div>
+                <div style="font-size:13px;color:rgba(255,255,255,.75);line-height:1.65;font-style:italic;margin-bottom:12px;">${esc(d.why||'')}</div>
+                ${d.naVersion && !S._funDrinkNA ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(59,130,246,0.15);border-radius:10px;border:1px solid rgba(59,130,246,0.3);margin-bottom:10px;">
+                  <span style="font-size:14px;">💧</span>
+                  <div style="font-size:12px;color:rgba(255,255,255,.65);line-height:1.4;"><span style="font-weight:700;color:rgba(147,197,253,.9);">NA option:</span> ${esc(d.naVersion)}</div>
+                </div>` : ''}
+                ${d.perfectMoment ? `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.4);">
+                  <span>✦</span><span>${esc(d.perfectMoment)}</span>
+                </div>` : ''}
+              </div>
+            </div>`;
+          })() : '';
+
+          return pickerHTML + loadingHTML + resultHTML;
+        })()}
+      </div>
+
       <!-- Book Pairing -->
-      <div style="margin:16px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
+      <div style="margin:10px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
           <div style="font-size:32px;line-height:1;">📚</div>
           <div style="flex:1;">
@@ -8131,8 +8365,11 @@ function viewFun() {
         })()}
       </div>
 
+      <!-- ── GROUP 3: JUST FOR YOU ──────────────────────────── -->
+      <div style="margin:24px 16px 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);">✦ Just for You</div>
+
       <!-- Claude Compliments -->
-      <div style="margin:16px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
+      <div style="margin:8px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px;">
           <div style="font-size:32px;line-height:1;">🌟</div>
           <div style="flex:1;">
@@ -8150,70 +8387,8 @@ function viewFun() {
         ${complimentHTML}
       </div>
 
-      <!-- Color Palette Analyzer -->
-      <div style="margin:16px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px;">
-          <div style="font-size:32px;line-height:1;">🎨</div>
-          <div style="flex:1;">
-            <div style="font-size:16px;font-weight:800;color:var(--text);">Color Palette</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">See the colors you wear most — and discover what you should try next.</div>
-          </div>
-        </div>
-        ${(()=>{
-          if (!S.funPalette) return `<button
-            ontouchend="if(_touchMoved)return;event.preventDefault();analyzePalette()"
-            onclick="analyzePalette()"
-            style="margin-top:14px;width:100%;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:10px;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            🎨 Scan my colours
-          </button>`;
-          const p = S.funPalette;
-          const total = (p.owned||[]).reduce((s,c)=>s+c.count,0)||1;
-          return `<div style="margin-top:16px;">
-            ${p.insight ? `<div style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:14px;padding:12px 14px;background:var(--surface-2);border-radius:12px;border-left:3px solid var(--gold);">${esc(p.insight)}</div>` : ''}
-
-            <!-- Colour DNA bar -->
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">Colour DNA</div>
-            <div style="display:flex;height:18px;border-radius:100px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 6px rgba(0,0,0,0.15);">
-              ${(p.owned||[]).map(c=>`<div style="flex:${c.count};background:${esc(c.hex)};transition:flex 0.3s;" title="${esc(c.color)}"></div>`).join('')}
-            </div>
-
-            <!-- Swatches -->
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Your Colours</div>
-            <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
-              ${(p.owned||[]).map(c=>`
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;">
-                  <div style="width:44px;height:44px;border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2.5px solid var(--surface);flex-shrink:0;"></div>
-                  <div style="font-size:10px;font-weight:700;color:var(--text-2);text-align:center;line-height:1.25;">${esc(c.color)}</div>
-                  <div style="font-size:10px;color:var(--text-3);">${c.count} item${c.count!==1?'s':''}</div>
-                </div>`).join('')}
-            </div>
-
-            <!-- Colours to try -->
-            ${(p.explore||[]).length ? `
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Colours to Try</div>
-            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
-              ${(p.explore||[]).map(c=>`
-                <div style="display:flex;align-items:center;gap:12px;">
-                  <div style="width:44px;height:44px;border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2.5px solid var(--surface);flex-shrink:0;"></div>
-                  <div style="flex:1;min-width:0;">
-                    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${esc(c.color)}</div>
-                    <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(c.why)}</div>
-                  </div>
-                </div>`).join('')}
-            </div>` : ''}
-
-            <button
-              ontouchend="if(_touchMoved)return;event.preventDefault();S.funPalette=null;analyzePalette()"
-              onclick="S.funPalette=null;analyzePalette()"
-              style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:2px 0;">
-              ↻ Re-scan
-            </button>
-          </div>`;
-        })()}
-      </div>
-
       <!-- Thank Someone -->
-      <div style="margin:16px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
+      <div style="margin:10px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
           <div style="font-size:32px;line-height:1;">💌</div>
           <div style="flex:1;">
@@ -8222,6 +8397,19 @@ function viewFun() {
           </div>
         </div>
         ${thankSomeoneHTML}
+      </div>
+
+      <!-- Share CTA -->
+      <div style="margin:16px 16px 0;padding:18px 20px;background:linear-gradient(135deg,var(--gold-bg) 0%,#FFF8E7 100%);border:1.5px solid var(--gold);border-radius:20px;text-align:center;">
+        <div style="font-size:24px;margin-bottom:8px;">🎉</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:4px;">Share the fun with friends</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.55;margin-bottom:14px;">Know someone who'd love this? Send them the app.</div>
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();shareClosetApp()"
+          onclick="shareClosetApp()"
+          style="background:var(--gold);border:none;border-radius:100px;padding:10px 28px;font-size:13px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          ✨ Share Closet
+        </button>
       </div>
 
       <div style="height:20px;"></div>
@@ -9994,8 +10182,8 @@ function viewPlan() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">📅 Plan</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();toast('Find a Stylist coming soon ✨')" onclick="toast('Find a Stylist coming soon ✨')">
-        + Find Stylist
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('closet-assistant')" onclick="navigate('closet-assistant')" style="font-size:12px;">
+        🌿 Closet Therapy
       </button>
     </div>
 
@@ -16804,34 +16992,20 @@ function viewSettings() {
       </div>` : ''}
     </div>
 
-    <!-- ── YOUR DATA ──────────────────────────────── -->
-    <div class="settings-group-label">Your Data</div>
+    <!-- ── DATA & STORAGE ──────────────────────────────── -->
+    <div class="settings-group-label">Data &amp; Storage</div>
     <div class="settings-section">
-      ${S.entries.length ? `
-      <div class="settings-row">
-        <div style="display:flex;gap:10px;margin-bottom:12px;">
-          <div style="flex:1;text-align:center;background:var(--surface-2);border-radius:10px;padding:10px 6px;">
-            <div style="font-size:22px;font-weight:900;color:var(--gold);">${S.entries.length}</div>
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);">Outfits</div>
+      <div class="settings-row" style="border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:0;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('dashboard')" onclick="navigate('dashboard')"
+          style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;text-align:left;">
+          <span style="font-size:20px;">📊</span>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:var(--text);">View Fashion Stats</div>
+            <div style="font-size:11px;color:var(--text-3);">Cost per wear, style score, top picks &amp; more</div>
           </div>
-          <div style="flex:1;text-align:center;background:var(--surface-2);border-radius:10px;padding:10px 6px;">
-            <div style="font-size:22px;font-weight:900;color:var(--gold);">${S.wardrobe.length}</div>
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);">Pieces</div>
-          </div>
-          <div style="flex:1;text-align:center;background:var(--surface-2);border-radius:10px;padding:10px 6px;">
-            <div style="font-size:22px;font-weight:900;color:var(--gold);">${styleScore(S.entries)||'—'}</div>
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);">Avg Score</div>
-          </div>
-        </div>
-        ${best ? `<div style="display:flex;align-items:center;gap:12px;background:var(--surface-2);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
-          <img src="${best.photo}" style="width:40px;height:53px;object-fit:cover;object-position:top;border-radius:7px;flex-shrink:0;">
-          <div>
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin-bottom:2px;">Best Outfit</div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);">⭐ ${best.rating}/10</div>
-            <div style="font-size:12px;color:var(--text-3);">${fmtDate(best.createdAt)}</div>
-          </div>
-        </div>` : ''}
-      </div>` : ''}
+          <span style="font-size:16px;color:var(--text-3);">›</span>
+        </button>
+      </div>
       ${(S.customCategories || []).length > 0 ? `
       <div class="settings-row" style="border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:0;">
         <div class="settings-label" style="margin-bottom:8px;">Custom Shelves</div>
