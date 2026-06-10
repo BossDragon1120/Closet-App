@@ -475,6 +475,20 @@ body {
   transition: transform .12s, box-shadow .12s;
   position: relative; overflow: hidden;
 }
+@keyframes paidOffGlow {
+  0%   { box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-color: var(--border); }
+  25%  { box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(184,125,42,0.45); border-color: var(--gold); }
+  60%  { box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(184,125,42,0.45); border-color: var(--gold); }
+  100% { box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-color: var(--border); }
+}
+.hanger-card.paid-off-glow { animation: paidOffGlow 2s ease forwards; }
+@keyframes paidOffGlowShelf {
+  0%   { box-shadow: none; }
+  25%  { box-shadow: 0 0 0 2px var(--gold), 0 0 14px rgba(184,125,42,0.4); }
+  60%  { box-shadow: 0 0 0 2px var(--gold), 0 0 14px rgba(184,125,42,0.4); }
+  100% { box-shadow: none; }
+}
+.shoe-card-img-wrap.paid-off-glow { animation: paidOffGlowShelf 2s ease forwards; }
 .hanger:active .hanger-card {
   transform: translateY(2px); box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
@@ -2793,6 +2807,8 @@ const S = {
   _funComplimentLoading: false,
   funRoulette: null,        // { items: [...], generatedAt }
   _funRouletteLoading: false,
+  _thankSomeoneExpanded: false,
+  _thankSomeoneOrder: null,  // shuffled IDs, stable within session
   funPalette: null,         // { owned: [{color,hex,count,items}], explore: [{color,hex,why}], insight }
   _funPaletteLoading: false,
   _genDescLoading: null,  // null | 'bulk' | 'receipt' | wardrobeId — which description field is generating
@@ -2808,6 +2824,7 @@ const S = {
   returnItems: JSON.parse(localStorage.getItem('closet-return-items') || '[]'),   // [{id,photo,store,channel,deadline,notes,createdAt}]
   sellTab: 'listings', // 'listings' | 'returns'
   _sellForm: null,   // active listing form state
+  _sellSaving: false,
   _returnForm: null, // active return form state
   _tripFlow: null, // { step:'naming', name:'' } — inline trip creation
   newsFlash: null, // { headline, summary, url, source, fetchedAt }
@@ -2842,7 +2859,8 @@ const S = {
   selectedWardrobeId: null,
   // ui
   loading: false, loadingMsg: '', error: null,
-  filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
+  filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeForSaleFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
+  _marketplaceListings: null, _marketplaceLoading: false, _viewSellerUid: null,
   closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
@@ -6868,29 +6886,29 @@ function viewSell() {
 
         <div class="form-group">
           <label class="form-label">Item Name *</label>
-          <input class="form-input" placeholder='e.g. Levi\'s 501 Jeans' value="${esc(sf.name||'')}" oninput="S._sellForm.name=this.value">
+          <input id="sellFormName" class="form-input" placeholder='e.g. Levi\'s 501 Jeans' value="${esc(sf.name||'')}" oninput="S._sellForm.name=this.value">
         </div>
         <div style="display:flex;gap:10px;">
           <div class="form-group" style="flex:1;margin-bottom:14px;">
             <label class="form-label">Brand</label>
-            <input class="form-input" style="margin:0;" placeholder="e.g. Zara" value="${esc(sf.brand||'')}" oninput="S._sellForm.brand=this.value">
+            <input id="sellFormBrand" class="form-input" style="margin:0;" placeholder="e.g. Zara" value="${esc(sf.brand||'')}" oninput="S._sellForm.brand=this.value">
           </div>
           <div class="form-group" style="flex:1;margin-bottom:14px;">
             <label class="form-label">Size</label>
-            <input class="form-input" style="margin:0;" placeholder="e.g. S, 28, 7.5" value="${esc(sf.size||'')}" oninput="S._sellForm.size=this.value">
+            <input id="sellFormSize" class="form-input" style="margin:0;" placeholder="e.g. S, 28, 7.5" value="${esc(sf.size||'')}" oninput="S._sellForm.size=this.value">
           </div>
         </div>
         <div style="display:flex;gap:10px;">
           <div class="form-group" style="flex:1;margin-bottom:14px;">
             <label class="form-label">Category</label>
-            <select class="form-input" style="margin:0;" onchange="S._sellForm.category=this.value">
+            <select id="sellFormCategory" class="form-input" style="margin:0;" onchange="S._sellForm.category=this.value">
               <option value="">— pick —</option>
               ${catOptions.map(c=>`<option value="${c}" ${sf.category===c?'selected':''}>${c}</option>`).join('')}
             </select>
           </div>
           <div class="form-group" style="flex:1;margin-bottom:14px;">
             <label class="form-label">Condition</label>
-            <select class="form-input" style="margin:0;" onchange="S._sellForm.condition=this.value">
+            <select id="sellFormCondition" class="form-input" style="margin:0;" onchange="S._sellForm.condition=this.value">
               <option value="">— pick —</option>
               ${condOptions.map(c=>`<option value="${c.val}" ${sf.condition===c.val?'selected':''}>${c.label}</option>`).join('')}
             </select>
@@ -6898,15 +6916,18 @@ function viewSell() {
         </div>
         <div class="form-group">
           <label class="form-label">Asking Price ($)</label>
-          <input class="form-input" type="number" min="0" step="0.01" placeholder="0.00" value="${sf.price||''}" oninput="S._sellForm.price=this.value">
+          <input id="sellFormPrice" class="form-input" type="number" min="0" step="0.01" placeholder="0.00" value="${sf.price||''}" oninput="S._sellForm.price=this.value">
         </div>
         <div class="form-group">
           <label class="form-label">Description</label>
-          <textarea class="plan-textarea" rows="3" placeholder="Condition details, measurements, styling notes…" oninput="S._sellForm.description=this.value">${esc(sf.description||'')}</textarea>
+          <textarea id="sellFormDesc" class="plan-textarea" rows="3" placeholder="Condition details, measurements, styling notes…" oninput="S._sellForm.description=this.value">${esc(sf.description||'')}</textarea>
         </div>
 
-        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();saveSellListing()" onclick="saveSellListing()" style="margin:4px 0 0;touch-action:manipulation;">
-          ${sf.id ? '✓ Save Changes' : '📦 Add to Listings'}
+        <button class="btn btn-primary" ${S._sellSaving?'disabled':''}
+          ontouchend="if(_touchMoved)return;event.preventDefault();saveSellListing()"
+          onclick="saveSellListing()"
+          style="margin:4px 0 0;touch-action:manipulation;${S._sellSaving?'opacity:.6;':''}">
+          ${S._sellSaving ? '⏳ Saving…' : (sf.id ? '✓ Save Changes' : '📦 Add to Listings')}
         </button>
       </div>
     </div>`;
@@ -6985,7 +7006,14 @@ function viewSell() {
         onclick="S.sellTab='listings';render()"
         style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${tab==='listings'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${tab==='listings'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
         <div style="font-size:18px;margin-bottom:4px;">📦</div>
-        <div style="font-size:12px;font-weight:${tab==='listings'?'800':'600'};color:${tab==='listings'?'var(--gold-dk)':'var(--text-2)'};">For Sale${activeListings.length?` (${activeListings.length})`:''}</div>
+        <div style="font-size:12px;font-weight:${tab==='listings'?'800':'600'};color:${tab==='listings'?'var(--gold-dk)':'var(--text-2)'};">My Listings${activeListings.length?` (${activeListings.length})`:''}</div>
+      </button>
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.sellTab='browse';if(S._marketplaceListings===null)loadMarketplaceListings();else render()"
+        onclick="S.sellTab='browse';if(S._marketplaceListings===null)loadMarketplaceListings();else render()"
+        style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${tab==='browse'?'2px solid #16A34A':'1.5px solid var(--border)'};background:${tab==='browse'?'#F0FDF4':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
+        <div style="font-size:18px;margin-bottom:4px;">🛍️</div>
+        <div style="font-size:12px;font-weight:${tab==='browse'?'800':'600'};color:${tab==='browse'?'#15803D':'var(--text-2)'};">Browse${S._marketplaceListings?.length?` (${S._marketplaceListings.length})`:''}</div>
       </button>
       <button
         ontouchend="if(_touchMoved)return;event.preventDefault();S.sellTab='returns';render()"
@@ -7041,9 +7069,13 @@ function viewSell() {
       </div>`;
     };
     return `<div style="padding:12px 16px 0;">
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm()" onclick="openSellForm()" style="flex:1;margin:0;touch-action:manipulation;">+ New Listing</button>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();shareMyListings()" onclick="shareMyListings()"
+          style="padding:12px 16px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">🔗 Share</button>
+      </div>
       ${activeListings.map(l=>listingCard(l,false)).join('')}
       ${soldListings.length?`<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin:16px 0 10px;">✓ Sold</div>${soldListings.map(l=>listingCard(l,true)).join('')}`:''}
-      <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm()" onclick="openSellForm()" style="margin:8px 0 0;touch-action:manipulation;">+ New Listing</button>
     </div>`;
   })();
 
@@ -7086,13 +7118,93 @@ function viewSell() {
     </div>`;
   })();
 
+  // ── Browse tab ─────────────────────────────────────────────
+  const browseTab = (() => {
+    if (S._marketplaceLoading) {
+      return `<div style="padding:60px 24px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:16px;">🛍️</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text-2);">Loading listings…</div>
+      </div>`;
+    }
+    if (S._marketplaceListings === null) {
+      return `<div style="padding:40px 24px;text-align:center;">
+        <div style="font-size:48px;margin-bottom:16px;">🛍️</div>
+        <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">Community Marketplace</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:24px;">Browse items listed for sale by other app users.</div>
+        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();loadMarketplaceListings()" onclick="loadMarketplaceListings()" style="margin:0;touch-action:manipulation;">Load listings</button>
+      </div>`;
+    }
+    const others = (S._marketplaceListings || []).filter(l => l.userId !== (currentUser && currentUser.uid));
+    const mine   = (S._marketplaceListings || []).filter(l => l.userId === (currentUser && currentUser.uid));
+    const condLabel = { 'new-tags':'New with tags','like-new':'Like new','good':'Good','fair':'Fair','poor':'Poor' };
+    const browseCard = (l) => {
+      const priceStr = l.price ? `$${parseFloat(l.price).toFixed(0)}` : 'Price TBD';
+      const photo = l.photoThumb || null;
+      const wornPhoto = l.wornPhotoThumb || null;
+      const mailSubject = encodeURIComponent(`Interested in: ${l.name}`);
+      const mailBody = encodeURIComponent(`Hi ${l.sellerName || 'there'},\n\nI saw your listing for "${l.name}" on the Closet App and I'd love to buy it!\n\nCan we chat?`);
+      return `<div style="display:flex;gap:12px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:12px;margin-bottom:10px;">
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
+          <div style="width:64px;height:80px;border-radius:10px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border);">
+            ${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22px;">📸</div>`}
+          </div>
+          ${wornPhoto?`<div style="width:64px;height:48px;border-radius:8px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border);"><img src="${wornPhoto}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`:''}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;line-height:1.2;">${esc(l.name)}</div>
+          ${l.brand?`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">${esc(l.brand)}</div>`:''}
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
+            ${l.size?`<span style="font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:2px 7px;color:var(--text-2);font-weight:600;">${esc(l.size)}</span>`:''}
+            ${l.condition?`<span style="font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:2px 7px;color:var(--text-2);font-weight:600;">${condLabel[l.condition]||l.condition}</span>`:''}
+          </div>
+          <div style="font-size:18px;font-weight:900;color:var(--gold-dk);margin-bottom:8px;">${priceStr}</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">By ${esc(l.sellerName||'A seller')}</div>
+          ${l.sellerEmail?`<a href="mailto:${esc(l.sellerEmail)}?subject=${mailSubject}&body=${mailBody}"
+            style="display:block;text-align:center;padding:8px 0;border-radius:var(--r-sm);border:none;background:#16A34A;color:#fff;font-size:12px;font-weight:700;text-decoration:none;font-family:inherit;touch-action:manipulation;">
+            ✉️ Contact seller</a>`:''}
+        </div>
+      </div>`;
+    };
+    const sellerName = (S._marketplaceListings||[]).find(l => l.userId === S._viewSellerUid)?.sellerName;
+    const sellerBanner = S._viewSellerUid ? `
+      <div style="background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:28px;">🛍️</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#15803D;">${sellerName ? esc(sellerName) + '\'s Closet Sale' : 'Closet Sale'}</div>
+          <div style="font-size:12px;color:#16A34A;margin-top:2px;">Contact the seller directly from any listing below</div>
+        </div>
+      </div>` : '';
+    const allItems = S._viewSellerUid
+      ? (S._marketplaceListings || [])  // show all when viewing a specific seller
+      : others;
+    if (!allItems.length && !mine.length) {
+      return `<div style="padding:40px 24px;text-align:center;">
+        <div style="font-size:48px;margin-bottom:16px;">🌱</div>
+        <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">Nothing listed yet</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:20px;">Be the first to list something! Go to My Listings and add a piece.</div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();loadMarketplaceListings()" onclick="loadMarketplaceListings()"
+          style="padding:10px 20px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">🔄 Refresh</button>
+      </div>`;
+    }
+    return `<div style="padding:12px 16px 0;">
+      ${sellerBanner}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:12px;color:var(--text-3);">${allItems.length} item${allItems.length===1?'':'s'} for sale</div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._marketplaceListings=null;loadMarketplaceListings()" onclick="S._marketplaceListings=null;loadMarketplaceListings()"
+          style="padding:6px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">🔄 Refresh</button>
+      </div>
+      ${allItems.map(l => browseCard(l)).join('')}
+      ${!S._viewSellerUid && mine.length ? `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin:16px 0 10px;">↑ Your listings</div>${mine.map(l => browseCard(l)).join('')}` : ''}
+    </div>`;
+  })();
+
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">🏷️ Sell</span>
     </div>
     ${tabBar}
     <div style="overflow-y:auto;height:calc(100% - 56px - 86px);-webkit-overflow-scrolling:touch;padding-bottom:80px;">
-      ${tab === 'listings' ? listingsTab : returnsTab}
+      ${tab === 'listings' ? listingsTab : tab === 'browse' ? browseTab : returnsTab}
     </div>
   </div>`;
 }
@@ -7112,25 +7224,55 @@ function openSellForm(id) {
 }
 
 function saveSellListing() {
+  if (S._sellSaving) return;
   const sf = S._sellForm;
   if (!sf) return;
+  // Flush any in-flight DOM values — iOS sometimes hasn't fired oninput on the active field yet
+  const nameEl = document.getElementById('sellFormName');
+  const brandEl = document.getElementById('sellFormBrand');
+  const sizeEl = document.getElementById('sellFormSize');
+  const priceEl = document.getElementById('sellFormPrice');
+  const descEl = document.getElementById('sellFormDesc');
+  const catEl = document.getElementById('sellFormCategory');
+  const condEl = document.getElementById('sellFormCondition');
+  if (nameEl) sf.name = nameEl.value;
+  if (brandEl) sf.brand = brandEl.value;
+  if (sizeEl) sf.size = sizeEl.value;
+  if (priceEl) sf.price = priceEl.value;
+  if (descEl) sf.description = descEl.value;
+  if (catEl) sf.category = catEl.value;
+  if (condEl) sf.condition = condEl.value;
+
   if (!sf.name || !sf.name.trim()) { toast('Please add an item name.'); return; }
+
+  S._sellSaving = true; render();
+
   const now = new Date().toISOString();
+  let saved;
   if (sf.id) {
     const idx = S.sellListings.findIndex(l => l.id === sf.id);
-    if (idx !== -1) S.sellListings[idx] = { ...sf };
+    if (idx !== -1) { S.sellListings[idx] = { ...sf }; saved = S.sellListings[idx]; }
   } else {
-    S.sellListings.unshift({ ...sf, id: uid(), createdAt: now, status: 'active' });
+    saved = { ...sf, id: uid(), createdAt: now, status: 'active' };
+    S.sellListings.unshift(saved);
   }
   localStorage.setItem('closet-sell-listings', JSON.stringify(S.sellListings));
-  S._sellForm = null;
-  toast(sf.id ? 'Listing updated!' : 'Added to listings!');
-  render();
+  if (saved) mirrorListingToMarketplace(saved).catch(() => {});
+
+  setTimeout(() => {
+    S._sellSaving = false;
+    S._sellForm = null;
+    toast(sf.id ? 'Listing updated!' : '📦 Listed!');
+    render();
+  }, 400);
 }
 
 function deleteSellListing(id) {
+  if (!confirm('Remove this listing?')) return;
   S.sellListings = S.sellListings.filter(l => l.id !== id);
   localStorage.setItem('closet-sell-listings', JSON.stringify(S.sellListings));
+  if (currentUser) firestore.collection('marketplace').doc(String(id)).delete().catch(() => {});
+  toast('Listing removed.');
   render();
 }
 
@@ -7139,6 +7281,7 @@ function markSellListingSold(id) {
   if (idx !== -1) {
     S.sellListings[idx].status = S.sellListings[idx].status === 'sold' ? 'active' : 'sold';
     localStorage.setItem('closet-sell-listings', JSON.stringify(S.sellListings));
+    mirrorListingToMarketplace(S.sellListings[idx]).catch(() => {});
     render();
   }
 }
@@ -7150,6 +7293,96 @@ function uploadSellListingPhoto(type, input) {
     S._sellForm[type] = data;
     render();
   }).catch(() => toast('Could not load photo.'));
+}
+
+/* ----------------------------------------------------------------
+   MARKETPLACE — mirror sell listings to Firestore for other users
+   ---------------------------------------------------------------- */
+async function mirrorListingToMarketplace(l) {
+  if (!currentUser) return;
+  const ref = firestore.collection('marketplace').doc(String(l.id));
+  // Remove sold or deleted items from the public marketplace
+  if (!l || l.status === 'sold') {
+    ref.delete().catch(() => {});
+    return;
+  }
+  try {
+    const { photo, wornPhoto, ...rest } = l;
+    const doc = {
+      ...rest,
+      userId: currentUser.uid,
+      sellerName: S.profileName || 'A seller',
+      sellerEmail: currentUser.email || '',
+      updatedAt: new Date().toISOString(),
+    };
+    if (photo && photo.startsWith('data:')) {
+      const thumb = await makePhotoThumb(photo);
+      if (thumb) doc.photoThumb = thumb;
+    } else if (photo) {
+      doc.photoThumb = photo;
+    }
+    if (wornPhoto && wornPhoto.startsWith('data:')) {
+      const wt = await makePhotoThumb(wornPhoto);
+      if (wt) doc.wornPhotoThumb = wt;
+    } else if (wornPhoto) {
+      doc.wornPhotoThumb = wornPhoto;
+    }
+    await ref.set(doc);
+  } catch(e) { console.warn('marketplace mirror:', e); }
+}
+
+async function loadMarketplaceListings() {
+  if (S._marketplaceLoading) return;
+  S._marketplaceLoading = true;
+  render();
+  try {
+    let query = firestore.collection('marketplace').where('status', '==', 'active');
+    if (S._viewSellerUid) query = query.where('userId', '==', S._viewSellerUid);
+    const snap = await query.limit(100).get();
+    S._marketplaceListings = snap.docs.map(d => d.data());
+  } catch(e) {
+    console.warn('loadMarketplaceListings:', e);
+    S._marketplaceListings = [];
+    toast('Could not load marketplace listings.');
+  }
+  S._marketplaceLoading = false;
+  render();
+}
+
+function listWardrobeItemForSale(wId) {
+  const w = S.wardrobe.find(i => i.id === wId);
+  if (!w) return;
+  const existing = (S.sellListings || []).find(l => l.wardrobeItemId === String(wId) && l.status !== 'sold');
+  if (existing) {
+    toast('This item is already listed — opening your listings.');
+    S.sellTab = 'listings';
+    switchTab('sell');
+    return;
+  }
+  const catMap = { Tops:'Tops', Bottoms:'Bottoms', Outerwear:'Outerwear', Dresses:'Dresses', Shoes:'Shoes', Bags:'Bags', Accessories:'Accessories', Sweats:'Sweats' };
+  const cat = catMap[w.category] || '';
+  S._sellForm = {
+    id: null, wardrobeItemId: String(wId),
+    photo: w.photo || null, wornPhoto: w.wearPhoto || null,
+    name: w.name || '', brand: w.brand || '',
+    category: cat, size: w.size || '',
+    condition: '', description: w.description || '',
+    price: '', status: 'active'
+  };
+  switchTab('sell');
+  render();
+}
+
+function shareMyListings() {
+  if (!currentUser) return;
+  const url = `${location.origin}${location.pathname}?seller=${currentUser.uid}`;
+  if (navigator.share) {
+    navigator.share({ title: 'My closet sale listings', url }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => toast('Link copied! Share it with buyers.'));
+  } else {
+    prompt('Copy this link:', url);
+  }
 }
 
 function openReturnForm(id) {
@@ -7490,19 +7723,35 @@ function _paletteIsWarm(name) {
   return /red|orange|brown|rust|terracotta|coral|peach|gold|mustard|amber|camel|tan|cognac|mocha|burgundy|wine|pink|rose|blush|salmon|caramel|ochre/.test(name);
 }
 
-// Returns perceived luminance 0 (dark) → 1 (light) for a wardrobe item
-// Uses _COLOR_MAP to match color words from color field, name, or description
+// Returns perceived luminance 0 (dark) → 1 (light) for a wardrobe item.
+// Searches color, name, description, notes, and brand for colour words.
+// Uses the same "longer match dominates shorter" logic as the palette analyser
+// so "navy blue" wins over "blue" or "navy" alone.
 function _itemColorLuminance(w) {
-  const text = [(w.color||''), (w.name||''), (w.description||'')].join(' ').toLowerCase();
-  for (const [name, hex] of _COLOR_MAP) {
-    if (text.includes(name)) {
-      const r = parseInt(hex.slice(1,3), 16) / 255;
-      const g = parseInt(hex.slice(3,5), 16) / 255;
-      const b = parseInt(hex.slice(5,7), 16) / 255;
-      return 0.299*r + 0.587*g + 0.114*b;
-    }
+  const text = [w.color, w.name, w.description, w.notes, w.brand].filter(Boolean).join(' ').toLowerCase();
+  const matched = new Set();
+  for (const [word] of _COLOR_MAP) {
+    if (!text.includes(word)) continue;
+    let dominated = false;
+    for (const m of matched) { if (m.includes(word) && m !== word) { dominated = true; break; } }
+    if (dominated) continue;
+    for (const m of matched) { if (word.includes(m) && m !== word) matched.delete(m); }
+    matched.add(word);
   }
-  return 0.5; // unknown color → middle
+  // Pick the darkest or lightest match depending on caller — just return average luminance
+  // of all matched colours so a "navy and white stripe" item lands somewhere in the middle
+  if (!matched.size) return 0.5;
+  const colorMap = Object.fromEntries(_COLOR_MAP);
+  let lum = 0;
+  for (const word of matched) {
+    const hex = colorMap[word];
+    if (!hex) continue;
+    const r = parseInt(hex.slice(1,3), 16) / 255;
+    const g = parseInt(hex.slice(3,5), 16) / 255;
+    const b = parseInt(hex.slice(5,7), 16) / 255;
+    lum += 0.299*r + 0.587*g + 0.114*b;
+  }
+  return lum / matched.size;
 }
 
 function _paletteExplore(owned) {
@@ -7618,13 +7867,32 @@ function viewFun() {
           Go to Closet →
         </button>
       </div>`;
-    return giftedItems.map(w => {
+    // Build a stable shuffled order (once per session, changes if gifted items change)
+    const allIds = giftedItems.map(w => w.id).sort().join(',');
+    if (!S._thankSomeoneOrder || S._thankSomeoneOrder._key !== allIds) {
+      const shuffled = [...giftedItems].sort(() => Math.random() - 0.5);
+      S._thankSomeoneOrder = { _key: allIds, ids: shuffled.map(w => w.id) };
+    }
+    const idMap = Object.fromEntries(giftedItems.map(w => [w.id, w]));
+    const ordered = S._thankSomeoneOrder.ids.map(id => idMap[id]).filter(Boolean);
+    const LIMIT = 3;
+    const visible = S._thankSomeoneExpanded ? ordered : ordered.slice(0, LIMIT);
+    const hidden = ordered.length - visible.length;
+
+    const itemsHTML = visible.map(w => {
       const giverName = w.giftedBy ? esc(w.giftedBy) : 'someone special';
+      const displaySrc = w.wearPhoto || w.photo || null;
+      const photoEl = displaySrc
+        ? `<div style="width:44px;height:56px;border-radius:8px;overflow:hidden;background:var(--surface-2);flex-shrink:0;position:relative;">
+             <img src="${esc(displaySrc)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<span style=\\'font-size:24px;display:flex;align-items:center;justify-content:center;height:100%;\\'>${w.icon||'🎁'}</span>'">
+             ${w.wearPhoto ? `<div style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,0.55);border-radius:3px;padding:1px 3px;font-size:8px;color:#fff;font-weight:700;">worn</div>` : ''}
+           </div>`
+        : `<div style="width:44px;height:56px;border-radius:8px;background:var(--surface-2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:26px;">${w.icon||'🎁'}</div>`;
       return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
-        <div style="font-size:28px;line-height:1;flex-shrink:0;">${w.icon||'🎁'}</div>
+        ${photoEl}
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
-          <div style="font-size:11px;color:var(--text-3);">From ${giverName}</div>
+          <div style="font-size:11px;color:var(--text-3);">From ${giverName}${w.wearPhoto ? ' · worn photo ready to share' : ''}</div>
         </div>
         <button
           ontouchend="if(_touchMoved)return;event.preventDefault();thankGifter('${w.id}')"
@@ -7634,6 +7902,24 @@ function viewFun() {
         </button>
       </div>`;
     }).join('');
+
+    const seeMoreBtn = hidden > 0
+      ? `<button
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._thankSomeoneExpanded=true;render()"
+          onclick="S._thankSomeoneExpanded=true;render()"
+          style="width:100%;margin-top:4px;background:none;border:1px solid var(--border);border-radius:100px;padding:8px 16px;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          See ${hidden} more →
+        </button>`
+      : (S._thankSomeoneExpanded && ordered.length > LIMIT
+          ? `<button
+              ontouchend="if(_touchMoved)return;event.preventDefault();S._thankSomeoneExpanded=false;render()"
+              onclick="S._thankSomeoneExpanded=false;render()"
+              style="width:100%;margin-top:4px;background:none;border:1px solid var(--border);border-radius:100px;padding:8px 16px;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              Show less ↑
+            </button>`
+          : '');
+
+    return itemsHTML + seeMoreBtn;
   })();
 
   // ── Roulette result ───────────────────────────────────
@@ -10927,10 +11213,10 @@ const ASSIST_TIERS = {
 
 // Seasonal booking options for Closet Therapy
 const THERAPY_SEASONS = [
-  { id:'spring', emoji:'🌸', name:'Spring', window:'Book January–February', tagline:'Freshen up after winter — lighter layers, brighter colours.' },
-  { id:'summer', emoji:'☀️', name:'Summer', window:'Book March–April',      tagline:'Build your warm-weather wardrobe before the heat hits.' },
-  { id:'fall',   emoji:'🍂', name:'Fall',   window:'Book July–August',      tagline:'Transition pieces, layering looks, back-to-everything dressing.' },
-  { id:'winter', emoji:'❄️', name:'Winter', window:'Book September–October',tagline:'Heavy layers, evening dressing, holiday wardrobe ready.' }
+  { id:'spring', emoji:'🌸', name:'Spring', months:[2,3,4],  window:'February · March · April',    tagline:'Freshen up after winter — lighter layers, brighter colours.' },
+  { id:'summer', emoji:'☀️', name:'Summer', months:[5,6,7],  window:'May · June · July',            tagline:'Build your warm-weather wardrobe before the heat hits.' },
+  { id:'fall',   emoji:'🍂', name:'Fall',   months:[8,9,10], window:'August · September · October', tagline:'Transition pieces, layering looks, back-to-everything dressing.' },
+  { id:'winter', emoji:'❄️', name:'Winter', months:[11,12,1],window:'November · December · January',tagline:'Heavy layers, evening dressing, holiday wardrobe ready.' }
 ];
 
 function bookAssistantSession() {
@@ -12410,9 +12696,15 @@ function viewWardrobe() {
     items = items.filter(w => w.inMaybePile);
   }
 
-  // Apply category filter (skip if tailoring, hero, or maybe pile filter is active)
+  // Apply for-sale filter
+  if (S._wardrobeForSaleFilter) {
+    const listedIds = new Set((S.sellListings || []).filter(l => l.wardrobeItemId && l.status !== 'sold').map(l => l.wardrobeItemId));
+    items = items.filter(w => listedIds.has(String(w.id)));
+  }
+
+  // Apply category filter (skip if tailoring, hero, maybe pile, or for-sale filter is active)
   // normalizeCat(S.wardrobeCategory) handles 'Bottoms' → 'Pants' so existing items match
-  if (!S.wardrobeTailoringFilter && !S._wardrobeHeroFilter && !S._wardrobeMaybePileFilter && S.wardrobeCategory !== 'All') {
+  if (!S.wardrobeTailoringFilter && !S._wardrobeHeroFilter && !S._wardrobeMaybePileFilter && !S._wardrobeForSaleFilter && S.wardrobeCategory !== 'All') {
     items = items.filter(w => normalizeCat(w.category || categoryFromIcon(w.icon, w.name)) === normalizeCat(S.wardrobeCategory));
   }
 
@@ -12466,9 +12758,13 @@ function viewWardrobe() {
         const badge = c !== 'All' ? `<span class="cat-count-badge">${count}</span>` : '';
         const active = S.wardrobeCategory === c && !S._wardrobeHeroFilter && !S._wardrobeMaybePileFilter;
         const isCustom = (S.customCategories || []).includes(c);
-        return `<div class="filter-chip ${active?'active':''} ${empty?'filter-chip-empty':''}" style="${isCustom&&!active?'border-style:dashed;':''}"
+        const deleteX = isCustom ? `<span
+          ontouchend="event.stopPropagation();event.preventDefault();confirmDeleteCustomShelf(${JSON.stringify(c)})"
+          onclick="event.stopPropagation();confirmDeleteCustomShelf(${JSON.stringify(c)})"
+          style="font-size:11px;line-height:1;opacity:${active?'0.75':'0.45'};padding:0 0 0 3px;cursor:pointer;touch-action:manipulation;" title="Delete shelf">✕</span>` : '';
+        return `<div class="filter-chip ${active?'active':''} ${empty?'filter-chip-empty':''}" style="${isCustom?'border-style:dashed;':''}display:inline-flex;align-items:center;gap:2px;"
           ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'&&!S._wardrobeHeroFilter?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()"
-          onclick="S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()">${c}${badge}</div>`;
+          onclick="S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()">${c}${badge}${deleteX}</div>`;
       }).join('')}
       ${(() => {
         const gemCount = activeWardrobe.filter(w => isGemPiece(w)).length;
@@ -12491,8 +12787,19 @@ function viewWardrobe() {
         const mpActive = S._wardrobeMaybePileFilter;
         const mpEmpty = mpCount === 0;
         return `<div class="filter-chip ${mpActive?'active':''} ${mpEmpty?'filter-chip-empty':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
-          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">🤔 Purgatory<span class="cat-count-badge">${mpCount}</span></div>`;
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S._wardrobeForSaleFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
+          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S._wardrobeForSaleFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">🤔 Purgatory<span class="cat-count-badge">${mpCount}</span></div>`;
+      })()}
+      ${(() => {
+        const fsCount = (() => {
+          const listedIds = new Set((S.sellListings || []).filter(l => l.wardrobeItemId && l.status !== 'sold').map(l => l.wardrobeItemId));
+          return activeWardrobe.filter(w => listedIds.has(String(w.id))).length;
+        })();
+        const fsActive = S._wardrobeForSaleFilter;
+        const fsEmpty = fsCount === 0;
+        return `<div class="filter-chip ${fsActive?'active':''} ${fsEmpty?'filter-chip-empty':''}"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeForSaleFilter=!S._wardrobeForSaleFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
+          onclick="S._wardrobeForSaleFilter=!S._wardrobeForSaleFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">💰 For Sale<span class="cat-count-badge">${fsCount}</span></div>`;
       })()}
       ${S._addingShelf ? `
         <div style="display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1.5px solid var(--gold);border-radius:100px;padding:4px 6px 4px 12px;">
@@ -12608,7 +12915,7 @@ function shelfCardHTML(w, fallbackIcon, _siblings) {
   return `<div class="shoe-card"
     ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
     onclick="openWardrobeItem('${w.id}')">
-    <div class="shoe-card-img-wrap${isGem?' hero':''}">
+    <div class="shoe-card-img-wrap${isGem?' hero':''}${S._newlyPaidOff===w.id?' paid-off-glow':''}">
       ${imgHTML}
       ${isGem ? `<div style="position:absolute;bottom:2px;right:3px;font-size:7px;font-weight:800;color:var(--gold-dk);background:rgba(255,255,255,.85);border-radius:3px;padding:1px 3px;">💎</div>` : ''}
     </div>
@@ -13145,7 +13452,7 @@ function hangerHTML(w, _siblings) {
     ontouchmove="${isReorder ? '' : 'wLongPressCancel()'}"
     style="user-select:none;-webkit-user-select:none;${isReorder ? 'cursor:grab;touch-action:none;' : ''}">
     ${hangerSVG}
-    <div class="hanger-card" style="${isGemPiece(w) ? 'border-color:var(--gold);box-shadow:0 2px 10px rgba(184,125,42,0.18);' : ''}${hSel ? 'border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);' : ''}position:relative;">
+    <div class="hanger-card${S._newlyPaidOff===w.id?' paid-off-glow':''}" style="${isGemPiece(w) ? 'border-color:var(--gold);box-shadow:0 2px 10px rgba(184,125,42,0.18);' : ''}${hSel ? 'border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);' : ''}position:relative;">
       ${stripeEl}
       ${displayPhoto
         ? `<img src="${esc(displayPhoto)}" class="hanger-img" alt="${esc(w.name)}" style="${hSel ? 'opacity:0.7;' : ''}">`
@@ -14318,6 +14625,24 @@ function viewWardrobeItem() {
       </button>
     </div>
 
+    <!-- 💰 List for Sale -->
+    ${(() => {
+      const existingListing = (S.sellListings || []).find(l => l.wardrobeItemId === String(w.id) && l.status !== 'sold');
+      return `<div style="padding:0 20px;margin-bottom:12px;">
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();listWardrobeItemForSale('${w.id}')"
+          onclick="listWardrobeItemForSale('${w.id}')"
+          style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;touch-action:manipulation;
+            border:1.5px solid ${existingListing ? '#16A34A' : '#D4A017'};
+            background:${existingListing ? '#F0FDF4' : '#FFFBEB'};
+            color:${existingListing ? '#15803D' : '#92660A'};
+            font-size:14px;font-weight:700;
+            display:flex;align-items:center;justify-content:center;gap:8px;">
+          ${existingListing ? '✓ Listed for $' + (parseFloat(existingListing.price)||0).toFixed(0) + ' — view listing' : '💰 List for Sale'}
+        </button>
+      </div>`;
+    })()}
+
     <div style="padding:0 20px;margin-bottom:20px;">
       <button onclick="logCompliment('${w.id}')" style="
         width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
@@ -14364,7 +14689,7 @@ function viewWardrobeItem() {
                 : 'A piece that\'s unmistakably you — the bold blazer, the bag everyone asks about, the thing you reach for first.'}
             </div>
           </div>
-          <button class="toggle ${isGemPiece(w) ? 'on' : ''}" style="${isGemPiece(w) ? 'background:var(--gold);flex-shrink:0;' : 'flex-shrink:0;'}"
+          <button class="toggle ${isGemPiece(w) ? 'on' : 'off'}" style="${isGemPiece(w) ? 'background:var(--gold);flex-shrink:0;' : 'flex-shrink:0;'}"
             ontouchend="if(_touchMoved)return;event.preventDefault();toggleGem('${w.id}')"
             onclick="toggleGem('${w.id}')"></button>
         </div>
@@ -14393,7 +14718,7 @@ function viewWardrobeItem() {
                 : 'Not quite ready to let it go? Park it here. If it goes unworn for 60 days, you\'ll get a nudge to decide.'}
             </div>
           </div>
-          <button class="toggle ${w.inMaybePile ? 'on' : ''}" style="${w.inMaybePile ? 'background:#9B7FE0;flex-shrink:0;' : 'flex-shrink:0;'}"
+          <button class="toggle ${w.inMaybePile ? 'on' : 'off'}" style="${w.inMaybePile ? 'background:#9B7FE0;flex-shrink:0;' : 'flex-shrink:0;'}"
             ontouchend="if(_touchMoved)return;event.preventDefault();toggleMaybePile('${w.id}')"
             onclick="toggleMaybePile('${w.id}')"></button>
         </div>
@@ -14428,6 +14753,13 @@ function viewWardrobeItem() {
       <label class="form-label">Brand</label>
       <input class="form-input" id="witemBrand" type="text" placeholder="e.g. Zara, Madewell, Gucci (optional)"
         value="${esc(w.brand||'')}" onchange="updateWardrobeBrand('${w.id}',this.value)"
+        enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+    </div>
+
+    <div style="padding:0 20px;margin-bottom:16px;">
+      <label class="form-label">Colour</label>
+      <input class="form-input" id="witemColor" type="text" placeholder="e.g. navy, cream, burgundy (used for colour sort)"
+        value="${esc(w.color||'')}" onchange="updateWardrobeColor('${w.id}',this.value)"
         enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
     </div>
 
@@ -14511,7 +14843,7 @@ function viewWardrobeItem() {
       return `<div style="padding:0 20px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:var(--r-sm);border:1px solid ${w.tailoringNeeded?'#C8A8E0':'var(--border)'};background:${w.tailoringNeeded?'#FAF5FF':'var(--surface)'};">
           <div style="font-size:13.5px;font-weight:600;color:${w.tailoringNeeded?'#7B35A8':'var(--text-2)'};">🧵 Needs tailoring</div>
-          <button class="toggle ${w.tailoringNeeded?'on':''}" style="${w.tailoringNeeded?'background:#9B60C8;flex-shrink:0;':'flex-shrink:0;'}"
+          <button class="toggle ${w.tailoringNeeded?'on':'off'}" style="${w.tailoringNeeded?'background:#9B60C8;flex-shrink:0;':'flex-shrink:0;'}"
             ontouchend="if(_touchMoved)return;event.preventDefault();toggleTailoring('${w.id}')"
             onclick="toggleTailoring('${w.id}')"></button>
         </div>
@@ -17920,6 +18252,11 @@ async function updateWardrobeBrand(id, val) {
   w.brand = val.trim()||null;
   await DB.wardrobe.put(w);
 }
+async function updateWardrobeColor(id, val) {
+  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
+  w.color = val.trim()||null;
+  await DB.wardrobe.put(w);
+}
 async function updateWardrobeSize(id, val) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.size = val.trim()||null;
@@ -18030,7 +18367,15 @@ async function generateWardrobeSketchFromPhoto(id, file) {
 async function toggleWardrobePaidOff(id, checked) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.paidOff = checked;
-  await DB.wardrobe.put(w); render();
+  await DB.wardrobe.put(w);
+  if (checked) {
+    toast('💰 Paid off! Every wear from here is pure joy.');
+    S._newlyPaidOff = id;
+    render();
+    setTimeout(() => { if (S._newlyPaidOff === id) { S._newlyPaidOff = null; } }, 2600);
+  } else {
+    render();
+  }
 }
 async function toggleWardrobeRetiring(id) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
@@ -18075,8 +18420,17 @@ async function removeCustomCategory(name) {
   await fsSet('customCategories', S.customCategories);
   // If we were filtering by this category, reset
   if (S._wardrobeFilter === name) S._wardrobeFilter = 'All';
+  if (S.wardrobeCategory === name) S.wardrobeCategory = 'All';
   render();
   toast(`Shelf "${name}" removed.`);
+}
+function confirmDeleteCustomShelf(name) {
+  const count = S.wardrobe.filter(w => w.category === name).length;
+  const msg = count > 0
+    ? `Delete the "${name}" shelf? The ${count} item${count===1?'':'s'} in it will still be in your wardrobe under All.`
+    : `Delete the "${name}" shelf?`;
+  if (!confirm(msg)) return;
+  removeCustomCategory(name);
 }
 
 /* ================================================================
@@ -18545,11 +18899,13 @@ async function thankGifter(wId) {
     ratingLine,
   ].filter(Boolean).join('\n\n');
 
-  // Try sharing with outfit photo if available
+  // Try sharing — priority: worn photo of this item > item photo > latest outfit photo
+  const sharePhotoSrc = w.wearPhoto || w.photo || (latest && latest.photo) || null;
   try {
-    if (latest && latest.photo && navigator.canShare) {
-      const blob = await (await fetch(latest.photo)).blob();
-      const file = new File([blob], 'outfit.jpg', { type: blob.type });
+    if (sharePhotoSrc && navigator.canShare) {
+      const blob = await (await fetch(sharePhotoSrc)).blob();
+      const ext = blob.type.includes('png') ? 'png' : 'jpg';
+      const file = new File([blob], `thank-you.${ext}`, { type: blob.type });
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({ title: 'Thanks for the ' + w.name + '!', text: text, files: [file] });
         S.giftNudge = null; render(); return;
@@ -18841,12 +19197,24 @@ function iconSparkle() { return `<svg width="22" height="22" viewBox="0 0 24 24"
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
     currentUser = null;
+    // Check for public seller link — sign in anonymously so we can read marketplace
+    const _sellerParam = new URLSearchParams(location.search).get('seller');
+    if (_sellerParam) {
+      auth.signInAnonymously().catch(() => { S.view = 'signin'; render(); });
+      return;
+    }
     S.view = 'signin';
     render();
     return;
   }
   // User is signed in — show loading, then fetch data
   currentUser = user;
+  // Deep-link: if URL contains ?seller=uid, go straight to marketplace Browse tab
+  const _sellerParam = new URLSearchParams(location.search).get('seller');
+  if (_sellerParam) {
+    S._viewSellerUid = _sellerParam;
+    S.sellTab = 'browse';
+  }
   S.view = 'loading';
   render();
   try {
@@ -18858,8 +19226,14 @@ auth.onAuthStateChanged(async (user) => {
       DB.wardrobe.getAll(),
     ]);
     const alreadyOnboarded = localStorage.getItem('closet-onboarded');
-    S.view = S.apiKey ? (alreadyOnboarded ? 'closet' : 'onboarding') : 'setup';
-    S.activeTab = S.apiKey ? 'closet' : S.activeTab;
+    if (S._viewSellerUid) {
+      // Visitor arrived via a seller share link — go straight to the marketplace
+      S.view = 'sell'; S.activeTab = 'sell';
+      loadMarketplaceListings();
+    } else {
+      S.view = S.apiKey ? (alreadyOnboarded ? 'closet' : 'onboarding') : 'setup';
+      S.activeTab = S.apiKey ? 'closet' : S.activeTab;
+    }
     // Track login count so delight features can wait until the user is settled in
     const _lc = parseInt(localStorage.getItem('closet-login-count') || '0', 10) + 1;
     localStorage.setItem('closet-login-count', _lc);
