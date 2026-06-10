@@ -8082,6 +8082,23 @@ function viewFun() {
     </div>
     <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding-bottom:100px;">
 
+      <!-- Share CTA -->
+      <div style="margin:16px 16px 0;">
+        <div style="border-radius:16px;border:1px solid rgba(212,175,55,0.35);background:linear-gradient(135deg,rgba(212,175,55,0.08) 0%,rgba(212,175,55,0.03) 100%);padding:16px 18px;display:flex;align-items:center;gap:14px;">
+          <div style="font-size:32px;line-height:1;flex-shrink:0;">🎀</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:700;color:#D4AF37;margin-bottom:2px;">Share with a friend</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.55);line-height:1.4;">Know someone who'd love this? Send them the link.</div>
+          </div>
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();shareClosetApp()"
+            onclick="shareClosetApp()"
+            style="flex-shrink:0;background:linear-gradient(135deg,#D4AF37,#B8962E);border:none;border-radius:20px;padding:8px 16px;font-size:13px;font-weight:700;color:#1A1A1A;cursor:pointer;white-space:nowrap;">
+            ✨ Share
+          </button>
+        </div>
+      </div>
+
       <!-- Fashion Battle -->
       <div style="margin:16px 16px 0;">
         <div style="border-radius:20px;overflow:hidden;background:linear-gradient(135deg,#1A1010 0%,#3A1010 50%,#1A1010 100%);padding:22px 20px;position:relative;">
@@ -14911,11 +14928,10 @@ function viewWardrobeItem() {
             <div class="price-wrap"><input class="form-input" type="number" min="0" step="0.01" placeholder="0.00" value="${w.originalPrice||''}" onchange="updateWardrobeOriginalPrice('${w.id}',this.value)" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"></div>
             ${w.originalPrice && w.price ? `<div style="margin-top:5px;font-size:12px;font-weight:700;color:#15803D;">🎉 Saved $${Math.max(0,parseFloat(w.originalPrice)-parseFloat(w.price)).toFixed(0)} (${Math.round((1-parseFloat(w.price)/parseFloat(w.originalPrice))*100)}% off)</div>` : ''}
           </div>` : ''}
-          ${w.price ? `
           <label style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;">
             <input type="checkbox" id="paidOffCheck" ${w.paidOff?'checked':''} onchange="toggleWardrobePaidOff('${w.id}',this.checked)" style="width:18px;height:18px;accent-color:#1E8449;cursor:pointer;flex-shrink:0;">
             <span style="font-size:13px;font-weight:600;color:#1E8449;">💚 Already paid for itself</span>
-          </label>` : ''}
+          </label>
         </div>`}
 
         <!-- When did you get it: New / Had it awhile pills + month picker -->
@@ -16875,13 +16891,13 @@ function viewSettings() {
     </div>
 
     <!-- ── CYCLE TRACKING (OPTIONAL) ────────────── -->
-    ${sectionLabel('Cycle Tracking', 'optional')}
+    ${sectionLabel('Cycle Sync', 'optional')}
     <div class="settings-section">
       <div class="settings-row">
         <div class="settings-row-toggle">
           <div class="settings-row-info">
-            <div class="settings-row-label">Track menstrual cycle</div>
-            <div class="settings-row-sub">Adds phase color bars to your calendar and tailors daily outfit tips to your cycle.</div>
+            <div class="settings-row-label">Track my cycle</div>
+            ${S.cycleEnabled ? '' : '<div class="settings-row-sub" style="font-size:11px;">Adds subtle phase color to your weekly outfit strip and tailors style tips to where you are in your cycle.</div>'}
           </div>
           <label class="sw-toggle">
             <input type="checkbox" ${S.cycleEnabled?'checked':''} onchange="S.cycleEnabled=this.checked;localStorage.setItem('closet-cycle-on',S.cycleEnabled);fsSet('cycleEnabled',S.cycleEnabled);render()">
@@ -16890,39 +16906,43 @@ function viewSettings() {
         </div>
       </div>
       ${S.cycleEnabled ? `
-      <div class="settings-row">
-        <div class="settings-label" style="margin-bottom:6px;">Period usually starts on day</div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <input type="number" class="settings-num-input" min="1" max="31" value="${S.cycleStartDay||5}"
-            onchange="S.cycleStartDay=Math.min(31,Math.max(1,parseInt(this.value)||5));localStorage.setItem('closet-cycle-day',S.cycleStartDay);fsSet('cycleStartDay',S.cycleStartDay);render()">
-          <span style="font-size:13px;color:var(--text-3);">of each month</span>
-        </div>
-      </div>
-      <div class="settings-row" style="display:flex;gap:20px;">
-        <div style="flex:1;">
-          <div class="settings-label" style="margin-bottom:6px;">Cycle length</div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <input type="number" class="settings-num-input" min="21" max="40" value="${S.cycleLength||28}"
-              onchange="S.cycleLength=Math.min(40,Math.max(21,parseInt(this.value)||28));localStorage.setItem('closet-cycle-len',S.cycleLength);fsSet('cycleLength',S.cycleLength);">
-            <span style="font-size:12px;color:var(--text-3);">days</span>
+      <div class="settings-row" style="padding-top:4px;">
+        <div style="display:flex;gap:12px;align-items:flex-end;">
+          <div style="flex:1.2;">
+            <div class="settings-label" style="margin-bottom:5px;font-size:11px;">Starts on day</div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <input type="number" class="settings-num-input" min="1" max="31" value="${S.cycleStartDay||5}"
+                onchange="S.cycleStartDay=Math.min(31,Math.max(1,parseInt(this.value)||5));localStorage.setItem('closet-cycle-day',S.cycleStartDay);fsSet('cycleStartDay',S.cycleStartDay);">
+              <span style="font-size:11px;color:var(--text-3);">of month</span>
+            </div>
+          </div>
+          <div style="flex:1;">
+            <div class="settings-label" style="margin-bottom:5px;font-size:11px;">Cycle</div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <input type="number" class="settings-num-input" min="21" max="40" value="${S.cycleLength||28}"
+                onchange="S.cycleLength=Math.min(40,Math.max(21,parseInt(this.value)||28));localStorage.setItem('closet-cycle-len',S.cycleLength);fsSet('cycleLength',S.cycleLength);">
+              <span style="font-size:11px;color:var(--text-3);">days</span>
+            </div>
+          </div>
+          <div style="flex:1;">
+            <div class="settings-label" style="margin-bottom:5px;font-size:11px;">Period</div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <input type="number" class="settings-num-input" min="1" max="10" value="${S.cyclePeriodDays||5}"
+                onchange="S.cyclePeriodDays=Math.min(10,Math.max(1,parseInt(this.value)||5));localStorage.setItem('closet-cycle-pdur',S.cyclePeriodDays);fsSet('cyclePeriodDays',S.cyclePeriodDays);">
+              <span style="font-size:11px;color:var(--text-3);">days</span>
+            </div>
           </div>
         </div>
-        <div style="flex:1;">
-          <div class="settings-label" style="margin-bottom:6px;">Period length</div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <input type="number" class="settings-num-input" min="1" max="10" value="${S.cyclePeriodDays||5}"
-              onchange="S.cyclePeriodDays=Math.min(10,Math.max(1,parseInt(this.value)||5));localStorage.setItem('closet-cycle-pdur',S.cyclePeriodDays);fsSet('cyclePeriodDays',S.cyclePeriodDays);">
-            <span style="font-size:12px;color:var(--text-3);">days</span>
-          </div>
-        </div>
       </div>
-      <div class="settings-row">
-        <div class="settings-label" style="margin-bottom:8px;">Phase guide</div>
-        ${Object.entries(CYCLE_PHASES).map(([,p])=>`
-          <div class="cycle-phase-chip">
-            <span class="cycle-phase-swatch ${p.sw}"></span>
-            <div><div class="cycle-phase-name">${p.label}</div><div class="cycle-phase-tip">${p.tip}</div></div>
-          </div>`).join('')}
+      <div class="settings-row" style="padding-top:8px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${Object.entries(CYCLE_PHASES).map(([key,p])=>`
+            <div style="display:flex;align-items:center;gap:5px;background:var(--surface-2);border-radius:20px;padding:4px 10px 4px 7px;">
+              <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block;" class="${p.sw}"></span>
+              <span style="font-size:11px;font-weight:600;color:var(--text-2);">${p.label}</span>
+            </div>`).join('')}
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5;">Color dots appear on your weekly outfit strip. Tips in Plan &amp; Discover adapt to your phase.</div>
       </div>` : ''}
     </div>
 
@@ -16961,9 +16981,21 @@ function viewSettings() {
           onclick="S._importStep=1;S._importRows=[];S._importPhotos={};navigate('import')"
           style="margin:0;width:100%;">📋 Import Session Log</button>
       </div>
+      <div class="settings-row" style="border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:0;">
+        <div class="settings-label" style="margin-bottom:2px;">Export Wardrobe</div>
+        <div class="settings-hint" style="margin-bottom:10px;">Download all wardrobe items as a spreadsheet — every field, wear stats, and status flags included.</div>
+        <button class="btn btn-primary"
+          ontouchend="if(_touchMoved)return;event.preventDefault();doExportWardrobeCSV()"
+          onclick="doExportWardrobeCSV()"
+          style="margin:0;width:100%;">📋 Export Wardrobe (CSV)</button>
+      </div>
       <div class="settings-row">
-        <div class="settings-hint" style="margin-bottom:8px;">Download everything — outfits, wardrobe, and photos — as a JSON backup.</div>
-        <button class="btn btn-secondary" onclick="doExport()" style="margin:0;width:100%;">Export Data</button>
+        <div class="settings-label" style="margin-bottom:2px;">Full Backup</div>
+        <div class="settings-hint" style="margin-bottom:10px;">Download everything — outfits, wardrobe, and photos — as a JSON backup file.</div>
+        <button class="btn btn-secondary"
+          ontouchend="if(_touchMoved)return;event.preventDefault();doExport()"
+          onclick="doExport()"
+          style="margin:0;width:100%;">💾 Full Backup (JSON)</button>
       </div>
       ${S.shopBlocked.size > 0 ? `
       <div class="settings-row">
@@ -18510,13 +18542,13 @@ async function toggleWardrobeRetiring(id) {
   if (w.retiring) toast('🪡 Flagged — time to find its successor!');
 }
 
-function toggleMaybePile(id) {
+async function toggleMaybePile(id) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.inMaybePile = !w.inMaybePile;
   w.maybePileAt = w.inMaybePile ? new Date().toISOString() : null;
   render(); // immediate visual update
   toast(w.inMaybePile ? '🤔 Sent to Purgatory — we\'ll check in if it goes unworn.' : 'Rescued from Purgatory.');
-  DB.wardrobe.put(w).catch(e => { console.error('toggleMaybePile save failed:', e); toast('Sync failed — check your connection.'); });
+  try { await DB.wardrobe.put(w); } catch(e) { console.error('toggleMaybePile save failed:', e); toast('⚠️ Couldn\'t save — check your connection.'); }
 }
 
 function rescueFromMaybePile(id) {
@@ -19019,10 +19051,14 @@ async function thankGifter(wId) {
     ? ('I even got a ' + latest.rating + '/10 from my AI stylist when I wore it! ⭐')
     : '';
 
+  const appUrl = location.origin + location.pathname;
+  const appLine = "P.S. I've been using this little app to make fashion fun — thought you might love it too! \u{1F9E5}\u2728 " + appUrl;
+
   const text = [
     greeting,
     'Just wanted to say thank you for the ' + w.name + ' — I absolutely love it. You have amazing taste! \u{1F64F}',
     ratingLine,
+    appLine,
   ].filter(Boolean).join('\n\n');
 
   // Try sharing — priority: worn photo of this item > item photo > latest outfit photo
@@ -19119,9 +19155,81 @@ function doSaveGoogleKey() {
   toast('Google settings saved!');
 }
 function doExport() {
+  // Full JSON backup — all data, all fields
   const blob = new Blob([JSON.stringify({ exportDate:new Date().toISOString(), entries:S.entries, wardrobe:S.wardrobe }, null, 2)], { type:'application/json' });
   const a = Object.assign(document.createElement('a'), { href:URL.createObjectURL(blob), download:`closet-backup-${new Date().toISOString().slice(0,10)}.json` });
   a.click(); URL.revokeObjectURL(a.href);
+}
+
+function doExportWardrobeCSV() {
+  const cols = [
+    'Item Name','Brand','Category','Subcategory','Color(s)','Size','Condition','Description',
+    'How Acquired','Gifted By','Price Paid $','Original Price $','On Sale?',
+    'Purchase Month','New When Got?',
+    '💎 Gem','Purgatory','Needs Tailoring','Tailoring Note','Retiring','Retired','Paid Off',
+    'Wear Count','Compliments','Last Worn','Avg Outfit Rating','Cost Per Wear ($)',
+    'For Sale','Asking Price $',
+    'Date Added','Added Via','Item ID'
+  ];
+
+  const csvEsc = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s;
+  };
+
+  const rows = S.wardrobe.map(w => {
+    const wears      = (w.wears || []).length;
+    const wearDates  = (w.wears || []).map(wr => new Date(wr.date || wr)).filter(d => !isNaN(d));
+    const lastWorn   = wearDates.length ? new Date(Math.max(...wearDates)).toISOString().slice(0,10) : '';
+    const ratedWears = (w.wears || []).map(wr => S.entries.find(e => e.id === wr.outfitId)).filter(e => e && e.rating);
+    const avgRating  = ratedWears.length ? (ratedWears.reduce((s,e)=>s+(e.rating||0),0)/ratedWears.length).toFixed(1) : '';
+    const cpw        = w.price && wears > 0 ? (w.price / wears).toFixed(2) : '';
+    const compliments = (w.compliments || []).length;
+
+    const acqMode = w.gifted ? 'Gifted' : w.onSale === true ? 'On Sale' : w.onSale === false ? 'Full Price' : '';
+
+    return [
+      w.name || '',
+      w.brand || '',
+      w.category || '',
+      w.subCategory || '',
+      w.color || '',
+      w.size || '',
+      w.condition || '',
+      w.description || '',
+      acqMode,
+      w.giftedBy || '',
+      w.price != null ? w.price : '',
+      w.originalPrice != null ? w.originalPrice : '',
+      w.onSale === true ? 'Yes' : w.onSale === false ? 'No' : '',
+      w.purchasedDate || '',
+      w.isNew === true ? 'Yes' : w.isNew === false ? 'No' : '',
+      (w.isGem || w.isHero || w.isSignature) ? 'Yes' : 'No',
+      w.inMaybePile ? 'Yes' : 'No',
+      w.tailoringNeeded ? 'Yes' : 'No',
+      w.tailoringNote || '',
+      w.retiring ? 'Yes' : 'No',
+      w.retiredFromCloset ? 'Yes' : 'No',
+      w.paidOff ? 'Yes' : 'No',
+      wears,
+      compliments,
+      lastWorn,
+      avgRating,
+      cpw,
+      w.forSale ? 'Yes' : 'No',
+      w.askingPrice != null ? w.askingPrice : '',
+      w.addedAt ? w.addedAt.slice(0,10) : '',
+      w.addedVia || '',
+      w.id || '',
+    ].map(csvEsc).join(',');
+  });
+
+  const csv = [cols.map(csvEsc).join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type:'text/csv' });
+  const a = Object.assign(document.createElement('a'), { href:URL.createObjectURL(blob), download:`closet-wardrobe-${new Date().toISOString().slice(0,10)}.csv` });
+  a.click(); URL.revokeObjectURL(a.href);
+  toast(`📋 Exported ${rows.length} items`);
 }
 
 function openStatsDash() {
