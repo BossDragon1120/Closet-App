@@ -497,6 +497,17 @@ body {
   position: absolute; top: 0; left: 0; right: 0; height: 3px;
   border-radius: 10px 10px 0 0;
 }
+@keyframes hangerJiggle {
+  0%,100% { transform: rotate(0deg); }
+  20% { transform: rotate(-2.5deg); }
+  60% { transform: rotate(2.5deg); }
+}
+.hanger-reorder {
+  animation: hangerJiggle 0.55s ease-in-out infinite;
+  animation-delay: calc(var(--jiggle-delay, 0) * 1ms);
+  cursor: grab !important;
+}
+.hanger-reorder:active { animation: none; cursor: grabbing !important; }
 /* hanger card: real product photo */
 .hanger-img {
   width: 58px; height: 58px; object-fit: contain; border-radius: 6px;
@@ -2784,6 +2795,7 @@ const S = {
   _funRouletteLoading: false,
   funPalette: null,         // { owned: [{color,hex,count,items}], explore: [{color,hex,why}], insight }
   _funPaletteLoading: false,
+  _genDescLoading: null,  // null | 'bulk' | 'receipt' | wardrobeId — which description field is generating
   funBook: null,            // { outfitId, title, author, genre, why, vibe }
   _funBookLoading: false,
   _funBookOutfitId: null,   // selected outfit id
@@ -2830,7 +2842,7 @@ const S = {
   selectedWardrobeId: null,
   // ui
   loading: false, loadingMsg: '', error: null,
-  filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false,
+  filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
   closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
@@ -2885,7 +2897,7 @@ const S = {
   eyeColor:           localStorage.getItem('closet-eye-color') || '',
   _auraEdit:          null,
   _expandedEvents:    {},
-  assistantTier:      'core',
+  assistantTier:      'therapy', _therapySeason: 'spring',
   _assistantBooked:   null,
   wardrobeSearch:     '',
   _wardrobeSearchOpen: false,
@@ -5393,9 +5405,8 @@ function featuresMenuHTML() {
           <button class="feat-close" ontouchend="if(_touchMoved)return;event.preventDefault();closeMenu();" onclick="closeMenu()">✕</button>
         </div>
         <div class="feat-body" style="padding:0;">
-          <div style="padding:16px 16px 8px;font-size:12px;color:var(--text-3);line-height:1.6;">Expert help delivered virtually — book a session and we'll be in touch to schedule.</div>
-          ${serviceRow('🤝', 'Virtual Closet Assistant', 'A virtual, hands-on session to organize and edit your wardrobe over video — no travel needed.', "S.featureMenuOpen=false;S.menuSection=null;S._assistantBooked=null;navigate('closet-assistant')")}
-          ${serviceRow('💼', 'Virtual Stylist Session', 'Work one-on-one with a professional stylist on your look, entirely online via video call.', "toast('Coming soon — we\\'ll let you know when booking opens! ✨');S.featureMenuOpen=false;S.menuSection=null;render()")}
+          <div style="padding:16px 16px 8px;font-size:12px;color:var(--text-3);line-height:1.6;">A Closet Therapist visits your home before each season — photographing, organising, and digitising your wardrobe so your app gives you truly personal advice.</div>
+          ${serviceRow('🌿', 'Closet Therapy Session', 'In-person · ~1.5 hrs · ~100 items · Seasonal. We come to you, photograph everything, and your whole wardrobe lands in the app.', "S.featureMenuOpen=false;S.menuSection=null;S._assistantBooked=null;navigate('closet-assistant')")}
         </div>
       </div>`;
   }
@@ -5422,7 +5433,7 @@ function featuresMenuHTML() {
         <button class="feat-close" onclick="closeMenu()">✕</button>
       </div>
       <div class="feat-body" style="padding:0;">
-        ${menuRow('💼', 'Virtual Services', 'Book a virtual Closet Assistant or Stylist session', "S.menuSection='services';render()")}
+        ${menuRow('🌿', 'Closet Therapy', 'Seasonal in-person visit — photograph, organise & digitise your wardrobe', "S.menuSection='services';render()")}
         ${menuRow('📊', 'Your Fashion Stats', 'Tiles of your style data — shareable at a tap', "closeMenu();navigate('dashboard')")}
         ${menuRow('✨', 'Onboarding', 'Take the feature tour or set up your style', "closeMenu();S.onboardStep=0;navigate('onboarding')")}
         ${menuRow('⚙️', 'Settings', 'API key, sync, and app preferences', "closeMenu();switchTab('settings')")}
@@ -7477,6 +7488,21 @@ function _paletteIsCool(name) {
 }
 function _paletteIsWarm(name) {
   return /red|orange|brown|rust|terracotta|coral|peach|gold|mustard|amber|camel|tan|cognac|mocha|burgundy|wine|pink|rose|blush|salmon|caramel|ochre/.test(name);
+}
+
+// Returns perceived luminance 0 (dark) → 1 (light) for a wardrobe item
+// Uses _COLOR_MAP to match color words from color field, name, or description
+function _itemColorLuminance(w) {
+  const text = [(w.color||''), (w.name||''), (w.description||'')].join(' ').toLowerCase();
+  for (const [name, hex] of _COLOR_MAP) {
+    if (text.includes(name)) {
+      const r = parseInt(hex.slice(1,3), 16) / 255;
+      const g = parseInt(hex.slice(3,5), 16) / 255;
+      const b = parseInt(hex.slice(5,7), 16) / 255;
+      return 0.299*r + 0.587*g + 0.114*b;
+    }
+  }
+  return 0.5; // unknown color → middle
 }
 
 function _paletteExplore(owned) {
@@ -10644,10 +10670,48 @@ function viewProfile() {
         </div>`;
       })();
 
+      const paidOffHeroesHTML = (()=>{
+        const heroes = activeWardrobe
+          .filter(w => w.paidOff)
+          .sort((a,b) => (b.wears||[]).length - (a.wears||[]).length);
+        if (!heroes.length) return '';
+        const totalValue = heroes.reduce((s,w) => s + (parseFloat(w.price)||0), 0);
+        const totalWears = heroes.reduce((s,w) => s + (w.wears?.length||0), 0);
+        const summaryLine = [
+          `${heroes.length} piece${heroes.length===1?'':'s'}`,
+          totalValue > 0 ? `$${Math.round(totalValue)} paid off` : null,
+          `${totalWears} total wears`
+        ].filter(Boolean).join(' · ');
+        return `<div style="margin:16px 0 0;">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:4px;padding:0 14px;">💚 Paid Off Heroes</div>
+          <div style="font-size:10px;color:#1E8449;font-weight:600;padding:0 14px;margin-bottom:10px;">${summaryLine}</div>
+          <div style="display:flex;gap:10px;overflow-x:auto;padding:0 14px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+            ${heroes.map((w,i) => {
+              const wears = w.wears?.length || 0;
+              const ppw = w.price && wears > 0 ? (w.price / wears).toFixed(2) : null;
+              return `<div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+                style="flex-shrink:0;width:88px;scroll-snap-align:start;cursor:pointer;touch-action:manipulation;">
+                <div style="width:88px;height:117px;border-radius:12px;overflow:hidden;position:relative;background:var(--surface-2);border:1.5px solid rgba(30,132,73,0.35);">
+                  ${w.photo
+                    ? `<img src="${esc(w.photo)}" loading="${i<3?'eager':'lazy'}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${w.icon||'👕'}</div>`}
+                  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,rgba(0,0,0,.6) 100%);pointer-events:none;"></div>
+                  <div style="position:absolute;top:5px;right:5px;font-size:13px;line-height:1;">💚</div>
+                  <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:10px;font-weight:800;color:#fff;line-height:1;">${wears}×</div>
+                </div>
+                <div style="font-size:10px;font-weight:700;color:var(--text);margin-top:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px;">${esc(w.name)}</div>
+                ${ppw ? `<div style="font-size:9px;color:#1E8449;font-weight:700;text-align:center;">$${ppw}/wear</div>` : (w.brand ? `<div style="font-size:9px;color:var(--text-3);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px;">${esc(w.brand)}</div>` : '')}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      })();
+
       return `<div style="margin:16px 16px 0;background:rgba(184,125,42,0.05);border:1.5px solid rgba(184,125,42,0.18);border-radius:16px;padding:14px 0 14px;">
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(184,125,42,0.45);margin-bottom:12px;padding:0 14px;">✦ Your Best</div>
         ${bestOutfitsHTML}
         ${gemsCarouselHTML}
+        ${paidOffHeroesHTML}
       </div>`;
     })()}
 
@@ -10844,47 +10908,30 @@ function viewProfile() {
    ================================================================ */
 
 const ASSIST_TIERS = {
-  quick: {
-    id: 'quick', icon: '⚡', name: 'Quick Start',
-    tagline: 'Load your everyday favorites',
-    price: 39, hours: 1, itemLabel: 'Up to 20 items',
-    color: '#4A8FA8', colorBg: '#EBF4F8', colorBorder: '#B8D8E8',
-    includes: [
-      'Up to 20 items photographed & entered',
-      'Category, color & brand tagging',
-      'Your first AI outfit analysis',
-      '30-min follow-up by email'
-    ]
-  },
-  core: {
-    id: 'core', icon: '✦', name: 'Core Closet',
-    tagline: 'Your whole active wardrobe, ready',
-    price: 79, hours: 2, itemLabel: 'Up to 55 items',
+  therapy: {
+    id: 'therapy', icon: '🌿', name: 'Closet Therapy Session',
+    tagline: 'Your whole wardrobe, photographed & live in the app',
+    price: 0, hours: 1.5, itemLabel: '~100 items',
     popular: true,
-    color: '#B87D2A', colorBg: '#FDF5E4', colorBorder: '#D4A851',
+    color: '#3A7D5C', colorBg: '#EDF7F2', colorBorder: '#A8D5BC',
     includes: [
-      'Up to 55 items photographed & entered',
-      'Full tagging: category, occasion, season',
-      '3 outfits built from your items',
-      'AI style score & analysis',
-      '48-hr email support after session'
-    ]
-  },
-  full: {
-    id: 'full', icon: '💎', name: 'Full Edit',
-    tagline: 'Your complete wardrobe, done right',
-    price: 129, hours: 3, itemLabel: 'Full wardrobe, no cap',
-    color: '#6B4A8A', colorBg: '#F5F0FA', colorBorder: '#C4A8E0',
-    includes: [
-      'Full wardrobe — unlimited items',
-      'Complete tagging + wear history seeded',
-      '5+ outfit combos built',
-      'Wardrobe audit: gaps & opportunities',
-      'AI style debrief & portrait',
-      '1-week email support after session'
+      '~100 items photographed & entered in ~1.5 hrs',
+      'Garments worn on body (shirts, jackets, dresses, pants)',
+      'Accessories product-shot in place (bags, jewellery, hats)',
+      'Full tagging: category, colour, brand, season',
+      'Session Log spreadsheet completed during visit',
+      'Seasonal scheduling — Spring, Summer, Fall & Winter'
     ]
   }
 };
+
+// Seasonal booking options for Closet Therapy
+const THERAPY_SEASONS = [
+  { id:'spring', emoji:'🌸', name:'Spring', window:'Book January–February', tagline:'Freshen up after winter — lighter layers, brighter colours.' },
+  { id:'summer', emoji:'☀️', name:'Summer', window:'Book March–April',      tagline:'Build your warm-weather wardrobe before the heat hits.' },
+  { id:'fall',   emoji:'🍂', name:'Fall',   window:'Book July–August',      tagline:'Transition pieces, layering looks, back-to-everything dressing.' },
+  { id:'winter', emoji:'❄️', name:'Winter', window:'Book September–October',tagline:'Heavy layers, evening dressing, holiday wardrobe ready.' }
+];
 
 function bookAssistantSession() {
   const name  = (document.getElementById('assist-name')?.value  || '').trim();
@@ -10899,12 +10946,13 @@ function bookAssistantSession() {
   if (!name)  { toast('Please enter your name'); return; }
   if (!email || !email.includes('@')) { toast('Please enter a valid email'); return; }
 
-  const t = ASSIST_TIERS[S.assistantTier] || ASSIST_TIERS.core;
-  const subject = encodeURIComponent('Closet Assistant Request — ' + t.name + ' ($' + t.price + ')');
+  const t = ASSIST_TIERS[S.assistantTier] || ASSIST_TIERS.therapy;
+  const season = THERAPY_SEASONS.find(s => s.id === S._therapySeason);
+  const subject = encodeURIComponent('Closet Therapy Request — ' + (season ? season.name + ' Session' : 'Session'));
   const bodyLines = [
-    'Hi Closet team!',
+    'Hi!',
     '',
-    'I\'d like to book a ' + t.name + ' session (' + t.hours + 'hr, $' + t.price + ').',
+    'I\'d like to book a Closet Therapy session' + (season ? ' (' + season.name + ' — ' + season.window + ')' : '') + '.',
     '',
     'My details:',
     'Name: ' + name,
@@ -10923,94 +10971,104 @@ function bookAssistantSession() {
 }
 
 function viewClosetAssistant() {
-  const tierCardHTML = (t) => {
-    const includeRows = t.includes.map(item =>
-      '<div style="font-size:11px;color:var(--text-2);display:flex;align-items:flex-start;gap:5px;margin-bottom:3px;">' +
-      '<span style="color:' + t.color + ';flex-shrink:0;margin-top:1px;">✓</span>' +
-      '<span>' + item + '</span></div>'
-    ).join('');
-    const popularBadge = t.popular
-      ? '<div style="position:absolute;top:-1px;right:14px;background:' + t.color + ';color:#fff;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:3px 10px;border-radius:0 0 8px 8px;">Most Popular</div>'
-      : '';
-    return '<div ontouchend="if(_touchMoved)return;event.preventDefault();S.assistantTier=\'' + t.id + '\';navigate(\'assistant-book\')" onclick="S.assistantTier=\'' + t.id + '\';navigate(\'assistant-book\')" ' +
-      'style="background:' + (t.popular ? t.colorBg : 'var(--surface)') + ';border:2px solid ' + (t.popular ? t.colorBorder : 'var(--border)') + ';border-radius:16px;padding:16px;cursor:pointer;position:relative;touch-action:manipulation;margin-bottom:12px;">' +
-      popularBadge +
-      '<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;">' +
-        '<div style="width:44px;height:44px;border-radius:12px;background:' + t.colorBg + ';border:1px solid ' + t.colorBorder + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">' + t.icon + '</div>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:2px;">' + t.name + '</div>' +
-          '<div style="font-size:12px;color:var(--text-2);">' + t.tagline + '</div>' +
-          '<div style="font-size:10px;color:var(--text-3);margin-top:3px;">⏱ ' + t.hours + ' hr session · ' + t.itemLabel + '</div>' +
-        '</div>' +
-        '<div style="text-align:right;flex-shrink:0;">' +
-          '<div style="font-size:24px;font-weight:900;color:' + t.color + ';line-height:1;">$' + t.price + '</div>' +
-          '<div style="font-size:10px;color:var(--text-3);">per session</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="padding-top:10px;border-top:1px solid ' + (t.popular ? t.colorBorder : 'var(--border)') + ';">' +
-        includeRows +
-      '</div>' +
-      '<div style="margin-top:12px;padding:9px 16px;background:' + t.color + ';border-radius:100px;text-align:center;font-size:12px;font-weight:800;color:#fff;letter-spacing:.02em;">Book this session →</div>' +
-    '</div>';
-  };
+  const t = ASSIST_TIERS.therapy;
 
-  const allTierCards = Object.values(ASSIST_TIERS).map(tierCardHTML).join('');
+  const includeRows = t.includes.map(item =>
+    '<div style="font-size:12px;color:var(--text-2);display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">' +
+    '<span style="color:' + t.color + ';flex-shrink:0;margin-top:1px;font-size:13px;">✓</span>' +
+    '<span>' + item + '</span></div>'
+  ).join('');
 
   const steps = [
-    ['📅', 'Book', 'Choose your tier and send your request.'],
-    ['📦', 'Prep', 'We\'ll confirm your time and send a simple checklist.'],
-    ['🎉', 'Done', 'App loaded. AI advice starts immediately.']
+    ['📅', 'Book', 'Pick your season and send a request — we\'ll confirm your date.'],
+    ['🏠', 'We arrive', 'Your Closet Therapist comes to you with a camera and laptop.'],
+    ['📸', 'We photograph', 'Garments worn on body · Accessories product-shot in place.'],
+    ['✨', 'Done', 'Your full wardrobe is live in the app. AI advice starts immediately.']
   ];
   const stepHTML = steps.map((s, i) =>
-    '<div style="flex:1;text-align:center;padding:0 6px;position:relative;">' +
-    (i < 2 ? '<div style="position:absolute;top:15px;right:-1px;width:50%;height:1px;background:var(--border);z-index:0;"></div>' : '') +
-    '<div style="width:32px;height:32px;border-radius:50%;background:var(--gold-bg);border:1.5px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:15px;margin:0 auto 8px;position:relative;z-index:1;">' + s[0] + '</div>' +
-    '<div style="font-size:11px;font-weight:800;color:var(--text);margin-bottom:3px;">' + s[1] + '</div>' +
-    '<div style="font-size:10px;color:var(--text-3);line-height:1.4;">' + s[2] + '</div>' +
+    '<div style="flex:1;text-align:center;padding:0 4px;position:relative;">' +
+    (i < 3 ? '<div style="position:absolute;top:15px;right:-1px;width:50%;height:1px;background:var(--border);z-index:0;"></div>' : '') +
+    '<div style="width:32px;height:32px;border-radius:50%;background:' + t.colorBg + ';border:1.5px solid ' + t.colorBorder + ';display:flex;align-items:center;justify-content:center;font-size:14px;margin:0 auto 8px;position:relative;z-index:1;">' + s[0] + '</div>' +
+    '<div style="font-size:10px;font-weight:800;color:var(--text);margin-bottom:3px;">' + s[1] + '</div>' +
+    '<div style="font-size:9px;color:var(--text-3);line-height:1.4;">' + s[2] + '</div>' +
+    '</div>'
+  ).join('');
+
+  const seasonCards = THERAPY_SEASONS.map(s =>
+    '<div ontouchend="if(_touchMoved)return;event.preventDefault();S.assistantTier=\'therapy\';S._therapySeason=\'' + s.id + '\';navigate(\'assistant-book\')" ' +
+    'onclick="S.assistantTier=\'therapy\';S._therapySeason=\'' + s.id + '\';navigate(\'assistant-book\')" ' +
+    'style="flex-shrink:0;width:140px;border:1.5px solid ' + t.colorBorder + ';border-radius:14px;padding:14px 12px;background:' + t.colorBg + ';cursor:pointer;scroll-snap-align:start;touch-action:manipulation;">' +
+    '<div style="font-size:24px;margin-bottom:6px;">' + s.emoji + '</div>' +
+    '<div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:3px;">' + s.name + '</div>' +
+    '<div style="font-size:10px;font-weight:600;color:' + t.color + ';margin-bottom:5px;">' + s.window + '</div>' +
+    '<div style="font-size:11px;color:var(--text-3);line-height:1.4;">' + s.tagline + '</div>' +
+    '<div style="margin-top:10px;padding:5px 12px;background:' + t.color + ';border-radius:100px;text-align:center;font-size:10px;font-weight:800;color:#fff;">Book ' + s.name + ' →</div>' +
     '</div>'
   ).join('');
 
   return '<div class="view">' +
     '<div class="nav">' +
       '<button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(\'profile\')" onclick="navigate(\'profile\')">‹</button>' +
-      '<span class="nav-title">Closet Assistant</span>' +
+      '<span class="nav-title">Closet Therapy</span>' +
       '<div style="width:40px;"></div>' +
     '</div>' +
 
     '<div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;">' +
 
       // Hero
-      '<div style="padding:24px 20px 20px;text-align:center;background:linear-gradient(180deg,var(--gold-bg) 0%,var(--bg) 100%);">' +
-        '<div style="font-size:42px;margin-bottom:10px;">🪞</div>' +
-        '<div style="font-size:21px;font-weight:900;color:var(--text);line-height:1.25;margin-bottom:10px;">Your closet, ready to<br>actually advise you</div>' +
-        '<div style="font-size:13px;color:var(--text-2);line-height:1.65;max-width:300px;margin:0 auto 14px;">A real Closet Assistant joins you on video — photographing, categorizing, and entering your wardrobe so the app can start giving you genuinely personal fashion advice.</div>' +
-        '<div style="display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:5px 14px;font-size:11px;color:var(--text-3);font-weight:600;">From $39 · Less than a blowout · More useful than Pinterest</div>' +
+      '<div style="padding:24px 20px 20px;text-align:center;background:linear-gradient(180deg,#EDF7F2 0%,var(--bg) 100%);">' +
+        '<div style="font-size:42px;margin-bottom:10px;">🌿</div>' +
+        '<div style="font-size:22px;font-weight:900;color:var(--text);line-height:1.2;margin-bottom:10px;">Your wardrobe, freshly<br>organised every season</div>' +
+        '<div style="font-size:13px;color:var(--text-2);line-height:1.65;max-width:300px;margin:0 auto 14px;">A Closet Therapist visits your home before each season — photographing, organising, and digitising your wardrobe so the app knows exactly what you own and how to style it.</div>' +
+        '<div style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid ' + t.colorBorder + ';border-radius:100px;padding:6px 16px;">' +
+          '<span style="font-size:11px;font-weight:700;color:' + t.color + ';">⏱ ~1.5 hrs</span>' +
+          '<span style="color:var(--border);">|</span>' +
+          '<span style="font-size:11px;font-weight:700;color:' + t.color + ';">📦 ~100 items</span>' +
+          '<span style="color:var(--border);">|</span>' +
+          '<span style="font-size:11px;font-weight:700;color:' + t.color + ';">🏠 In-person</span>' +
+        '</div>' +
+      '</div>' +
+
+      // How we photograph
+      '<div style="margin:0 16px;padding:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;">' +
+        '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Two ways we photograph</div>' +
+        '<div style="display:flex;gap:12px;">' +
+          '<div style="flex:1;background:#EDF7F2;border:1.5px solid ' + t.colorBorder + ';border-radius:12px;padding:12px;">' +
+            '<div style="font-size:20px;margin-bottom:6px;">👔</div>' +
+            '<div style="font-size:12px;font-weight:800;color:var(--text);margin-bottom:4px;">Worn on body</div>' +
+            '<div style="font-size:11px;color:var(--text-3);line-height:1.5;">Shirts, jackets, dresses, pants — photographed on you so they look their best.</div>' +
+          '</div>' +
+          '<div style="flex:1;background:#F5F0FA;border:1.5px solid #C4A8E0;border-radius:12px;padding:12px;">' +
+            '<div style="font-size:20px;margin-bottom:6px;">👜</div>' +
+            '<div style="font-size:12px;font-weight:800;color:var(--text);margin-bottom:4px;">Product shot</div>' +
+            '<div style="font-size:11px;color:var(--text-3);line-height:1.5;">Bags, jewellery, hats, accessories — quick flat-lay or shelf shot.</div>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
 
       // How it works
-      '<div style="padding:20px 20px 8px;">' +
+      '<div style="padding:20px 16px 8px;">' +
         '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:16px;">How it works</div>' +
-        '<div style="display:flex;gap:0;margin-bottom:4px;">' + stepHTML + '</div>' +
+        '<div style="display:flex;gap:0;">' + stepHTML + '</div>' +
       '</div>' +
 
-      // Comparison callout
-      '<div style="margin:16px 16px 0;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;display:flex;gap:16px;">' +
-        '<div style="flex:1;text-align:center;">' +
-          '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin-bottom:6px;">Personal stylist visit</div>' +
-          '<div style="font-size:20px;font-weight:900;color:var(--text-3);text-decoration:line-through;">$200–500</div>' +
-        '</div>' +
-        '<div style="width:1px;background:var(--border);flex-shrink:0;"></div>' +
-        '<div style="flex:1;text-align:center;">' +
-          '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--gold);margin-bottom:6px;">Closet Assistant</div>' +
-          '<div style="font-size:20px;font-weight:900;color:var(--gold);">$39–129</div>' +
+      // What's included
+      '<div style="margin:12px 16px 0;padding:16px;background:' + t.colorBg + ';border:1.5px solid ' + t.colorBorder + ';border-radius:14px;">' +
+        '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:' + t.color + ';margin-bottom:12px;">Every session includes</div>' +
+        includeRows +
+      '</div>' +
+
+      // Season picker
+      '<div style="padding:20px 16px 8px;">' +
+        '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Pick your season</div>' +
+        '<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">' +
+          seasonCards +
         '</div>' +
       '</div>' +
 
-      // Tier cards
-      '<div style="padding:20px 16px 32px;">' +
-        '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:16px;">Choose your session</div>' +
-        allTierCards +
-        '<div style="font-size:11px;color:var(--text-3);text-align:center;line-height:1.6;margin-top:8px;">All sessions are virtual (video call). Payment collected after we confirm your booking.<br>Questions? <a href="mailto:hello@closetapp.com" style="color:var(--gold);font-weight:700;">hello@closetapp.com</a></div>' +
+      '<div style="padding:0 16px 36px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.6;">' +
+        'Pricing confirmed when we get in touch. Questions? ' +
+        '<a href="mailto:hello@closetapp.com" style="color:' + t.color + ';font-weight:700;">hello@closetapp.com</a>' +
       '</div>' +
     '</div>' +
   '</div>';
@@ -11079,36 +11137,25 @@ function viewAssistantBook() {
     '</label>'
   ).join('');
 
-  const tierSwitcher = Object.values(ASSIST_TIERS).map(opt =>
-    '<button ontouchend="if(_touchMoved)return;event.preventDefault();S.assistantTier=\'' + opt.id + '\';render()" onclick="S.assistantTier=\'' + opt.id + '\';render()" ' +
-    'style="flex:1;padding:7px 4px;border:1.5px solid ' + (S.assistantTier===opt.id ? t.color : 'var(--border)') + ';' +
-    'background:' + (S.assistantTier===opt.id ? t.colorBg : 'var(--surface)') + ';' +
-    'border-radius:10px;font-size:11px;font-weight:' + (S.assistantTier===opt.id ? '800' : '600') + ';' +
-    'color:' + (S.assistantTier===opt.id ? t.color : 'var(--text-3)') + ';cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">' +
-    opt.icon + '<br><span style="font-size:9px;">' + opt.name + '</span><br><span style="font-size:10px;">$' + opt.price + '</span>' +
-    '</button>'
-  ).join('');
+  const season = THERAPY_SEASONS.find(s => s.id === S._therapySeason) || THERAPY_SEASONS[0];
 
   return '<div class="view">' +
     '<div class="nav">' +
       '<button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(\'closet-assistant\')" onclick="navigate(\'closet-assistant\')">‹</button>' +
-      '<span class="nav-title">Book Your Session</span>' +
+      '<span class="nav-title">Book Closet Therapy</span>' +
       '<div style="width:40px;"></div>' +
     '</div>' +
     '<div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding:16px;">' +
 
-      // Tier switcher
-      '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Selected session</div>' +
-      '<div style="display:flex;gap:8px;margin-bottom:20px;">' + tierSwitcher + '</div>' +
-
-      // Selected tier details
+      // Session summary card
       '<div style="background:' + t.colorBg + ';border:1.5px solid ' + t.colorBorder + ';border-radius:14px;padding:14px 16px;margin-bottom:20px;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-          '<div>' +
-            '<div style="font-size:15px;font-weight:800;color:var(--text);">' + t.icon + ' ' + t.name + '</div>' +
-            '<div style="font-size:11px;color:var(--text-2);margin-top:2px;">⏱ ' + t.hours + ' hr · ' + t.itemLabel + '</div>' +
+        '<div style="display:flex;align-items:center;gap:12px;">' +
+          '<div style="font-size:28px;">' + season.emoji + '</div>' +
+          '<div style="flex:1;">' +
+            '<div style="font-size:15px;font-weight:800;color:var(--text);">🌿 ' + season.name + ' Closet Therapy</div>' +
+            '<div style="font-size:11px;color:' + t.color + ';font-weight:600;margin-top:2px;">' + season.window + '</div>' +
+            '<div style="font-size:11px;color:var(--text-2);margin-top:2px;">⏱ ~1.5 hrs · ~100 items · In-person</div>' +
           '</div>' +
-          '<div style="font-size:22px;font-weight:900;color:' + t.color + ';">$' + t.price + '</div>' +
         '</div>' +
       '</div>' +
 
@@ -12214,6 +12261,67 @@ function wLongPressCancel() {
   clearTimeout(_wLongPressTimer);
   _wLongPressTimer = null;
 }
+
+// ── Drag-to-reorder for hanger rods ──────────────────────────
+let _rdDrag = null;
+function rodDragStart(wId, catKey, e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const allHangers = [...document.querySelectorAll(`.hanger[data-cat="${catKey}"]`)];
+  const el = document.querySelector(`.hanger[data-hid="${wId}"][data-cat="${catKey}"]`);
+  if (!el || !allHangers.length) return;
+  const startIdx = allHangers.findIndex(h => h.dataset.hid === String(wId));
+  const existingOrder = (S._wardrobeCustomOrder || {})[catKey];
+  const order = existingOrder && existingOrder.length
+    ? [...existingOrder]
+    : allHangers.map(h => h.dataset.hid);
+  if (navigator.vibrate) navigator.vibrate(25);
+  const elRect = el.getBoundingClientRect();
+  const elWidth = elRect.width + 8; // 8px gap
+  _rdDrag = { wId: String(wId), catKey, el, allHangers, startX: e.touches[0].clientX, startIdx, currentIdx: startIdx, order, elWidth };
+  el.style.transition = 'none';
+  el.style.zIndex = '30';
+  el.style.opacity = '0.75';
+  el.style.transform = 'scale(1.1)';
+  document.addEventListener('touchmove', _rdMove, { passive: false });
+  document.addEventListener('touchend',  _rdEnd,  { passive: false });
+  document.addEventListener('touchcancel', _rdEnd, { passive: false });
+}
+function _rdMove(e) {
+  if (!_rdDrag) return;
+  e.preventDefault();
+  const dx = e.touches[0].clientX - _rdDrag.startX;
+  _rdDrag.el.style.transform = `translateX(${dx}px) scale(1.1)`;
+  const steps = Math.round(dx / _rdDrag.elWidth);
+  const newIdx = Math.max(0, Math.min(_rdDrag.allHangers.length - 1, _rdDrag.startIdx + steps));
+  if (newIdx !== _rdDrag.currentIdx) {
+    _rdDrag.currentIdx = newIdx;
+    _rdDrag.allHangers.forEach((h, i) => {
+      if (h === _rdDrag.el) return;
+      h.style.transition = 'transform 0.15s ease';
+      const shifted = _rdDrag.startIdx < newIdx
+        ? (i > _rdDrag.startIdx && i <= newIdx ? -_rdDrag.elWidth : 0)
+        : (i >= newIdx && i < _rdDrag.startIdx ? _rdDrag.elWidth : 0);
+      h.style.transform = shifted ? `translateX(${shifted}px)` : '';
+    });
+  }
+}
+function _rdEnd() {
+  if (!_rdDrag) return;
+  document.removeEventListener('touchmove', _rdMove);
+  document.removeEventListener('touchend',  _rdEnd);
+  document.removeEventListener('touchcancel', _rdEnd);
+  const { wId, catKey, order, startIdx, currentIdx } = _rdDrag;
+  _rdDrag = null;
+  if (startIdx !== currentIdx) {
+    const newOrder = [...order];
+    const [item] = newOrder.splice(startIdx, 1);
+    newOrder.splice(currentIdx, 0, item);
+    S._wardrobeCustomOrder = Object.assign({}, S._wardrobeCustomOrder || {}, { [catKey]: newOrder });
+    localStorage.setItem('closet-custom-order', JSON.stringify(S._wardrobeCustomOrder));
+  }
+  render();
+}
 // Save scroll position of all rod-track containers + window Y
 function _saveWardrobeScroll() {
   return {
@@ -12319,13 +12427,23 @@ function viewWardrobe() {
 
   // Sort
   if (S.wardrobeSort === 'newest')    items.sort((a,b) => new Date(b.addedAt||0) - new Date(a.addedAt||0));
-  if (S.wardrobeSort === 'most-worn') items.sort((a,b) => b.wears.length - a.wears.length);
+  if (S.wardrobeSort === 'most-worn') items.sort((a,b) => (b.wears||[]).length - (a.wears||[]).length);
   if (S.wardrobeSort === 'best-val')  items.sort((a,b) => {
-    const ppwA = a.price && a.wears.length ? a.price/a.wears.length : Infinity;
-    const ppwB = b.price && b.wears.length ? b.price/b.wears.length : Infinity;
+    const ppwA = a.price && (a.wears||[]).length ? a.price/(a.wears||[]).length : Infinity;
+    const ppwB = b.price && (b.wears||[]).length ? b.price/(b.wears||[]).length : Infinity;
     return ppwA - ppwB;
   });
   if (S.wardrobeSort === 'az') items.sort((a,b) => a.name.localeCompare(b.name));
+  if (S.wardrobeSort === 'recent-worn') {
+    const lastWorn = w => {
+      const wrs = w.wears || [];
+      if (!wrs.length) return 0;
+      return Math.max(...wrs.map(wr => new Date(wr.date || wr).getTime() || 0));
+    };
+    items.sort((a,b) => lastWorn(b) - lastWorn(a));
+  }
+  if (S.wardrobeSort === 'color-asc') items.sort((a,b) => _itemColorLuminance(b) - _itemColorLuminance(a)); // light first (high luminance)
+  if (S.wardrobeSort === 'color-desc') items.sort((a,b) => _itemColorLuminance(a) - _itemColorLuminance(b)); // dark first (low luminance)
 
   // Search filter — applied after sort so results maintain sort order
   if (S.wardrobeSearch.trim()) {
@@ -12374,7 +12492,7 @@ function viewWardrobe() {
         const mpEmpty = mpCount === 0;
         return `<div class="filter-chip ${mpActive?'active':''} ${mpEmpty?'filter-chip-empty':''}"
           ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
-          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">🤔 Maybe Pile<span class="cat-count-badge">${mpCount}</span></div>`;
+          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">🤔 Purgatory<span class="cat-count-badge">${mpCount}</span></div>`;
       })()}
       ${S._addingShelf ? `
         <div style="display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1.5px solid var(--gold);border-radius:100px;padding:4px 6px 4px 12px;">
@@ -12423,12 +12541,15 @@ function viewWardrobe() {
       onclick="S._wardrobeMaybePileFilter=true;S._wardrobeHeroFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';render()">
       <div style="font-size:22px;flex-shrink:0;">🤔</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:700;color:#5B3FBF;margin-bottom:2px;">${maybePileOverdue.length} item${maybePileOverdue.length===1?'':'s'} in your Maybe Pile ${maybePileOverdue.length===1?'hasn\'t':'haven\'t'} been worn in ${MAYBE_PILE_DAYS} days</div>
+        <div style="font-size:13px;font-weight:700;color:#5B3FBF;margin-bottom:2px;">${maybePileOverdue.length} item${maybePileOverdue.length===1?'':'s'} in Purgatory ${maybePileOverdue.length===1?'hasn\'t':'haven\'t'} been worn in ${MAYBE_PILE_DAYS} days</div>
         <div style="font-size:12px;color:#7B6AAF;line-height:1.4;">Time to decide — keep it or let it go? Tap to review.</div>
       </div>
       <div style="font-size:14px;color:#9B7FE0;flex-shrink:0;">→</div>
     </div>` : '';
 
+  const _colorSortActive = S.wardrobeSort === 'color-asc' || S.wardrobeSort === 'color-desc';
+  const _colorSortLabel  = S.wardrobeSort === 'color-desc' ? '🌑→☀ Color' : '☀→🌑 Color';
+  const _colorNextSort   = S.wardrobeSort === 'color-asc' ? 'color-desc' : 'color-asc';
   const sortBar = S.wardrobe.length > 1 ? `
     <div style="padding:0 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
       <div class="filter-chip ${S.wardrobeSort==='newest'?'active':''}"
@@ -12437,12 +12558,22 @@ function viewWardrobe() {
       <div class="filter-chip ${S.wardrobeSort==='most-worn'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='most-worn';render()"
         onclick="S.wardrobeSort='most-worn';render()">Most Worn</div>
+      <div class="filter-chip ${S.wardrobeSort==='recent-worn'?'active':''}"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='recent-worn';render()"
+        onclick="S.wardrobeSort='recent-worn';render()">🕐 Recently Worn</div>
       <div class="filter-chip ${S.wardrobeSort==='best-val'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='best-val';render()"
         onclick="S.wardrobeSort='best-val';render()">Best Value</div>
+      <div class="filter-chip ${_colorSortActive?'active':''}"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort=_colorSortActive?'${_colorNextSort}':'color-asc';render()"
+        onclick="S.wardrobeSort=_colorSortActive?'${_colorNextSort}':'color-asc';render()">${_colorSortLabel}</div>
       <div class="filter-chip ${S.wardrobeSort==='az'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='az';render()"
         onclick="S.wardrobeSort='az';render()">A–Z</div>
+      <div class="filter-chip ${S.wardrobeSort==='custom'||S._wardrobeReorderMode?'active':''}"
+        style="${S._wardrobeReorderMode?'background:#9B7FE0;border-color:#9B7FE0;color:#fff;':''}"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeReorderMode=!S._wardrobeReorderMode;if(S._wardrobeReorderMode){S.wardrobeSort='custom';}render()"
+        onclick="S._wardrobeReorderMode=!S._wardrobeReorderMode;if(S._wardrobeReorderMode){S.wardrobeSort='custom';}render()">⇄ Reorder</div>
     </div>` : '';
 
   // ── Helper: total cost for a set of items ─────────────────
@@ -12562,8 +12693,18 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
 
     // ── Regular category rods ─────────────────────────────────
     CATEGORY_ORDER.forEach(cat => {
-      const catItems = grouped[cat];
+      let catItems = grouped[cat];
       if (!catItems.length) return;
+      // Apply per-category custom order when in reorder/custom sort mode
+      if (S.wardrobeSort === 'custom') {
+        const ord = (S._wardrobeCustomOrder || {})[cat] || [];
+        if (ord.length) {
+          catItems = [...catItems].sort((a,b) => {
+            const ai = ord.indexOf(String(a.id)), bi = ord.indexOf(String(b.id));
+            return (ai < 0 ? 9999 : ai) - (bi < 0 ? 9999 : bi);
+          });
+        }
+      }
 
       if (cat === 'Sweats') {
         sections += shelfSectionHTML(catItems, '🩳', 'Sweats & Comfy', catItems.length===1?'item':'items', 'sweatRackLevels', '🩳', 'rgba(100,130,180,0.08)');
@@ -12749,7 +12890,14 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
       <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${activeWardrobe.length}</span>
       <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">piece${activeWardrobe.length===1?'':'s'} in your closet</span>
     </div>` : ''}
-    ${catBar}${subCatBar}${maybePileNudge}${sortBar}${gridHTML}
+    ${catBar}${subCatBar}${maybePileNudge}${sortBar}
+    ${S._wardrobeReorderMode ? `
+    <div style="position:sticky;top:0;z-index:90;margin:0 0 4px;padding:10px 16px;background:#9B7FE0;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+      <div style="font-size:13px;font-weight:700;color:#fff;">✥ Hold &amp; drag a hanger to reorder</div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeReorderMode=false;render()" onclick="S._wardrobeReorderMode=false;render()"
+        style="padding:6px 16px;background:#fff;border:none;border-radius:100px;font-size:13px;font-weight:800;color:#9B7FE0;cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Done</button>
+    </div>` : ''}
+    ${gridHTML}
     ${retiredSectionHTML}
 
     ${(()=>{
@@ -12862,8 +13010,11 @@ function wardrobeCardHTML(w) {
         <span class="wear-badge">${iconClock(14)} ${wears} wear${wears===1?'':'s'}</span>
         ${priceBadge}
         ${w.retiring ? `<span class="retiring-chip">🪡 Retiring</span>` : ''}
-        ${w.inMaybePile ? `<span class="maybe-pile-chip">🤔 Maybe</span>` : ''}
+        ${w.inMaybePile && !S._wardrobeMaybePileFilter ? `<span class="maybe-pile-chip">🤔 Purgatory</span>` : ''}
       </div>
+      ${S._wardrobeMaybePileFilter && w.inMaybePile && !S._wardrobeSelectMode ? `
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();rescueFromMaybePile('${w.id}')" onclick="event.stopPropagation();rescueFromMaybePile('${w.id}')"
+        style="margin-top:6px;padding:5px 12px;background:#9B7FE0;color:#fff;border:none;border-radius:100px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;align-self:flex-start;">✕ Remove from Purgatory</button>` : ''}
     </div>
     ${S._wardrobeSelectMode ? '' : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>`}
   </div>`;
@@ -12985,12 +13136,14 @@ function hangerHTML(w, _siblings) {
   const hSel = S._wardrobeSelectMode && S._wardrobeSelected.includes(w.id);
   const isWearFlipped = (S._wearFlipped || new Set()).has(w.id);
   const displayPhoto = isWearFlipped && w.wearPhoto ? w.wearPhoto : (w.photo || null);
-  return `<div class="hanger"
-    onclick="${S._wardrobeSelectMode ? `toggleWardrobeSelect('${w.id}')` : `openWardrobeItem('${w.id}')`}"
-    ontouchstart="wLongPressStart('${w.id}',event)"
-    ontouchend="if(_touchMoved)return;event.preventDefault();wLongPressCancel();if(!_wLongPressFired){${S._wardrobeSelectMode ? `toggleWardrobeSelect('${w.id}')` : `openWardrobeItem('${w.id}')`}}"
-    ontouchmove="wLongPressCancel()"
-    style="user-select:none;-webkit-user-select:none;">
+  const catKey = normalizeCat(w.category || categoryFromIcon(w.icon, w.name));
+  const isReorder = S._wardrobeReorderMode;
+  return `<div class="hanger${isReorder?' hanger-reorder':''}" data-hid="${w.id}" data-cat="${catKey}"
+    onclick="${isReorder ? '' : (S._wardrobeSelectMode ? `toggleWardrobeSelect('${w.id}')` : `openWardrobeItem('${w.id}')`)}"
+    ontouchstart="${isReorder ? `rodDragStart('${w.id}','${catKey}',event)` : `wLongPressStart('${w.id}',event)`}"
+    ontouchend="${isReorder ? '' : `if(_touchMoved)return;event.preventDefault();wLongPressCancel();if(!_wLongPressFired){${S._wardrobeSelectMode ? `toggleWardrobeSelect('${w.id}')` : `openWardrobeItem('${w.id}')`}}`}"
+    ontouchmove="${isReorder ? '' : 'wLongPressCancel()'}"
+    style="user-select:none;-webkit-user-select:none;${isReorder ? 'cursor:grab;touch-action:none;' : ''}">
     ${hangerSVG}
     <div class="hanger-card" style="${isGemPiece(w) ? 'border-color:var(--gold);box-shadow:0 2px 10px rgba(184,125,42,0.18);' : ''}${hSel ? 'border-color:var(--gold);box-shadow:0 0 0 2px var(--gold);' : ''}position:relative;">
       ${stripeEl}
@@ -13524,8 +13677,8 @@ function viewBulkAdd() {
     <div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
       <div>
         <label class="form-label" style="font-size:10px;margin-bottom:3px;">Name <span style="color:var(--gold);">*</span></label>
-        <input id="bulk-name" class="form-input" type="text" value=""
-          placeholder="${esc(p.name||'e.g. White Leather Sneakers')}" style="margin:0;">
+        <input id="bulk-name" class="form-input" type="text" value="${esc(p.name||'')}"
+          placeholder="e.g. White Leather Sneakers" style="margin:0;">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
@@ -13553,7 +13706,13 @@ function viewBulkAdd() {
         </div>
       </div>
       <div>
-        <label class="form-label" style="font-size:10px;margin-bottom:3px;">Description</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+          <label class="form-label" style="font-size:10px;margin:0;">Description</label>
+          ${S.apiKey ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBulkDescription()" onclick="generateBulkDescription()"
+            style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
+            ${S._genDescLoading==='bulk' ? '⏳ Generating…' : '✨ Generate'}
+          </button>` : ''}
+        </div>
         <textarea id="bulk-notes" class="form-textarea" style="min-height:50px;margin:0;"
           placeholder="Color, material, fit…">${esc(p.description||'')}</textarea>
       </div>
@@ -13763,8 +13922,14 @@ function viewReceiptAdd() {
                   </select>
                 </div>
                 <div style="margin-bottom:11px;">
-                  <label class="form-label" style="font-size:10px;">Description</label>
-                  <textarea class="form-textarea" style="min-height:54px;margin:4px 0 0;"
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                    <label class="form-label" style="font-size:10px;margin:0;">Description</label>
+                    ${S.apiKey ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateReceiptDescription()" onclick="generateReceiptDescription()"
+                      style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
+                      ${S._genDescLoading==='receipt' ? '⏳ Generating…' : '✨ Generate'}
+                    </button>` : ''}
+                  </div>
+                  <textarea class="form-textarea" style="min-height:54px;margin:0;"
                     oninput="S.receiptFlow.preview.description=this.value"
                     placeholder="Color, material, style…">${esc(p.description||'')}</textarea>
                 </div>
@@ -13890,8 +14055,14 @@ function viewReceiptAdd() {
           </select>
         </div>
         <div class="form-group" style="margin-bottom:14px;">
-          <label class="form-label">Description</label>
-          <textarea class="form-textarea" style="min-height:64px;"
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <label class="form-label" style="margin:0;">Description</label>
+            ${S.apiKey ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateReceiptDescription()" onclick="generateReceiptDescription()"
+              style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
+              ${S._genDescLoading==='receipt' ? '⏳ Generating…' : '✨ Generate'}
+            </button>` : ''}
+          </div>
+          <textarea class="form-textarea" style="min-height:64px;margin:0;"
             oninput="S.receiptFlow.preview.description=this.value"
             placeholder="Color, style, material…">${esc(p.description||'')}</textarea>
         </div>
@@ -14208,17 +14379,17 @@ function viewWardrobeItem() {
       </div>
     </div>
 
-    <!-- ══ MAYBE PILE toggle ══ -->
+    <!-- ══ PURGATORY toggle ══ -->
     <div style="padding:0 20px;margin-bottom:16px;">
       <div class="maybe-pile-box ${w.inMaybePile ? 'active' : ''}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
           <div style="flex:1;min-width:0;">
             <div style="font-weight:700;font-size:14px;color:${w.inMaybePile?'#5B3FBF':'var(--text)'};display:flex;align-items:center;gap:6px;">
-              🤔 Maybe Pile
+              🤔 Purgatory
             </div>
             <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
               ${w.inMaybePile
-                ? `In your maybe pile since ${fmtDate(w.maybePileAt)}. If you wear it before ${MAYBE_PILE_DAYS||60} days are up, Claude will surface it as a rescue.`
+                ? `In Purgatory since ${fmtDate(w.maybePileAt)}. If you wear it before ${MAYBE_PILE_DAYS||60} days are up, Claude will surface it as a rescue.`
                 : 'Not quite ready to let it go? Park it here. If it goes unworn for 60 days, you\'ll get a nudge to decide.'}
             </div>
           </div>
@@ -14275,8 +14446,14 @@ function viewWardrobeItem() {
     </div>
 
     <div style="padding:0 20px;margin-bottom:16px;">
-      <label class="form-label">Description</label>
-      <textarea class="form-textarea" style="min-height:56px;" placeholder="Color, material, style notes…"
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <label class="form-label" style="margin:0;">Description</label>
+        ${S.apiKey ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateWardrobeItemDescription('${w.id}')" onclick="generateWardrobeItemDescription('${w.id}')"
+          style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
+          ${S._genDescLoading===w.id ? '⏳ Generating…' : '✨ Generate'}
+        </button>` : ''}
+      </div>
+      <textarea class="form-textarea" style="min-height:56px;margin:0;" placeholder="Color, material, style notes…"
         onchange="updateWardrobeDescription('${w.id}',this.value)">${esc(w.description||'')}</textarea>
     </div>
 
@@ -15532,7 +15709,7 @@ function viewMatchReview() {
             <div style="font-size:20px;flex-shrink:0;">✨</div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:12px;font-weight:700;color:#5B3FBF;margin-bottom:2px;">You just wore it!</div>
-              <div style="font-size:12px;color:#7B6AAF;line-height:1.4;">This is in your Maybe Pile — wearing it is a pretty good sign it belongs. Remove it?</div>
+              <div style="font-size:12px;color:#7B6AAF;line-height:1.4;">This is in Purgatory — wearing it is a pretty good sign it belongs. Remove it?</div>
             </div>
             <button
               ontouchend="if(_touchMoved)return;event.preventDefault();rescueFromMaybePile('${wItem.id}')"
@@ -17070,6 +17247,70 @@ async function bulkSaveAndNext() {
 function bulkSkip() { bulkAdvance(); }
 
 // Read current bulk form field values into preview so re-renders don't wipe typed values
+// ── Description generator — shared by bulk, receipt, and wardrobe-item edit ──
+async function _genDescText(name, brand, category) {
+  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return null; }
+  if (!name?.trim()) { toast('Add an item name first.'); return null; }
+  const context = [name.trim(), brand && `by ${brand}`, category && `(${category})`].filter(Boolean).join(' ');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': S.apiKey.trim(),
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 120,
+      messages: [{ role: 'user', content: `Write a short 1-2 sentence wardrobe description for: ${context}. Mention likely color, material, and fit/style. Be specific and useful. Return ONLY the description, no quotes or labels.` }],
+    }),
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  const data = await res.json();
+  return (data.content?.[0]?.text || '').trim();
+}
+
+async function generateBulkDescription() {
+  bulkSyncForm();
+  const idx = S.bulkIdx || 0;
+  if (!S.bulkQueue?.[idx]) return;
+  if (!S.bulkQueue[idx].preview) S.bulkQueue[idx].preview = {};
+  const name  = document.getElementById('bulk-name')?.value  || S.bulkQueue[idx].preview.name  || '';
+  const brand = document.getElementById('bulk-brand')?.value || S.bulkQueue[idx].preview.brand || '';
+  const cat   = document.getElementById('bulk-category')?.value || S.bulkQueue[idx].preview.category || '';
+  S._genDescLoading = 'bulk'; render();
+  try {
+    const text = await _genDescText(name, brand, cat);
+    if (text) { bulkSyncForm(); S.bulkQueue[idx].preview.description = text; }
+  } catch(e) { toast('Couldn\'t generate — try again.'); }
+  S._genDescLoading = null; render();
+}
+
+async function generateReceiptDescription() {
+  const p = S.receiptFlow?.preview; if (!p) return;
+  S._genDescLoading = 'receipt'; render();
+  try {
+    const text = await _genDescText(p.name, p.brand, p.category);
+    if (text) S.receiptFlow.preview.description = text;
+  } catch(e) { toast('Couldn\'t generate — try again.'); }
+  S._genDescLoading = null; render();
+}
+
+async function generateWardrobeItemDescription(wId) {
+  const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
+  S._genDescLoading = wId; render();
+  try {
+    const text = await _genDescText(w.name, w.brand, w.category);
+    if (text) {
+      w.description = text;
+      render(); // show immediately in textarea
+      DB.wardrobe.put(w).catch(e => console.error('generateWardrobeItemDescription save:', e));
+    }
+  } catch(e) { toast('Couldn\'t generate — try again.'); }
+  S._genDescLoading = null; render();
+}
+
 function bulkSyncForm() {
   const idx = S.bulkIdx || 0;
   if (!S.bulkQueue?.[idx]) return;
@@ -17803,7 +18044,7 @@ function toggleMaybePile(id) {
   w.inMaybePile = !w.inMaybePile;
   w.maybePileAt = w.inMaybePile ? new Date().toISOString() : null;
   render(); // immediate visual update
-  toast(w.inMaybePile ? '🤔 Added to your Maybe Pile — we\'ll check in if it goes unworn.' : 'Removed from Maybe Pile.');
+  toast(w.inMaybePile ? '🤔 Sent to Purgatory — we\'ll check in if it goes unworn.' : 'Rescued from Purgatory.');
   DB.wardrobe.put(w).catch(e => { console.error('toggleMaybePile save failed:', e); toast('Sync failed — check your connection.'); });
 }
 
