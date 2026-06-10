@@ -7381,7 +7381,7 @@ function listWardrobeItemForSale(wId) {
 
 function shareClosetApp() {
   const url = location.origin + location.pathname;
-  const text = 'I've been using this app to organize my closet — it's so good! 🧥✨';
+  const text = "I've been using this app to organize my closet — it's so good! 🧥✨";
   if (navigator.share) {
     navigator.share({ title: 'Closet App', text, url }).catch(() => {});
   } else if (navigator.clipboard) {
@@ -14664,7 +14664,7 @@ function viewWardrobeItem() {
   const complimentCount = w.compliments?.length || 0;
   const outfits = (w.wears||[]).map(wr => S.entries.find(e => e.id === wr.outfitId)).filter(Boolean);
 
-  // Similar items: same category OR first word of name matches
+  // Similar items: computed but not rendered (reserved for future use)
   const firstName = w.name.toLowerCase().split(/\s+/)[0];
   const similar = S.wardrobe.filter(other =>
     other.id !== w.id && (
@@ -14672,6 +14672,9 @@ function viewWardrobeItem() {
       other.name.toLowerCase().split(/\s+/)[0] === firstName
     )
   ).slice(0, 5);
+
+  // Acquisition mode
+  const acqMode = w.gifted ? 'gifted' : w.onSale === true ? 'sale' : w.onSale === false ? 'full' : null;
 
   return `<div class="view view-notab">
     <div class="nav">
@@ -14767,40 +14770,18 @@ function viewWardrobeItem() {
         `}
       </div>
 
-      <div class="witem-stats">
-        <div class="witem-stat">
-          <div class="witem-stat-val">${wears}</div>
-          <div class="witem-stat-lbl">Total Wears</div>
-        </div>
-        ${complimentCount > 0 ? `
-        <div class="witem-stat" style="background:#FDF5E4;border-color:rgba(184,125,42,0.25);">
-          <div class="witem-stat-val" style="color:var(--gold);">${complimentCount}</div>
-          <div class="witem-stat-lbl" style="color:var(--gold-dk);">Compliment${complimentCount===1?'':'s'}</div>
-        </div>` : ''}
-        ${w.price ? `
-        <div class="witem-stat"${w.onSale ? ' style="background:#F0FDF4;border-color:rgba(22,163,74,0.25);"' : ''}>
-          <div class="witem-stat-val"${w.onSale ? ' style="color:#15803D;"' : ''}>$${parseFloat(w.price).toFixed(0)}</div>
-          <div class="witem-stat-lbl"${w.onSale ? ' style="color:#15803D;"' : ''}>${w.onSale ? '🏷️ Sale Price' : 'Price Paid'}</div>
-        </div>` : ''}
-        ${w.onSale && w.originalPrice && w.price ? `
-        <div class="witem-stat" style="background:#F0FDF4;border-color:rgba(22,163,74,0.25);">
-          <div class="witem-stat-val" style="color:#15803D;">$${Math.max(0,parseFloat(w.originalPrice)-parseFloat(w.price)).toFixed(0)}</div>
-          <div class="witem-stat-lbl" style="color:#15803D;">Saved 🎉</div>
-        </div>` : ''}
-        ${w.paidOff ? `
-        <div class="witem-stat" style="background:#EAFAF1;border-color:rgba(30,132,73,0.2);">
-          <div class="witem-stat-val" style="font-size:16px;">💚</div>
-          <div class="witem-stat-lbl" style="color:#1E8449;">Paid Off!</div>
-        </div>` : ppw ? `
-        <div class="witem-stat">
-          <div class="witem-stat-val">$${ppw}</div>
-          <div class="witem-stat-lbl">Per Wear</div>
-        </div>` : ''}
+      <!-- Subtle stats + compliment link -->
+      <div style="margin-top:12px;font-size:12px;color:var(--text-3);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;">
+        <span>${wears} wear${wears===1?'':'s'}${ppw ? ' · $'+ppw+'/wear' : ''}${w.paidOff ? ' · 💚 paid off' : ''}</span>
+        ${complimentCount > 0 ? `<span>· <span style="color:var(--gold-dk);">${complimentCount} compliment${complimentCount===1?'':'s'}</span></span>` : ''}
+        <span style="color:var(--border);">·</span>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();logCompliment('${w.id}')" onclick="logCompliment('${w.id}')"
+          style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;touch-action:manipulation;">Got a compliment?</button>
       </div>
     </div>
 
     <!-- ✨ Build an Outfit Around This -->
-    <div style="padding:0 20px;margin-bottom:12px;">
+    <div style="padding:0 20px;margin-bottom:20px;">
       <button
         ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};navigate('outfit-builder')"
         onclick="S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};navigate('outfit-builder')"
@@ -14813,68 +14794,20 @@ function viewWardrobeItem() {
       </button>
     </div>
 
-    <!-- 💰 List for Sale -->
-    ${(() => {
-      const existingListing = (S.sellListings || []).find(l => l.wardrobeItemId === String(w.id) && l.status !== 'sold');
-      return `<div style="padding:0 20px;margin-bottom:12px;">
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();listWardrobeItemForSale('${w.id}')"
-          onclick="listWardrobeItemForSale('${w.id}')"
-          style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;touch-action:manipulation;
-            border:1.5px solid ${existingListing ? '#16A34A' : '#D4A017'};
-            background:${existingListing ? '#F0FDF4' : '#FFFBEB'};
-            color:${existingListing ? '#15803D' : '#92660A'};
-            font-size:14px;font-weight:700;
-            display:flex;align-items:center;justify-content:center;gap:8px;">
-          ${existingListing ? '✓ Listed for $' + (parseFloat(existingListing.price)||0).toFixed(0) + ' — view listing' : '💰 List for Sale'}
-        </button>
-      </div>`;
-    })()}
-
-    <div style="padding:0 20px;margin-bottom:20px;">
-      <button onclick="logCompliment('${w.id}')" style="
-        width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
-        border:1.5px solid var(--gold);background:var(--gold-bg);
-        color:var(--gold-dk);font-size:14px;font-weight:700;
-        display:flex;align-items:center;justify-content:center;gap:8px;
-        transition:background .15s,transform .1s;
-      " onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform=''">
-        ✦ Got a compliment on this!
-      </button>
-      ${complimentCount > 0 ? `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:6px;">
-        ${complimentCount} compliment${complimentCount===1?'':'s'} logged${w.compliments?.length ? ' · last ' + fmtDate(w.compliments[w.compliments.length-1].date) : ''}
-      </div>` : `<div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:6px;">
-        Tap whenever someone notices this piece
-      </div>`}
+    <!-- ── Item Status ── -->
+    <div style="padding:0 20px 8px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">Item Status</div>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
     </div>
 
-    ${w.gifted ? `
-    <div style="padding:0 20px;margin-bottom:20px;">
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();thankGifter('${w.id}')"
-        onclick="thankGifter('${w.id}')"
-        style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;touch-action:manipulation;
-        border:1.5px solid #C8A0E8;background:#FDF0FF;color:#7B35A8;font-size:14px;font-weight:700;
-        display:flex;align-items:center;justify-content:center;gap:8px;">
-        💌 Thank ${w.giftedBy ? esc(w.giftedBy.trim().split(' ')[0]) : 'the gifter'}
-      </button>
-      <div style="text-align:center;font-size:12px;color:var(--text-3);margin-top:6px;">
-        Opens share sheet with a ready-to-send thank you note
-      </div>
-    </div>` : ''}
-
     <!-- 💎 Gem toggle -->
-    <div style="padding:0 20px;margin-bottom:16px;">
+    <div style="padding:0 20px;margin-bottom:10px;">
       <div class="${isGemPiece(w) ? 'sig-toggle-box active' : 'hero-toggle-box'}">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;color:${isGemPiece(w)?'var(--gold-dk)':'var(--text)'};">
-              💎 Gem Piece
-            </div>
-            <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
-              ${isGemPiece(w)
-                ? 'This piece shines in your wardrobe — it shows up in your Portfolio and can anchor any outfit.'
-                : 'A piece that\'s unmistakably you — the bold blazer, the bag everyone asks about, the thing you reach for first.'}
+            <div style="font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:6px;color:${isGemPiece(w)?'var(--gold-dk)':'var(--text)'};">💎 Gem Piece</div>
+            <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;line-height:1.45;">
+              ${isGemPiece(w) ? 'Featured in your Portfolio — the pieces that define your style.' : 'The pieces unmistakably you. Mark it and it\'ll feature in your Portfolio.'}
             </div>
           </div>
           <button class="toggle ${isGemPiece(w) ? 'on' : 'off'}" style="${isGemPiece(w) ? 'background:var(--gold);flex-shrink:0;' : 'flex-shrink:0;'}"
@@ -14882,28 +14815,24 @@ function viewWardrobeItem() {
             onclick="toggleGem('${w.id}')"></button>
         </div>
         ${isGemPiece(w) ? `
-        <div style="margin-top:12px;display:flex;gap:8px;">
-          <button class="hero-share-btn" style="flex:1;padding:11px;"
+        <div style="margin-top:10px;">
+          <button class="hero-share-btn" style="width:100%;padding:10px;"
             ontouchend="if(_touchMoved)return;event.preventDefault();shareHeroPiece('${w.id}')"
-            onclick="shareHeroPiece('${w.id}')">
-            📤 Share with Stylist
-          </button>
+            onclick="shareHeroPiece('${w.id}')">📤 Share with Stylist</button>
         </div>` : ''}
       </div>
     </div>
 
-    <!-- ══ PURGATORY toggle ══ -->
-    <div style="padding:0 20px;margin-bottom:16px;">
+    <!-- 🤔 Purgatory toggle -->
+    <div style="padding:0 20px;margin-bottom:10px;">
       <div class="maybe-pile-box ${w.inMaybePile ? 'active' : ''}">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:14px;color:${w.inMaybePile?'#5B3FBF':'var(--text)'};display:flex;align-items:center;gap:6px;">
-              🤔 Purgatory
-            </div>
-            <div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.5;">
+            <div style="font-weight:700;font-size:13.5px;color:${w.inMaybePile?'#5B3FBF':'var(--text)'};display:flex;align-items:center;gap:6px;">🤔 Purgatory</div>
+            <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;line-height:1.45;">
               ${w.inMaybePile
-                ? `In Purgatory since ${fmtDate(w.maybePileAt)}. If you wear it before ${MAYBE_PILE_DAYS||60} days are up, Claude will surface it as a rescue.`
-                : 'Not quite ready to let it go? Park it here. If it goes unworn for 60 days, you\'ll get a nudge to decide.'}
+                ? `In since ${fmtDate(w.maybePileAt)} — ${Math.floor((Date.now()-new Date(w.maybePileAt).getTime())/(24*60*60*1000))} days unworn.`
+                : "Not ready to part with it? Park it here for 60 days and see if you reach for it."}
             </div>
           </div>
           <button class="toggle ${w.inMaybePile ? 'on' : 'off'}" style="${w.inMaybePile ? 'background:#9B7FE0;flex-shrink:0;' : 'flex-shrink:0;'}"
@@ -14911,132 +14840,225 @@ function viewWardrobeItem() {
             onclick="toggleMaybePile('${w.id}')"></button>
         </div>
         ${w.inMaybePile ? (() => {
-          const flaggedMs = new Date(w.maybePileAt).getTime();
-          const daysIn = Math.floor((Date.now() - flaggedMs) / (24*60*60*1000));
-          const daysLeft = Math.max(0, 60 - daysIn);
+          const daysIn = Math.floor((Date.now()-new Date(w.maybePileAt).getTime())/(24*60*60*1000));
+          const daysLeft = Math.max(0, 60-daysIn);
           return `<div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
-            <div style="flex:1;background:rgba(155,127,224,0.2);border-radius:100px;height:5px;overflow:hidden;">
-              <div style="height:5px;background:#9B7FE0;border-radius:100px;width:${Math.min(100,Math.round(daysIn/60*100))}%;"></div>
+            <div style="flex:1;background:rgba(155,127,224,0.2);border-radius:100px;height:4px;overflow:hidden;">
+              <div style="height:4px;background:#9B7FE0;border-radius:100px;width:${Math.min(100,Math.round(daysIn/60*100))}%;"></div>
             </div>
-            <div style="font-size:11px;font-weight:700;color:#7B5FC0;white-space:nowrap;">${daysLeft > 0 ? `${daysLeft} days left` : 'Time to decide!'}</div>
+            <div style="font-size:11px;font-weight:700;color:#7B5FC0;white-space:nowrap;">${daysLeft>0?`${daysLeft}d left`:'Decide!'}</div>
           </div>`;
         })() : ''}
       </div>
     </div>
 
-    <!-- ══ EDIT DETAILS SECTION ══ -->
-    <div id="witem-edit-section" style="padding:0 20px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+    <!-- 🧵 Tailoring toggle -->
+    <div style="padding:0 20px;margin-bottom:24px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:var(--r-sm);border:1px solid ${w.tailoringNeeded?'#C8A8E0':'var(--border)'};background:${w.tailoringNeeded?'#FAF5FF':'var(--surface)'};">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13.5px;font-weight:700;color:${w.tailoringNeeded?'#7B35A8':'var(--text-2)'};">🧵 Needs Tailoring</div>
+          ${w.tailoringNeeded && w.tailoringNote ? `<div style="font-size:11.5px;color:var(--text-3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.tailoringNote)}</div>` : ''}
+        </div>
+        <button class="toggle ${w.tailoringNeeded?'on':'off'}" style="${w.tailoringNeeded?'background:#9B60C8;flex-shrink:0;':'flex-shrink:0;'}"
+          ontouchend="if(_touchMoved)return;event.preventDefault();toggleTailoring('${w.id}')"
+          onclick="toggleTailoring('${w.id}')"></button>
+      </div>
+      ${w.tailoringNeeded ? `<textarea class="form-input" id="tailoringNoteInput" placeholder="What needs fixing? e.g. hem, replace button, take in waist…" style="margin-top:8px;resize:vertical;min-height:52px;font-size:13px;" onchange="saveTailoringNote('${w.id}',this.value)">${esc(w.tailoringNote||'')}</textarea>` : ''}
+    </div>
+
+    <!-- ── Ownership & Value ── -->
+    <div style="padding:0 20px 8px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">Ownership &amp; Value</div>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+    <div style="padding:0 20px;margin-bottom:24px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:16px;display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Acquisition pills -->
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">How did you get it?</div>
+          <div style="display:flex;gap:6px;">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();setWardrobeAcquisition('${w.id}','gifted')" onclick="setWardrobeAcquisition('${w.id}','gifted')"
+              style="flex:1;padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${acqMode==='gifted'?'#C8A0E8':'var(--border)'};background:${acqMode==='gifted'?'#FDF0FF':'var(--surface)'};color:${acqMode==='gifted'?'#7B35A8':'var(--text-2)'};">💝 Gifted</button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();setWardrobeAcquisition('${w.id}','full')" onclick="setWardrobeAcquisition('${w.id}','full')"
+              style="flex:1;padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${acqMode==='full'?'var(--gold)':'var(--border)'};background:${acqMode==='full'?'var(--gold-bg)':'var(--surface)'};color:${acqMode==='full'?'var(--gold-dk)':'var(--text-2)'};">Full Price</button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();setWardrobeAcquisition('${w.id}','sale')" onclick="setWardrobeAcquisition('${w.id}','sale')"
+              style="flex:1;padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${acqMode==='sale'?'#16A34A':'var(--border)'};background:${acqMode==='sale'?'#F0FDF4':'var(--surface)'};color:${acqMode==='sale'?'#15803D':'var(--text-2)'};">🏷️ On Sale</button>
+          </div>
+        </div>
+
+        <!-- Gifted: gifter name + thank link | OR: price fields + paid off -->
+        ${w.gifted ? `
+        <div>
+          <input class="form-input" type="text" id="giftedByInput" placeholder="Who gave this to you? (optional)"
+            value="${esc(w.giftedBy||'')}"
+            onchange="updateGiftedBy('${w.id}',this.value)">
+          ${w.giftedBy ? `<div style="margin-top:8px;">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();thankGifter('${w.id}')" onclick="thankGifter('${w.id}')"
+              style="background:none;border:none;font-size:12px;color:#7B35A8;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;touch-action:manipulation;">💌 Send ${esc(w.giftedBy.trim().split(' ')[0])} a thank you note</button>
+          </div>` : ''}
+        </div>` : `
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;">Price Paid</div>
+          <div class="price-wrap">
+            <input class="form-input" id="witemPrice" type="number" min="0" step="0.01"
+              placeholder="0.00" value="${w.price||''}"
+              onchange="updateWardrobePrice('${w.id}',this.value)">
+          </div>
+          ${acqMode==='sale' ? `
+          <div style="margin-top:10px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;">Original Price (optional)</div>
+            <div class="price-wrap"><input class="form-input" type="number" min="0" step="0.01" placeholder="0.00" value="${w.originalPrice||''}" onchange="updateWardrobeOriginalPrice('${w.id}',this.value)" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"></div>
+            ${w.originalPrice && w.price ? `<div style="margin-top:5px;font-size:12px;font-weight:700;color:#15803D;">🎉 Saved $${Math.max(0,parseFloat(w.originalPrice)-parseFloat(w.price)).toFixed(0)} (${Math.round((1-parseFloat(w.price)/parseFloat(w.originalPrice))*100)}% off)</div>` : ''}
+          </div>` : ''}
+          ${w.price ? `
+          <label style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;">
+            <input type="checkbox" id="paidOffCheck" ${w.paidOff?'checked':''} onchange="toggleWardrobePaidOff('${w.id}',this.checked)" style="width:18px;height:18px;accent-color:#1E8449;cursor:pointer;flex-shrink:0;">
+            <span style="font-size:13px;font-weight:600;color:#1E8449;">💚 Already paid for itself</span>
+          </label>` : ''}
+        </div>`}
+
+        <!-- When did you get it: New / Had it awhile pills + month picker -->
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">When did you get it?</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();updateWardrobeIsNew('${w.id}',true)" onclick="updateWardrobeIsNew('${w.id}',true)"
+              style="flex:1;padding:7px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${w.isNew===true?'var(--gold)':'var(--border)'};background:${w.isNew===true?'var(--gold-bg)':'var(--surface)'};color:${w.isNew===true?'var(--gold-dk)':'var(--text-2)'};">✨ New</button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();updateWardrobeIsNew('${w.id}',false)" onclick="updateWardrobeIsNew('${w.id}',false)"
+              style="flex:1;padding:7px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${w.isNew===false?'var(--text-3)':'var(--border)'};background:${w.isNew===false?'var(--surface-2)':'var(--surface)'};color:${w.isNew===false?'var(--text-2)':'var(--text-3)'};">Had it awhile</button>
+          </div>
+          <input class="form-input" type="month" id="witemPurchasedDate"
+            value="${esc(w.purchasedDate||'')}"
+            onchange="updateWardrobePurchasedDate('${w.id}',this.value)"
+            style="font-size:14px;">
+        </div>
+
+        <!-- List for Sale -->
+        ${(() => {
+          const existingListing = (S.sellListings || []).find(l => l.wardrobeItemId === String(w.id) && l.status !== 'sold');
+          return `<button
+            ontouchend="if(_touchMoved)return;event.preventDefault();listWardrobeItemForSale('${w.id}')"
+            onclick="listWardrobeItemForSale('${w.id}')"
+            style="width:100%;padding:11px;border-radius:var(--r-sm);cursor:pointer;font-family:inherit;touch-action:manipulation;
+              border:1.5px solid ${existingListing ? '#16A34A' : 'var(--border)'};
+              background:${existingListing ? '#F0FDF4' : 'var(--surface-2)'};
+              color:${existingListing ? '#15803D' : 'var(--text-2)'};
+              font-size:13px;font-weight:700;
+              display:flex;align-items:center;justify-content:center;gap:6px;">
+            ${existingListing ? '✓ Listed for $'+(parseFloat(existingListing.price)||0).toFixed(0)+' — view listing' : '💰 List for Sale'}
+          </button>`;
+        })()}
+      </div>
+    </div>
+
+    <!-- ── EDIT DETAILS ── -->
+    <div id="witem-edit-section" style="padding:0 20px 8px;display:flex;align-items:center;gap:10px;">
       <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">✏️ Edit Details</div>
       <div style="flex:1;height:1px;background:var(--border);"></div>
     </div>
 
-    <div style="padding:0 20px;margin-bottom:16px;">
-      <label class="form-label">Name</label>
-      <input class="form-input" id="witemName" type="text" placeholder="Item name"
-        value="${esc(w.name)}" onchange="updateWardrobeName('${w.id}',this.value)"
-        enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-    </div>
-
-    <div style="padding:0 20px;margin-bottom:16px;">
-      <label class="form-label">Brand</label>
-      <input class="form-input" id="witemBrand" type="text" placeholder="e.g. Zara, Madewell, Gucci (optional)"
-        value="${esc(w.brand||'')}" onchange="updateWardrobeBrand('${w.id}',this.value)"
-        enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-    </div>
-
-    <div style="padding:0 20px;margin-bottom:16px;">
-      <label class="form-label">Colour</label>
-      <input class="form-input" id="witemColor" type="text" placeholder="e.g. navy, cream, burgundy (used for colour sort)"
-        value="${esc(w.color||'')}" onchange="updateWardrobeColor('${w.id}',this.value)"
-        enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-    </div>
-
-    <div style="padding:0 20px;margin-bottom:16px;">
-      <label class="form-label">Category</label>
-      <select class="form-input" onchange="updateWardrobeCategory('${w.id}',this.value)">
-        ${getAllCategories().filter(c=>c!=='All').map(c=>`<option value="${c}" ${(w.category||'Other')===c?'selected':''}>${c==='Pants'?'Bottoms':c}</option>`).join('')}
-      </select>
-    </div>
-
-    <div style="padding:0 20px;margin-bottom:16px;">
-      <label class="form-label">Size</label>
-      <input class="form-input" id="witemSize" type="text" placeholder="e.g. XS, 8, 27, EU 38 (optional)"
-        value="${esc(w.size||'')}" onchange="updateWardrobeSize('${w.id}',this.value)"
-        enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-    </div>
-
-    <div style="padding:0 20px;margin-bottom:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <label class="form-label" style="margin:0;">Description</label>
-        ${S.apiKey ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateWardrobeItemDescription('${w.id}')" onclick="generateWardrobeItemDescription('${w.id}')"
-          style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
-          ${S._genDescLoading===w.id ? '⏳ Generating…' : '✨ Generate'}
-        </button>` : ''}
+    <div style="padding:0 20px;display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
+      <div>
+        <label class="form-label">Name</label>
+        <input class="form-input" id="witemName" type="text" placeholder="Item name"
+          value="${esc(w.name)}" onchange="updateWardrobeName('${w.id}',this.value)"
+          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
       </div>
-      <textarea class="form-textarea" style="min-height:56px;margin:0;" placeholder="Color, material, style notes…"
-        onchange="updateWardrobeDescription('${w.id}',this.value)">${esc(w.description||'')}</textarea>
-    </div>
-
-    <div style="padding:0 20px;margin-bottom:16px;">
-      <label class="form-label">Purchased</label>
-      <input class="form-input" type="month" id="witemPurchasedDate"
-        value="${esc(w.purchasedDate||'')}"
-        onchange="updateWardrobePurchasedDate('${w.id}',this.value)"
-        style="font-size:14px;">
-      <p style="font-size:12px;color:var(--text-3);margin-top:6px;">
-        ${w.purchasedDate ? `Added ${w.isNew?'new':'(had awhile)'} · Purchased ${fmtMonth(w.purchasedDate)}` : 'Optional — helps track how long you\'ve had this piece.'}
-      </p>
-    </div>
-
-    <div style="padding:0 20px;margin-bottom:24px;">
-      <label class="form-label">Price Paid</label>
-      ${w.gifted ? `
-        <div style="background:#FDF0FF;border:1px solid #E0B8F0;border-radius:var(--r-sm);padding:10px 14px;font-size:13px;color:#7B35A8;font-weight:500;">
-          💝 Gifted — no cost to you!
-        </div>` : `
-        <div class="price-wrap">
-          <input class="form-input" id="witemPrice" type="number" min="0" step="0.01"
-            placeholder="0.00" value="${w.price||''}"
-            onchange="updateWardrobePrice('${w.id}',this.value)">
+      <div>
+        <label class="form-label">Brand</label>
+        <input class="form-input" id="witemBrand" type="text" placeholder="e.g. Zara, Madewell (optional)"
+          value="${esc(w.brand||'')}" onchange="updateWardrobeBrand('${w.id}',this.value)"
+          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+      </div>
+      <div>
+        <label class="form-label">Colour</label>
+        <input class="form-input" id="witemColor" type="text" placeholder="e.g. navy, cream, burgundy"
+          value="${esc(w.color||'')}" onchange="updateWardrobeColor('${w.id}',this.value)"
+          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+      </div>
+      <div>
+        <label class="form-label">Category</label>
+        <select class="form-input" onchange="updateWardrobeCategory('${w.id}',this.value)">
+          ${getAllCategories().filter(c=>c!=='All').map(c=>`<option value="${c}" ${(w.category||'Other')===c?'selected':''}>${c==='Pants'?'Bottoms':c}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Size</label>
+        <input class="form-input" id="witemSize" type="text" placeholder="e.g. XS, 8, 27, EU 38 (optional)"
+          value="${esc(w.size||'')}" onchange="updateWardrobeSize('${w.id}',this.value)"
+          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label class="form-label" style="margin:0;">Description</label>
+          ${S.apiKey ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateWardrobeItemDescription('${w.id}')" onclick="generateWardrobeItemDescription('${w.id}')"
+            style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
+            ${S._genDescLoading===w.id ? '⏳ Generating…' : '✨ Generate'}
+          </button>` : ''}
         </div>
-        ${!w.price ? `<p style="font-size:12px;color:var(--text-3);margin-top:8px;">Add the price you paid to see cost per wear.</p>` : ''}
-        <!-- Sale toggle -->
-        <div style="margin-top:12px;display:flex;gap:8px;">
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleWardrobeSale('${w.id}',true)" onclick="toggleWardrobeSale('${w.id}',true)"
-            style="flex:1;padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${w.onSale?'#16A34A':'var(--border)'};background:${w.onSale?'#F0FDF4':'var(--surface)'};color:${w.onSale?'#15803D':'var(--text-2)'};">🏷️ Got it on sale</button>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleWardrobeSale('${w.id}',false)" onclick="toggleWardrobeSale('${w.id}',false)"
-            style="flex:1;padding:8px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${w.onSale===false?'var(--gold)':'var(--border)'};background:${w.onSale===false?'var(--gold-bg)':'var(--surface)'};color:${w.onSale===false?'var(--gold-dk)':'var(--text-2)'};">Full price</button>
-        </div>
-        ${w.onSale ? `<div style="margin-top:8px;">
-          <label class="form-label" style="font-size:11px;">Original price (optional)</label>
-          <div class="price-wrap"><input class="form-input" type="number" min="0" step="0.01" placeholder="0.00" value="${w.originalPrice||''}" onchange="updateWardrobeOriginalPrice('${w.id}',this.value)" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"></div>
-          ${w.originalPrice && w.price ? `<div style="margin-top:5px;font-size:12px;font-weight:700;color:#15803D;">🎉 You saved $${Math.max(0,parseFloat(w.originalPrice)-parseFloat(w.price)).toFixed(0)} (${Math.round((1-parseFloat(w.price)/parseFloat(w.originalPrice))*100)}% off)!</div>` : ''}
-        </div>` : ''}
-        <label style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;">
-          <input type="checkbox" id="paidOffCheck" ${w.paidOff?'checked':''} onchange="toggleWardrobePaidOff('${w.id}',this.checked)" style="width:18px;height:18px;accent-color:#1E8449;cursor:pointer;flex-shrink:0;">
-          <span style="font-size:13px;font-weight:600;color:#1E8449;">💚 Already paid for itself! (closet staple)</span>
-        </label>`}
-      <label style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;">
-        <input type="checkbox" id="giftedCheck" ${w.gifted?'checked':''} onchange="toggleGifted('${w.id}',this.checked)" style="width:18px;height:18px;accent-color:#9B35C8;cursor:pointer;flex-shrink:0;">
-        <span style="font-size:13px;font-weight:600;color:#7B35A8;">💝 Gifted to me</span>
-      </label>
-      ${w.gifted ? `
-        <input class="form-input" type="text" id="giftedByInput" placeholder="Who gave this to you? (optional)"
-          value="${esc(w.giftedBy||'')}" style="margin-top:10px;"
-          onchange="updateGiftedBy('${w.id}',this.value)">` : ''}
+        <textarea class="form-textarea" style="min-height:56px;margin:0;" placeholder="Colour, material, style notes…"
+          onchange="updateWardrobeDescription('${w.id}',this.value)">${esc(w.description||'')}</textarea>
+      </div>
     </div>
 
     ${(()=>{
-      // ── Tailoring section — slim toggle row ──────────────────
-      return `<div style="padding:0 20px;margin-bottom:16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:var(--r-sm);border:1px solid ${w.tailoringNeeded?'#C8A8E0':'var(--border)'};background:${w.tailoringNeeded?'#FAF5FF':'var(--surface)'};">
-          <div style="font-size:13.5px;font-weight:600;color:${w.tailoringNeeded?'#7B35A8':'var(--text-2)'};">🧵 Needs tailoring</div>
-          <button class="toggle ${w.tailoringNeeded?'on':'off'}" style="${w.tailoringNeeded?'background:#9B60C8;flex-shrink:0;':'flex-shrink:0;'}"
-            ontouchend="if(_touchMoved)return;event.preventDefault();toggleTailoring('${w.id}')"
-            onclick="toggleTailoring('${w.id}')"></button>
-        </div>
-        ${w.tailoringNeeded ? `<textarea class="form-input" id="tailoringNoteInput" placeholder="What needs fixing? e.g. hem the hem, replace button, take in waist…" style="margin-top:8px;resize:vertical;min-height:52px;font-size:13px;" onchange="saveTailoringNote('${w.id}',this.value)">${esc(w.tailoringNote||'')}</textarea>` : ''}
-      </div>`;
+      // ── Outfit linker ──────────────────────────────────────
+      const ol = S.outfitLinker?.mode === 'from-wardrobe' && S.outfitLinker?.wardrobeId === w.id ? S.outfitLinker : null;
+      if (ol) {
+        const allEntries = S.entries.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+        return `<div style="padding:0 20px;margin-bottom:28px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div class="section-title" style="margin-bottom:0;">Select Outfits With This Item</div>
+            <button onclick="S.outfitLinker=null;render()" style="background:none;border:none;font-size:22px;color:var(--text-3);cursor:pointer;padding:0;">✕</button>
+          </div>
+          <p style="font-size:12px;color:var(--text-3);margin-bottom:12px;">Tap each outfit photo that includes this piece. This records a wear for every outfit you select.</p>
+          <div class="outfit-thumb-grid" style="grid-template-columns:repeat(3,1fr);gap:6px;">
+            ${allEntries.map(e => {
+              const sel = !!ol.selected[e.id];
+              return `<div onclick="toggleOutfitLink('${e.id}')"
+                style="position:relative;border-radius:10px;overflow:hidden;cursor:pointer;
+                  border:${sel?'3px solid var(--gold)':'3px solid transparent'};
+                  box-shadow:${sel?'0 0 0 2px var(--gold-bg)':'none'};transition:all .15s;">
+                <img src="${e.photo}" alt="Outfit" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;">
+                ${sel?`<div style="position:absolute;top:4px;right:4px;background:var(--gold);color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">✓</div>`:''}
+                <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.5));padding:4px 5px 5px;">
+                  <div style="font-size:9px;color:#fff;font-weight:600;">${e.rating}/10</div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+          <div style="margin-top:14px;display:flex;gap:8px;">
+            <button onclick="confirmOutfitLinks()" style="flex:1;padding:13px;border-radius:var(--r-sm);background:var(--gold);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
+              Save Links (${Object.values(ol.selected).filter(Boolean).length} selected)
+            </button>
+            <button onclick="S.outfitLinker=null;render()" style="padding:13px 16px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border);font-size:14px;cursor:pointer;font-family:inherit;">Cancel</button>
+          </div>
+        </div>`;
+      }
+      return outfits.length ? `
+        <div style="padding:0 20px;margin-bottom:28px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div class="section-title" style="margin-bottom:0;">Worn in ${outfits.length} Outfit${outfits.length===1?'':'s'}</div>
+            <button onclick="openWardrobeOutfitLinker('${w.id}')" style="font-size:12px;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer;font-family:inherit;font-weight:600;">✏️ Edit links</button>
+          </div>
+          <div class="outfit-thumb-grid">
+            ${outfits.map(e => `
+              <div class="outfit-thumb"
+                ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')"
+                onclick="openEntry('${e.id}')">
+                <img src="${e.photo}" alt="Outfit" loading="lazy">
+              </div>`).join('')}
+          </div>
+        </div>` :
+        `<div style="padding:0 20px;margin-bottom:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div class="section-title" style="margin-bottom:0;">Outfits</div>
+            <button onclick="openWardrobeOutfitLinker('${w.id}')" style="font-size:12px;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer;font-family:inherit;font-weight:600;">✏️ Link outfits</button>
+          </div>
+          <div style="font-size:14px;color:var(--text-3);text-align:center;padding:16px;background:var(--surface);border-radius:var(--r-sm);border:1px dashed var(--border);">
+            No outfits linked yet — tap <b>Link outfits</b> to connect this piece to existing photos.
+          </div>
+        </div>`;
     })()}
 
     ${(()=>{
@@ -15044,11 +15066,9 @@ function viewWardrobeItem() {
       if (w.retiredFromCloset) {
         const outcomeLabel = {donated:'Donated',sold:'Sold',tossed:'Tossed'}[w.retireOutcome] || 'Retired';
         const reasonLabel = {'worn-out':'Worn out','didnt-suit-me':"Didn't suit me"}[w.retireReason] || '';
-        // Memorial section: editing flow, existing memorial, or prompt button
         const mf = S.memorialFlow?.id === w.id ? S.memorialFlow : null;
         const memorialSection = (() => {
           if (mf) {
-            // Active editor
             const hasPhoto = !!mf.photo;
             return `<div class="rip-memorial-box">
               <div class="rip-memorial-title">🪦 Memorial</div>
@@ -15066,7 +15086,6 @@ function viewWardrobeItem() {
             </div>`;
           }
           if (w.memorial) {
-            // Already memorialized
             return `<div style="padding:0 20px;margin-bottom:16px;">
               <div class="rip-memorialized-box">
                 ${w.memorialPhoto ? `<img class="rip-memorialized-photo" src="data:${esc(w.memorialMime||'image/jpeg')};base64,${w.memorialPhoto}" alt="Memorial">` : ''}
@@ -15082,7 +15101,6 @@ function viewWardrobeItem() {
               </div>
             </div>`;
           }
-          // Not yet memorialized — prompt button
           return `<div style="padding:0 20px;margin-bottom:16px;">
             <button class="rip-memorialize-btn" onclick="S.memorialFlow={id:'${w.id}',note:'',photo:null,mime:null};render()">
               🌹 Memorialize This Piece
@@ -15143,7 +15161,6 @@ function viewWardrobeItem() {
           </div>
         </div>`;
       }
-      // Default: show retire button
       return `<div style="padding:0 20px;margin-bottom:24px;">
         <div style="background:var(--surface);border-radius:var(--r-sm);border:1px solid var(--border);padding:14px 16px;">
           <div style="font-weight:600;font-size:13px;margin-bottom:3px;">Part ways with this piece?</div>
@@ -15152,89 +15169,6 @@ function viewWardrobeItem() {
         </div>
       </div>`;
     })()}
-
-    ${(()=>{
-      const ol = S.outfitLinker?.mode === 'from-wardrobe' && S.outfitLinker?.wardrobeId === w.id ? S.outfitLinker : null;
-      if (ol) {
-        // Outfit picker mode — show ALL outfits as selectable thumbs
-        const allEntries = S.entries.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-        return `<div style="padding:0 20px;margin-bottom:28px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <div class="section-title" style="margin-bottom:0;">Select Outfits With This Item</div>
-            <button onclick="S.outfitLinker=null;render()" style="background:none;border:none;font-size:22px;color:var(--text-3);cursor:pointer;padding:0;">✕</button>
-          </div>
-          <p style="font-size:12px;color:var(--text-3);margin-bottom:12px;">Tap each outfit photo that includes this piece. This records a wear for every outfit you select.</p>
-          <div class="outfit-thumb-grid" style="grid-template-columns:repeat(3,1fr);gap:6px;">
-            ${allEntries.map(e => {
-              const sel = !!ol.selected[e.id];
-              return `<div onclick="toggleOutfitLink('${e.id}')"
-                style="position:relative;border-radius:10px;overflow:hidden;cursor:pointer;
-                  border:${sel?'3px solid var(--gold)':'3px solid transparent'};
-                  box-shadow:${sel?'0 0 0 2px var(--gold-bg)':'none'};transition:all .15s;">
-                <img src="${e.photo}" alt="Outfit" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;display:block;">
-                ${sel?`<div style="position:absolute;top:4px;right:4px;background:var(--gold);color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">✓</div>`:''}
-                <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.5));padding:4px 5px 5px;">
-                  <div style="font-size:9px;color:#fff;font-weight:600;">${e.rating}/10</div>
-                </div>
-              </div>`;
-            }).join('')}
-          </div>
-          <div style="margin-top:14px;display:flex;gap:8px;">
-            <button onclick="confirmOutfitLinks()" style="flex:1;padding:13px;border-radius:var(--r-sm);background:var(--gold);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
-              Save Links (${Object.values(ol.selected).filter(Boolean).length} selected)
-            </button>
-            <button onclick="S.outfitLinker=null;render()" style="padding:13px 16px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border);font-size:14px;cursor:pointer;font-family:inherit;">Cancel</button>
-          </div>
-        </div>`;
-      }
-      // Normal view — show linked outfit thumbs
-      return outfits.length ? `
-        <div style="padding:0 20px;margin-bottom:28px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <div class="section-title" style="margin-bottom:0;">Worn in ${outfits.length} Outfit${outfits.length===1?'':'s'}</div>
-            <button onclick="openWardrobeOutfitLinker('${w.id}')" style="font-size:12px;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer;font-family:inherit;font-weight:600;">✏️ Edit links</button>
-          </div>
-          <div class="outfit-thumb-grid">
-            ${outfits.map(e => `
-              <div class="outfit-thumb"
-                ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')"
-                onclick="openEntry('${e.id}')">
-                <img src="${e.photo}" alt="Outfit" loading="lazy">
-              </div>`).join('')}
-          </div>
-        </div>` :
-        `<div style="padding:0 20px;margin-bottom:24px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <div class="section-title" style="margin-bottom:0;">Outfits</div>
-            <button onclick="openWardrobeOutfitLinker('${w.id}')" style="font-size:12px;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer;font-family:inherit;font-weight:600;">✏️ Link outfits</button>
-          </div>
-          <div style="font-size:14px;color:var(--text-3);text-align:center;padding:16px;background:var(--surface);border-radius:var(--r-sm);border:1px dashed var(--border);">
-            No outfits linked yet — tap <b>Link outfits</b> to connect this item to existing photos.
-          </div>
-        </div>`;
-    })()}
-
-    ${similar.length ? `
-      <div style="padding:0 20px;margin-bottom:28px;">
-        <div class="section-title">Similar Items in Your Wardrobe</div>
-        <p style="font-size:12px;color:var(--text-3);margin-bottom:12px;">Same category or similar name — tap to view or merge duplicates.</p>
-        ${similar.map(s => {
-          const sWears = s.wears?.length || 0;
-          return `<div class="wardrobe-card"
-            ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${s.id}')"
-            onclick="openWardrobeItem('${s.id}')" style="margin-bottom:8px;">
-            <div class="wardrobe-icon">${s.icon||'👕'}</div>
-            <div class="wardrobe-info">
-              <div class="wardrobe-name">${esc(s.name)}</div>
-              <div class="wardrobe-meta">
-                <span class="wear-badge">${sWears} wear${sWears===1?'':'s'}</span>
-                ${s.brand ? `<span style="font-size:12px;color:var(--text-3);">${esc(s.brand)}</span>` : ''}
-                ${s.category && s.category !== 'All' ? `<span style="font-size:12px;color:var(--text-3);">${esc(s.category)}</span>` : ''}
-              </div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>` : ''}
 
     <div style="height:8px"></div>
   </div>`;
@@ -18451,6 +18385,24 @@ async function updateWardrobeDescription(id, val) {
 async function updateWardrobePurchasedDate(id, val) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.purchasedDate = val.trim()||null;
+  await DB.wardrobe.put(w);
+}
+async function updateWardrobeIsNew(id, val) {
+  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
+  w.isNew = val;
+  render();
+  await DB.wardrobe.put(w);
+}
+async function setWardrobeAcquisition(id, mode) {
+  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
+  if (mode === 'gifted') {
+    w.gifted = true; w.price = null; w.paidOff = false; w.onSale = null; w.originalPrice = null;
+  } else if (mode === 'full') {
+    w.gifted = false; delete w.giftedBy; w.onSale = false; w.originalPrice = null;
+  } else if (mode === 'sale') {
+    w.gifted = false; delete w.giftedBy; w.onSale = true;
+  }
+  render();
   await DB.wardrobe.put(w);
 }
 async function generateWardrobeSketch(id) {
