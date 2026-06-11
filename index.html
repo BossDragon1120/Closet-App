@@ -2759,6 +2759,18 @@ const DB = {
           item.photo = item.photoUrl;      // cross-device: Storage URL (may be stale)
         }
       }));
+      // Apply localStorage purgatory backup -- belt-and-suspenders for offline/race conditions
+      try {
+        const purgatoryIds = new Set(JSON.parse(localStorage.getItem('closet-purgatory-ids') || '[]'));
+        if (purgatoryIds.size) {
+          items.forEach(item => {
+            if (purgatoryIds.has(String(item.id)) && !item.inMaybePile) {
+              item.inMaybePile = true;
+              item.maybePileAt = item.maybePileAt || new Date().toISOString();
+            }
+          });
+        }
+      } catch(e) {}
       return items;
     },
     put: async (w) => {
@@ -2894,6 +2906,7 @@ const S = {
   filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeForSaleFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
   _marketplaceListings: null, _marketplaceLoading: false, _viewSellerUid: null,
   _fbPrepSelected: [], _fbListings: {}, _fbPrepLoading: false, _fbPrepEdits: {},
+  _sellShareMode: false, _sellShareSelected: [],
   closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
@@ -2974,6 +2987,7 @@ const S = {
   _syncPulling:       false,
   // Quick Memorials (standalone — not tied to wardrobe items)
   quickMemorials:     JSON.parse(localStorage.getItem('closet-quick-memorials') || '[]'),
+  thankedLog:         JSON.parse(localStorage.getItem('closet-thanked-log') || '[]'),
   _quickMemorialForm: null, // { photo, mime, name, note } while composing
   // Squad Plans
   squadPlans:         JSON.parse(localStorage.getItem('closet-squad-plans') || '[]'),
@@ -3508,7 +3522,7 @@ async function shareText(title, text) {
   // Fallback: copy to clipboard
   try {
     await navigator.clipboard.writeText(text);
-    toast('Copied to clipboard ✓');
+    _recordThank(w); toast('Copied to clipboard ✓');
   } catch(e) { toast('Could not share — try copying manually'); }
 }
 
@@ -5302,6 +5316,7 @@ function switchTab(tab)  {
   // Paint the tab-bar active state immediately, then do the heavy render next frame
   requestAnimationFrame(() => render());
 }
+function renderRAF() { requestAnimationFrame(render); }
 
 /* ================================================================
    FEATURE MENU
@@ -5497,8 +5512,8 @@ function featuresMenuHTML() {
         ${menuRow('🌿', 'Closet Therapy', 'Seasonal in-person visit — photograph, organise & digitise your wardrobe', "S.menuSection='services';render()")}
         ${menuRow('📊', 'Your Fashion Stats', 'Tiles of your style data — shareable at a tap', "closeMenu();navigate('dashboard')")}
         ${menuRow('✨', 'Onboarding', 'Take the feature tour or set up your style', "closeMenu();S.onboardStep=0;navigate('onboarding')")}
-        ${menuRow('⚙️', 'Settings', 'API key, sync, and app preferences', "closeMenu();switchTab('settings')")}
         ${menuRow('✦', 'About Closet', 'Everything built into your style journal', "S.menuSection='about';render()")}
+        ${menuRow('⚙️', 'Settings', 'API key, sync, and app preferences', "closeMenu();switchTab('settings')")}
       </div>
       <div style="padding:12px 16px calc(12px + var(--safe-b));border-top:1px solid var(--border);flex-shrink:0;">
         <button onclick="S.featureMenuOpen=false;S.menuSection=null;signOut();" style="width:100%;background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Sign out</button>
@@ -6494,6 +6509,7 @@ function render() {
     case 'local':        html = viewLocal();        break;
     case 'sell':         html = viewSell();         break;
     case 'fun':          html = viewFun();          break;
+    case 'thanked-log':   html = viewThankedLog();   break;
     case 'hero-pieces':       navigate('wardrobe'); return; // merged into Gems
     case 'signature-pieces':  navigate('wardrobe'); return; // merged into Gems
     case 'brands':            html = viewBrands();            break;
@@ -7245,6 +7261,8 @@ function viewSell() {
           ${!isSold?`<div style="display:flex;gap:6px;">
             <button ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm('${l.id}')" onclick="openSellForm('${l.id}')"
               style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✏️ Edit</button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();shareOneListing('${l.id}')" onclick="shareOneListing('${l.id}')"
+              style="padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">🔗</button>
             <button ontouchend="if(_touchMoved)return;event.preventDefault();markSellListingSold('${l.id}')" onclick="markSellListingSold('${l.id}')"
               style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Sold</button>
             <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteSellListing('${l.id}')" onclick="deleteSellListing('${l.id}')"
@@ -7257,10 +7275,36 @@ function viewSell() {
     return `<div style="padding:12px 16px 0;">
       <div style="display:flex;gap:8px;margin-bottom:14px;">
         <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm()" onclick="openSellForm()" style="flex:1;margin:0;touch-action:manipulation;">+ New Listing</button>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();shareMyListings()" onclick="shareMyListings()"
-          style="padding:12px 16px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">🔗 Share</button>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._sellShareMode=!S._sellShareMode;S._sellShareSelected=[];renderRAF()" onclick="S._sellShareMode=!S._sellShareMode;S._sellShareSelected=[];renderRAF()"
+          style="padding:12px 16px;border-radius:var(--r-sm);border:1.5px solid ${S._sellShareMode?'var(--gold)':'var(--border)'};background:${S._sellShareMode?'rgba(212,175,55,0.12)':'var(--surface)'};font-size:13px;font-weight:700;color:${S._sellShareMode?'var(--gold-dk)':'var(--text-2)'};cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">🔗 ${S._sellShareMode?'Cancel':'Share'}</button>
       </div>
       ${activeListings.map(l=>listingCard(l,false)).join('')}
+      ${S._sellShareMode && activeListings.length ? (() => {
+        const sel = new Set(S._sellShareSelected || []);
+        const rows = activeListings.map(l => {
+          const checked = sel.has(l.id);
+          const priceStr = l.price ? ` - $${parseFloat(l.price).toFixed(0)}` : '';
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(212,175,55,0.2);touch-action:manipulation;"
+            ontouchend="if(_touchMoved)return;event.preventDefault();(()=>{const s=new Set(S._sellShareSelected||[]);if(s.has('${l.id}'))s.delete('${l.id}');else s.add('${l.id}');S._sellShareSelected=[...s];render()})()"
+            onclick="(()=>{const s=new Set(S._sellShareSelected||[]);if(s.has('${l.id}'))s.delete('${l.id}');else s.add('${l.id}');S._sellShareSelected=[...s];render()})()">
+            <div style="width:22px;height:22px;border-radius:6px;border:2px solid ${checked?'var(--gold)':'var(--border)'};background:${checked?'var(--gold)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+              ${checked?'<svg width="12" height="10" viewBox="0 0 12 10"><path d="M1 5l3.5 3.5L11 1" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>':''}
+            </div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);flex:1;">${esc(l.name)}${priceStr}</div>
+          </div>`;
+        }).join('');
+        const btnLabel = (S._sellShareSelected||[]).length
+          ? `Share ${(S._sellShareSelected||[]).length} listing${(S._sellShareSelected||[]).length>1?'s':''}`
+          : 'Share my shop';
+        return `<div style="margin-bottom:12px;padding:14px;background:rgba(212,175,55,0.08);border:1.5px solid var(--gold);border-radius:16px;">
+          <div style="font-size:12px;font-weight:700;color:var(--gold-dk);margin-bottom:10px;">Select listings to share (or share all):</div>
+          ${rows}
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();shareSelectedListings()" onclick="shareSelectedListings()"
+            style="margin-top:10px;width:100%;padding:11px;border-radius:100px;border:none;background:var(--gold);color:#1A1A1A;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            🔗 ${btnLabel}
+          </button>
+        </div>`;
+      })() : ''}
       ${soldListings.length?`<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin:16px 0 10px;">✓ Sold</div>${soldListings.map(l=>listingCard(l,true)).join('')}`:''}
     </div>`;
   })();
@@ -7672,6 +7716,39 @@ function shareMyListings() {
     navigator.clipboard.writeText(url).then(() => toast('Link copied! Share it with buyers.'));
   } else {
     prompt('Copy this link:', url);
+  }
+}
+function shareOneListing(id) {
+  const l = (S.sellListings || []).find(x => x.id === id);
+  if (!l) return;
+  const priceStr = l.price ? ` - $${parseFloat(l.price).toFixed(0)}` : '';
+  const condMap = { 'new-tags':'New with tags','like-new':'Like new','good':'Good','fair':'Fair','poor':'Poor' };
+  const condStr = l.condition ? ` (${condMap[l.condition]||l.condition})` : '';
+  const url = currentUser ? `${location.origin}${location.pathname}?seller=${currentUser.uid}` : location.href;
+  const text = `${l.name}${l.brand?' by '+l.brand:''}${priceStr}${condStr}\n${l.description||''}\n\nSee my full closet sale: ${url}`.trim();
+  if (navigator.share) {
+    navigator.share({ title: l.name + priceStr, text }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => toast('Listing copied to clipboard!'));
+  }
+}
+function shareSelectedListings() {
+  const sel = S._sellShareSelected || [];
+  const all = S.sellListings || [];
+  const items = sel.length ? all.filter(l => sel.includes(l.id)) : all.filter(l => l.status !== 'sold');
+  if (!items.length) { toast('No listings to share.'); return; }
+  const url = currentUser ? `${location.origin}${location.pathname}?seller=${currentUser.uid}` : location.href;
+  const condMap = { 'new-tags':'New with tags','like-new':'Like new','good':'Good','fair':'Fair','poor':'Poor' };
+  const lines = items.map(l => {
+    const priceStr = l.price ? ` - $${parseFloat(l.price).toFixed(0)}` : '';
+    const condStr = l.condition ? ` (${condMap[l.condition]||l.condition})` : '';
+    return `🏷️ ${l.name}${l.brand?' by '+l.brand:''}${priceStr}${condStr}`;
+  });
+  const text = `My closet sale \n${lines.join('\n')}\n\nShop here: ${url}`;
+  if (navigator.share) {
+    navigator.share({ title: 'My closet sale', text }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => { S._sellShareMode=false; S._sellShareSelected=[]; render(); toast('Listings copied to clipboard!'); });
   }
 }
 
@@ -8229,6 +8306,43 @@ function analyzePalette() {
   render();
 }
 
+
+function viewThankedLog() {
+  const log = (S.thankedLog || []);
+
+  const rows = log.map(t => {
+    const w = S.wardrobe.find(i => i.id === t.wId);
+    const dateStr = t.date ? fmtDate(t.date) : '';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="width:38px;height:38px;border-radius:10px;background:var(--gold-bg);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${w?.icon||'🎁'}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.itemName||'Item')}</div>
+        <div style="font-size:11px;color:var(--text-3);">${t.giftedBy ? 'Thanked ' + esc(t.giftedBy) : 'Thank you sent'} · ${dateStr}</div>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:#16A34A;background:#F0FDF4;border:1px solid #86EFAC;border-radius:100px;padding:4px 10px;flex-shrink:0;">✓ Sent</span>
+    </div>`;
+  }).join('');
+
+  const empty = `<div style="text-align:center;padding:48px 24px;color:var(--text-3);">
+    <div style="font-size:40px;margin-bottom:12px;">💌</div>
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">No thank yous logged yet</div>
+    <div style="font-size:13px;line-height:1.6;">When you send a thank you from the Fun tab, it'll be recorded here.</div>
+  </div>`;
+
+  return `<div class="view view-notab">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('fun')" onclick="navigate('fun')">${iconBack()} Fun</button>
+      <span class="nav-title">💌 Thank You History</span>
+      <div style="width:72px;"></div>
+    </div>
+    <div style="padding:16px 16px 80px;">
+      ${log.length ? `
+        <div style="font-size:13px;color:var(--text-2);margin-bottom:8px;">${log.length} thank you${log.length===1?'':'s'} sent</div>
+        ${rows}` : empty}
+    </div>
+  </div>`;
+}
+
 function viewFun() {
   const giftedItems = S.wardrobe.filter(w => w.gifted === true);
 
@@ -8276,6 +8390,7 @@ function viewFun() {
           style="flex-shrink:0;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:7px 14px;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
           💌 Thank ${w.giftedBy ? esc(w.giftedBy.split(' ')[0]) : 'them'}
         </button>
+        ${(S.thankedLog||[]).some(t=>t.wId===w.id)?'<span style="flex-shrink:0;font-size:11px;font-weight:700;color:#16A34A;background:#F0FDF4;border:1px solid #86EFAC;border-radius:100px;padding:4px 10px;">\u2713 Sent</span>':''}
       </div>`;
     }).join('');
 
@@ -8295,7 +8410,13 @@ function viewFun() {
             </button>`
           : '');
 
-    return itemsHTML + seeMoreBtn;
+    const thankedCount = (S.thankedLog||[]).length;
+    const historyLink = thankedCount > 0
+      ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('thanked-log')" onclick="navigate('thanked-log')"
+          style="width:100%;margin-top:10px;background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;padding:4px 0;">
+          💌 View thank you history (${thankedCount}) →
+        </button>` : '';
+    return itemsHTML + seeMoreBtn + historyLink;
   })();
 
   // ── Roulette result ───────────────────────────────────
@@ -8351,25 +8472,9 @@ function viewFun() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">🎉 Fun</span>
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();shareClosetApp()" onclick="shareClosetApp()" style="touch-action:manipulation;">🎀 Share</button>
     </div>
     <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding-bottom:100px;">
-
-      <!-- Share CTA -->
-      <div style="margin:16px 16px 0;">
-        <div style="border-radius:16px;border:1px solid rgba(212,175,55,0.35);background:linear-gradient(135deg,rgba(212,175,55,0.08) 0%,rgba(212,175,55,0.03) 100%);padding:16px 18px;display:flex;align-items:center;gap:14px;">
-          <div style="font-size:32px;line-height:1;flex-shrink:0;">🎀</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:700;color:#D4AF37;margin-bottom:2px;">Share with a friend</div>
-            <div style="font-size:12px;color:rgba(255,255,255,.55);line-height:1.4;">Know someone who'd love this? Send them the link.</div>
-          </div>
-          <button
-            ontouchend="if(_touchMoved)return;event.preventDefault();shareClosetApp()"
-            onclick="shareClosetApp()"
-            style="flex-shrink:0;background:linear-gradient(135deg,#D4AF37,#B8962E);border:none;border-radius:20px;padding:8px 16px;font-size:13px;font-weight:700;color:#1A1A1A;cursor:pointer;white-space:nowrap;">
-            ✨ Share
-          </button>
-        </div>
-      </div>
 
       <!-- Fashion Battle -->
       <div style="margin:16px 16px 0;">
@@ -12761,7 +12866,8 @@ function viewDashboard() {
   const avgRating = styleScore(S.entries);
   const totalWears = S.wardrobe.reduce((s,w)=>s+(w.wears?.length||0),0);
   const closetValue = S.wardrobe.reduce((s,w)=>s+(parseFloat(w.price)||0),0);
-  const unworn = S.wardrobe.filter(w=>!(w.wears?.length)).length;
+  const activeCount = S.wardrobe.filter(w=>!w.retiredFromCloset).length;
+  const unworn = S.wardrobe.filter(w=>!w.retiredFromCloset&&!(w.wears?.length)).length;
   const gifted = S.wardrobe.filter(w=>w.gifted).length;
   const tailoring = S.wardrobe.filter(w=>w.tailoringNeeded && !w.retiredFromCloset).length;
   const retired = S.wardrobe.filter(w=>w.retiredFromCloset).length;
@@ -12822,12 +12928,12 @@ function viewDashboard() {
   const gridTiles = [
     tile('📊', avgRating || '—', 'Style Score', S.entries.length ? `avg of ${S.entries.length} outfits` : 'no outfits yet', avgRating && avgRating >= 8 ? '#C8A000' : ''),
     tile('👗', S.entries.length, 'Outfits Logged', streak > 0 ? `🔥 ${streak}-day streak` : 'start a streak!'),
-    tile('🧺', S.wardrobe.length, 'Pieces in Closet', unworn > 0 ? `${unworn} never worn` : S.wardrobe.length ? 'all worn ✓' : 'add your first piece'),
-    tile('🔄', totalWears, 'Total Wears', S.wardrobe.length ? `avg ${(totalWears/Math.max(S.wardrobe.length,1)).toFixed(1)}/piece` : ''),
+    tile('🧺', activeCount, 'Pieces in Closet', unworn > 0 ? `${unworn} never worn` : activeCount ? 'all worn ✓' : 'add your first piece'),
+    tile('🔄', totalWears, 'Total Wears', activeCount ? `avg ${(totalWears/Math.max(activeCount,1)).toFixed(1)}/piece` : ''),
     ...(closetValue > 0 ? [tile('💰', '$'+Math.round(closetValue).toLocaleString(), 'Closet Value', costPerWear ? `$${costPerWear}/wear avg` : '')] : []),
     ...(wastedTotal > 0 ? [tile('💸', '$'+Math.round(wastedTotal), "Didn't Suit Me", `${wastedItems.length} piece${wastedItems.length===1?'':'s'} retired`)] : []),
-    ...(gifted > 0 ? [tile('🎁', gifted, 'Gifted Pieces', `${Math.round(gifted/Math.max(S.wardrobe.length,1)*100)}% of closet`)] : []),
-    ...(saleItems.length > 0 ? [tile('🏷️', saleItems.length, 'Bought on Sale', `${Math.round(saleItems.length/Math.max(S.wardrobe.length,1)*100)}% of closet`, '#16A34A')] : []),
+    ...(gifted > 0 ? [tile('🎁', gifted, 'Gifted Pieces', `${Math.round(gifted/Math.max(activeCount,1)*100)}% of closet`)] : []),
+    ...(saleItems.length > 0 ? [tile('🏷️', saleItems.length, 'Bought on Sale', `${Math.round(saleItems.length/Math.max(activeCount,1)*100)}% of closet`, '#16A34A')] : []),
     ...(totalSaved > 0 ? [tile('💚', '$'+Math.round(totalSaved).toLocaleString(), 'Total Saved', 'on sale purchases', '#16A34A')] : []),
     ...(tailoring > 0 ? [tile('🪡', tailoring, 'Need Tailoring', `piece${tailoring===1?'':'s'} to repair`, '#C8A8E0', `S.wardrobeTailoringFilter=true;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';switchTab('wardrobe')`)] : []),
     ...(retired > 0 ? [tile('🪦', retired, 'Retired', 'graduated from the closet')] : []),
@@ -12960,8 +13066,8 @@ async function shareStatsCard() {
   const stats=[
     ['📊', avgRating||'—', 'Style Score', S.entries.length?`${S.entries.length} outfits`:''],
     ['👗', S.entries.length, 'Outfits', streak>0?`${streak}-day streak`:''],
-    ['🧺', S.wardrobe.length, 'In Closet', unworn>0?`${unworn} never worn`:''],
-    ['🔄', totalWears, 'Total Wears', S.wardrobe.length?`avg ${(totalWears/Math.max(S.wardrobe.length,1)).toFixed(1)}/pc`:''],
+    ['🧺', activeCount, 'In Closet', unworn>0?`${unworn} never worn`:''],
+    ['🔄', totalWears, 'Total Wears', activeCount?`avg ${(totalWears/Math.max(activeCount,1)).toFixed(1)}/pc`:''],
     ...(closetValue>0?[['💰','$'+Math.round(closetValue).toLocaleString(),'Closet Value',totalWears>0?`$${(closetValue/totalWears).toFixed(2)}/wear`:'']]:[] ),
     ...(streak>0?[['🔥',streak,'Day Streak','keep it going!']]:[] ),
   ];
@@ -13451,7 +13557,7 @@ function viewWardrobe() {
           onclick="event.stopPropagation();confirmDeleteCustomShelf(${JSON.stringify(c)})"
           style="font-size:11px;line-height:1;opacity:${active?'0.75':'0.45'};padding:0 0 0 3px;cursor:pointer;touch-action:manipulation;" title="Delete shelf">✕</span>` : '';
         return `<div class="filter-chip ${active?'active':''} ${empty?'filter-chip-empty':''}" style="${isCustom?'border-style:dashed;':''}display:inline-flex;align-items:center;gap:2px;"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'&&!S._wardrobeHeroFilter?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'&&!S._wardrobeHeroFilter?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;renderRAF()"
           onclick="S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()">${c}${badge}${deleteX}</div>`;
       }).join('')}
       ${(() => {
@@ -13459,24 +13565,24 @@ function viewWardrobe() {
         const heroActive = S._wardrobeHeroFilter;
         const heroEmpty = gemCount === 0;
         return `<div class="filter-chip ${heroActive?'active':''} ${heroEmpty?'filter-chip-empty':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=!S._wardrobeHeroFilter;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
-          onclick="S._wardrobeHeroFilter=!S._wardrobeHeroFilter;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">💎 Gems<span class="cat-count-badge">${gemCount}</span></div>`;
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=!S._wardrobeHeroFilter;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()"
+          onclick="S._wardrobeHeroFilter=!S._wardrobeHeroFilter;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()">💎 Gems<span class="cat-count-badge">${gemCount}</span></div>`;
       })()}
       ${(() => {
         const tailorCount = activeWardrobe.filter(w => w.tailoringNeeded).length;
         const tailorActive = S.wardrobeTailoringFilter;
         const tailorEmpty = tailorCount === 0;
         return `<div class="filter-chip ${tailorActive?'active':''} ${tailorEmpty?'filter-chip-empty':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeTailoringFilter=!S.wardrobeTailoringFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
-          onclick="S.wardrobeTailoringFilter=!S.wardrobeTailoringFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">✂️ Tailor<span class="cat-count-badge">${tailorCount}</span></div>`;
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeTailoringFilter=!S.wardrobeTailoringFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()"
+          onclick="S.wardrobeTailoringFilter=!S.wardrobeTailoringFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()">✂️ Tailor<span class="cat-count-badge">${tailorCount}</span></div>`;
       })()}
       ${(() => {
         const mpCount = activeWardrobe.filter(w => w.inMaybePile).length;
         const mpActive = S._wardrobeMaybePileFilter;
         const mpEmpty = mpCount === 0;
         return `<div class="filter-chip ${mpActive?'active':''} ${mpEmpty?'filter-chip-empty':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S._wardrobeForSaleFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
-          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S._wardrobeForSaleFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">🤔 Purgatory<span class="cat-count-badge">${mpCount}</span></div>`;
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S._wardrobeForSaleFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()"
+          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S._wardrobeForSaleFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()">🤔 Purgatory<span class="cat-count-badge">${mpCount}</span></div>`;
       })()}
       ${(() => {
         const fsCount = (() => {
@@ -13486,8 +13592,8 @@ function viewWardrobe() {
         const fsActive = S._wardrobeForSaleFilter;
         const fsEmpty = fsCount === 0;
         return `<div class="filter-chip ${fsActive?'active':''} ${fsEmpty?'filter-chip-empty':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeForSaleFilter=!S._wardrobeForSaleFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()"
-          onclick="S._wardrobeForSaleFilter=!S._wardrobeForSaleFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;render()">💰 For Sale<span class="cat-count-badge">${fsCount}</span></div>`;
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeForSaleFilter=!S._wardrobeForSaleFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()"
+          onclick="S._wardrobeForSaleFilter=!S._wardrobeForSaleFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()">💰 For Sale<span class="cat-count-badge">${fsCount}</span></div>`;
       })()}
       ${S._addingShelf ? `
         <div style="display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1.5px solid var(--gold);border-radius:100px;padding:4px 6px 4px 12px;">
@@ -13532,8 +13638,8 @@ function viewWardrobe() {
   });
   const maybePileNudge = maybePileOverdue.length > 0 && !S._wardrobeMaybePileFilter ? `
     <div style="margin:0 16px 10px;padding:12px 14px;background:#F0EFFE;border:1.5px solid #9B7FE0;border-radius:var(--r-sm);display:flex;align-items:center;gap:12px;cursor:pointer;"
-      ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=true;S._wardrobeHeroFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';render()"
-      onclick="S._wardrobeMaybePileFilter=true;S._wardrobeHeroFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';render()">
+      ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=true;S._wardrobeHeroFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';renderRAF()"
+      onclick="S._wardrobeMaybePileFilter=true;S._wardrobeHeroFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';renderRAF()">
       <div style="font-size:22px;flex-shrink:0;">🤔</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:700;color:#5B3FBF;margin-bottom:2px;">${maybePileOverdue.length} item${maybePileOverdue.length===1?'':'s'} in Purgatory ${maybePileOverdue.length===1?'hasn\'t':'haven\'t'} been worn in ${MAYBE_PILE_DAYS} days</div>
@@ -13771,7 +13877,7 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
       .filter(w => w.retireReason === 'didnt-suit-me' && w.price)
       .reduce((sum, w) => sum + parseFloat(w.price || 0), 0);
     return `<div style="margin:4px 16px 8px;">
-      <button onclick="S.wardrobeRetiredExpanded=!S.wardrobeRetiredExpanded;render()" style="
+      <button onclick="S.wardrobeRetiredExpanded=!S.wardrobeRetiredExpanded;renderRAF()" style="
         width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;
         background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
         padding:12px 16px;cursor:pointer;font-family:inherit;
@@ -13842,8 +13948,8 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
       <span style="font-size:16px;">🧵</span>
       <div style="flex:1;font-size:13px;font-weight:700;color:#7B35A8;">Showing items that need tailoring</div>
       <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeTailoringFilter=false;render()"
-        onclick="S.wardrobeTailoringFilter=false;render()"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeTailoringFilter=false;renderRAF()"
+        onclick="S.wardrobeTailoringFilter=false;renderRAF()"
         style="font-size:12px;font-weight:700;color:#9050B8;background:none;border:1.5px solid #C8A0E8;border-radius:100px;padding:4px 10px;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
         ✕ Clear
       </button>
@@ -19029,10 +19135,15 @@ async function toggleWardrobeRetiring(id) {
   if (w.retiring) toast('🪡 Flagged — time to find its successor!');
 }
 
+function _savePurgatoryIds() {
+  const ids = S.wardrobe.filter(w=>w.inMaybePile).map(w=>String(w.id));
+  localStorage.setItem('closet-purgatory-ids', JSON.stringify(ids));
+}
 async function toggleMaybePile(id) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.inMaybePile = !w.inMaybePile;
   w.maybePileAt = w.inMaybePile ? new Date().toISOString() : null;
+  _savePurgatoryIds();
   render(); // immediate visual update
   toast(w.inMaybePile ? '🤔 Sent to Purgatory — we\'ll check in if it goes unworn.' : 'Rescued from Purgatory.');
   try { await DB.wardrobe.put(w); } catch(e) { console.error('toggleMaybePile save failed:', e); toast('⚠️ Couldn\'t save — check your connection.'); }
@@ -19042,6 +19153,7 @@ function rescueFromMaybePile(id) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.inMaybePile = false;
   w.maybePileAt = null;
+  _savePurgatoryIds();
   render(); // immediate visual update
   toast(`✨ ${w.name} rescued! It's earned its place.`);
   DB.wardrobe.put(w).catch(e => { console.error('rescueFromMaybePile save failed:', e); toast('Sync failed — check your connection.'); });
@@ -19394,16 +19506,36 @@ function viewRIP() {
     <div style="margin:0 16px 20px;border-radius:16px;border:1px solid rgba(147,112,219,0.35);background:rgba(147,112,219,0.08);padding:18px 16px;">
       <div style="font-size:14px;font-weight:700;color:#C39BD3;margin-bottom:14px;">📸 Add a Memory</div>
 
-      ${qf.photo
-        ? `<img src="data:${qf.mime||'image/jpeg'};base64,${qf.photo}" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-bottom:14px;">`
-        : `<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(147,112,219,0.12);border:2px dashed rgba(147,112,219,0.4);border-radius:12px;padding:28px 16px;margin-bottom:14px;cursor:pointer;">
-            <span style="font-size:32px;">📷</span>
-            <span style="font-size:13px;color:rgba(255,255,255,0.6);">Tap to choose a photo</span>
-            <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleQuickMemPhoto(this)">
-          </label>`}
+      ${qf._cropSrc ? `
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);text-align:center;padding:0 0 8px;">Drag the box to reposition · Drag corners to resize</div>
+        <div class="crop-wrap" id="qmCropWrap" style="margin-bottom:10px;border-radius:12px;height:240px;">
+          <img id="qmCropImg" class="crop-img-full" src="${esc(qf._cropSrc)}" alt="Crop photo" draggable="false">
+          <div class="crop-box" id="qmCropBox">
+            <div class="crop-rule-v"></div><div class="crop-rule-v"></div>
+            <div class="crop-rule-h"></div><div class="crop-rule-h"></div>
+            <div class="crop-handle" data-handle="tl"></div>
+            <div class="crop-handle" data-handle="tr"></div>
+            <div class="crop-handle" data-handle="bl"></div>
+            <div class="crop-handle" data-handle="br"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();cancelQuickMemCrop()" onclick="cancelQuickMemCrop()"
+            style="flex:1;padding:10px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">Cancel</button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();applyQuickMemCrop()" onclick="applyQuickMemCrop()"
+            style="flex:2;padding:10px;border-radius:100px;border:none;background:#9B59B6;color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Use Photo</button>
+        </div>` : ''}
 
-      ${qf.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('qmPhotoSwap').click()" onclick="document.getElementById('qmPhotoSwap').click()" style="background:none;border:none;color:rgba(147,112,219,0.8);font-size:12px;padding:0;margin-bottom:12px;cursor:pointer;">Change photo</button>
-      <input id="qmPhotoSwap" type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleQuickMemPhoto(this)">` : ''}
+      ${!qf._cropSrc && qf.photo
+        ? `<img src="data:${qf.mime||'image/jpeg'};base64,${qf.photo}" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-bottom:14px;">`
+        : (!qf._cropSrc ? `<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(147,112,219,0.12);border:2px dashed rgba(147,112,219,0.4);border-radius:12px;padding:28px 16px;margin-bottom:14px;cursor:pointer;">
+            <span style="font-size:32px;">📷</span>
+            <span style="font-size:13px;color:rgba(255,255,255,0.6);">Tap to choose from camera or library</span>
+            <input type="file" accept="image/*" style="display:none;" onchange="handleQuickMemPhoto(this)">
+          </label>` : '')}
+
+      ${!qf._cropSrc && qf.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('qmPhotoSwap').click()" onclick="document.getElementById('qmPhotoSwap').click()" style="background:none;border:none;color:rgba(147,112,219,0.8);font-size:12px;padding:0;margin-bottom:12px;cursor:pointer;">Change photo</button>
+      <input id="qmPhotoSwap" type="file" accept="image/*" style="display:none;" onchange="handleQuickMemPhoto(this)">` : ''}
 
       <input type="text" id="qmName" placeholder="Label (e.g. My favourite denim jacket)" value="${esc(qf.name||'')}"
         style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;font-size:14px;color:#fff;margin-bottom:10px;">
@@ -19448,21 +19580,89 @@ function viewRIP() {
 
 function handleQuickMemPhoto(input) {
   const file = input.files?.[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = evt => {
-    const dataUrl = evt.target.result;
-    const comma = dataUrl.indexOf(',');
-    // Capture current form text before re-render
-    const nameEl = document.getElementById('qmName');
-    const noteEl = document.getElementById('qmNote');
-    if (!S._quickMemorialForm) S._quickMemorialForm = {photo:null,mime:null,name:'',note:''};
-    if (nameEl) S._quickMemorialForm.name = nameEl.value;
-    if (noteEl) S._quickMemorialForm.note = noteEl.value;
-    S._quickMemorialForm.photo = dataUrl.slice(comma + 1);
-    S._quickMemorialForm.mime = file.type || 'image/jpeg';
+  input.value = '';
+  // Capture form text before async
+  const nameEl = document.getElementById('qmName');
+  const noteEl = document.getElementById('qmNote');
+  if (!S._quickMemorialForm) S._quickMemorialForm = {photo:null,mime:null,name:'',note:'',_cropSrc:null};
+  if (nameEl) S._quickMemorialForm.name = nameEl.value;
+  if (noteEl) S._quickMemorialForm.note = noteEl.value;
+  compressImage(file).then(({data}) => {
+    S._quickMemorialForm._cropSrc = data;
+    quickMemCropState = null;
     render();
+    requestAnimationFrame(() => initQuickMemCrop());
+  }).catch(() => toast('Could not load photo.'));
+}
+let quickMemCropState = null, _quickMemCropCleanup = null;
+function initQuickMemCrop() {
+  const wrap = document.getElementById('qmCropWrap');
+  const img  = document.getElementById('qmCropImg');
+  const box  = document.getElementById('qmCropBox');
+  if (!wrap || !img || !box) return;
+  img.onload = () => {
+    const cW = wrap.offsetWidth, cH = wrap.offsetHeight;
+    const bW = Math.min(cW * 0.9, cH * 0.9 * (4/3)), bH = bW * (3/4);
+    quickMemCropState = { x:Math.round((cW-bW)/2), y:Math.round((cH-bH)/2), w:Math.round(bW), h:Math.round(bH), containerW:cW, containerH:cH, dragging:false, resizing:null };
+    _updateQMCropBox();
+    const onMove = e => { const pt = e.touches?.[0]||e; const px=pt.clientX, py=pt.clientY;
+      if (!quickMemCropState) return;
+      if (quickMemCropState.dragging) { quickMemCropState.x=Math.round(Math.max(0,Math.min(quickMemCropState.containerW-quickMemCropState.w,px-quickMemCropState._ox))); quickMemCropState.y=Math.round(Math.max(0,Math.min(quickMemCropState.containerH-quickMemCropState.h,py-quickMemCropState._oy))); }
+      else if (quickMemCropState.resizing) { _doQMCropResize(px-quickMemCropState._px0, py-quickMemCropState._py0); }
+      _updateQMCropBox(); };
+    const onUp = () => { if(quickMemCropState){quickMemCropState.dragging=false;quickMemCropState.resizing=null;} };
+    const onDown = e => { e.preventDefault(); const pt=e.touches?.[0]||e; const px=pt.clientX, py=pt.clientY;
+      const hdl = e.target.dataset?.handle;
+      if (hdl) { quickMemCropState.resizing=hdl; quickMemCropState._px0=px; quickMemCropState._py0=py; quickMemCropState._x0=quickMemCropState.x; quickMemCropState._y0=quickMemCropState.y; quickMemCropState._w0=quickMemCropState.w; quickMemCropState._h0=quickMemCropState.h; }
+      else { quickMemCropState.dragging=true; quickMemCropState._ox=px-quickMemCropState.x; quickMemCropState._oy=py-quickMemCropState.y; } };
+    box.addEventListener('mousedown', onDown); box.addEventListener('touchstart', onDown, {passive:false});
+    document.addEventListener('mousemove', onMove); document.addEventListener('touchmove', onMove, {passive:false});
+    document.addEventListener('mouseup', onUp); document.addEventListener('touchend', onUp);
+    _quickMemCropCleanup = () => { box.removeEventListener('mousedown',onDown); box.removeEventListener('touchstart',onDown); document.removeEventListener('mousemove',onMove); document.removeEventListener('touchmove',onMove); document.removeEventListener('mouseup',onUp); document.removeEventListener('touchend',onUp); };
   };
-  reader.readAsDataURL(file);
+  if (img.complete && img.naturalWidth) img.onload();
+}
+function _updateQMCropBox() {
+  const box = document.getElementById('qmCropBox'); if (!box||!quickMemCropState) return;
+  box.style.left=quickMemCropState.x+'px'; box.style.top=quickMemCropState.y+'px';
+  box.style.width=quickMemCropState.w+'px'; box.style.height=quickMemCropState.h+'px';
+}
+function _doQMCropResize(dx, dy) {
+  if (!quickMemCropState) return;
+  const h=quickMemCropState.resizing, R=4/3, MIN=80;
+  const {_x0:sx,_y0:sy,_w0:sw,_h0:sh}=quickMemCropState;
+  let nx=sx,ny=sy,nw=sw,nh=sh;
+  if(h==='br'){nw=sw+dx;nh=nw/R;}else if(h==='bl'){nw=sw-dx;nh=nw/R;nx=sx+dx;}else if(h==='tr'){nw=sw+dx;nh=nw/R;ny=sy+sh-nh;}else if(h==='tl'){nw=sw-dx;nh=nw/R;nx=sx+dx;ny=sy+sh-nh;}
+  if(nw<MIN){nw=MIN;nh=nw/R;}
+  if(nx+nw>quickMemCropState.containerW){nw=quickMemCropState.containerW-nx;nh=nw/R;}
+  if(ny+nh>quickMemCropState.containerH){nh=quickMemCropState.containerH-ny;nw=nh*R;}
+  quickMemCropState.x=Math.round(nx); quickMemCropState.y=Math.round(ny);
+  quickMemCropState.w=Math.round(Math.max(MIN,nw)); quickMemCropState.h=Math.round(Math.max(MIN/R*1,nh));
+}
+function applyQuickMemCrop() {
+  const qf = S._quickMemorialForm; if (!qf||!qf._cropSrc||!quickMemCropState) return;
+  const img = document.getElementById('qmCropImg');
+  const wrap = document.getElementById('qmCropWrap');
+  if (!img||!wrap) return;
+  const scaleX = img.naturalWidth/wrap.offsetWidth;
+  const scaleY = img.naturalHeight/img.offsetHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width=Math.round(quickMemCropState.w*scaleX);
+  canvas.height=Math.round(quickMemCropState.h*scaleY);
+  canvas.getContext('2d').drawImage(img,Math.round(quickMemCropState.x*scaleX),Math.round(quickMemCropState.y*scaleY),canvas.width,canvas.height,0,0,canvas.width,canvas.height);
+  const dataUrl = canvas.toDataURL('image/jpeg',0.85);
+  const comma = dataUrl.indexOf(',');
+  qf.photo = dataUrl.slice(comma+1);
+  qf.mime = 'image/jpeg';
+  qf._cropSrc = null;
+  if (_quickMemCropCleanup) _quickMemCropCleanup();
+  quickMemCropState = null;
+  render();
+}
+function cancelQuickMemCrop() {
+  if (_quickMemCropCleanup) _quickMemCropCleanup();
+  quickMemCropState = null;
+  if (S._quickMemorialForm) { S._quickMemorialForm._cropSrc = null; render(); }
 }
 
 async function saveQuickMemorial() {
@@ -19631,6 +19831,15 @@ async function updateGiftedBy(id, name) {
   await DB.wardrobe.put(w);
 }
 
+function _recordThank(w) {
+  if (!S.thankedLog) S.thankedLog = [];
+  const today = new Date().toISOString().slice(0,10);
+  const already = S.thankedLog.find(t => t.wId === w.id && t.date.slice(0,10) === today);
+  if (already) return;
+  S.thankedLog.unshift({ id: Date.now().toString(36), wId: w.id, giftedBy: w.giftedBy || null, itemName: w.name, date: new Date().toISOString() });
+  localStorage.setItem('closet-thanked-log', JSON.stringify(S.thankedLog));
+}
+
 async function thankGifter(wId) {
   const w = S.wardrobe.find(i => i.id === wId); if (!w) return;
   const firstName = w.giftedBy ? w.giftedBy.trim().split(' ')[0] : null;
@@ -19665,12 +19874,12 @@ async function thankGifter(wId) {
       const file = new File([blob], `thank-you.${ext}`, { type: blob.type });
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({ title: 'Thanks for the ' + w.name + '!', text: text, files: [file] });
-        S.giftNudge = null; render(); return;
+        _recordThank(w); S.giftNudge = null; render(); return;
       }
     }
     if (navigator.share) {
       await navigator.share({ title: 'Thanks for the ' + w.name + '!', text: text });
-      S.giftNudge = null; render(); return;
+      _recordThank(w); S.giftNudge = null; render(); return;
     }
   } catch(shareErr) { if (shareErr.name === 'AbortError') return; }
 
@@ -19923,6 +20132,7 @@ function attachListeners() {
   if (fi) fi.onchange = handleFile;
   if (S.view === 'crop') initCrop();
   if (S._spottedCapture && S._spottedCapture._cropSrc) initSpottedCrop();
+  if (S._quickMemorialForm && S._quickMemorialForm._cropSrc) initQuickMemCrop();
   // Filter bar fade edges
   ['fbw-closet','fbw-wcat','fbw-wsub','fbw-wsort'].forEach(initFilterFade);
   // News flash swipe-to-dismiss
