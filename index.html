@@ -1956,63 +1956,6 @@ body {
 .shop-card-domain { font-size: 11px; color: var(--text-3); margin-top: 3px; }
 .shop-card-chevron { color: var(--text-3); flex-shrink: 0; }
 
-/* ── SQUAD MODE ──────────────────────────────────────────── */
-.squad-event-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow);
-  margin-bottom: 10px; cursor: pointer; transition: transform .12s;
-  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-}
-.squad-event-card:active { transform: scale(.98); }
-.squad-event-header {
-  padding: 12px 14px 10px; display: flex; align-items: center; gap: 10px;
-}
-.squad-event-icon { font-size: 26px; flex-shrink: 0; line-height: 1; }
-.squad-event-name { font-size: 15px; font-weight: 800; }
-.squad-event-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; line-height: 1.4; }
-.squad-member-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; border-top: 1px solid var(--border);
-}
-.squad-member-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: var(--gold-bg); display: flex; align-items: center;
-  justify-content: center; font-size: 15px; font-weight: 800;
-  color: var(--gold-dk); flex-shrink: 0;
-}
-.squad-member-name { font-size: 13px; font-weight: 700; }
-.squad-member-outfit { font-size: 12px; color: var(--text-2); margin-top: 1px; line-height: 1.35; }
-.squad-vibe-badge {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: var(--gold-bg); color: var(--gold-dk);
-  border-radius: 100px; font-size: 11px; font-weight: 800;
-  padding: 2px 8px; margin-left: auto; flex-shrink: 0;
-}
-.squad-reaction-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
-.squad-reaction-btn {
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 100px; padding: 2px 8px; font-size: 12px;
-  cursor: pointer; font-family: inherit; transition: background .12s;
-  display: flex; align-items: center; gap: 3px;
-}
-.squad-reaction-btn:active { background: var(--gold-bg); }
-.squad-vibe-check-card {
-  margin: 12px 14px; padding: 12px 14px;
-  background: var(--gold-bg); border-radius: var(--r-sm);
-  border: 1px solid rgba(184,125,42,.2);
-}
-.squad-type-grid {
-  display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 8px;
-}
-.squad-type-btn {
-  padding: 10px 4px; border-radius: var(--r-sm); border: 1.5px solid var(--border);
-  background: var(--surface); cursor: pointer; text-align: center;
-  font-family: inherit; transition: all .12s;
-}
-.squad-type-btn.active { border-color: var(--gold); background: var(--gold-bg); }
-.squad-type-btn .squad-type-icon { font-size: 20px; display: block; margin-bottom: 3px; }
-.squad-type-btn .squad-type-label { font-size: 10px; font-weight: 700; color: var(--text-2); }
-
 /* ── RESPONSIVE ──────────────────────────────────────────── */
 @media (min-width: 431px) {
   body { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
@@ -2657,6 +2600,7 @@ async function saveProfileToFirestore() {
       profileGeneration: S.profileGeneration, profileMBTI: S.profileMBTI,
       profileZodiac: S.profileZodiac, profileLocation: S.profileLocation,
       profileStyleWords: S.profileStyleWords,
+      nonNegPhysical: S.nonNegPhysical, nonNegAesthetic: S.nonNegAesthetic,
       cycleEnabled: S.cycleEnabled, cycleStartDay: S.cycleStartDay,
       cycleLength: S.cycleLength, cyclePeriodDays: S.cyclePeriodDays,
       stylePersona: S.stylePersona || null,
@@ -2669,7 +2613,6 @@ async function saveProfileToFirestore() {
       shopBlocked: [...S.shopBlocked],
       purchased: [...S.purchasedQueries],
       shopCache: S.shopCache,
-      squadPlans: S.squadPlans,
       weatherPin: S.weatherPin || null,
       customCategories: S.customCategories || [],
     }, { merge: true });
@@ -2700,6 +2643,8 @@ async function loadProfileFromFirestore() {
     applyStr('profileZodiac',     'closet-profile-zodiac');
     applyStr('profileLocation',   'closet-profile-location');
     applyStr('profileStyleWords', 'closet-profile-style-words');
+    applyStr('nonNegPhysical',    'closet-non-neg-physical');
+    applyStr('nonNegAesthetic',   'closet-non-neg-aesthetic');
     applyStr('signatureScent',    'closet-signature-scent');
     applyStr('hairstyle',         'closet-hairstyle');
     applyStr('signatureNailColor','closet-nail-color');
@@ -2721,7 +2666,6 @@ async function loadProfileFromFirestore() {
     if (p.purchased     != null) { S.purchasedQueries= new Set(p.purchased);                localStorage.setItem('closet-purchased',       JSON.stringify(p.purchased)); }
     if (p.shopBlocked   != null) { S.shopBlocked     = new Set(p.shopBlocked);              localStorage.setItem('closet-shop-blocked',    JSON.stringify(p.shopBlocked)); }
     if (p.shopCache     != null) { S.shopCache       = p.shopCache;                         localStorage.setItem('closet-shop-cache',      JSON.stringify(p.shopCache)); }
-    if (p.squadPlans    != null) { S.squadPlans      = p.squadPlans;                        localStorage.setItem('closet-squad-plans',     JSON.stringify(p.squadPlans)); }
     if (p.occasionTags     != null) { localStorage.setItem('closet-occasion-tags', JSON.stringify(p.occasionTags)); }
     if (p.customCategories != null) { S.customCategories = p.customCategories; localStorage.setItem('closet-custom-categories', JSON.stringify(p.customCategories)); }
   } catch(e) { console.error('loadProfileFromFirestore:', e); }
@@ -2864,11 +2808,7 @@ const S = {
   plan: { eventDesc: '', suggestion: null, loadingSuggest: false, tripPickerOpen: false, activeTripId: null, savedSuccess: false, soloMode: null, tripDestination: '', tripDays: 5, tripSuggestions: null, tripGaps: null, loadingTrip: false },
   eventBoard: JSON.parse(localStorage.getItem('closet-event-board') || '[]'), // [{id, desc, suggestion, tripId, addedAt}]
   eventTrips: JSON.parse(localStorage.getItem('closet-event-trips') || '[]'), // [{id, name, createdAt}]
-  sellListings: JSON.parse(localStorage.getItem('closet-sell-listings') || '[]'), // [{id,photo,wornPhoto,name,brand,category,size,condition,description,price,status,createdAt}]
   returnItems: JSON.parse(localStorage.getItem('closet-return-items') || '[]'),   // [{id,photo,store,channel,deadline,notes,createdAt}]
-  sellTab: 'listings', // 'listings' | 'returns'
-  _sellForm: null,   // active listing form state
-  _sellSaving: false,
   _returnForm: null, // active return form state
   _tripFlow: null, // { step:'naming', name:'' } — inline trip creation
   newsFlash: null, // { headline, summary, url, source, fetchedAt }
@@ -2903,10 +2843,7 @@ const S = {
   selectedWardrobeId: null,
   // ui
   loading: false, loadingMsg: '', error: null,
-  filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeForSaleFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
-  _marketplaceListings: null, _marketplaceLoading: false, _viewSellerUid: null,
-  _fbPrepSelected: [], _fbListings: {}, _fbPrepLoading: false, _fbPrepEdits: {},
-  _sellShareMode: false, _sellShareSelected: [],
+  filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
   closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
@@ -2920,6 +2857,9 @@ const S = {
   profileZodiac:      localStorage.getItem('closet-profile-zodiac')      || '',
   profileLocation:    localStorage.getItem('closet-profile-location')    || '',
   profileStyleWords:  localStorage.getItem('closet-profile-style-words') || '',
+  nonNegPhysical:     localStorage.getItem('closet-non-neg-physical')    || '',
+  nonNegAesthetic:    localStorage.getItem('closet-non-neg-aesthetic')   || '',
+  bulkAutoIdentify:   localStorage.getItem('closet-bulk-auto-id') === 'true',
   memorialFlow:       null,   // { id, note, photo, mime } — inline memorial editor
   eulogyPolishing:    false,  // true while Claude is rewriting the eulogy
   weatherPin:         JSON.parse(localStorage.getItem('closet-weather-pin') || 'null'),
@@ -2989,11 +2929,6 @@ const S = {
   quickMemorials:     JSON.parse(localStorage.getItem('closet-quick-memorials') || '[]'),
   thankedLog:         JSON.parse(localStorage.getItem('closet-thanked-log') || '[]'),
   _quickMemorialForm: null, // { photo, mime, name, note } while composing
-  // Squad Plans
-  squadPlans:         JSON.parse(localStorage.getItem('closet-squad-plans') || '[]'),
-  selectedSquadId:    null,
-  squadActiveEventId: '__default__',   // which event tab is open in squad detail
-  squadFlow:          null,            // { step:'create'|'join'|'claim', ...fields }
   toast: null,
 };
 
@@ -3167,8 +3102,9 @@ async function analyzeOutfit(photoBase64, mime, occasion, isFriend = false, frie
     ? `\nOCCASION CONTEXT: "${occasion}"\nSCORING CRITERIA: Analyze this outfit specifically against the stated occasion/context. Score on fit, cohesion, and appropriateness for this specific scenario. Tailor all recommendations and the suggestedOccasion to this context.\n`
     : '\nSCORING CRITERIA: Color coordination, color harmony, fit, proportions, overall styling, and appropriateness for the look\'s implied occasion.\n';
 
-  const prompt = `You are an expert fashion stylist and judge. Analyze this outfit photo and respond with ONLY a raw JSON object — no markdown, no code fences, no commentary before or after.
-${profileLine ? `\nCLIENT PROFILE: ${profileLine}\n` : ''}${occasionLine}${wardrobeSummary}
+  // Static system prompt — eligible for Anthropic prompt caching (same profile + wardrobe across calls)
+  const sysText = `You are an expert fashion stylist and judge. Analyze this outfit photo and respond with ONLY a raw JSON object — no markdown, no code fences, no commentary before or after.
+${profileLine ? `\nCLIENT PROFILE: ${profileLine}\n` : ''}${wardrobeSummary}
 FIRST: count the number of people in the photo.
 
 IF EXACTLY ONE PERSON — respond with exactly this JSON shape:
@@ -3214,11 +3150,15 @@ MANDATORY rules — violating any of these makes the response unusable:
 • "ratingNote" MUST be a non-empty string — this field is REQUIRED, never omit it
 • Item names must be specific: "Ivory Linen Wide-Leg Trouser" not "pants"
 • Pick an accurate emoji icon per item
-• Use the SCORING CRITERIA above — do not fall back to generic fashion scoring when an occasion is provided
+• Use the SCORING CRITERIA from the user message — do not fall back to generic fashion scoring when an occasion is provided
 • "stylingTips": 1–3 actionable tips using items they ALREADY OWN (tucking, swapping a logged wardrobe piece, adjusting proportions, etc.) — never suggest buying something here
-• "purchaseRecs": 1–3 items NOT in their wardrobe that would visibly elevate this outfit. Each entry must have "item" (specific name), "reason" (one sentence), and "query" (retail search term). PRICE TIER: ${{ 1:'under $50 (budget/affordable)', 2:'$50–$200 (mid-range)', 3:'$200+ (luxury/designer)' }[S.shopBudget]} — tailor terms to this price point.${S.shopBlocked.size > 0 ? `\n• NEVER suggest any of these item types the user has explicitly rejected: ${[...S.shopBlocked].join(', ')} — avoid these categories entirely.` : ''}
-• "suggestedOccasion": Pick the single best-matching category from this list based on the occasion context provided (or infer from the outfit if no context given): ${getOccasionTags().join(', ')}. Return exactly one tag from this list.
+• "purchaseRecs": 1–3 items NOT in their wardrobe that would visibly elevate this outfit. Each entry must have "item" (specific name), "reason" (one sentence), and "query" (retail search term). Price tier and blocked categories are specified in the user message.
+• "suggestedOccasion": Pick the single best-matching tag from the occasion list in the user message. Return exactly one tag from that list.
 • Output ONLY the JSON object — no text before or after, no code fences`;
+
+  // Dynamic user text — changes per call (occasion context, shop budget/blocked, occasion tag list)
+  const userText = `${occasionLine}PURCHASE RECS — PRICE TIER: ${{ 1:'under $50 (budget/affordable)', 2:'$50–$200 (mid-range)', 3:'$200+ (luxury/designer)' }[S.shopBudget]} — tailor purchase rec search terms to this price point.${S.shopBlocked.size > 0 ? `\nNEVER suggest any of these item types the user has explicitly rejected: ${[...S.shopBlocked].join(', ')} — avoid these categories entirely.` : ''}
+SUGGESTED OCCASION LIST — pick exactly one: ${getOccasionTags().join(', ')}`;
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -3227,12 +3167,14 @@ MANDATORY rules — violating any of these makes the response unusable:
       'x-api-key': key,
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
+      'anthropic-beta': 'prompt-caching-2024-07-31',
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-6', max_tokens: 2048,
+      model: 'claude-sonnet-4-6', max_tokens: 2048,
+      system: [{ type: 'text', text: sysText, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: mime || 'image/jpeg', data: photoBase64.split(',')[1] } },
-        { type: 'text', text: prompt }
+        { type: 'text', text: userText }
       ]}]
     }),
   });
@@ -3414,6 +3356,8 @@ async function generateStylePersona() {
       S.profileLocation    ? `Location/Climate: ${S.profileLocation}` : '',
       S.profileStyleWords  ? `Self-described style: "${S.profileStyleWords}"` : '',
       S.profileAge         ? `Age: ${S.profileAge}` : '',
+      S.nonNegPhysical     ? `Physical/practical non-negotiables (never suggest items that conflict with these): ${S.nonNegPhysical}` : '',
+      S.nonNegAesthetic    ? `Aesthetic non-negotiables (styles this person consistently avoids): ${S.nonNegAesthetic}` : '',
     ].filter(Boolean).join('\n');
 
     const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
@@ -4412,541 +4356,6 @@ async function initWeatherPin() {
 /* ================================================================
    SQUAD MODE
    ================================================================ */
-const SQUAD_TYPES = [
-  { id:'beach',        label:'Beach Trip',    icon:'🌊' },
-  { id:'bachelorette', label:'Bachelorette',  icon:'💅' },
-  { id:'bachelor',     label:'Bachelor',      icon:'🕺' },
-  { id:'wedding',      label:'Wedding',       icon:'💒' },
-  { id:'athletic',     label:'Team Sport',    icon:'🏆' },
-  { id:'birthday',     label:'Birthday',      icon:'🎂' },
-  { id:'work',         label:'Work Trip',     icon:'💼' },
-  { id:'holiday',      label:'Holiday Party', icon:'🎉' },
-  { id:'custom',       label:'Custom',        icon:'✨' },
-];
-const SQUAD_REACTIONS = ['❤️','🔥','👏','😍','🤌','😂'];
-// Default event id used for single-event plans
-const SQUAD_DEFAULT_EVT = '__default__';
-
-function getSquadType(id) { return SQUAD_TYPES.find(t=>t.id===id) || SQUAD_TYPES[SQUAD_TYPES.length-1]; }
-function saveSquadPlans() {
-  localStorage.setItem('closet-squad-plans', JSON.stringify(S.squadPlans)); fsSet('squadPlans', S.squadPlans);
-  scheduleSyncPush();
-}
-
-/* ================================================================
-   CLOUD SYNC
-   ================================================================ */
-let _syncPushTimer = null;
-
-function scheduleSyncPush() {
-  if (!S.syncUrl || !S.syncCode) return;
-  clearTimeout(_syncPushTimer);
-  _syncPushTimer = setTimeout(syncPush, 20000); // 20 s debounce
-}
-
-async function buildSyncPayload() {
-  // Strip base64 photos (large) — they stay local, referenced by id
-  const stripPhoto = items => items.map(item => {
-    const c = { ...item };
-    if (c.photo) { c.hasPhoto = true; delete c.photo; }
-    return c;
-  });
-  const stripSquadPhotos = plans => plans.map(p => {
-    const cp = JSON.parse(JSON.stringify(p));
-    cp.slots?.forEach(s => { delete s.photo; });
-    return cp;
-  });
-  const [entries, wardrobe] = await Promise.all([
-    DB.entries.getAll(),
-    DB.wardrobe.getAll(),
-  ]);
-  return {
-    v: 2, ts: Date.now(),
-    entries:  stripPhoto(entries),
-    wardrobe: stripPhoto(wardrobe),
-    squadPlans:     stripSquadPhotos(S.squadPlans),
-    persona:        S.stylePersona,
-    personaHistory: S.personaHistory,
-    styleAvatar:    S.styleAvatar,
-    profileName:    S.profileName,
-    profileAge:     S.profileAge,
-    profileHeight:  S.profileHeight,
-    profileWeight:  S.profileWeight,
-    profileGeneration:  S.profileGeneration,
-    profileMBTI:        S.profileMBTI,
-    profileZodiac:      S.profileZodiac,
-    profileLocation:    S.profileLocation,
-    profileStyleWords:  S.profileStyleWords,
-    shopBlocked:        [...S.shopBlocked],
-    purchasedQueries:   [...S.purchasedQueries],
-  };
-}
-
-/* syncPush / syncPull — replaced by Firebase automatic sync */
-async function syncPush() {
-  await saveProfileToFirestore();
-  toast('Saved to cloud ✓');
-}
-async function syncPull() {
-  await loadProfileFromFirestore();
-  [S.entries, S.wardrobe] = await Promise.all([DB.entries.getAll(), DB.wardrobe.getAll()]);
-  render();
-  toast('Refreshed from cloud ✓');
-}
-
-async function applySyncData(remote) {
-  // Save local photos by id before merge
-  const photoMap = {};
-  S.entries.forEach(e  => { if (e.photo)  photoMap[`e-${e.id}`]  = e.photo; });
-  S.wardrobe.forEach(w => { if (w.photo)  photoMap[`w-${w.id}`]  = w.photo; });
-
-  // ── Entries: union by id, newer createdAt wins ──────────────
-  const eMap = {};
-  S.entries.forEach(e => eMap[e.id] = e);
-  (remote.entries || []).forEach(re => {
-    const local = eMap[re.id];
-    if (!local || new Date(re.createdAt) >= new Date(local.createdAt)) eMap[re.id] = re;
-  });
-  const mergedEntries = Object.values(eMap).sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
-  mergedEntries.forEach(e => { if (photoMap[`e-${e.id}`]) e.photo = photoMap[`e-${e.id}`]; });
-
-  // ── Wardrobe: union by id ────────────────────────────────────
-  const wMap = {};
-  S.wardrobe.forEach(w => wMap[w.id] = w);
-  (remote.wardrobe || []).forEach(rw => { if (!wMap[rw.id]) wMap[rw.id] = rw; });
-  const mergedWardrobe = Object.values(wMap);
-  mergedWardrobe.forEach(w => { if (photoMap[`w-${w.id}`]) w.photo = photoMap[`w-${w.id}`]; });
-
-  // Write to IndexedDB
-  await Promise.all([
-    ...mergedEntries.map(e => DB.entries.put(e)),
-    ...mergedWardrobe.map(w => DB.wardrobe.put(w)),
-  ]);
-  S.entries  = await DB.entries.getAll();
-  S.wardrobe = await DB.wardrobe.getAll();
-
-  // ── Squad plans: union by id ─────────────────────────────────
-  const sqMap = {};
-  S.squadPlans.forEach(p => sqMap[p.id] = p);
-  (remote.squadPlans || []).forEach(p => { if (!sqMap[p.id]) sqMap[p.id] = p; });
-  S.squadPlans = Object.values(sqMap);
-  localStorage.setItem('closet-squad-plans', JSON.stringify(S.squadPlans)); fsSet('squadPlans', S.squadPlans);
-
-  // ── Persona: newest wins ──────────────────────────────────────
-  if (remote.persona && (!S.stylePersona || (remote.persona.ts||0) > (S.stylePersona?.ts||0))) {
-    S.stylePersona = remote.persona;
-    localStorage.setItem('closet-persona', JSON.stringify(S.stylePersona));
-  }
-  if (remote.personaHistory?.length) {
-    const hMap = {};
-    [...S.personaHistory, ...remote.personaHistory].forEach(h => hMap[h.ts] = h);
-    S.personaHistory = Object.values(hMap).sort((a,b) => b.ts-a.ts);
-    localStorage.setItem('closet-persona-history', JSON.stringify(S.personaHistory)); fsSet('personaHistory', S.personaHistory);
-  }
-  if (remote.styleAvatar && (!S.styleAvatar || (remote.styleAvatar.ts||0) > (S.styleAvatar?.ts||0))) {
-    S.styleAvatar = remote.styleAvatar;
-    localStorage.setItem('closet-style-avatar', JSON.stringify(S.styleAvatar)); fsSet('styleAvatar', S.styleAvatar);
-  }
-
-  // ── Profile: fill blanks from remote ─────────────────────────
-  const pFields = ['profileName','profileAge','profileHeight','profileWeight',
-    'profileGeneration','profileMBTI','profileZodiac','profileLocation','profileStyleWords'];
-  const lsKeys  = ['closet-profile-name','closet-profile-age','closet-profile-height',
-    'closet-profile-weight','closet-profile-gen','closet-profile-mbti','closet-profile-zodiac',
-    'closet-profile-location','closet-profile-style-words'];
-  pFields.forEach((f, i) => {
-    if (remote[f] && !S[f]) { S[f] = remote[f]; localStorage.setItem(lsKeys[i], S[f]); }
-  });
-
-  // ── Shop data: union ─────────────────────────────────────────
-  (remote.shopBlocked      || []).forEach(k => S.shopBlocked.add(k));
-  (remote.purchasedQueries || []).forEach(k => S.purchasedQueries.add(k));
-  localStorage.setItem('closet-shop-blocked',  JSON.stringify([...S.shopBlocked]));
-  localStorage.setItem('closet-purchased',      JSON.stringify([...S.purchasedQueries]));
-}
-
-function generateSyncCode() {
-  const uuid = typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
-  S.syncCode = uuid;
-  localStorage.setItem('closet-sync-code', uuid);
-  render();
-  toast('New code generated — save it somewhere safe!');
-}
-
-function saveSyncSettings() {
-  const urlEl = document.getElementById('syncUrlInput');
-  const codeEl = document.getElementById('syncCodeInput');
-  if (urlEl) { S.syncUrl  = urlEl.value.trim().replace(/\/$/, ''); localStorage.setItem('closet-sync-url',  S.syncUrl);  }
-  if (codeEl) { S.syncCode = codeEl.value.trim();                  localStorage.setItem('closet-sync-code', S.syncCode); }
-  toast('Sync settings saved');
-  render();
-}
-
-function openSquadDetail(id) {
-  S.selectedSquadId = id;
-  S.planMode = 'group';
-  navigate('squad');
-}
-
-function startCreateSquad() {
-  S.squadFlow = { step:'create', name:'', type:'custom', dateStart:'', dateEnd:'', vibe:'', dressCode:'', names:'' };
-  render();
-}
-function cancelSquadFlow() { S.squadFlow = null; render(); }
-
-function confirmCreateSquad() {
-  if (document.activeElement?.blur) document.activeElement.blur();
-  const flow = S.squadFlow;
-  if (!flow || flow.step !== 'create') return;
-  if (!flow.name.trim()) { toast('Give your event a name ✏️'); return; }
-  const plan = {
-    id: 'sq-'+Date.now(),
-    name: flow.name.trim(),
-    type: flow.type,
-    dateStart: flow.dateStart,
-    dateEnd: flow.dateEnd,
-    vibe: flow.vibe.trim(),
-    dressCode: flow.dressCode.trim(),
-    names: flow.names.trim(),
-    slots: [
-      { label: 'Look 1', photo: null },
-      { label: 'Look 2', photo: null },
-      { label: 'Look 3', photo: null },
-      { label: 'Look 4', photo: null },
-      { label: 'Look 5', photo: null },
-    ],
-    createdAt: new Date().toISOString(),
-  };
-  S.squadPlans.unshift(plan);
-  saveSquadPlans();
-  S.squadFlow = null;
-  S.selectedSquadId = plan.id;
-  navigate('squad');
-  toast(`${getSquadType(plan.type).icon} "${plan.name}" created!`);
-}
-
-async function squadSlotPhoto(planId, slotIdx, file) {
-  if (!file) return;
-  const plan = S.squadPlans.find(p => p.id === planId);
-  if (!plan || !plan.slots?.[slotIdx]) return;
-  try {
-    const compressed = await compressImage(file);
-    plan.slots[slotIdx].photo = compressed.data;
-    saveSquadPlans(); render();
-  } catch { toast('Could not load photo'); }
-}
-
-function removeSquadSlotPhoto(planId, slotIdx) {
-  const plan = S.squadPlans.find(p => p.id === planId);
-  if (!plan || !plan.slots?.[slotIdx]) return;
-  plan.slots[slotIdx].photo = null;
-  saveSquadPlans(); render();
-}
-
-function updateSquadSlotLabel(planId, slotIdx, label) {
-  const plan = S.squadPlans.find(p => p.id === planId);
-  if (!plan || !plan.slots?.[slotIdx]) return;
-  plan.slots[slotIdx].label = label;
-  saveSquadPlans();
-}
-
-function deleteSquadPlan(id) {
-  if (!confirm('Remove this squad plan from your device?')) return;
-  S.squadPlans = S.squadPlans.filter(p => p.id !== id);
-  saveSquadPlans(); S.planMode = 'group'; navigate('plan'); toast('Removed');
-}
-
-function updateSquadPlanField(planId, field, value) {
-  const plan = S.squadPlans.find(p => p.id === planId);
-  if (!plan) return;
-  plan[field] = value;
-  saveSquadPlans();
-}
-
-async function shareSquadCard(planId) {
-  const plan = S.squadPlans.find(p => p.id === planId);
-  if (!plan) return;
-  toast('Generating card…');
-
-  const slots = (plan.slots || []).slice(0, 5);
-  const t = getSquadType(plan.type);
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const bg = isDark ? '#1c1c1e' : '#f9f7f4';
-  const surface = isDark ? '#2c2c2e' : '#ffffff';
-  const border = isDark ? '#3a3a3c' : '#e5e0d8';
-  const textPrimary = isDark ? '#f5f5f5' : '#1a1a1a';
-  const textSecondary = isDark ? '#8e8e93' : '#888888';
-  const gold = '#b87d2a';
-
-  const fmtDate = (() => {
-    if (plan.dateStart && plan.dateEnd && plan.dateStart !== plan.dateEnd) {
-      const s = new Date(plan.dateStart+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      const e = new Date(plan.dateEnd+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-      return `${s} – ${e}`;
-    } else if (plan.dateStart) {
-      return new Date(plan.dateStart+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    }
-    return '';
-  })();
-
-  // Canvas layout
-  const W = 750;
-  const SLOT_W = 130, SLOT_H = 174;
-  const HEADER_H = 160;
-  const SLOTS_ROW_H = SLOT_H + 44;
-  const H = HEADER_H + SLOTS_ROW_H + 48;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-
-  // Background
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
-
-  // Gold top bar
-  ctx.fillStyle = gold;
-  ctx.fillRect(0, 0, W, 4);
-
-  // Header card
-  ctx.fillStyle = surface;
-  ctx.beginPath();
-  ctx.roundRect(16, 14, W-32, HEADER_H - 8, 14);
-  ctx.fill();
-  ctx.strokeStyle = border;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Event type icon
-  ctx.font = '38px serif';
-  ctx.fillText(t.icon, 28, 68);
-
-  // Event name
-  ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
-  ctx.fillStyle = textPrimary;
-  ctx.fillText(plan.name.slice(0, 38), 78, 60);
-
-  // Type + date
-  ctx.font = '12px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
-  ctx.fillStyle = textSecondary;
-  ctx.fillText(`${t.label}${fmtDate ? ' · ' + fmtDate : ''}`, 78, 78);
-
-  // Vibe
-  if (plan.vibe) {
-    ctx.font = 'italic 12px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
-    ctx.fillStyle = gold;
-    ctx.fillText(`✦ ${plan.vibe.slice(0,50)}`, 78, 96);
-  }
-
-  // Dress code + squad
-  let infoY = 116;
-  if (plan.dressCode) {
-    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
-    ctx.fillStyle = textSecondary;
-    ctx.fillText(`Dress code: ${plan.dressCode.slice(0,50)}`, 28, infoY);
-    infoY += 16;
-  }
-  if (plan.names) {
-    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
-    ctx.fillStyle = textSecondary;
-    ctx.fillText(`Squad: ${plan.names.slice(0,60)}`, 28, infoY);
-  }
-
-  // Slots
-  const totalW = slots.length * SLOT_W + (slots.length - 1) * 10;
-  const startX = Math.round((W - totalW) / 2);
-  const slotY = HEADER_H + 8;
-
-  for (let i = 0; i < slots.length; i++) {
-    const slot = slots[i] || { label: `Look ${i+1}`, photo: null };
-    const x = startX + i * (SLOT_W + 10);
-
-    // Slot card
-    ctx.fillStyle = surface;
-    ctx.beginPath();
-    ctx.roundRect(x, slotY, SLOT_W, SLOT_H + 30, 10);
-    ctx.fill();
-    ctx.strokeStyle = border;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    if (slot.photo) {
-      await new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => {
-          ctx.save();
-          ctx.beginPath();
-          ctx.roundRect(x, slotY, SLOT_W, SLOT_H, 10);
-          ctx.clip();
-          const ar = img.width / img.height;
-          const slotAr = SLOT_W / SLOT_H;
-          let sx=0,sy=0,sw=img.width,sh=img.height;
-          if (ar > slotAr) { sw = img.height * slotAr; sx = (img.width - sw) / 2; }
-          else { sh = img.width / slotAr; sy = (img.height - sh) / 2; }
-          ctx.drawImage(img, sx, sy, sw, sh, x, slotY, SLOT_W, SLOT_H);
-          ctx.restore();
-          resolve();
-        };
-        img.onerror = resolve;
-        img.src = slot.photo;
-      });
-    } else {
-      ctx.fillStyle = isDark ? '#3a3a3c' : '#f0ede8';
-      ctx.beginPath();
-      ctx.roundRect(x, slotY, SLOT_W, SLOT_H, 10);
-      ctx.fill();
-      ctx.font = '30px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('👗', x + SLOT_W/2, slotY + SLOT_H/2 + 10);
-      ctx.textAlign = 'left';
-    }
-
-    // Label
-    ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
-    ctx.fillStyle = textPrimary;
-    ctx.textAlign = 'center';
-    const labelText = (slot.label || `Look ${i+1}`).slice(0, 14);
-    ctx.fillText(labelText, x + SLOT_W/2, slotY + SLOT_H + 18);
-    ctx.textAlign = 'left';
-  }
-
-  // Watermark
-  ctx.font = '11px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif';
-  ctx.fillStyle = isDark ? '#48484a' : '#c7c2b8';
-  ctx.textAlign = 'center';
-  ctx.fillText('Made with Closet', W/2, H - 12);
-  ctx.textAlign = 'left';
-
-  canvas.toBlob(async blob => {
-    const fileName = `${plan.name.replace(/[^a-z0-9]/gi,'-').toLowerCase()}-squad.png`;
-    const file = new File([blob], fileName, { type:'image/png' });
-    if (navigator.share && navigator.canShare?.({ files:[file] })) {
-      try { await navigator.share({ files:[file], title:plan.name }); return; }
-      catch(e) { if (e.name==='AbortError') return; }
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    toast('Card saved ✓');
-  }, 'image/png');
-}
-
-/* ================================================================
-   VIEW: SQUAD DETAIL
-   ================================================================ */
-function viewSquadDetail() {
-  const plan = S.squadPlans.find(p => p.id === S.selectedSquadId);
-  if (!plan) { navigate('plan'); return ''; }
-
-  // Ensure slots exist (backward compat with old schema)
-  if (!plan.slots || !Array.isArray(plan.slots)) plan.slots = [];
-  while (plan.slots.length < 5) plan.slots.push({ label: `Look ${plan.slots.length+1}`, photo: null });
-
-  const t = getSquadType(plan.type);
-  const fmtDate = (() => {
-    if (plan.dateStart && plan.dateEnd && plan.dateStart !== plan.dateEnd) {
-      const s = new Date(plan.dateStart+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      const e = new Date(plan.dateEnd+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-      return `${s} – ${e}`;
-    } else if (plan.dateStart) {
-      return new Date(plan.dateStart+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    } else if (plan.date) {
-      return new Date(plan.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    }
-    return '';
-  })();
-
-  // ── Photo slots ─────────────────────────────────────────────
-  const slotsHTML = plan.slots.slice(0,5).map((slot, i) => {
-    return `
-      <div style="display:flex;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
-        ${slot.photo
-          ? `<div style="position:relative;">
-              <img src="${slot.photo}" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block;">
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();removeSquadSlotPhoto('${plan.id}',${i})" onclick="removeSquadSlotPhoto('${plan.id}',${i})" style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.55);border:none;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;">✕</button>
-            </div>`
-          : `<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;aspect-ratio:3/4;background:var(--surface-2);cursor:pointer;">
-              <span style="font-size:24px;">📸</span>
-              <span style="font-size:10px;font-weight:700;color:var(--gold);text-align:center;line-height:1.3;">Add Photo</span>
-              <input type="file" accept="image/*" style="display:none;" onchange="squadSlotPhoto('${plan.id}',${i},this.files[0])">
-            </label>`}
-        <div style="padding:6px 8px;">
-          <input class="form-input" style="margin:0;font-size:11px;padding:5px 7px;font-weight:700;"
-            placeholder="Label…"
-            value="${esc(slot.label||'')}"
-            onchange="updateSquadSlotLabel('${plan.id}',${i},this.value)"
-            oninput="updateSquadSlotLabel('${plan.id}',${i},this.value)">
-        </div>
-      </div>`;
-  }).join('');
-
-  return `<div class="view view-notab">
-    <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();S.planMode='group';navigate('plan')" onclick="S.planMode='group';navigate('plan')">${iconBack()} Plan</button>
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteSquadPlan('${plan.id}')" onclick="deleteSquadPlan('${plan.id}')" style="background:none;border:none;font-size:13px;font-weight:600;color:#c0392b;cursor:pointer;font-family:inherit;padding:4px 8px;">Delete</button>
-    </div>
-
-    <!-- Plan info card — editable inline -->
-    <div style="margin:14px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-        <div style="font-size:32px;line-height:1;">${t.icon}</div>
-        <div style="flex:1;min-width:0;">
-          <input class="form-input" style="margin:0 0 4px;font-size:17px;font-weight:800;padding:5px 8px;border-radius:8px;"
-            value="${esc(plan.name)}"
-            placeholder="Event name"
-            oninput="updateSquadPlanField('${plan.id}','name',this.value)">
-          <div style="font-size:11px;color:var(--text-3);">${t.label}${fmtDate ? ' · ' + fmtDate : ''}</div>
-        </div>
-      </div>
-      <input class="form-input" style="margin:0 0 6px;font-size:13px;padding:6px 8px;border-radius:8px;"
-        value="${esc(plan.vibe||'')}"
-        placeholder="✦ Vibe / theme…"
-        oninput="updateSquadPlanField('${plan.id}','vibe',this.value)">
-      <input class="form-input" style="margin:0 0 6px;font-size:13px;padding:6px 8px;border-radius:8px;"
-        value="${esc(plan.dressCode||'')}"
-        placeholder="Dress code…"
-        oninput="updateSquadPlanField('${plan.id}','dressCode',this.value)">
-      <input class="form-input" style="margin:0;font-size:13px;padding:6px 8px;border-radius:8px;"
-        value="${esc(plan.names||'')}"
-        placeholder="Who's coming? (comma-separated)"
-        oninput="updateSquadPlanField('${plan.id}','names',this.value)">
-    </div>
-
-    <!-- Photo slots -->
-    <div style="margin:16px 16px 0;">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">📸 Looks</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-        ${slotsHTML}
-        <div style="display:none;"></div>
-      </div>
-      <div style="font-size:11px;color:var(--text-3);margin-top:8px;text-align:center;">Tap a slot to add a photo · Edit labels below each photo</div>
-    </div>
-
-    <!-- Actions -->
-    <div style="padding:16px 16px max(24px,env(safe-area-inset-bottom,24px));display:flex;flex-direction:column;gap:8px;">
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();shareSquadCard('${plan.id}')" onclick="shareSquadCard('${plan.id}')" class="btn btn-primary" style="margin:0;">📤 Share Squad Card</button>
-    </div>
-  </div>`;
-}
-
-const FASHION_RSS_FEEDS = [
-  { url: 'https://www.vogue.com/feed/rss',                    source: 'Vogue' },
-  { url: 'https://www.harpersbazaar.com/rss/all.xml',         source: "Harper's Bazaar" },
-  { url: 'https://wwd.com/feed/',                             source: 'WWD' },
-  { url: 'https://www.whowhatwear.com/rss',                   source: 'Who What Wear' },
-  { url: 'https://www.elle.com/rss/all.xml',                  source: 'Elle' },
-  { url: 'https://fashionista.com/rss',                       source: 'Fashionista' },
-  { url: 'https://www.refinery29.com/rss.xml',                source: 'Refinery29' },
-  { url: 'https://www.thecut.com/feeds/all.rss',              source: 'The Cut' },
-  { url: 'https://www.glamour.com/feed/rss',                  source: 'Glamour' },
-  { url: 'https://nymag.com/feeds/main.rss',                  source: 'New York Mag' },
-  { url: 'https://feeds.feedburner.com/InStyle',              source: 'InStyle' },
-  { url: 'https://www.instyle.com/feeds/all.rss',             source: 'InStyle' },
-];
 
 async function fetchNewsFlash() {
   // — Try real RSS feeds via rss2json (no API key required) —
@@ -5138,7 +4547,7 @@ Do not include emojis in item names. Return only the JSON object, no other text.
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 800,
+        model: 'claude-haiku-4-5-20251001', max_tokens: 400,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -5365,11 +4774,10 @@ function featuresMenuHTML() {
       ],
     },
     {
-      title: 'Plan & Group Fit',
+      title: 'Plan',
       items: [
         { icon: '✨', text: '<strong>AI Outfit Ideas</strong> — Describe an event and get personalised outfit suggestions drawn from your actual wardrobe.' },
         { icon: '🌤', text: '<strong>Weather-Aware</strong> — Suggestions factor in today\'s forecast so you\'re never under- or over-dressed.' },
-        { icon: '👯', text: '<strong>Group Fit</strong> — Create a squad plan for any event: name it, set the vibe and dress code, upload up to 5 looks, and share a Group Fit card with your crew.' },
       ],
     },
     {
@@ -5578,7 +4986,7 @@ async function signOut() {
 /* ================================================================
    RENDER ROUTER
    ================================================================ */
-const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','sell','fun']);
+const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','returns','fun']);
 
 /* ================================================================
    FASHION WORD OF THE DAY
@@ -6484,6 +5892,7 @@ function render() {
     case 'home':         html = viewHome();         break;
     case 'profile':      html = viewProfile();      break;
     case 'aura':              html = viewAura();              break;
+    case 'non-negotiables':   html = viewNonNegotiables();   break;
     case 'saved-tips':        html = viewSavedTips();         break;
     case 'closet-assistant':  html = viewClosetAssistant();   break;
     case 'assistant-book':    html = viewAssistantBook();     break;
@@ -6504,10 +5913,9 @@ function render() {
     case 'new-piece':    html = viewNewPiece();     break;
     case 'bulk-add':     html = viewBulkAdd();      break;
     case 'onboarding':   html = viewOnboarding();   break;
-    case 'squad':        html = viewSquadDetail();  break;
     case 'hot':          html = viewHot();          break;
     case 'local':        html = viewLocal();        break;
-    case 'sell':         html = viewSell();         break;
+    case 'returns':      html = viewReturns();      break;
     case 'fun':          html = viewFun();          break;
     case 'thanked-log':   html = viewThankedLog();   break;
     case 'hero-pieces':       navigate('wardrobe'); return; // merged into Gems
@@ -6606,11 +6014,6 @@ function bottomBarHTML() {
       ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('home')"
       onclick="switchTab('home')" title="Discover">
       ${iconCompass()} <span>Discover</span>
-    </button>
-    <button class="bottom-btn ${S.view==='sell'?'bottom-btn-active':''}"
-      ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('sell')"
-      onclick="switchTab('sell')" title="Sell">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> <span>Sell</span>
     </button>
     <button class="bottom-btn ${S.view==='fun'?'bottom-btn-active':''}"
       ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('fun')"
@@ -6868,11 +6271,9 @@ function viewLocal() {
 }
 
 /* ================================================================
-   VIEW: SELL
+   VIEW: RETURNS — Track items you need to return
    ================================================================ */
-function viewSell() {
-  const tab = S.sellTab || 'listings';
-  const sf = S._sellForm;
+function viewReturns() {
   const rf = S._returnForm;
 
   // ── Countdown helpers ──────────────────────────────────────
@@ -6895,104 +6296,8 @@ function viewSell() {
 
   const returnsWithDays = (S.returnItems || []).map(r => ({ ...r, dl: daysLeft(r.deadline) }))
     .sort((a,b) => (a.dl??999) - (b.dl??999));
-  const urgentCount = returnsWithDays.filter(r => r.dl !== null && r.dl <= 6 && r.dl >= 0).length;
-  const activeListings = (S.sellListings || []).filter(l => l.status !== 'sold');
-  const soldListings   = (S.sellListings || []).filter(l => l.status === 'sold');
 
-  // ── Sell listing form ──────────────────────────────────────
-  if (sf) {
-    const catOptions = ['Tops','Bottoms','Outerwear','Dresses','Shoes','Bags','Accessories','Sweats','Other'];
-    const condOptions = [
-      { val:'new-tags',  label:'New with tags' },
-      { val:'like-new',  label:'Like new' },
-      { val:'good',      label:'Good' },
-      { val:'fair',      label:'Fair' },
-      { val:'poor',      label:'Poor' },
-    ];
-    return `<div class="view view-notab">
-      <div class="nav">
-        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();S._sellForm=null;render()" onclick="S._sellForm=null;render()">${iconBack()} Back</button>
-        <span class="nav-title">${sf.id ? 'Edit Listing' : 'New Listing'}</span>
-        <div style="width:72px"></div>
-      </div>
-      <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding:16px 16px 100px;">
-
-        <!-- Two photo slots -->
-        <div style="display:flex;gap:10px;margin-bottom:20px;">
-          <!-- Item photo -->
-          <div style="flex:1;">
-            <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Item Photo</div>
-            <label style="display:block;width:100%;aspect-ratio:3/4;border-radius:14px;overflow:hidden;background:var(--surface);border:2px dashed var(--border);cursor:pointer;position:relative;touch-action:manipulation;">
-              ${sf.photo
-                ? `<img src="${sf.photo}" style="width:100%;height:100%;object-fit:cover;display:block;">`
-                : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;"><span style="font-size:28px;">📸</span><span style="font-size:11px;color:var(--text-3);font-weight:600;">Add photo</span></div>`}
-              <input type="file" accept="image/*" style="display:none;" onchange="uploadSellListingPhoto('photo',this)">
-            </label>
-            ${sf.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();S._sellForm.photo=null;render()" onclick="S._sellForm.photo=null;render()" style="width:100%;margin-top:6px;background:none;border:none;font-size:11px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove</button>` : ''}
-          </div>
-          <!-- Worn photo -->
-          <div style="flex:1;">
-            <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Worn Photo</div>
-            <label style="display:block;width:100%;aspect-ratio:3/4;border-radius:14px;overflow:hidden;background:var(--surface);border:2px dashed var(--border);cursor:pointer;position:relative;touch-action:manipulation;">
-              ${sf.wornPhoto
-                ? `<img src="${sf.wornPhoto}" style="width:100%;height:100%;object-fit:cover;display:block;">`
-                : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;"><span style="font-size:28px;">🧍</span><span style="font-size:11px;color:var(--text-3);font-weight:600;">Add worn photo</span></div>`}
-              <input type="file" accept="image/*" style="display:none;" onchange="uploadSellListingPhoto('wornPhoto',this)">
-            </label>
-            ${sf.wornPhoto ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();S._sellForm.wornPhoto=null;render()" onclick="S._sellForm.wornPhoto=null;render()" style="width:100%;margin-top:6px;background:none;border:none;font-size:11px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove</button>` : ''}
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Item Name *</label>
-          <input id="sellFormName" class="form-input" placeholder='e.g. Levi\'s 501 Jeans' value="${esc(sf.name||'')}" oninput="S._sellForm.name=this.value">
-        </div>
-        <div style="display:flex;gap:10px;">
-          <div class="form-group" style="flex:1;margin-bottom:14px;">
-            <label class="form-label">Brand</label>
-            <input id="sellFormBrand" class="form-input" style="margin:0;" placeholder="e.g. Zara" value="${esc(sf.brand||'')}" oninput="S._sellForm.brand=this.value">
-          </div>
-          <div class="form-group" style="flex:1;margin-bottom:14px;">
-            <label class="form-label">Size</label>
-            <input id="sellFormSize" class="form-input" style="margin:0;" placeholder="e.g. S, 28, 7.5" value="${esc(sf.size||'')}" oninput="S._sellForm.size=this.value">
-          </div>
-        </div>
-        <div style="display:flex;gap:10px;">
-          <div class="form-group" style="flex:1;margin-bottom:14px;">
-            <label class="form-label">Category</label>
-            <select id="sellFormCategory" class="form-input" style="margin:0;" onchange="S._sellForm.category=this.value">
-              <option value="">— pick —</option>
-              ${catOptions.map(c=>`<option value="${c}" ${sf.category===c?'selected':''}>${c}</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group" style="flex:1;margin-bottom:14px;">
-            <label class="form-label">Condition</label>
-            <select id="sellFormCondition" class="form-input" style="margin:0;" onchange="S._sellForm.condition=this.value">
-              <option value="">— pick —</option>
-              ${condOptions.map(c=>`<option value="${c.val}" ${sf.condition===c.val?'selected':''}>${c.label}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Asking Price ($)</label>
-          <input id="sellFormPrice" class="form-input" type="number" min="0" step="0.01" placeholder="0.00" value="${sf.price||''}" oninput="S._sellForm.price=this.value">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Description</label>
-          <textarea id="sellFormDesc" class="plan-textarea" rows="3" placeholder="Condition details, measurements, styling notes…" oninput="S._sellForm.description=this.value">${esc(sf.description||'')}</textarea>
-        </div>
-
-        <button class="btn btn-primary" ${S._sellSaving?'disabled':''}
-          ontouchend="if(_touchMoved)return;event.preventDefault();saveSellListing()"
-          onclick="saveSellListing()"
-          style="margin:4px 0 0;touch-action:manipulation;${S._sellSaving?'opacity:.6;':''}">
-          ${S._sellSaving ? '⏳ Saving…' : (sf.id ? '✓ Save Changes' : '📦 Add to Listings')}
-        </button>
-      </div>
-    </div>`;
-  }
-
-  // ── Return item form ───────────────────────────────────────
+  // ── Return form ────────────────────────────────────────────
   if (rf) {
     return `<div class="view view-notab">
       <div class="nav">
@@ -7001,8 +6306,6 @@ function viewSell() {
         <div style="width:72px"></div>
       </div>
       <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding:16px 16px 100px;">
-
-        <!-- Item photo -->
         <div style="margin-bottom:20px;">
           <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Photo <span style="font-weight:400;text-transform:none;">(optional)</span></div>
           <label style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1.5px dashed var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;touch-action:manipulation;">
@@ -7017,7 +6320,6 @@ function viewSell() {
           </label>
           ${rf.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();S._returnForm.photo=null;render()" onclick="S._returnForm.photo=null;render()" style="margin-top:6px;background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove photo</button>` : ''}
         </div>
-
         <div class="form-group">
           <label class="form-label">Item Name *</label>
           <input class="form-input" placeholder='e.g. Black blazer' value="${esc(rf.name||'')}" oninput="S._returnForm.name=this.value">
@@ -7026,8 +6328,6 @@ function viewSell() {
           <label class="form-label">Store *</label>
           <input class="form-input" placeholder='e.g. Zara, ASOS, Nordstrom' value="${esc(rf.store||'')}" oninput="S._returnForm.store=this.value">
         </div>
-
-        <!-- Online vs In-store -->
         <div class="form-group">
           <label class="form-label">How to return</label>
           <div style="display:flex;gap:8px;margin-top:4px;">
@@ -7040,7 +6340,6 @@ function viewSell() {
               </button>`).join('')}
           </div>
         </div>
-
         <div class="form-group">
           <label class="form-label">Return deadline *</label>
           <input class="form-input" type="date" value="${esc(rf.deadline||'')}" onchange="S._returnForm.deadline=this.value">
@@ -7049,7 +6348,6 @@ function viewSell() {
           <label class="form-label">Notes <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
           <input class="form-input" placeholder='e.g. need original tags, receipt in email' value="${esc(rf.notes||'')}" oninput="S._returnForm.notes=this.value">
         </div>
-
         <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();saveReturnItem()" onclick="saveReturnItem()" style="margin:4px 0 0;touch-action:manipulation;">
           ${rf.id ? '✓ Save Changes' : '🔄 Add Return'}
         </button>
@@ -7057,699 +6355,46 @@ function viewSell() {
     </div>`;
   }
 
-
-  // ── FB Quick List tab ──────────────────────────────────────
-  const fbCandidates = (() => {
-    const listedIds = new Set((S.sellListings || []).filter(l => l.wardrobeItemId && l.status !== 'sold').map(l => l.wardrobeItemId));
-    const active = S.wardrobe.filter(w => !w.retiredFromCloset && !w.memorial);
-    return active.filter(w => w.inMaybePile || listedIds.has(String(w.id)));
-  })();
-  const fbSel = new Set(S._fbPrepSelected || []);
-  const fbRes = S._fbListings || {};
-  const fbEdits = S._fbPrepEdits || {};
-
-  const fbPrepTab = (() => {
-    if (!fbCandidates.length) return `
-      <div style="padding:32px 16px;text-align:center;">
-        <div style="font-size:40px;margin-bottom:12px;">📱</div>
-        <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:8px;">Nothing to list yet</div>
-        <div style="font-size:13px;color:var(--text-3);line-height:1.6;">Add items to Purgatory or mark wardrobe items For Sale — they'll appear here ready to prep.</div>
-      </div>`;
-
-    const hasResults = Object.keys(fbRes).length > 0;
-
-    if (hasResults) {
-      const cards = fbCandidates.filter(w => fbRes[w.id]).map(w => {
-        const r = fbRes[w.id];
-        const priceVal = fbEdits[w.id]?.price ?? r.price ?? '';
-        const titleVal = r.title ?? '';
-        const descVal  = r.description ?? '';
-        return `<div style="border-radius:14px;border:1.5px solid #1877F2;background:#EBF3FF;padding:14px 14px 12px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <div style="width:44px;height:44px;border-radius:10px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${w.icon||'👗'}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:14px;font-weight:800;color:var(--text);line-height:1.2;">${esc(w.name)}</div>
-              <div style="font-size:11px;color:var(--text-3);">${[w.brand,w.size,w.category].filter(Boolean).join(' · ')}</div>
-            </div>
-            <div style="font-size:22px;font-weight:900;color:#1877F2;">$${priceVal}</div>
-          </div>
-
-          <div style="margin-bottom:8px;">
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#1877F2;margin-bottom:4px;">Asking Price — tap to adjust</div>
-            <div style="display:flex;gap:6px;align-items:center;">
-              <input type="number" min="0" value="${esc(String(priceVal))}" placeholder="0"
-                style="flex:1;background:#fff;border:1.5px solid #BFDBFE;border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700;color:var(--text);font-family:inherit;"
-                oninput="if(!S._fbPrepEdits)S._fbPrepEdits={};if(!S._fbPrepEdits['${w.id}'])S._fbPrepEdits['${w.id}']={};S._fbPrepEdits['${w.id}'].price=this.value">
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();copyToClipboard('$${priceVal}','Price copied!')"
-                onclick="copyToClipboard('$${priceVal}','Price copied!')"
-                style="flex-shrink:0;background:#1877F2;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;touch-action:manipulation;">Copy $</button>
-            </div>
-          </div>
-
-          <div style="margin-bottom:8px;">
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#1877F2;margin-bottom:4px;">Listing Title</div>
-            <div style="display:flex;gap:6px;align-items:flex-start;">
-              <div style="flex:1;background:#fff;border:1.5px solid #BFDBFE;border-radius:8px;padding:7px 10px;font-size:13px;color:var(--text);line-height:1.4;">${esc(titleVal)}</div>
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();copyToClipboard(${JSON.stringify(titleVal)},'Title copied!')"
-                onclick="copyToClipboard(${JSON.stringify(titleVal)},'Title copied!')"
-                style="flex-shrink:0;background:#1877F2;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;touch-action:manipulation;">Copy</button>
-            </div>
-          </div>
-
-          <div style="margin-bottom:10px;">
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#1877F2;margin-bottom:4px;">Description</div>
-            <div style="display:flex;gap:6px;align-items:flex-start;">
-              <div style="flex:1;background:#fff;border:1.5px solid #BFDBFE;border-radius:8px;padding:7px 10px;font-size:12px;color:var(--text);line-height:1.55;">${esc(descVal)}</div>
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();copyToClipboard(${JSON.stringify(descVal)},'Description copied!')"
-                onclick="copyToClipboard(${JSON.stringify(descVal)},'Description copied!')"
-                style="flex-shrink:0;background:#1877F2;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;touch-action:manipulation;">Copy</button>
-            </div>
-          </div>
-
-          <a href="https://www.facebook.com/marketplace/create/item" target="_blank" rel="noopener"
-            ontouchend="if(_touchMoved)return;event.preventDefault();window.open('https://www.facebook.com/marketplace/create/item','_blank')"
-            style="display:flex;align-items:center;justify-content:center;gap:8px;background:#1877F2;border-radius:10px;padding:10px 16px;text-decoration:none;touch-action:manipulation;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-            <span style="font-size:13px;font-weight:800;color:#fff;">Post on Facebook Marketplace</span>
-          </a>
-        </div>`;
-      }).join('');
-
-      return `
-        <div style="padding:12px 16px 8px;display:flex;align-items:center;justify-content:space-between;">
-          <div style="font-size:14px;font-weight:800;color:var(--text);">📋 Your Listings (${Object.keys(fbRes).length})</div>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._fbListings={};S._fbPrepEdits={};render()"
-            onclick="S._fbListings={};S._fbPrepEdits={};render()"
-            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">← Start over</button>
-        </div>
-        <div style="padding:0 16px 80px;">${cards}</div>`;
-    }
-
-    // Picker view
-    const purgatoryItems = fbCandidates.filter(w => w.inMaybePile);
-    const forSaleItems   = fbCandidates.filter(w => !w.inMaybePile);
-    const selCount = fbCandidates.filter(w => fbSel.has(w.id)).length;
-
-    const itemRow = w => `
-      <div ontouchend="if(_touchMoved)return;event.preventDefault();(()=>{const s=new Set(S._fbPrepSelected||[]);if(s.has('${w.id}'))s.delete('${w.id}');else s.add('${w.id}');S._fbPrepSelected=[...s];render()})()"
-        onclick="(()=>{const s=new Set(S._fbPrepSelected||[]);if(s.has('${w.id}'))s.delete('${w.id}');else s.add('${w.id}');S._fbPrepSelected=[...s];render()})()"
-        style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
-        <div style="width:22px;height:22px;border-radius:6px;border:2px solid ${fbSel.has(w.id)?'#1877F2':'var(--border)'};background:${fbSel.has(w.id)?'#1877F2':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;">
-          ${fbSel.has(w.id)?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}
-        </div>
-        <div style="width:40px;height:40px;border-radius:10px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${w.icon||'👗'}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
-          <div style="font-size:11px;color:var(--text-3);">${[w.brand,w.size,w.condition,w.price?'paid $'+w.price:''].filter(Boolean).join(' · ')||'No details set'}</div>
-        </div>
-        ${w.inMaybePile?`<span style="font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;border-radius:100px;padding:2px 8px;flex-shrink:0;">Purgatory</span>`:''}
-      </div>`;
-
-    return `
-      <div style="padding:14px 16px 0;">
-        <div style="font-size:13px;color:var(--text-2);line-height:1.5;">Select items to list — Claude will write your title, description, and suggest a fair price.</div>
-      </div>
-      <div style="padding:4px 16px;">
-        ${purgatoryItems.length ? `
-          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin:12px 0 2px;">🤔 In Purgatory (${purgatoryItems.length})</div>
-          ${purgatoryItems.map(itemRow).join('')}` : ''}
-        ${forSaleItems.length ? `
-          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin:${purgatoryItems.length?'16':'12'}px 0 2px;">💰 Marked For Sale (${forSaleItems.length})</div>
-          ${forSaleItems.map(itemRow).join('')}` : ''}
-      </div>
-      <div style="height:100px;"></div>
-      <div style="position:fixed;bottom:80px;left:0;right:0;padding:12px 16px;background:rgba(247,244,240,0.97);backdrop-filter:blur(8px);border-top:1px solid var(--border);">
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();generateFBListings()"
-          onclick="generateFBListings()"
-          ${!selCount||S._fbPrepLoading?'disabled':''}
-          style="width:100%;padding:14px;background:${selCount&&!S._fbPrepLoading?'#1877F2':'#94A3B8'};border:none;border-radius:12px;font-size:15px;font-weight:800;color:#fff;cursor:${selCount&&!S._fbPrepLoading?'pointer':'default'};font-family:inherit;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:8px;">
-          ${S._fbPrepLoading
-            ? `<div class="spinner" style="width:18px;height:18px;border-width:2px;border-color:#fff;border-top-color:transparent;"></div><span>Pricing with Claude…</span>`
-            : selCount
-              ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg><span>Price &amp; Prep ${selCount} item${selCount===1?'':'s'} for FB</span>`
-              : `<span>Select items above</span>`}
-        </button>
-      </div>`;
-  })();
-
-  // ── Main sell page ─────────────────────────────────────────
-  const tabBar = `
-    <div style="display:flex;gap:8px;padding:12px 16px 4px;">
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.sellTab='listings';render()"
-        onclick="S.sellTab='listings';render()"
-        style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${tab==='listings'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${tab==='listings'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
-        <div style="font-size:18px;margin-bottom:4px;">📦</div>
-        <div style="font-size:12px;font-weight:${tab==='listings'?'800':'600'};color:${tab==='listings'?'var(--gold-dk)':'var(--text-2)'};">My Listings${activeListings.length?` (${activeListings.length})`:''}</div>
-      </button>
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.sellTab='browse';if(S._marketplaceListings===null)loadMarketplaceListings();else render()"
-        onclick="S.sellTab='browse';if(S._marketplaceListings===null)loadMarketplaceListings();else render()"
-        style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${tab==='browse'?'2px solid #16A34A':'1.5px solid var(--border)'};background:${tab==='browse'?'#F0FDF4':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
-        <div style="font-size:18px;margin-bottom:4px;">🛍️</div>
-        <div style="font-size:12px;font-weight:${tab==='browse'?'800':'600'};color:${tab==='browse'?'#15803D':'var(--text-2)'};">Browse${S._marketplaceListings?.length?` (${S._marketplaceListings.length})`:''}</div>
-      </button>
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.sellTab='returns';render()"
-        onclick="S.sellTab='returns';render()"
-        style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${tab==='returns'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${tab==='returns'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;position:relative;">
-        <div style="font-size:18px;margin-bottom:4px;">🔄</div>
-        <div style="font-size:12px;font-weight:${tab==='returns'?'800':'600'};color:${tab==='returns'?'var(--gold-dk)':'var(--text-2)'};">Returns${returnsWithDays.length?` (${returnsWithDays.length})`:''}</div>
-        ${urgentCount>0&&tab!=='returns'?`<div style="position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#DC2626;"></div>`:''}
-      </button>
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.sellTab='fbprep';render()"
-        onclick="S.sellTab='fbprep';render()"
-        style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${tab==='fbprep'?'2px solid #1877F2':'1.5px solid var(--border)'};background:${tab==='fbprep'?'#EBF3FF':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
-        <div style="font-size:18px;margin-bottom:4px;">📱</div>
-        <div style="font-size:12px;font-weight:${tab==='fbprep'?'800':'600'};color:${tab==='fbprep'?'#1877F2':'var(--text-2)'};">FB Quick List</div>
-      </button>
-    </div>`;
-
-  // ── Listings tab ───────────────────────────────────────────
-  const listingsTab = (() => {
-    if (!activeListings.length && !soldListings.length) {
-      return `<div style="padding:40px 24px;text-align:center;">
-        <div style="font-size:48px;margin-bottom:16px;">🏷️</div>
-        <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">Nothing listed yet</div>
-        <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:24px;">Snap a photo of what you want to sell — add the details and it's ready to share.</div>
-        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm()" onclick="openSellForm()" style="margin:0;touch-action:manipulation;">+ New Listing</button>
-      </div>`;
-    }
-    const condLabel = { 'new-tags':'New with tags','like-new':'Like new','good':'Good','fair':'Fair','poor':'Poor' };
-    const listingCard = (l, isSold) => {
-      const priceStr = l.price ? `$${parseFloat(l.price).toFixed(0)}` : '';
-      return `<div style="display:flex;gap:12px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:12px;${isSold?'opacity:.55;':''}margin-bottom:10px;">
-        <!-- Photos -->
-        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
-          <div style="width:64px;height:80px;border-radius:10px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border);">
-            ${l.photo?`<img src="${l.photo}" style="width:100%;height:100%;object-fit:cover;">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22px;">📸</div>`}
-          </div>
-          ${l.wornPhoto?`<div style="width:64px;height:48px;border-radius:8px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border);"><img src="${l.wornPhoto}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`:''}
-        </div>
-        <!-- Info -->
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;line-height:1.2;">${esc(l.name)}</div>
-          ${l.brand?`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">${esc(l.brand)}</div>`:''}
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
-            ${l.size?`<span style="font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:2px 7px;color:var(--text-2);font-weight:600;">${esc(l.size)}</span>`:''}
-            ${l.condition?`<span style="font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:2px 7px;color:var(--text-2);font-weight:600;">${condLabel[l.condition]||l.condition}</span>`:''}
-            ${isSold?`<span style="font-size:10px;background:#F0FDF4;border:1px solid #86EFAC;border-radius:100px;padding:2px 7px;color:#15803D;font-weight:700;">✓ Sold</span>`:''}
-          </div>
-          ${priceStr?`<div style="font-size:18px;font-weight:900;color:var(--gold-dk);margin-bottom:8px;">${priceStr}</div>`:''}
-          ${!isSold?`<div style="display:flex;gap:6px;">
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm('${l.id}')" onclick="openSellForm('${l.id}')"
-              style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✏️ Edit</button>
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();shareOneListing('${l.id}')" onclick="shareOneListing('${l.id}')"
-              style="padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">🔗</button>
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();markSellListingSold('${l.id}')" onclick="markSellListingSold('${l.id}')"
-              style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Sold</button>
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteSellListing('${l.id}')" onclick="deleteSellListing('${l.id}')"
-              style="padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:#DC2626;cursor:pointer;font-family:inherit;touch-action:manipulation;">🗑</button>
-          </div>`:`<button ontouchend="if(_touchMoved)return;event.preventDefault();deleteSellListing('${l.id}')" onclick="deleteSellListing('${l.id}')"
-            style="padding:6px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:11px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove</button>`}
-        </div>
-      </div>`;
-    };
-    return `<div style="padding:12px 16px 0;">
-      <div style="display:flex;gap:8px;margin-bottom:14px;">
-        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openSellForm()" onclick="openSellForm()" style="flex:1;margin:0;touch-action:manipulation;">+ New Listing</button>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._sellShareMode=!S._sellShareMode;S._sellShareSelected=[];renderRAF()" onclick="S._sellShareMode=!S._sellShareMode;S._sellShareSelected=[];renderRAF()"
-          style="padding:12px 16px;border-radius:var(--r-sm);border:1.5px solid ${S._sellShareMode?'var(--gold)':'var(--border)'};background:${S._sellShareMode?'rgba(212,175,55,0.12)':'var(--surface)'};font-size:13px;font-weight:700;color:${S._sellShareMode?'var(--gold-dk)':'var(--text-2)'};cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">🔗 ${S._sellShareMode?'Cancel':'Share'}</button>
-      </div>
-      ${activeListings.map(l=>listingCard(l,false)).join('')}
-      ${S._sellShareMode && activeListings.length ? (() => {
-        const sel = new Set(S._sellShareSelected || []);
-        const rows = activeListings.map(l => {
-          const checked = sel.has(l.id);
-          const priceStr = l.price ? ` - $${parseFloat(l.price).toFixed(0)}` : '';
-          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(212,175,55,0.2);touch-action:manipulation;"
-            ontouchend="if(_touchMoved)return;event.preventDefault();(()=>{const s=new Set(S._sellShareSelected||[]);if(s.has('${l.id}'))s.delete('${l.id}');else s.add('${l.id}');S._sellShareSelected=[...s];render()})()"
-            onclick="(()=>{const s=new Set(S._sellShareSelected||[]);if(s.has('${l.id}'))s.delete('${l.id}');else s.add('${l.id}');S._sellShareSelected=[...s];render()})()">
-            <div style="width:22px;height:22px;border-radius:6px;border:2px solid ${checked?'var(--gold)':'var(--border)'};background:${checked?'var(--gold)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-              ${checked?'<svg width="12" height="10" viewBox="0 0 12 10"><path d="M1 5l3.5 3.5L11 1" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>':''}
-            </div>
-            <div style="font-size:13px;font-weight:600;color:var(--text);flex:1;">${esc(l.name)}${priceStr}</div>
-          </div>`;
-        }).join('');
-        const btnLabel = (S._sellShareSelected||[]).length
-          ? `Share ${(S._sellShareSelected||[]).length} listing${(S._sellShareSelected||[]).length>1?'s':''}`
-          : 'Share my shop';
-        return `<div style="margin-bottom:12px;padding:14px;background:rgba(212,175,55,0.08);border:1.5px solid var(--gold);border-radius:16px;">
-          <div style="font-size:12px;font-weight:700;color:var(--gold-dk);margin-bottom:10px;">Select listings to share (or share all):</div>
-          ${rows}
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();shareSelectedListings()" onclick="shareSelectedListings()"
-            style="margin-top:10px;width:100%;padding:11px;border-radius:100px;border:none;background:var(--gold);color:#1A1A1A;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            🔗 ${btnLabel}
-          </button>
-        </div>`;
-      })() : ''}
-      ${soldListings.length?`<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin:16px 0 10px;">✓ Sold</div>${soldListings.map(l=>listingCard(l,true)).join('')}`:''}
-    </div>`;
-  })();
-
-  // ── Returns tab ────────────────────────────────────────────
-  const returnsTab = (() => {
-    if (!returnsWithDays.length) {
-      return `<div style="padding:40px 24px;text-align:center;">
-        <div style="font-size:48px;margin-bottom:16px;">🔄</div>
-        <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">No returns tracked</div>
-        <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:24px;">Add items you need to return and get a countdown so you never miss the window.</div>
-        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm()" onclick="openReturnForm()" style="margin:0;touch-action:manipulation;">+ Add Return</button>
-      </div>`;
-    }
-    return `<div style="padding:12px 16px 0;">
-      ${returnsWithDays.map(r => {
-        const urg = returnUrgency(r.dl);
-        const dlLabel = r.dl === null ? 'No deadline' : r.dl < 0 ? `Expired ${Math.abs(r.dl)}d ago` : r.dl === 0 ? '⚠️ Due today!' : r.dl === 1 ? '⚠️ Due tomorrow!' : `${r.dl} days left`;
-        const fmtDeadline = r.deadline ? new Date(r.deadline+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
-        return `<div style="display:flex;gap:12px;background:${urgencyBg[urg]};border:1.5px solid ${urgencyBorder[urg]};border-radius:16px;padding:12px;margin-bottom:10px;">
-          <!-- Photo -->
-          <div style="width:58px;height:72px;border-radius:10px;overflow:hidden;background:var(--surface);border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-            ${r.photo?`<img src="${r.photo}" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:24px;">🛍</span>`}
-          </div>
-          <!-- Info -->
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;">${esc(r.name||'Unnamed item')}</div>
-            <div style="font-size:12px;color:var(--text-2);margin-bottom:4px;">${esc(r.store||'')}${r.channel?` · ${r.channel==='online'?'🌐 Online':'🏪 In-store'}`:''}</div>
-            <div style="font-size:13px;font-weight:800;color:${urgencyColor[urg]};margin-bottom:${r.notes?'4':'8'}px;">${dlLabel}${fmtDeadline?' · '+fmtDeadline:''}</div>
-            ${r.notes?`<div style="font-size:11px;color:var(--text-3);margin-bottom:8px;line-height:1.4;">${esc(r.notes)}</div>`:''}
-            <div style="display:flex;gap:6px;">
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm('${r.id}')" onclick="openReturnForm('${r.id}')"
-                style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✏️ Edit</button>
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();markReturned('${r.id}')" onclick="markReturned('${r.id}')"
-                style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:#16A34A;cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Returned</button>
-            </div>
-          </div>
-        </div>`;
-      }).join('')}
-      <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm()" onclick="openReturnForm()" style="margin:8px 0 0;touch-action:manipulation;">+ Add Return</button>
-    </div>`;
-  })();
-
-  // ── Browse tab ─────────────────────────────────────────────
-  const browseTab = (() => {
-    if (S._marketplaceLoading) {
-      return `<div style="padding:60px 24px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:16px;">🛍️</div>
-        <div style="font-size:15px;font-weight:700;color:var(--text-2);">Loading listings…</div>
-      </div>`;
-    }
-    if (S._marketplaceListings === null) {
-      return `<div style="padding:40px 24px;text-align:center;">
-        <div style="font-size:48px;margin-bottom:16px;">🛍️</div>
-        <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">Community Marketplace</div>
-        <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:24px;">Browse items listed for sale by other app users.</div>
-        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();loadMarketplaceListings()" onclick="loadMarketplaceListings()" style="margin:0;touch-action:manipulation;">Load listings</button>
-      </div>`;
-    }
-    const others = (S._marketplaceListings || []).filter(l => l.userId !== (currentUser && currentUser.uid));
-    const mine   = (S._marketplaceListings || []).filter(l => l.userId === (currentUser && currentUser.uid));
-    const condLabel = { 'new-tags':'New with tags','like-new':'Like new','good':'Good','fair':'Fair','poor':'Poor' };
-    const browseCard = (l) => {
-      const priceStr = l.price ? `$${parseFloat(l.price).toFixed(0)}` : 'Price TBD';
-      const photo = l.photoThumb || null;
-      const wornPhoto = l.wornPhotoThumb || null;
-      const mailSubject = encodeURIComponent(`Interested in: ${l.name}`);
-      const mailBody = encodeURIComponent(`Hi ${l.sellerName || 'there'},\n\nI saw your listing for "${l.name}" on the Closet App and I'd love to buy it!\n\nCan we chat?`);
-      return `<div style="display:flex;gap:12px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:12px;margin-bottom:10px;">
-        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
-          <div style="width:64px;height:80px;border-radius:10px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border);">
-            ${photo?`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22px;">📸</div>`}
-          </div>
-          ${wornPhoto?`<div style="width:64px;height:48px;border-radius:8px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border);"><img src="${wornPhoto}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`:''}
-        </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;line-height:1.2;">${esc(l.name)}</div>
-          ${l.brand?`<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">${esc(l.brand)}</div>`:''}
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
-            ${l.size?`<span style="font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:2px 7px;color:var(--text-2);font-weight:600;">${esc(l.size)}</span>`:''}
-            ${l.condition?`<span style="font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:2px 7px;color:var(--text-2);font-weight:600;">${condLabel[l.condition]||l.condition}</span>`:''}
-          </div>
-          <div style="font-size:18px;font-weight:900;color:var(--gold-dk);margin-bottom:8px;">${priceStr}</div>
-          <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">By ${esc(l.sellerName||'A seller')}</div>
-          ${l.sellerEmail?`<a href="mailto:${esc(l.sellerEmail)}?subject=${mailSubject}&body=${mailBody}"
-            style="display:block;text-align:center;padding:8px 0;border-radius:var(--r-sm);border:none;background:#16A34A;color:#fff;font-size:12px;font-weight:700;text-decoration:none;font-family:inherit;touch-action:manipulation;">
-            ✉️ Contact seller</a>`:''}
-        </div>
-      </div>`;
-    };
-    const sellerName = (S._marketplaceListings||[]).find(l => l.userId === S._viewSellerUid)?.sellerName;
-    const sellerBanner = S._viewSellerUid ? `
-      <div style="background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:28px;">🛍️</span>
-        <div>
-          <div style="font-size:15px;font-weight:800;color:#15803D;">${sellerName ? esc(sellerName) + '\'s Closet Sale' : 'Closet Sale'}</div>
-          <div style="font-size:12px;color:#16A34A;margin-top:2px;">Contact the seller directly from any listing below</div>
-        </div>
-      </div>` : '';
-    const allItems = S._viewSellerUid
-      ? (S._marketplaceListings || [])  // show all when viewing a specific seller
-      : others;
-    if (!allItems.length && !mine.length) {
-      return `<div style="padding:40px 24px;text-align:center;">
-        <div style="font-size:48px;margin-bottom:16px;">🌱</div>
-        <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">Nothing listed yet</div>
-        <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:20px;">Be the first to list something! Go to My Listings and add a piece.</div>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();loadMarketplaceListings()" onclick="loadMarketplaceListings()"
-          style="padding:10px 20px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">🔄 Refresh</button>
-      </div>`;
-    }
-    return `<div style="padding:12px 16px 0;">
-      ${sellerBanner}
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:12px;color:var(--text-3);">${allItems.length} item${allItems.length===1?'':'s'} for sale</div>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._marketplaceListings=null;loadMarketplaceListings()" onclick="S._marketplaceListings=null;loadMarketplaceListings()"
-          style="padding:6px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">🔄 Refresh</button>
-      </div>
-      ${allItems.map(l => browseCard(l)).join('')}
-      ${!S._viewSellerUid && mine.length ? `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin:16px 0 10px;">↑ Your listings</div>${mine.map(l => browseCard(l)).join('')}` : ''}
-    </div>`;
-  })();
-
-  return `<div class="view">
+  // ── Returns list ───────────────────────────────────────────
+  return `<div class="view view-notab">
     <div class="nav">
-      <span class="nav-logo">🏷️ Sell</span>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('shop')" onclick="switchTab('shop')">${iconBack()} Shop</button>
+      <span class="nav-title">Returns</span>
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm()" onclick="openReturnForm()">＋ Add</button>
     </div>
-    ${tabBar}
-    <div style="overflow-y:auto;height:calc(100% - 56px - 86px);-webkit-overflow-scrolling:touch;padding-bottom:80px;">
-      ${tab === 'listings' ? listingsTab : tab === 'browse' ? browseTab : tab === 'fbprep' ? fbPrepTab : returnsTab}
+    <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding:16px 16px 100px;">
+      ${!returnsWithDays.length ? `
+        <div style="padding:40px 0;text-align:center;">
+          <div style="font-size:48px;margin-bottom:16px;">🔄</div>
+          <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">No returns tracked</div>
+          <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:24px;">Add items you need to return and get a countdown so you never miss the window.</div>
+          <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm()" onclick="openReturnForm()" style="margin:0;touch-action:manipulation;">+ Add Return</button>
+        </div>` :
+        returnsWithDays.map(r => {
+          const urg = returnUrgency(r.dl);
+          const dlLabel = r.dl === null ? 'No deadline' : r.dl < 0 ? `Expired ${Math.abs(r.dl)}d ago` : r.dl === 0 ? '⚠️ Due today!' : r.dl === 1 ? '⚠️ Due tomorrow!' : `${r.dl} days left`;
+          const fmtDeadline = r.deadline ? new Date(r.deadline+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+          return `<div style="display:flex;gap:12px;background:${urgencyBg[urg]};border:1.5px solid ${urgencyBorder[urg]};border-radius:16px;padding:12px;margin-bottom:10px;">
+            <div style="width:58px;height:72px;border-radius:10px;overflow:hidden;background:var(--surface);border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+              ${r.photo?`<img src="${r.photo}" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:24px;">🛍</span>`}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;">${esc(r.name||'Unnamed item')}</div>
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px;">${esc(r.store||'')}${r.channel?` · ${r.channel==='online'?'🌐 Online':'🏪 In-store'}`:''}</div>
+              <div style="font-size:13px;font-weight:800;color:${urgencyColor[urg]};margin-bottom:${r.notes?'4':'8'}px;">${dlLabel}${fmtDeadline?' · '+fmtDeadline:''}</div>
+              ${r.notes?`<div style="font-size:11px;color:var(--text-3);margin-bottom:8px;line-height:1.4;">${esc(r.notes)}</div>`:''}
+              <div style="display:flex;gap:6px;">
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm('${r.id}')" onclick="openReturnForm('${r.id}')"
+                  style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✏️ Edit</button>
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();markReturned('${r.id}')" onclick="markReturned('${r.id}')"
+                  style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:#16A34A;cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Returned</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('')
+      }
     </div>
   </div>`;
-}
-
-
-/* ================================================================
-   FACEBOOK MARKETPLACE QUICK LIST
-   ================================================================ */
-function copyToClipboard(text, successMsg) {
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => toast(successMsg || 'Copied!')).catch(() => {
-      _fallbackCopy(text); toast(successMsg || 'Copied!');
-    });
-  } else {
-    _fallbackCopy(text); toast(successMsg || 'Copied!');
-  }
-}
-function _fallbackCopy(text) {
-  const ta = document.createElement('textarea');
-  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-  document.body.appendChild(ta); ta.select();
-  try { document.execCommand('copy'); } catch(e) {}
-  document.body.removeChild(ta);
-}
-
-async function generateFBListings() {
-  if (S._fbPrepLoading) return;
-  if (!S.apiKey?.trim()) { switchTab('settings'); toast('Add your API key first!'); return; }
-  const selIds = S._fbPrepSelected || [];
-  if (!selIds.length) { toast('Select some items first.'); return; }
-
-  const listedIds = new Set((S.sellListings||[]).filter(l=>l.wardrobeItemId&&l.status!=='sold').map(l=>l.wardrobeItemId));
-  const candidates = S.wardrobe.filter(w => !w.retiredFromCloset && !w.memorial && (w.inMaybePile || listedIds.has(String(w.id))));
-  const items = candidates.filter(w => selIds.includes(w.id)).map(w => ({
-    id: w.id,
-    name: w.name,
-    brand: w.brand || '',
-    category: w.category || '',
-    size: w.size || '',
-    condition: w.condition || '',
-    colors: w.colors ? w.colors.join(', ') : (w.color || ''),
-    originalPrice: w.price ? Number(w.price) : null,
-    wears: w.wears?.length || 0,
-    description: w.description || '',
-    isNew: w.isNew || false,
-  }));
-
-  S._fbPrepLoading = true; render();
-
-  const today = new Date().toISOString().slice(0,10);
-  const prompt = `You are a resale pricing expert and Facebook Marketplace copywriter. Today is ${today}.
-
-For each item below, return a JSON array (no markdown, no explanation) where each object has:
-- id: the item id
-- price: integer asking price in USD (fair resale, not retail — factor in brand, condition, wears, and current secondhand market)
-- title: Facebook Marketplace listing title (max 60 chars, include brand + item + size + key feature)
-- description: 2–3 sentence listing description (condition, styling note, measurement or size note if relevant, "open to offers" if appropriate)
-
-Items:
-${JSON.stringify(items, null, 2)}
-
-Rules: Be realistic with pricing — buyers expect 30–70% off retail for used items, more if worn often. New-with-tags can be 60–80% of retail. Return ONLY the JSON array.`;
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': S.apiKey.trim(),
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-    if (!resp.ok) throw new Error(`API ${resp.status}`);
-    const data = await resp.json();
-    const raw = data.content?.[0]?.text || '';
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error('No JSON array in response');
-    const parsed = JSON.parse(match[0]);
-    const results = {};
-    parsed.forEach(r => { if (r.id) results[r.id] = r; });
-    S._fbListings = results;
-    toast('Listings ready — copy and post! 📱');
-  } catch(e) {
-    console.error('generateFBListings error', e);
-    toast('Couldn\'t generate listings — check your API key');
-  } finally {
-    S._fbPrepLoading = false; render();
-  }
-}
-
-/* ================================================================
-   SELL PAGE HELPERS
-   ================================================================ */
-
-function openSellForm(id) {
-  if (id) {
-    const existing = S.sellListings.find(l => l.id === id);
-    S._sellForm = existing ? { ...existing } : null;
-  } else {
-    S._sellForm = { id: null, photo: null, wornPhoto: null, name: '', brand: '', category: '', size: '', condition: '', description: '', price: '', status: 'active' };
-  }
-  render();
-}
-
-function saveSellListing() {
-  if (S._sellSaving) return;
-  const sf = S._sellForm;
-  if (!sf) return;
-  // Flush any in-flight DOM values — iOS sometimes hasn't fired oninput on the active field yet
-  const nameEl = document.getElementById('sellFormName');
-  const brandEl = document.getElementById('sellFormBrand');
-  const sizeEl = document.getElementById('sellFormSize');
-  const priceEl = document.getElementById('sellFormPrice');
-  const descEl = document.getElementById('sellFormDesc');
-  const catEl = document.getElementById('sellFormCategory');
-  const condEl = document.getElementById('sellFormCondition');
-  if (nameEl) sf.name = nameEl.value;
-  if (brandEl) sf.brand = brandEl.value;
-  if (sizeEl) sf.size = sizeEl.value;
-  if (priceEl) sf.price = priceEl.value;
-  if (descEl) sf.description = descEl.value;
-  if (catEl) sf.category = catEl.value;
-  if (condEl) sf.condition = condEl.value;
-
-  if (!sf.name || !sf.name.trim()) { toast('Please add an item name.'); return; }
-
-  S._sellSaving = true; render();
-
-  const now = new Date().toISOString();
-  let saved;
-  if (sf.id) {
-    const idx = S.sellListings.findIndex(l => l.id === sf.id);
-    if (idx !== -1) { S.sellListings[idx] = { ...sf }; saved = S.sellListings[idx]; }
-  } else {
-    saved = { ...sf, id: uid(), createdAt: now, status: 'active' };
-    S.sellListings.unshift(saved);
-  }
-  localStorage.setItem('closet-sell-listings', JSON.stringify(S.sellListings));
-  if (saved) mirrorListingToMarketplace(saved).catch(() => {});
-
-  setTimeout(() => {
-    S._sellSaving = false;
-    S._sellForm = null;
-    toast(sf.id ? 'Listing updated!' : '📦 Listed!');
-    render();
-  }, 400);
-}
-
-function deleteSellListing(id) {
-  if (!confirm('Remove this listing?')) return;
-  S.sellListings = S.sellListings.filter(l => l.id !== id);
-  localStorage.setItem('closet-sell-listings', JSON.stringify(S.sellListings));
-  if (currentUser) firestore.collection('marketplace').doc(String(id)).delete().catch(() => {});
-  toast('Listing removed.');
-  render();
-}
-
-function markSellListingSold(id) {
-  const idx = S.sellListings.findIndex(l => l.id === id);
-  if (idx !== -1) {
-    S.sellListings[idx].status = S.sellListings[idx].status === 'sold' ? 'active' : 'sold';
-    localStorage.setItem('closet-sell-listings', JSON.stringify(S.sellListings));
-    mirrorListingToMarketplace(S.sellListings[idx]).catch(() => {});
-    render();
-  }
-}
-
-function uploadSellListingPhoto(type, input) {
-  if (!input.files || !input.files[0]) return;
-  compressImage(input.files[0]).then(({ data }) => {
-    if (!S._sellForm) return;
-    S._sellForm[type] = data;
-    render();
-  }).catch(() => toast('Could not load photo.'));
-}
-
-/* ----------------------------------------------------------------
-   MARKETPLACE — mirror sell listings to Firestore for other users
-   ---------------------------------------------------------------- */
-async function mirrorListingToMarketplace(l) {
-  if (!currentUser) return;
-  const ref = firestore.collection('marketplace').doc(String(l.id));
-  // Remove sold or deleted items from the public marketplace
-  if (!l || l.status === 'sold') {
-    ref.delete().catch(() => {});
-    return;
-  }
-  try {
-    const { photo, wornPhoto, ...rest } = l;
-    const doc = {
-      ...rest,
-      userId: currentUser.uid,
-      sellerName: S.profileName || 'A seller',
-      sellerEmail: currentUser.email || '',
-      updatedAt: new Date().toISOString(),
-    };
-    if (photo && photo.startsWith('data:')) {
-      const thumb = await makePhotoThumb(photo);
-      if (thumb) doc.photoThumb = thumb;
-    } else if (photo) {
-      doc.photoThumb = photo;
-    }
-    if (wornPhoto && wornPhoto.startsWith('data:')) {
-      const wt = await makePhotoThumb(wornPhoto);
-      if (wt) doc.wornPhotoThumb = wt;
-    } else if (wornPhoto) {
-      doc.wornPhotoThumb = wornPhoto;
-    }
-    await ref.set(doc);
-  } catch(e) { console.warn('marketplace mirror:', e); }
-}
-
-async function loadMarketplaceListings() {
-  if (S._marketplaceLoading) return;
-  S._marketplaceLoading = true;
-  render();
-  try {
-    let query = firestore.collection('marketplace').where('status', '==', 'active');
-    if (S._viewSellerUid) query = query.where('userId', '==', S._viewSellerUid);
-    const snap = await query.limit(100).get();
-    S._marketplaceListings = snap.docs.map(d => d.data());
-  } catch(e) {
-    console.warn('loadMarketplaceListings:', e);
-    S._marketplaceListings = [];
-    toast('Could not load marketplace listings.');
-  }
-  S._marketplaceLoading = false;
-  render();
-}
-
-function listWardrobeItemForSale(wId) {
-  const w = S.wardrobe.find(i => i.id === wId);
-  if (!w) return;
-  const existing = (S.sellListings || []).find(l => l.wardrobeItemId === String(wId) && l.status !== 'sold');
-  if (existing) {
-    toast('This item is already listed — opening your listings.');
-    S.sellTab = 'listings';
-    switchTab('sell');
-    return;
-  }
-  const catMap = { Tops:'Tops', Bottoms:'Bottoms', Outerwear:'Outerwear', Dresses:'Dresses', Shoes:'Shoes', Bags:'Bags', Accessories:'Accessories', Sweats:'Sweats' };
-  const cat = catMap[w.category] || '';
-  S._sellForm = {
-    id: null, wardrobeItemId: String(wId),
-    photo: w.photo || null, wornPhoto: w.wearPhoto || null,
-    name: w.name || '', brand: w.brand || '',
-    category: cat, size: w.size || '',
-    condition: '', description: w.description || '',
-    price: '', status: 'active'
-  };
-  switchTab('sell');
-  render();
-}
-
-function shareClosetApp() {
-  const url = location.origin + location.pathname;
-  const text = "I've been using this app to organize my closet — it's so good! 🧥✨";
-  if (navigator.share) {
-    navigator.share({ title: 'Closet App', text, url }).catch(() => {});
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(() => toast('Link copied! Send it to a friend. 🎉'));
-  } else {
-    prompt('Copy this link to share:', url);
-  }
-}
-
-function shareMyListings() {
-  if (!currentUser) return;
-  const url = `${location.origin}${location.pathname}?seller=${currentUser.uid}`;
-  if (navigator.share) {
-    navigator.share({ title: 'My closet sale listings', url }).catch(() => {});
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(() => toast('Link copied! Share it with buyers.'));
-  } else {
-    prompt('Copy this link:', url);
-  }
-}
-function shareOneListing(id) {
-  const l = (S.sellListings || []).find(x => x.id === id);
-  if (!l) return;
-  const priceStr = l.price ? ` - $${parseFloat(l.price).toFixed(0)}` : '';
-  const condMap = { 'new-tags':'New with tags','like-new':'Like new','good':'Good','fair':'Fair','poor':'Poor' };
-  const condStr = l.condition ? ` (${condMap[l.condition]||l.condition})` : '';
-  const url = currentUser ? `${location.origin}${location.pathname}?seller=${currentUser.uid}` : location.href;
-  const text = `${l.name}${l.brand?' by '+l.brand:''}${priceStr}${condStr}\n${l.description||''}\n\nSee my full closet sale: ${url}`.trim();
-  if (navigator.share) {
-    navigator.share({ title: l.name + priceStr, text }).catch(() => {});
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => toast('Listing copied to clipboard!'));
-  }
-}
-function shareSelectedListings() {
-  const sel = S._sellShareSelected || [];
-  const all = S.sellListings || [];
-  const items = sel.length ? all.filter(l => sel.includes(l.id)) : all.filter(l => l.status !== 'sold');
-  if (!items.length) { toast('No listings to share.'); return; }
-  const url = currentUser ? `${location.origin}${location.pathname}?seller=${currentUser.uid}` : location.href;
-  const condMap = { 'new-tags':'New with tags','like-new':'Like new','good':'Good','fair':'Fair','poor':'Poor' };
-  const lines = items.map(l => {
-    const priceStr = l.price ? ` - $${parseFloat(l.price).toFixed(0)}` : '';
-    const condStr = l.condition ? ` (${condMap[l.condition]||l.condition})` : '';
-    return `🏷️ ${l.name}${l.brand?' by '+l.brand:''}${priceStr}${condStr}`;
-  });
-  const text = `My closet sale \n${lines.join('\n')}\n\nShop here: ${url}`;
-  if (navigator.share) {
-    navigator.share({ title: 'My closet sale', text }).catch(() => {});
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => { S._sellShareMode=false; S._sellShareSelected=[]; render(); toast('Listings copied to clipboard!'); });
-  }
 }
 
 function openReturnForm(id) {
@@ -7777,7 +6422,6 @@ function saveReturnItem() {
   }
   localStorage.setItem('closet-return-items', JSON.stringify(S.returnItems));
   S._returnForm = null;
-  S.sellTab = 'returns'; // land on Returns tab so the user sees their new item
   toast(rf.id ? 'Return updated!' : 'Return added!');
   render();
 }
@@ -10577,6 +9221,21 @@ function viewShop() {
         </div>
       </div>`;
     })() : ''}
+
+  ${/* Returns entry point — subtle utility row at bottom of Shop */ ''}
+  ${src !== 'spotted' && src !== 'wishlist' ? `
+    <div style="margin:4px 16px 0;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:space-between;cursor:pointer;touch-action:manipulation;"
+      ontouchend="if(_touchMoved)return;event.preventDefault();navigate('returns')"
+      onclick="navigate('returns')">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">🔄</span>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);">Track a Return${(S.returnItems||[]).length ? ` <span style="font-size:11px;font-weight:600;color:var(--text-3);">(${(S.returnItems||[]).length} active)</span>` : ''}</div>
+          <div style="font-size:11px;color:var(--text-3);">Never miss a return window</div>
+        </div>
+      </div>
+      <span style="font-size:18px;color:var(--text-3);">›</span>
+    </div>` : ''}
   </div>`;
 }
 
@@ -10585,84 +9244,6 @@ function viewShop() {
    ================================================================ */
 function viewPlan() {
   const p = S.plan;
-
-  // ── Group Fit section ─────────────────────────────────────
-  const squadSectionHTML = (() => {
-    const flow = S.squadFlow;
-
-    // Create flow
-    if (flow?.step === 'create') {
-      const typeGrid = SQUAD_TYPES.map(t => `
-        <button class="squad-type-btn ${flow.type===t.id?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();S.squadFlow.type='${t.id}';render()" onclick="S.squadFlow.type='${t.id}';render()">
-          <span class="squad-type-icon">${t.icon}</span>
-          <span class="squad-type-label">${t.label}</span>
-        </button>`).join('');
-      return `<div class="plan-card" style="margin-bottom:0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div class="plan-card-title" style="margin-bottom:0;">New Group Plan</div>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();cancelSquadFlow()" onclick="cancelSquadFlow()" style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;">Cancel</button>
-        </div>
-        <div class="form-group"><label class="form-label">Event Name</label>
-          <input class="form-input" placeholder='e.g. "Indian Wedding — Cabo June 2026"' value="${esc(flow.name)}" oninput="S.squadFlow.name=this.value"></div>
-        <div class="form-group"><label class="form-label">Type</label>
-          <div class="squad-type-grid">${typeGrid}</div></div>
-        <div class="form-group"><label class="form-label">Dates <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input class="form-input" type="date" style="margin:0;flex:1;" value="${esc(flow.dateStart||'')}" onchange="S.squadFlow.dateStart=this.value">
-            <span style="font-size:12px;color:var(--text-3);flex-shrink:0;">to</span>
-            <input class="form-input" type="date" style="margin:0;flex:1;" value="${esc(flow.dateEnd||'')}" onchange="S.squadFlow.dateEnd=this.value">
-          </div>
-        </div>
-        <div class="form-group"><label class="form-label">Vibe / Theme</label>
-          <input class="form-input" placeholder='e.g. maximalist South Asian glam' value="${esc(flow.vibe)}" oninput="S.squadFlow.vibe=this.value"></div>
-        <div class="form-group"><label class="form-label">Dress Code <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
-          <input class="form-input" placeholder='e.g. "All white, no exceptions"' value="${esc(flow.dressCode)}" oninput="S.squadFlow.dressCode=this.value"></div>
-        <div class="form-group"><label class="form-label">Who's coming?</label>
-          <input class="form-input" placeholder='e.g. Dana, Sarah, Priya, Tom' value="${esc(flow.names)}" oninput="S.squadFlow.names=this.value">
-          <div style="font-size:11px;color:var(--text-3);margin-top:4px;">Names, separated by commas</div></div>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();confirmCreateSquad()" onclick="confirmCreateSquad()" class="btn btn-primary" style="margin:4px 0 0;width:100%;touch-action:manipulation;">Create Squad Plan ✓</button>
-      </div>`;
-    }
-
-    // Default: list of squad plans + create button
-    const planCards = S.squadPlans.map(sp => {
-      const st = getSquadType(sp.type);
-      const fmtD = (() => {
-        if (sp.dateStart && sp.dateEnd && sp.dateStart !== sp.dateEnd) {
-          const s = new Date(sp.dateStart+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
-          const e = new Date(sp.dateEnd+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
-          return `${s} – ${e}`;
-        } else if (sp.dateStart) {
-          return new Date(sp.dateStart+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
-        } else if (sp.date) {
-          return new Date(sp.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
-        }
-        return '';
-      })();
-      const photoCount = (sp.slots||[]).filter(s=>s.photo).length;
-      return `<div class="squad-event-card" ontouchend="if(_touchMoved)return;event.preventDefault();openSquadDetail('${sp.id}')" onclick="openSquadDetail('${sp.id}')">
-        <div class="squad-event-header">
-          <div class="squad-event-icon">${st.icon}</div>
-          <div style="flex:1;min-width:0;">
-            <div class="squad-event-name">${esc(sp.name)}</div>
-            <div class="squad-event-meta">${st.label}${fmtD?' · '+fmtD:''}${photoCount?' · '+photoCount+' photo'+(photoCount===1?'':'s'):''}</div>
-            ${sp.vibe?`<div style="font-size:11px;color:var(--gold-dk);margin-top:2px;font-weight:600;">✦ ${esc(sp.vibe)}</div>`:''}
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div style="margin-bottom:4px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">👯 Group Fit</div>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();startCreateSquad()" onclick="startCreateSquad()" style="padding:6px 12px;border-radius:100px;border:none;background:var(--gold);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ Create</button>
-      </div>
-      ${planCards || `<div style="font-size:13px;color:var(--text-3);font-style:italic;padding:4px 0 8px;">Plan a trip, party, or event — add up to 5 photos with custom labels and share a card with the squad.</div>`}
-    </div>`;
-  })();
-
-  const planMode = S.planMode || 'solo';
 
   return `<div class="view">
     <div class="nav">
@@ -10674,22 +9255,9 @@ function viewPlan() {
 
     <div class="plan-hero">
       <div class="plan-hero-title">What's the occasion?</div>
-      <div class="plan-hero-sub">Plan what's next — solo or with your crew.</div>
+      <div class="plan-hero-sub">Plan what's next.</div>
     </div>
 
-    <!-- Mode toggle -->
-    <div style="display:flex;gap:8px;padding:0 16px 16px;">
-      <button onclick="S.planMode='solo';render()" style="flex:1;padding:10px 0;border-radius:var(--r-sm);border:2px solid ${planMode==='solo'?'var(--gold)':'var(--border)'};background:${planMode==='solo'?'var(--gold-bg)':'var(--surface)'};color:${planMode==='solo'?'var(--gold-dk)':'var(--text-2)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;">
-        🪞 Solo Fit
-      </button>
-      <button onclick="S.planMode='group';render()" style="flex:1;padding:10px 0;border-radius:var(--r-sm);border:2px solid ${planMode==='group'?'var(--gold)':'var(--border)'};background:${planMode==='group'?'var(--gold-bg)':'var(--surface)'};color:${planMode==='group'?'var(--gold-dk)':'var(--text-2)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;">
-        👯 Group Fit
-      </button>
-    </div>
-
-    ${planMode === 'group' ? `
-      <div style="padding:0 16px 16px;">${squadSectionHTML}</div>
-    ` : `
       <!-- SOLO SUB-MODE PICKER -->
       ${!p.soloMode ? `
         <div style="padding:0 16px 16px;display:flex;gap:10px;">
@@ -10924,7 +9492,6 @@ function viewPlan() {
           </div>
         </div>
       ` : ''}
-    `}
 
     <div style="height:30px"></div>
   </div>`;
@@ -11019,7 +9586,7 @@ Return ONLY a valid JSON object (no markdown):
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST',
       headers:{'x-api-key':S.apiKey,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:2500, messages:[{role:'user',content:prompt}] })
+      body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:2000, messages:[{role:'user',content:prompt}] })
     });
     const data = await resp.json();
     const txt = data.content?.[0]?.text || '';
@@ -11797,6 +10364,17 @@ function viewProfile() {
           <div style="font-size:18px;color:var(--text-3);">›</div>
         </button>
       </div>
+      <div style="margin-top:8px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('non-negotiables')" onclick="navigate('non-negotiables')"
+          style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
+          <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#FFF3E0,#FFE0B2);border:1px solid #FFD180;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">🚫</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">My Non-Negotiables</div>
+            <div style="font-size:12px;color:var(--text-3);">${(S.nonNegPhysical||S.nonNegAesthetic) ? 'What I know about myself ✓' : 'What I always skip — and what my body needs'}</div>
+          </div>
+          <div style="font-size:18px;color:var(--text-3);">›</div>
+        </button>
+      </div>
     </div>
 
     <!-- 📦 Past Looks + 🌹 Memorial Garden — grouped as "Looking Back" -->
@@ -12149,6 +10727,77 @@ function viewAssistantBook() {
       '<div style="height:32px;"></div>' +
     '</div>' +
   '</div>';
+}
+
+/* ================================================================
+   VIEW: MY NON-NEGOTIABLES
+   ================================================================ */
+function saveNonNeg(field, localKey) {
+  const el = document.getElementById('nn-' + field);
+  if (!el) return;
+  const val = el.value.trim();
+  S[field] = val;
+  localStorage.setItem(localKey, val);
+  // Sync to Firestore if available
+  try { if (typeof fsSet === 'function') fsSet(field, val); } catch(e) {}
+  toast('Saved');
+}
+
+function viewNonNegotiables() {
+  const hasSomething = S.nonNegPhysical || S.nonNegAesthetic;
+  return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">‹</button>
+      <span class="nav-title">🚫 My Non-Negotiables</span>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div style="padding:16px;">
+
+      <!-- Intro -->
+      <div style="background:linear-gradient(135deg,rgba(255,193,7,0.08),rgba(255,152,0,0.06));border:1.5px solid rgba(255,193,7,0.25);border-radius:16px;padding:16px 16px 14px;margin-bottom:20px;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;">What I know about myself.</div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.6;">
+          Not rules. Not limits. Just the things experience has taught you — what your body needs, and what you consistently skip. Claude uses this to make sure recommendations actually work for you.
+        </div>
+      </div>
+
+      <!-- Physical & Practical -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:6px;">🦶 Physical &amp; Practical</div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.55;margin-bottom:10px;">
+          Things your body needs — or things that cause genuine discomfort. Arch support. Fabric sensitivities. Anything tactile that makes you reach for something else. These are facts about you, not limitations.
+        </div>
+        <textarea id="nn-nonNegPhysical" rows="4"
+          placeholder="e.g. Need arch support in all shoes · Can't wear itchy wool against skin · Avoid underwire · Loose waistbands only · Sensititve to synthetic fabrics…"
+          onblur="saveNonNeg('nonNegPhysical','closet-non-neg-physical')"
+          style="width:100%;box-sizing:border-box;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--text);resize:none;font-family:inherit;line-height:1.55;">${esc(S.nonNegPhysical||'')}</textarea>
+      </div>
+
+      <!-- Aesthetic -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:6px;">🎨 Aesthetic Preferences</div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.55;margin-bottom:10px;">
+          Styles, silhouettes, or fabrics you consistently pass on — not because anyone told you to, but because you just know. (These are allowed to evolve. But right now, they're yours to name.)
+        </div>
+        <textarea id="nn-nonNegAesthetic" rows="4"
+          placeholder="e.g. Don't love thin white fabrics as bottoms · Skip cropped tops · Never wear yellow · Avoid overly structured blazers · Not a mini skirt person…"
+          onblur="saveNonNeg('nonNegAesthetic','closet-non-neg-aesthetic')"
+          style="width:100%;box-sizing:border-box;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--text);resize:none;font-family:inherit;line-height:1.55;">${esc(S.nonNegAesthetic||'')}</textarea>
+      </div>
+
+      <!-- Save button -->
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();saveNonNeg('nonNegPhysical','closet-non-neg-physical');saveNonNeg('nonNegAesthetic','closet-non-neg-aesthetic')"
+        onclick="saveNonNeg('nonNegPhysical','closet-non-neg-physical');saveNonNeg('nonNegAesthetic','closet-non-neg-aesthetic')"
+        style="width:100%;padding:14px;background:var(--gold);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:16px;">
+        Save My Non-Negotiables
+      </button>
+
+      ${hasSomething ? '' : `<div style="font-size:12px;color:var(--text-3);text-align:center;line-height:1.5;">You can update this any time. Knowing yourself is part of the work.</div>`}
+
+    </div>
+  </div>`;
 }
 
 /* ================================================================
@@ -13447,14 +12096,13 @@ function viewWardrobe() {
   const _vwKey = [
     S.wardrobeCategory, S.wardrobeSubCategory, S.wardrobeSort, S.wardrobeSearch,
     S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0,
-    S.wardrobeTailoringFilter?1:0, S._wardrobeForSaleFilter?1:0,
+    S.wardrobeTailoringFilter?1:0,
     S.wardrobeExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0,
     S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels, S.sweatRackLevels, S.intRackLevels,
     S.weatherPin ? S.weatherPin.city+S.weatherPin.tempF : '',
     (S._wardrobeSelected||[]).join(','),
     (S._wearFlipped ? [...S._wearFlipped].sort().join(',') : ''),
     S.wardrobe.map(w=>w.id+'|'+(w.wears?.length||0)+'|'+(w.inMaybePile?1:0)+'|'+(w.tailoringNeeded?1:0)+'|'+(w.retiredFromCloset?1:0)+'|'+(!!w.photo?1:0)+'|'+(!!w.wearPhoto?1:0)+'|'+(w.name||'')+'|'+(w.category||'')+'|'+(w.brand||'')+'|'+(w.isGem?1:0)).join(';'),
-    (S.sellListings||[]).map(l=>l.id+':'+l.status).join(','),
     (S.customCategories||[]).join(','),
   ].join('§');
   if (S._vwCache && S._vwCache.key === _vwKey) return S._vwCache.html;
@@ -13491,14 +12139,14 @@ function viewWardrobe() {
   }
 
   // Apply for-sale filter
-  if (S._wardrobeForSaleFilter) {
-    const listedIds = new Set((S.sellListings || []).filter(l => l.wardrobeItemId && l.status !== 'sold').map(l => l.wardrobeItemId));
+  if (false) {
+    // For Sale filter removed
     items = items.filter(w => listedIds.has(String(w.id)));
   }
 
   // Apply category filter (skip if tailoring, hero, maybe pile, or for-sale filter is active)
   // normalizeCat(S.wardrobeCategory) handles 'Bottoms' → 'Pants' so existing items match
-  if (!S.wardrobeTailoringFilter && !S._wardrobeHeroFilter && !S._wardrobeMaybePileFilter && !S._wardrobeForSaleFilter && S.wardrobeCategory !== 'All') {
+  if (!S.wardrobeTailoringFilter && !S._wardrobeHeroFilter && !S._wardrobeMaybePileFilter && S.wardrobeCategory !== 'All') {
     items = items.filter(w => normalizeCat(w.category || categoryFromIcon(w.icon, w.name)) === normalizeCat(S.wardrobeCategory));
   }
 
@@ -13581,20 +12229,10 @@ function viewWardrobe() {
         const mpActive = S._wardrobeMaybePileFilter;
         const mpEmpty = mpCount === 0;
         return `<div class="filter-chip ${mpActive?'active':''} ${mpEmpty?'filter-chip-empty':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S._wardrobeForSaleFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()"
-          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S._wardrobeForSaleFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()">🤔 Purgatory<span class="cat-count-badge">${mpCount}</span></div>`;
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()"
+          onclick="S._wardrobeMaybePileFilter=!S._wardrobeMaybePileFilter;S._wardrobeHeroFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()">🤔 Purgatory<span class="cat-count-badge">${mpCount}</span></div>`;
       })()}
-      ${(() => {
-        const fsCount = (() => {
-          const listedIds = new Set((S.sellListings || []).filter(l => l.wardrobeItemId && l.status !== 'sold').map(l => l.wardrobeItemId));
-          return activeWardrobe.filter(w => listedIds.has(String(w.id))).length;
-        })();
-        const fsActive = S._wardrobeForSaleFilter;
-        const fsEmpty = fsCount === 0;
-        return `<div class="filter-chip ${fsActive?'active':''} ${fsEmpty?'filter-chip-empty':''}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeForSaleFilter=!S._wardrobeForSaleFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()"
-          onclick="S._wardrobeForSaleFilter=!S._wardrobeForSaleFilter;S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';S.wardrobeExpanded=false;renderRAF()">💰 For Sale<span class="cat-count-badge">${fsCount}</span></div>`;
-      })()}
+
       ${S._addingShelf ? `
         <div style="display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1.5px solid var(--gold);border-radius:100px;padding:4px 6px 4px 12px;">
           <input type="text" id="newShelfInput" placeholder="Shelf name…"
@@ -13714,7 +12352,7 @@ function shelfCardHTML(w, fallbackIcon, _siblings) {
       ${isGem ? `<div style="position:absolute;bottom:2px;right:3px;font-size:7px;font-weight:800;color:var(--gold-dk);background:rgba(255,255,255,.85);border-radius:3px;padding:1px 3px;">💎</div>` : ''}
     </div>
     <div class="shoe-card-name">${esc(w.name)}</div>
-    <div class="shoe-card-wears">${wears}w</div>
+    ${wears >= 10 ? `<div class="shoe-card-wears" style="color:var(--gold);font-weight:700;">${wears}w</div>` : ''}
   </div>`;
 }
 
@@ -14249,7 +12887,7 @@ function hangerHTML(w, _siblings) {
       ${w.brand ? `<div class="hanger-brand">${esc(w.brand)}</div>` : ''}
       <div class="hanger-name">${esc(w.name)}</div>
       ${w.size ? `<div class="hanger-brand" style="color:var(--text-2);font-weight:600;text-transform:none;letter-spacing:0;">${esc(w.size)}</div>` : ''}
-      <div class="hanger-wears">${wears}w</div>
+      ${wears >= 10 ? `<div class="hanger-wears">${wears}w</div>` : ''}
       ${isGemPiece(w) ? `<div style="font-size:9px;font-weight:700;color:var(--gold-dk);margin-top:3px;letter-spacing:.02em;">💎 Gem</div>` : ''}
       ${S._wardrobeSelectMode ? `<div style="position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:50%;background:${hSel ? 'var(--gold)' : 'rgba(255,255,255,0.85)'};border:2px solid ${hSel ? 'var(--gold)' : '#ccc'};display:flex;align-items:center;justify-content:center;z-index:5;">${hSel ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>` : ''}
       ${!S._wardrobeSelectMode && w.wearPhoto ? `
@@ -14467,7 +13105,7 @@ function viewOnboarding() {
     // 4 — Plan
     { label:'Plan', dark:false,
       headline:'Never scramble\nbefore an event again.',
-      sub:'Tell Claude your occasion and it builds an outfit from your actual wardrobe. Going with friends? Create a Group Fit and plan together.',
+      sub:'Tell Claude your occasion and it builds an outfit from your actual wardrobe — weather-aware and personalised to what you actually own.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
           <div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:11px;padding:12px 14px;margin-bottom:12px;">
@@ -14479,10 +13117,7 @@ function viewOnboarding() {
           <div style="display:flex;gap:6px;margin-bottom:10px;">
             ${['👗 Silk Slip Dress','👡 Strappy Heels','✨ Gold Cuff'].map(i=>`<div style="flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:7px 4px;text-align:center;font-size:9px;font-weight:700;color:var(--text-2);line-height:1.5;">${i}</div>`).join('')}
           </div>
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
-            <span style="font-size:14px;">👯</span>
-            <div style="font-size:11px;font-weight:700;color:var(--text);">Group Fit · 3 people planned</div>
-          </div>
+
         </div>
       </div>`
     },
@@ -15540,21 +14175,7 @@ function viewWardrobeItem() {
             style="font-size:14px;">
         </div>
 
-        <!-- List for Sale -->
-        ${(() => {
-          const existingListing = (S.sellListings || []).find(l => l.wardrobeItemId === String(w.id) && l.status !== 'sold');
-          return `<button
-            ontouchend="if(_touchMoved)return;event.preventDefault();listWardrobeItemForSale('${w.id}')"
-            onclick="listWardrobeItemForSale('${w.id}')"
-            style="width:100%;padding:11px;border-radius:var(--r-sm);cursor:pointer;font-family:inherit;touch-action:manipulation;
-              border:1.5px solid ${existingListing ? '#16A34A' : 'var(--border)'};
-              background:${existingListing ? '#F0FDF4' : 'var(--surface-2)'};
-              color:${existingListing ? '#15803D' : 'var(--text-2)'};
-              font-size:13px;font-weight:700;
-              display:flex;align-items:center;justify-content:center;gap:6px;">
-            ${existingListing ? '✓ Listed for $'+(parseFloat(existingListing.price)||0).toFixed(0)+' — view listing' : '💰 List for Sale'}
-          </button>`;
-        })()}
+
       </div>
     </div>
 
@@ -17408,6 +16029,19 @@ function viewSettings() {
         <input class="form-input" id="apiKeyInput" type="password" placeholder="sk-ant-…" value="${esc(S.apiKey)}" style="margin-bottom:8px;">
         <button class="btn btn-primary" onclick="doSaveApiKey()" style="margin:0;width:100%;">Save Key</button>
       </div>
+      <div class="settings-row">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="settings-label" style="margin-bottom:2px;">Auto-identify photos ✨</div>
+            <div class="settings-hint" style="margin:0;">When ON, Claude automatically identifies each photo during bulk upload. When OFF (default), tap <strong>✨ Identify</strong> only on the pieces you want analyzed — saves tokens for heavy uploaders.</div>
+          </div>
+          <div ontouchend="if(_touchMoved)return;event.preventDefault();S.bulkAutoIdentify=!S.bulkAutoIdentify;localStorage.setItem('closet-bulk-auto-id',S.bulkAutoIdentify);render();" onclick="S.bulkAutoIdentify=!S.bulkAutoIdentify;localStorage.setItem('closet-bulk-auto-id',S.bulkAutoIdentify);render();" style="flex-shrink:0;margin-left:12px;cursor:pointer;touch-action:manipulation;">
+            <div style="width:44px;height:26px;border-radius:13px;background:${S.bulkAutoIdentify?'var(--accent)':'var(--border)'};transition:background .2s;position:relative;">
+              <div style="position:absolute;top:3px;left:${S.bulkAutoIdentify?'21':'3'}px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:left .2s;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ── PROFILE ───────────────────────────────── -->
@@ -18198,7 +16832,7 @@ function bulkFilesSelected(input) {
       if (loaded === files.length) {
         S.bulkQueue = results;
         navigate('bulk-add');
-        if (S.apiKey) setTimeout(() => bulkAnalyzeCurrent(), 200);
+        if (S.apiKey && S.bulkAutoIdentify) setTimeout(() => bulkAnalyzeCurrent(), 200);
       }
     };
     reader.readAsDataURL(file);
@@ -18212,7 +16846,14 @@ async function bulkAnalyzeCurrent() {
   if (!current) return;
   if (!S.apiKey) { toast('Add your API key in Settings first.'); return; }
   S.bulkAnalyzing = true;
+  const _fid0 = document.activeElement?.id;
+  const _fss0 = document.activeElement?.selectionStart;
+  const _fse0 = document.activeElement?.selectionEnd;
   render();
+  if (_fid0) {
+    const _el0 = document.getElementById(_fid0);
+    if (_el0) { _el0.focus(); try { _el0.setSelectionRange(_fss0||0, _fse0||0); } catch(e){} }
+  }
   const comma     = current.dataUrl.indexOf(',');
   const imageData = current.dataUrl.slice(comma + 1);
   const imageMime = current.imageMime;
@@ -18404,7 +17045,7 @@ function bulkAdvance() {
   render();
   const queue = S.bulkQueue || [];
   const idx   = S.bulkIdx;
-  if (idx < queue.length && S.apiKey && !queue[idx].preview) {
+  if (idx < queue.length && S.apiKey && S.bulkAutoIdentify && !queue[idx].preview) {
     setTimeout(() => bulkAnalyzeCurrent(), 150);
   }
 }
@@ -19979,7 +18620,6 @@ function doExportWardrobeCSV() {
     'Purchase Month','New When Got?',
     '💎 Gem','Purgatory','Needs Tailoring','Tailoring Note','Retiring','Retired','Paid Off',
     'Wear Count','Compliments','Last Worn','Avg Outfit Rating','Cost Per Wear ($)',
-    'For Sale','Asking Price $',
     'Date Added','Added Via','Item ID'
   ];
 
@@ -20028,7 +18668,6 @@ function doExportWardrobeCSV() {
       lastWorn,
       avgRating,
       cpw,
-      w.forSale ? 'Yes' : 'No',
       w.askingPrice != null ? w.askingPrice : '',
       w.addedAt ? w.addedAt.slice(0,10) : '',
       w.addedVia || '',
@@ -20258,8 +18897,6 @@ auth.onAuthStateChanged(async (user) => {
   // Deep-link: if URL contains ?seller=uid, go straight to marketplace Browse tab
   const _sellerParam = new URLSearchParams(location.search).get('seller');
   if (_sellerParam) {
-    S._viewSellerUid = _sellerParam;
-    S.sellTab = 'browse';
   }
   S.view = 'loading';
   render();
@@ -20272,7 +18909,7 @@ auth.onAuthStateChanged(async (user) => {
       DB.wardrobe.getAll(),
     ]);
     const alreadyOnboarded = localStorage.getItem('closet-onboarded');
-    if (S._viewSellerUid) {
+    if (false) {
       // Visitor arrived via a seller share link — go straight to the marketplace
       S.view = 'sell'; S.activeTab = 'sell';
       loadMarketplaceListings();
