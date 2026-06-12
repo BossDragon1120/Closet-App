@@ -2280,6 +2280,49 @@ body {
   border-radius: 8px; transition: background .12s; flex-shrink: 0;
 }
 .feat-menu-btn:active { background: var(--border); }
+
+/* ── SKELETON LOADER ─────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.skel {
+  background: linear-gradient(90deg,
+    var(--surface-2) 25%,
+    var(--border)    50%,
+    var(--surface-2) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
+.skel-nav {
+  height: 52px; display: flex; align-items: center;
+  padding: 0 16px; gap: 10px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.skel-tab-bar {
+  display: flex; border-top: 1px solid var(--border);
+  background: var(--bg); position: fixed; bottom: 0; left: 0; right: 0;
+  max-width: 430px; margin: 0 auto; z-index: 100;
+}
+.skel-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 4px; padding: 10px 0;
+}
+.skel-rod-label { height: 13px; width: 80px; margin: 16px 16px 6px; }
+.skel-rod-track {
+  display: flex; gap: 10px; padding: 0 16px 20px; overflow: hidden;
+}
+.skel-hanger-card {
+  flex-shrink: 0; width: 88px; display: flex; flex-direction: column; align-items: center; gap: 5px;
+}
+.skel-hanger-photo { width: 88px; height: 112px; border-radius: 10px; }
+.skel-hanger-text  { height: 9px; width: 68px; }
+.skel-hanger-text2 { height: 9px; width: 48px; }
+.skel-filter-bar {
+  display: flex; gap: 6px; padding: 8px 16px; overflow: hidden;
+}
+.skel-chip { height: 28px; border-radius: 100px; flex-shrink: 0; }
 </style>
   <!-- Firebase SDK (compat v10) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -5877,11 +5920,56 @@ function viewBrands() {
   </div>`;
 }
 
+
+function viewSkeletonWardrobe() {
+  const hangerCard = `
+    <div class="skel-hanger-card">
+      <div class="skel skel-hanger-photo"></div>
+      <div class="skel skel-hanger-text"></div>
+      <div class="skel skel-hanger-text2"></div>
+    </div>`;
+  const rod = (w) => `
+    <div class="skel skel-rod-label"></div>
+    <div class="skel-rod-track">${hangerCard.repeat(w)}</div>`;
+  const tab = (active) => `
+    <div class="skel-tab">
+      <div class="skel" style="width:20px;height:20px;border-radius:4px;${active?'opacity:.35;':''}"></div>
+      <div class="skel" style="width:${active?32:28}px;height:8px;${active?'opacity:.35;':''}"></div>
+    </div>`;
+  return `<div class="view" style="display:flex;flex-direction:column;height:100vh;overflow:hidden;">
+    <!-- Nav -->
+    <div class="skel-nav">
+      <div class="skel" style="width:90px;height:18px;"></div>
+      <div style="flex:1;"></div>
+      <div class="skel" style="width:24px;height:24px;border-radius:50%;"></div>
+      <div class="skel" style="width:90px;height:32px;border-radius:20px;"></div>
+    </div>
+    <!-- Filter chips -->
+    <div class="skel-filter-bar">
+      ${[80,64,72,56,68].map(w=>`<div class="skel skel-chip" style="width:${w}px;"></div>`).join('')}
+    </div>
+    <!-- Rod sections -->
+    ${rod(6)}
+    ${rod(5)}
+    ${rod(7)}
+    <!-- Spacer for tab bar -->
+    <div style="height:80px;flex-shrink:0;"></div>
+    <!-- Tab bar -->
+    <div class="skel-tab-bar">
+      ${tab(false)}
+      ${tab(true)}
+      ${tab(false)}
+      ${tab(false)}
+      ${tab(false)}
+    </div>
+  </div>`;
+}
+
 function render() {
   const root = document.getElementById('root');
   let html = '';
   switch (S.view) {
-    case 'loading':      html = `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;"><div class="spinner"></div></div>`; break;
+    case 'loading':      html = viewSkeletonWardrobe(); break;
     case 'signin':        html = viewSignIn(false); break;
     case 'signin-loading':html = viewSignIn(true);  break;
     case 'setup':        html = viewSetup();        break;
