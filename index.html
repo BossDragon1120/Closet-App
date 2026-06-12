@@ -18254,7 +18254,14 @@ Do NOT include a brand field unless the brand name is explicitly readable as tex
     if (S.bulkIdx === idx) toast('Couldn\'t identify — fill in details manually.');
   }
   S.bulkAnalyzing = false;
+  const _fid = document.activeElement?.id;
+  const _fss = document.activeElement?.selectionStart;
+  const _fse = document.activeElement?.selectionEnd;
   render();
+  if (_fid) {
+    const _el = document.getElementById(_fid);
+    if (_el) { _el.focus(); try { _el.setSelectionRange(_fss||0, _fse||0); } catch(e){} }
+  }
 }
 
 async function bulkSaveAndNext() {
