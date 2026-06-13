@@ -1049,16 +1049,17 @@ body {
 .plan-card-title { font-size: 13px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
 .plan-textarea {
   width: 100%; border: 1.5px solid var(--border); border-radius: var(--r-sm);
-  padding: 12px; font-size: 15px; font-family: inherit; color: var(--text);
+  padding: 12px; font-size: 16px; font-family: inherit; color: var(--text);
   background: var(--bg); resize: none; line-height: 1.5; outline: none;
-  transition: border-color .15s;
+  transition: border-color .15s; -webkit-appearance: none; appearance: none;
 }
 .plan-textarea:focus { border-color: var(--gold); }
 .plan-date-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .plan-date-input {
   flex: 1; border: 1.5px solid var(--border); border-radius: var(--r-sm);
-  padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--text);
+  padding: 10px 12px; font-size: 16px; font-family: inherit; color: var(--text);
   background: var(--bg); outline: none; transition: border-color .15s;
+  -webkit-appearance: none; appearance: none;
 }
 .plan-date-input:focus { border-color: var(--gold); }
 .forecast-chip {
@@ -2872,6 +2873,7 @@ const S = {
   _flipCardFlipped: false, // tracks flip card side so render() doesn't snap it back
   _pendingWitemPhoto: null, // { wId, data } — preview before explicit save
   _pendingWearPhoto: null,  // { wId, data } — preview before explicit save
+  _wearPhotoPicker: null,   // wId when outfit-photo picker is open
   _savingPhoto: false,      // true while DB.wardrobe.put is running for photo save
   bulkQueue: [], bulkIdx: 0, bulkSaved: 0, bulkAnalyzing: false, bulkSaving: false,
   onboardStep: 0,
@@ -4766,7 +4768,7 @@ function switchTab(tab)  {
   S.activeTab = tab;
   S.view = tab;
   // Paint the tab-bar active state immediately, then do the heavy render next frame
-  requestAnimationFrame(() => render());
+  requestAnimationFrame(() => { render(); window.scrollTo(0,0); });
 }
 function renderRAF() { requestAnimationFrame(render); }
 
@@ -5969,7 +5971,7 @@ function render() {
   const root = document.getElementById('root');
   let html = '';
   switch (S.view) {
-    case 'loading':      html = viewSkeletonWardrobe(); break;
+    case 'loading':      html = `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;"><div class="spinner"></div></div>`; break;
     case 'signin':        html = viewSignIn(false); break;
     case 'signin-loading':html = viewSignIn(true);  break;
     case 'setup':        html = viewSetup();        break;
@@ -6044,6 +6046,13 @@ function render() {
   if (S._wardrobeSearchOpen && S.view === 'wardrobe') {
     requestAnimationFrame(() => {
       const inp = document.getElementById('wardrobe-search-input');
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    });
+  }
+  // Post-render: re-focus outfit linker search input when user is actively typing
+  if (S.outfitLinker?.search) {
+    requestAnimationFrame(() => {
+      const inp = document.getElementById('outfit-linker-search');
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
     });
   }
@@ -10902,22 +10911,26 @@ function viewNonNegotiables() {
    ================================================================ */
 function viewSavedTips() {
   const tips = [];
+  const doingTips = [];
   S.entries.forEach(e => {
     if (!e.recReactions) return;
     if (e.stylingTips?.length) {
       e.stylingTips.forEach((r, i) => {
         if (e.recReactions[String(i)] === 'liked') tips.push({ text: r, entry: e });
+        else if (e.recReactions[String(i)] === 'doing') doingTips.push({ text: r, entry: e });
       });
     } else {
       (e.recommendations||[]).forEach(r => {
         if (e.recReactions[r] === 'liked') tips.push({ text: r, entry: e });
+        else if (e.recReactions[r] === 'doing') doingTips.push({ text: r, entry: e });
       });
     }
   });
   // Most recent outfit first
   tips.sort((a,b) => new Date(b.entry.createdAt) - new Date(a.entry.createdAt));
+  doingTips.sort((a,b) => new Date(b.entry.createdAt) - new Date(a.entry.createdAt));
 
-  const rows = tips.length ? tips.map(({text, entry}) => `
+  const tipRow = ({text, entry}) => `
     <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')" onclick="openEntry('${entry.id}')"
       style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;cursor:pointer;touch-action:manipulation;">
       ${entry.photo
@@ -10929,12 +10942,30 @@ function viewSavedTips() {
           ${entry.rating != null ? `⭐ ${entry.rating}` : ''}${entry.occasionTag ? (entry.rating!=null?' · ':'')+esc(entry.occasionTag) : ''} · ${fmtDate(entry.createdAt)}
         </div>
       </div>
-    </div>`).join('') : `
+    </div>`;
+
+  const rows = tips.length ? tips.map(tipRow).join('') : `
     <div style="padding:40px 20px;text-align:center;">
       <div style="font-size:36px;margin-bottom:12px;">✂️</div>
       <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">No saved tips yet</div>
       <div style="font-size:13px;color:var(--text-3);line-height:1.5;">After a fit check, tap ♥ on any styling tip to save it here.</div>
     </div>`;
+
+  const doingSection = doingTips.length ? `
+    <div style="margin-top:8px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#2E9E6B;padding:0 2px 10px;">✓ Already nailing it</div>
+      ${doingTips.map(t => `
+        <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${t.entry.id}')" onclick="openEntry('${t.entry.id}')"
+          style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:rgba(46,158,107,0.06);border:1.5px solid rgba(46,158,107,0.2);border-radius:14px;cursor:pointer;touch-action:manipulation;margin-bottom:8px;opacity:0.8;">
+          ${t.entry.photo
+            ? `<img src="${esc(t.entry.photo)}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;object-position:top;flex-shrink:0;border:1px solid rgba(46,158,107,0.2);">`
+            : `<div style="width:40px;height:40px;border-radius:8px;background:rgba(46,158,107,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">✓</div>`}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;color:var(--text-3);line-height:1.5;text-decoration:line-through;">${esc(t.text)}</div>
+            <div style="font-size:10px;font-weight:700;color:#2E9E6B;margin-top:3px;">Already doing this</div>
+          </div>
+        </div>`).join('')}
+    </div>` : '';
 
   return `<div class="view">
     <div class="nav">
@@ -10944,6 +10975,7 @@ function viewSavedTips() {
     <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
       ${tips.length ? `<div style="font-size:12px;color:var(--text-3);padding:0 2px 4px;">${tips.length} tip${tips.length===1?'':'s'} saved — tap any to open the outfit</div>` : ''}
       ${rows}
+      ${doingSection}
     </div>
     <div style="height:40px;"></div>
   </div>`;
@@ -12204,7 +12236,7 @@ function viewWardrobe() {
     S.wardrobeCategory, S.wardrobeSubCategory, S.wardrobeSort, S.wardrobeSearch,
     S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0,
     S.wardrobeTailoringFilter?1:0,
-    S.wardrobeExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0,
+    S.wardrobeExpanded?1:0, S.wardrobeRetiredExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0,
     S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels, S.sweatRackLevels, S.intRackLevels, S.showIntimatesShelf?1:0,
     S.weatherPin ? S.weatherPin.city+S.weatherPin.tempF : '',
     (S._wardrobeSelected||[]).join(','),
@@ -12411,8 +12443,8 @@ function viewWardrobe() {
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='best-val';render()"
         onclick="S.wardrobeSort='best-val';render()">Best Value</div>
       <div class="filter-chip ${_colorSortActive?'active':''}"
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort=_colorSortActive?'${_colorNextSort}':'color-asc';render()"
-        onclick="S.wardrobeSort=_colorSortActive?'${_colorNextSort}':'color-asc';render()">${_colorSortLabel}</div>
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort=(S.wardrobeSort==='color-asc')?'color-desc':'color-asc';render()"
+        onclick="S.wardrobeSort=(S.wardrobeSort==='color-asc')?'color-desc':'color-asc';render()">${_colorSortLabel}</div>
       <div class="filter-chip ${S.wardrobeSort==='az'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='az';render()"
         onclick="S.wardrobeSort='az';render()">A–Z</div>
@@ -14046,11 +14078,15 @@ function viewWardrobeItem() {
     <div class="witem-hero">
       ${(() => {
         const isFlipped = S._wearFlipped.has(w.id);
-        const showWear = isFlipped && (S._pendingWearPhoto?.wId === w.id ? S._pendingWearPhoto.data : w.wearPhoto);
         const pendingItem = S._pendingWitemPhoto?.wId === w.id ? S._pendingWitemPhoto.data : null;
         const pendingWear = S._pendingWearPhoto?.wId === w.id ? S._pendingWearPhoto.data : null;
-        const displaySrc = showWear ? (pendingWear || w.wearPhoto) : (pendingItem || w.photo);
-        const hasBoth = (pendingItem || w.photo) && (pendingWear || w.wearPhoto);
+        // Auto-pull best linked outfit photo if no explicit wearPhoto
+        const linkedEntries = _linkedOutfitEntries(w);
+        const autoWearSrc = w.wearPhoto || (linkedEntries.length ? linkedEntries[0].photo : null);
+        const isAutoWear = !w.wearPhoto && !!autoWearSrc; // true = showing auto-pulled (not saved)
+        const showWear = isFlipped && (pendingWear || autoWearSrc);
+        const displaySrc = showWear ? (pendingWear || autoWearSrc) : (pendingItem || w.photo);
+        const hasBoth = (pendingItem || w.photo) && (pendingWear || autoWearSrc);
         const toggle = hasBoth ? `
           <div style="display:flex;justify-content:center;gap:4px;margin-bottom:10px;">
             <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wearFlipped.delete('${w.id}');render();" onclick="S._wearFlipped.delete('${w.id}');render();"
@@ -14063,7 +14099,10 @@ function viewWardrobeItem() {
             </button>
           </div>` : '';
         const imgEl = displaySrc
-          ? `<div class="witem-img-wrap"><img src="${esc(displaySrc)}" class="witem-img" alt="${esc(w.name)}" onerror="this.style.display='none'"></div>`
+          ? `<div class="witem-img-wrap" style="position:relative;">
+               <img src="${esc(displaySrc)}" class="witem-img" alt="${esc(w.name)}" onerror="this.style.display='none'">
+               ${isAutoWear && showWear ? `<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.62);color:#fff;border-radius:100px;padding:3px 10px;font-size:10px;font-weight:700;white-space:nowrap;backdrop-filter:blur(4px);">from linked outfit</div>` : ''}
+             </div>`
           : `<div class="witem-emoji" style="${w.retiredFromCloset?'opacity:0.45;filter:saturate(0.3)':w.retiring?'opacity:0.72;filter:saturate(0.7)':''}">${w.icon||'👕'}</div>`;
         return toggle + imgEl;
       })()}
@@ -14101,14 +14140,19 @@ function viewWardrobeItem() {
           style="background:none;border:1.5px solid var(--border);color:var(--text-2);border-radius:100px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
           ✕ Cancel
         </button>
-        ` : `
+        ` : (() => {
+          // Compute linked outfits here too (in scope for this IIFE)
+          const _le = _linkedOutfitEntries(w);
+          const _pickerOpen = S._wearPhotoPicker === w.id;
+          const _hasLinked = _le.length > 0;
+          return `
         <button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witemPhotoInput').click()" onclick="document.getElementById('witemPhotoInput').click()"
           style="background:none;border:1.5px solid var(--gold);color:var(--gold-dk);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
           📸 ${w.photo ? 'Replace item photo' : 'Add item photo'}
         </button>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witemWearPhotoInput').click()" onclick="document.getElementById('witemWearPhotoInput').click()"
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();${_hasLinked ? `S._wearPhotoPicker=(S._wearPhotoPicker==='${w.id}'?null:'${w.id}');render()` : `document.getElementById('witemWearPhotoInput').click()`}" onclick="${_hasLinked ? `S._wearPhotoPicker=(S._wearPhotoPicker==='${w.id}'?null:'${w.id}');render()` : `document.getElementById('witemWearPhotoInput').click()`}"
           style="background:none;border:1.5px solid var(--gold);color:var(--gold-dk);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          🧍 ${w.wearPhoto ? 'Replace worn photo' : 'Add worn photo'}
+          🧍 ${w.wearPhoto ? 'Change worn photo' : 'Set worn photo'}
         </button>
         ${(w.photo || w.wearPhoto) ? `
         <div style="display:flex;gap:8px;justify-content:center;margin-top:6px;flex-wrap:wrap;width:100%;">
@@ -14117,7 +14161,23 @@ function viewWardrobeItem() {
           ${w.wearPhoto ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();removeWardrobeWearPhoto('${w.id}')" onclick="removeWardrobeWearPhoto('${w.id}')"
             style="background:none;border:1.5px solid var(--border);color:var(--text-3);border-radius:100px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕ Remove worn photo</button>` : ''}
         </div>` : ''}
-        `}
+        ${_pickerOpen ? `
+        <div style="width:100%;margin-top:10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);margin-bottom:10px;">Choose from your outfits</div>
+          <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+            ${_le.map(e => `
+              <div ontouchend="if(_touchMoved)return;event.preventDefault();setWearPhotoFromOutfit('${w.id}','${e.id}')" onclick="setWearPhotoFromOutfit('${w.id}','${e.id}')"
+                style="flex-shrink:0;width:90px;scroll-snap-align:start;cursor:pointer;border-radius:10px;overflow:hidden;border:2px solid var(--border);touch-action:manipulation;position:relative;">
+                <img src="${esc(e.photo)}" style="width:90px;height:110px;object-fit:cover;object-position:top;display:block;">
+                ${e.rating != null ? `<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.65));padding:4px 6px;font-size:10px;font-weight:700;color:#fff;">⭐ ${e.rating}</div>` : ''}
+              </div>`).join('')}
+          </div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witemWearPhotoInput').click()" onclick="document.getElementById('witemWearPhotoInput').click()"
+            style="width:100%;margin-top:10px;background:none;border:1px solid var(--border);border-radius:100px;padding:7px;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            📷 Upload from camera roll instead
+          </button>
+        </div>` : ''}
+        `;})()}
       </div>
 
       <!-- Subtle stats + compliment link -->
@@ -15815,7 +15875,10 @@ function viewDetail() {
         const ol = S.outfitLinker?.mode === 'from-outfit' && S.outfitLinker?.entryId === entry.id ? S.outfitLinker : null;
         if (ol) {
           // Wardrobe picker mode — show all wardrobe items to select
-          const sortedWardrobe = S.wardrobe.slice().sort((a,b) => (a.name||'').localeCompare(b.name));
+          const _olSearch = (ol.search || '').toLowerCase().trim();
+          const sortedWardrobe = S.wardrobe.slice()
+            .sort((a,b) => (a.name||'').localeCompare(b.name))
+            .filter(w => !_olSearch || (w.name||'').toLowerCase().includes(_olSearch) || (w.brand||'').toLowerCase().includes(_olSearch) || (w.category||'').toLowerCase().includes(_olSearch));
           const selCount = Object.values(ol.selected).filter(Boolean).length;
           return `<div class="section">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -15823,6 +15886,10 @@ function viewDetail() {
               <button onclick="S.outfitLinker=null;render()" style="background:none;border:none;font-size:22px;color:var(--text-3);cursor:pointer;padding:0;">✕</button>
             </div>
             <p style="font-size:12px;color:var(--text-3);margin-bottom:12px;">Tap each wardrobe item you're wearing in this outfit. This records a wear on those items.</p>
+            <input id="outfit-linker-search" type="search" value="${esc(ol.search||'')}"
+              oninput="S.outfitLinker.search=this.value;render()"
+              placeholder="Search items…"
+              style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:16px;font-family:inherit;background:var(--bg);color:var(--text);outline:none;margin-bottom:12px;-webkit-appearance:none;appearance:none;">
             ${sortedWardrobe.map(w => {
               const sel = !!ol.selected[w.id];
               return `<div onclick="toggleOutfitLink('${w.id}')" style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-sm);margin-bottom:6px;cursor:pointer;
@@ -15904,13 +15971,19 @@ function viewDetail() {
               const reaction = entry.recReactions?.[String(i)];
               const isLiked = reaction === 'liked';
               const isDismissed = reaction === 'dismissed';
-              return `<div class="rec-item" style="${isDismissed?'opacity:0.38;':''}">
-                <div class="rec-text" style="${isDismissed?'text-decoration:line-through;':''};flex:1;">${esc(r)}</div>
-                <div style="display:flex;gap:4px;flex-shrink:0;margin-left:6px;">
-                  <button onclick="event.stopPropagation();setRecReaction('${entry.id}',${i},'liked')"
-                    title="Save tip" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px;line-height:1;opacity:${isLiked?'1':'0.35'};transition:opacity .15s;">${isLiked?'♥':'♡'}</button>
-                  <button onclick="event.stopPropagation();setRecReaction('${entry.id}',${i},'dismissed')"
-                    title="Dismiss" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;opacity:${isDismissed?'1':'0.35'};transition:opacity .15s;color:var(--text-3);">✕</button>
+              const isDoing = reaction === 'doing';
+              return `<div class="rec-item" style="${isDismissed?'opacity:0.38;':isDoing?'opacity:0.55;':''}">
+                <div style="flex:1;min-width:0;">
+                  <div class="rec-text" style="${isDismissed?'text-decoration:line-through;':isDoing?'text-decoration:line-through;color:var(--text-3);':''}">${esc(r)}</div>
+                  ${isDoing?`<div style="font-size:10px;font-weight:700;color:#2E9E6B;margin-top:3px;letter-spacing:.02em;">✓ Already doing this</div>`:''}
+                </div>
+                <div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px;align-items:center;">
+                  <button ontouchend="event.stopPropagation();if(_touchMoved)return;event.preventDefault();setRecReaction('${entry.id}',${i},'liked')" onclick="event.stopPropagation();setRecReaction('${entry.id}',${i},'liked')"
+                    title="Save tip" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px;line-height:1;opacity:${isLiked?'1':'0.3'};transition:opacity .15s;touch-action:manipulation;">${isLiked?'♥':'♡'}</button>
+                  <button ontouchend="event.stopPropagation();if(_touchMoved)return;event.preventDefault();setRecReaction('${entry.id}',${i},'doing')" onclick="event.stopPropagation();setRecReaction('${entry.id}',${i},'doing')"
+                    title="Already doing this" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;opacity:${isDoing?'1':'0.3'};transition:opacity .15s;color:#2E9E6B;touch-action:manipulation;font-weight:700;">✓</button>
+                  <button ontouchend="event.stopPropagation();if(_touchMoved)return;event.preventDefault();setRecReaction('${entry.id}',${i},'dismissed')" onclick="event.stopPropagation();setRecReaction('${entry.id}',${i},'dismissed')"
+                    title="Dismiss" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;opacity:${isDismissed?'1':'0.3'};transition:opacity .15s;color:var(--text-3);touch-action:manipulation;">✕</button>
                 </div>
               </div>`;
             }).join('')}</div>
@@ -16765,6 +16838,27 @@ async function removeWardrobeWearPhoto(wId) {
   toast('Worn photo removed');
 }
 
+// Set worn photo from a saved outfit entry photo
+async function setWearPhotoFromOutfit(wId, entryId) {
+  const entry = S.entries.find(e => e.id === entryId);
+  const w = S.wardrobe.find(i => i.id === wId);
+  if (!entry?.photo || !w) return;
+  w.wearPhoto = entry.photo;
+  S._wearPhotoPicker = null;
+  S._wearFlipped.add(wId);
+  render();
+  toast('🧍 Worn photo set ✓');
+  DB.wardrobe.put(w).catch(() => {});
+}
+
+// Get linked outfit entries for a wardrobe item, sorted by rating desc
+function _linkedOutfitEntries(w) {
+  return (w.wears || [])
+    .map(wr => S.entries.find(e => e.id === wr.outfitId))
+    .filter(e => e && e.photo)
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0));
+}
+
 function toggleWearFlip(id, ev) {
   if (ev) { ev.stopPropagation(); ev.preventDefault(); }
   if (S._wearFlipped.has(id)) S._wearFlipped.delete(id);
@@ -16834,7 +16928,7 @@ function openOutfitLinker(entryId) {
   S.wardrobe.forEach(w => {
     if (w.wears?.some(wr => wr.outfitId === entryId)) currentlyLinked[w.id] = true;
   });
-  S.outfitLinker = { mode: 'from-outfit', entryId, selected: { ...currentlyLinked } };
+  S.outfitLinker = { mode: 'from-outfit', entryId, selected: { ...currentlyLinked }, search: '' };
   render();
 }
 
