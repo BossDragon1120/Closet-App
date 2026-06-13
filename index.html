@@ -2887,7 +2887,7 @@ const S = {
   // ui
   loading: false, loadingMsg: '', error: null,
   filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), wardrobeExpanded: false, wardrobeRetiredExpanded: false,
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
   // Style Persona
@@ -6912,7 +6912,8 @@ function _paletteIsWarm(name) {
 // Searches color, name, description, notes, and brand for colour words.
 // Uses the same "longer match dominates shorter" logic as the palette analyser
 // so "navy blue" wins over "blue" or "navy" alone.
-function _itemColorLuminance(w) {
+function _itemColorHue(w) {
+  // Returns hue (0–360) for rainbow sorting. Unmatched items get 999 (sorted to end).
   const text = [w.color, w.name, w.description, w.notes, w.brand].filter(Boolean).join(' ').toLowerCase();
   const matched = new Set();
   for (const [word] of _COLOR_MAP) {
@@ -6923,21 +6924,29 @@ function _itemColorLuminance(w) {
     for (const m of matched) { if (word.includes(m) && m !== word) matched.delete(m); }
     matched.add(word);
   }
-  // Pick the darkest or lightest match depending on caller — just return average luminance
-  // of all matched colours so a "navy and white stripe" item lands somewhere in the middle
-  if (!matched.size) return 0.5;
+  if (!matched.size) return 999;
   const colorMap = Object.fromEntries(_COLOR_MAP);
-  let lum = 0;
+  // Convert hex → HSL hue, average across matched colours
+  let totalHue = 0; let count = 0;
   for (const word of matched) {
     const hex = colorMap[word];
     if (!hex) continue;
-    const r = parseInt(hex.slice(1,3), 16) / 255;
-    const g = parseInt(hex.slice(3,5), 16) / 255;
-    const b = parseInt(hex.slice(5,7), 16) / 255;
-    lum += 0.299*r + 0.587*g + 0.114*b;
+    const r = parseInt(hex.slice(1,3),16)/255;
+    const g = parseInt(hex.slice(3,5),16)/255;
+    const b = parseInt(hex.slice(5,7),16)/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+    if (d === 0) { totalHue += 0; } // achromatic (black/white/grey) → hue 0, handled below
+    else if (max === r) totalHue += (((g-b)/d) % 6) * 60;
+    else if (max === g) totalHue += ((b-r)/d + 2) * 60;
+    else               totalHue += ((r-g)/d + 4) * 60;
+    count++;
   }
-  return lum / matched.size;
+  if (!count) return 999;
+  const hue = ((totalHue / count) + 360) % 360;
+  return hue;
 }
+// Keep old name as alias so existing references don't break
+const _itemColorLuminance = _itemColorHue;
 
 function _paletteExplore(owned) {
   const names = owned.map(c => c.color.toLowerCase()).join(' ');
@@ -8921,7 +8930,7 @@ function viewShop() {
     .filter(i => !S.shopBlocked.has(i.query.toLowerCase().trim()))
     .sort((a, b) => b.count - a.count);
 
-  const src = S.shopSource || 'recs';
+  const src = S.shopSource || 'wishlist';
   const activeItems = src === 'wishlist'
     ? wishItems.map(w => ({ label: w.label, query: w.query, sub: w.reason, entry: w.entry, recIdx: w.recIdx, outfitIds: [w.entry?.id].filter(Boolean) }))
     : recsRaw.map(i => ({ label: i.query, query: i.query, sub: i.count > 1 ? `×${i.count} outfits` : '×1 outfit', priority: i.count > 1, outfitIds: i.outfitIds || [] }));
@@ -9041,7 +9050,7 @@ function viewShop() {
           onclick="S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;render()"
           style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${src==='wishlist'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='wishlist'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:16px;margin-bottom:3px;">♥</div>
-          <div style="font-size:12px;font-weight:${src==='wishlist'?'800':'600'};color:${src==='wishlist'?'var(--gold-dk)':'var(--text-2)'};">Wish List</div>
+          <div style="font-size:12px;font-weight:${src==='wishlist'?'800':'600'};color:${src==='wishlist'?'var(--gold-dk)':'var(--text-2)'};">Saved</div>
           <div style="font-size:10px;color:${src==='wishlist'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${wishItems.length} item${wishItems.length===1?'':'s'}</div>
         </button>
         <button
@@ -9049,7 +9058,7 @@ function viewShop() {
           onclick="S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;render()"
           style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${src==='recs'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='recs'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:16px;margin-bottom:3px;">✦</div>
-          <div style="font-size:12px;font-weight:${src==='recs'?'800':'600'};color:${src==='recs'?'var(--gold-dk)':'var(--text-2)'};">Claude's Recs</div>
+          <div style="font-size:12px;font-weight:${src==='recs'?'800':'600'};color:${src==='recs'?'var(--gold-dk)':'var(--text-2)'};">AI Picks</div>
           <div style="font-size:10px;color:${src==='recs'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${recsRaw.length} item${recsRaw.length===1?'':'s'}</div>
         </button>
         <button
@@ -11028,9 +11037,19 @@ function viewAura() {
                 : `<div style="font-size:12px;color:var(--text-3);font-style:italic;">Tap to add fit notes, go-to brands, sizing quirks…</div>`}
             </div>
             <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeCategory='Intimates';switchTab('wardrobe')"
-                onclick="S.wardrobeCategory='Intimates';switchTab('wardrobe')"
-                style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">View my Intimates shelf →</button>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeCategory='Intimates';switchTab('wardrobe')"
+                  onclick="S.wardrobeCategory='Intimates';switchTab('wardrobe')"
+                  style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">View shelf →</button>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="font-size:11px;color:var(--text-3);">Show in Closet</span>
+                  <div ontouchend="if(_touchMoved)return;event.preventDefault();S.showIntimatesShelf=!S.showIntimatesShelf;localStorage.setItem('closet-int-shelf-visible',S.showIntimatesShelf);S._vwCache=null;render()"
+                    onclick="S.showIntimatesShelf=!S.showIntimatesShelf;localStorage.setItem('closet-int-shelf-visible',S.showIntimatesShelf);S._vwCache=null;render()"
+                    style="width:36px;height:20px;border-radius:100px;background:${S.showIntimatesShelf?'var(--gold)':'var(--border)'};position:relative;cursor:pointer;transition:background .2s;touch-action:manipulation;flex-shrink:0;">
+                    <div style="position:absolute;top:2px;left:${S.showIntimatesShelf?'18px':'2px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></div>
+                  </div>
+                </div>
+              </div>
             </div>`}
         </div>`;
       })()}
@@ -12186,7 +12205,7 @@ function viewWardrobe() {
     S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0,
     S.wardrobeTailoringFilter?1:0,
     S.wardrobeExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0,
-    S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels, S.sweatRackLevels, S.intRackLevels,
+    S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels, S.sweatRackLevels, S.intRackLevels, S.showIntimatesShelf?1:0,
     S.weatherPin ? S.weatherPin.city+S.weatherPin.tempF : '',
     (S._wardrobeSelected||[]).join(','),
     (S._wearFlipped ? [...S._wearFlipped].sort().join(',') : ''),
@@ -12255,7 +12274,7 @@ function viewWardrobe() {
     const ppwB = b.price && (b.wears||[]).length ? b.price/(b.wears||[]).length : Infinity;
     return ppwA - ppwB;
   });
-  if (S.wardrobeSort === 'az') items.sort((a,b) => a.name.localeCompare(b.name));
+  if (S.wardrobeSort === 'az') items.sort((a,b) => (a.brand||a.name).localeCompare(b.brand||b.name));
   if (S.wardrobeSort === 'recent-worn') {
     const lastWorn = w => {
       const wrs = w.wears || [];
@@ -12264,8 +12283,8 @@ function viewWardrobe() {
     };
     items.sort((a,b) => lastWorn(b) - lastWorn(a));
   }
-  if (S.wardrobeSort === 'color-asc') items.sort((a,b) => _itemColorLuminance(b) - _itemColorLuminance(a)); // light first (high luminance)
-  if (S.wardrobeSort === 'color-desc') items.sort((a,b) => _itemColorLuminance(a) - _itemColorLuminance(b)); // dark first (low luminance)
+  if (S.wardrobeSort === 'color-asc') items.sort((a,b) => _itemColorHue(a) - _itemColorHue(b)); // rainbow order (red→violet)
+  if (S.wardrobeSort === 'color-desc') items.sort((a,b) => _itemColorHue(b) - _itemColorHue(a)); // reverse rainbow (violet→red)
 
   // Search filter — applied after sort so results maintain sort order
   if (S.wardrobeSearch.trim()) {
@@ -12375,7 +12394,7 @@ function viewWardrobe() {
     </div>` : '';
 
   const _colorSortActive = S.wardrobeSort === 'color-asc' || S.wardrobeSort === 'color-desc';
-  const _colorSortLabel  = S.wardrobeSort === 'color-desc' ? '🌑→☀ Color' : '☀→🌑 Color';
+  const _colorSortLabel  = S.wardrobeSort === 'color-desc' ? '🌈 Rainbow ↩' : '🌈 Rainbow';
   const _colorNextSort   = S.wardrobeSort === 'color-asc' ? 'color-desc' : 'color-asc';
   const sortBar = S.wardrobe.length > 1 ? `
     <div style="padding:0 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
@@ -12506,7 +12525,7 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
 
   } else {
     // All — hero section first, then getting-dressed category order, shoes as rack
-    const CATEGORY_ORDER = ['Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry','Intimates','Accessories','Other'];
+    const CATEGORY_ORDER = ['Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry',...(S.showIntimatesShelf?['Intimates']:[]),'Accessories','Other'];
     const grouped = {};
     CATEGORY_ORDER.forEach(c => grouped[c] = []);
     const uncategorized = [];
