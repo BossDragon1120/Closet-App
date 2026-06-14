@@ -2562,6 +2562,131 @@ function colorFromItemName(name) {
   return null;
 }
 
+/* ================================================================
+   FASHION COLOR DATABASE — for fabric scanner + auto-detect
+   ================================================================ */
+const _FASHION_COLORS = [
+  {name:'Black',        hex:'#1C1C1C'}, {name:'Off White',    hex:'#F5F0E8'},
+  {name:'Ivory',        hex:'#E8DCC8'}, {name:'Cream',        hex:'#E4D4B4'},
+  {name:'Ecru',         hex:'#C8B99A'}, {name:'Linen',        hex:'#C8BC9E'},
+  {name:'White',        hex:'#EFEFEF'}, {name:'Beige',        hex:'#D4BEA0'},
+  {name:'Sand',         hex:'#C8A87A'}, {name:'Nude',         hex:'#D4A882'},
+  {name:'Blush Nude',   hex:'#E0B8A4'}, {name:'Warm Nude',    hex:'#C89878'},
+  {name:'Tan',          hex:'#B89060'}, {name:'Camel',        hex:'#C19A6B'},
+  {name:'Khaki',        hex:'#B8A070'}, {name:'Greige',       hex:'#A89880'},
+  {name:'Taupe',        hex:'#8A7868'}, {name:'Stone',        hex:'#928070'},
+  {name:'Mushroom',     hex:'#9E8E80'}, {name:'Warm Gray',    hex:'#9E9086'},
+  {name:'Light Gray',   hex:'#C0C0C0'}, {name:'Gray',         hex:'#888888'},
+  {name:'Silver Gray',  hex:'#A0A0A8'}, {name:'Charcoal',     hex:'#404850'},
+  {name:'Mocha',        hex:'#7A5840'}, {name:'Brown',        hex:'#7A5438'},
+  {name:'Chestnut',     hex:'#7A4020'}, {name:'Chocolate',    hex:'#6B3A20'},
+  {name:'Mahogany',     hex:'#601820'}, {name:'Sienna',       hex:'#A0522D'},
+  {name:'Terracotta',   hex:'#C16842'}, {name:'Rust',         hex:'#B7410E'},
+  {name:'Brick',        hex:'#B0442A'}, {name:'Burnt Orange', hex:'#CC5500'},
+  {name:'Orange',       hex:'#E67E22'}, {name:'Tangerine',    hex:'#E87030'},
+  {name:'Apricot',      hex:'#F4A868'}, {name:'Peach',        hex:'#F4B183'},
+  {name:'Coral',        hex:'#E8644E'}, {name:'Salmon',       hex:'#E88070'},
+  {name:'Butter Yellow',hex:'#F0E080'}, {name:'Yellow',       hex:'#F4C430'},
+  {name:'Mustard',      hex:'#E2A500'}, {name:'Amber',        hex:'#E8A000'},
+  {name:'Gold',         hex:'#C8940E'}, {name:'Honey',        hex:'#D4900A'},
+  {name:'Chartreuse',   hex:'#A8C820'}, {name:'Moss',         hex:'#7A8840'},
+  {name:'Olive',        hex:'#6B7C3B'}, {name:'Army Green',   hex:'#4A5240'},
+  {name:'Sage',         hex:'#7A9E80'}, {name:'Mint',         hex:'#98D8C8'},
+  {name:'Jade Green',   hex:'#00A878'}, {name:'Emerald',      hex:'#2E8B57'},
+  {name:'Forest Green', hex:'#228B22'}, {name:'Hunter Green', hex:'#355E3B'},
+  {name:'Teal',         hex:'#008080'}, {name:'Turquoise',    hex:'#3ABFBF'},
+  {name:'Powder Blue',  hex:'#B0C8D8'}, {name:'Baby Blue',    hex:'#A8CBE8'},
+  {name:'Sky Blue',     hex:'#87CEEB'}, {name:'Periwinkle',   hex:'#8090C8'},
+  {name:'Cornflower',   hex:'#6495ED'}, {name:'Slate Blue',   hex:'#6A7EA8'},
+  {name:'French Blue',  hex:'#4070B8'}, {name:'Denim Blue',   hex:'#3B6EA5'},
+  {name:'Royal Blue',   hex:'#3A5BC7'}, {name:'Cobalt Blue',  hex:'#0C4DA2'},
+  {name:'Navy Blue',    hex:'#1B2A6B'}, {name:'Indigo',       hex:'#3C3090'},
+  {name:'Lilac',        hex:'#C0A0D8'}, {name:'Lavender',     hex:'#B090C8'},
+  {name:'Violet',       hex:'#6020A0'}, {name:'Purple',       hex:'#7030A0'},
+  {name:'Plum',         hex:'#6A2060'}, {name:'Eggplant',     hex:'#380038'},
+  {name:'Mauve',        hex:'#A07890'}, {name:'Dusty Rose',   hex:'#C09090'},
+  {name:'Ballet Pink',  hex:'#F0C0C0'}, {name:'Blush',        hex:'#F0A8A8'},
+  {name:'Pink',         hex:'#E07090'}, {name:'Rose',         hex:'#D45070'},
+  {name:'Hot Pink',     hex:'#E0208C'}, {name:'Fuchsia',      hex:'#C020A0'},
+  {name:'Magenta',      hex:'#B01890'}, {name:'Crimson',      hex:'#C01230'},
+  {name:'Red',          hex:'#D93025'}, {name:'Scarlet',      hex:'#D42020'},
+  {name:'Cherry Red',   hex:'#B01030'}, {name:'Burgundy',     hex:'#7A1B2A'},
+  {name:'Wine',         hex:'#6E2030'}, {name:'Maroon',       hex:'#7B0000'},
+  {name:'Oxblood',      hex:'#600018'},
+];
+
+// Weighted Euclidean distance in RGB space (human perception weighting)
+function _closestFashionColor(r, g, b) {
+  let best = _FASHION_COLORS[0], bestDist = Infinity;
+  for (const c of _FASHION_COLORS) {
+    const cr = parseInt(c.hex.slice(1,3),16);
+    const cg = parseInt(c.hex.slice(3,5),16);
+    const cb = parseInt(c.hex.slice(5,7),16);
+    const dist = (r-cr)*(r-cr)*0.299 + (g-cg)*(g-cg)*0.587 + (b-cb)*(b-cb)*0.114;
+    if (dist < bestDist) { bestDist = dist; best = c; }
+  }
+  return best;
+}
+
+// Detect color from item name + description when color field is empty
+function _detectColorFromItem(w) {
+  if (w.color) return null;
+  const text = [w.name, w.description, w.notes].filter(Boolean).join(' ');
+  const hex = colorFromItemName(text);
+  if (!hex) return null;
+  return _closestFashionColor(parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16));
+}
+
+// Open camera / file picker, sample dominant center-region color, match to nearest fashion color
+function scanFabricColor(wardrobeId) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.setAttribute('capture', 'environment');
+  inp.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:0;left:0;';
+  document.body.appendChild(inp);
+  inp.onchange = () => {
+    const file = inp.files[0];
+    document.body.removeChild(inp);
+    if (!file) return;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const SIZE = 120;
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE; canvas.height = SIZE;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, SIZE, SIZE);
+      // Sample the center 40% to avoid background bleed-in at edges
+      const m = Math.floor(SIZE * 0.3), region = SIZE - 2 * m;
+      const data = ctx.getImageData(m, m, region, region).data;
+      let r = 0, g = 0, b = 0, count = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i+3] < 128) continue;
+        r += data[i]; g += data[i+1]; b += data[i+2]; count++;
+      }
+      URL.revokeObjectURL(url);
+      if (!count) { toast('Couldn\'t read color — try better lighting'); return; }
+      const result = _closestFashionColor(Math.round(r/count), Math.round(g/count), Math.round(b/count));
+      S._colorScanResult = { wardrobeId, name: result.name, hex: result.hex };
+      render();
+      requestAnimationFrame(() => document.getElementById('witemColor')?.scrollIntoView({ behavior:'smooth', block:'center' }));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); toast('Could not read image'); };
+    img.src = url;
+  };
+  inp.click();
+}
+
+// Apply scanned color to item
+function applyScannedColor(wardrobeId) {
+  if (!S._colorScanResult || S._colorScanResult.wardrobeId !== wardrobeId) return;
+  const name = S._colorScanResult.name;
+  S._colorScanResult = null;
+  updateWardrobeColor(wardrobeId, name);
+  render();
+}
+
 function categoryFromIcon(icon, name) {
   const iconMap = {
     '👗':'Dresses','👘':'Dresses','🥻':'Dresses',
@@ -2836,6 +2961,7 @@ const S = {
   _thankSomeoneExpanded: false,
   _thankSomeoneOrder: null,  // shuffled IDs, stable within session
   funPalette: null,         // { owned: [{color,hex,count,items}], explore: [{color,hex,why}], insight }
+  _colorScanResult: null,   // { wardrobeId, name, hex } — fabric scanner result pending apply
   _funPaletteLoading: false,
   _genDescLoading: null,  // null | 'bulk' | 'receipt' | wardrobeId — which description field is generating
   funBook: null,            // { outfitId, title, author, genre, why, vibe }
@@ -3260,6 +3386,37 @@ SUGGESTED OCCASION LIST — pick exactly one: ${getOccasionTags().join(', ')}`;
 /* ================================================================
    CLAUDE API — WARDROBE MATCHING
    ================================================================ */
+// Icon → category group map for client-side match sanity check
+const _ICON_GROUPS = {
+  tops:    ['👕','👚','👗','🧥','🥼','👔','🧤','🩱','🩲','👙'],
+  bottoms: ['👖','🩲','🩳'],
+  dresses: ['👗','🩱'],
+  shoes:   ['👟','👠','👡','👢','🥿','🥾','👞'],
+  bags:    ['👜','👛','🎒','💼','🧳'],
+  jewelry: ['💍','📿','💎'],
+  hats:    ['🎩','🧢','👒','⛑️'],
+  belts:   ['🪢'],
+  scarves: ['🧣'],
+  glasses: ['🕶️','👓'],
+};
+function _iconGroup(icon) {
+  if (!icon) return null;
+  for (const [g, icons] of Object.entries(_ICON_GROUPS)) {
+    if (icons.includes(icon)) return g;
+  }
+  return null;
+}
+// Returns true if the two icons could plausibly be the same item
+function _iconsCompatible(iconA, iconB) {
+  const gA = _iconGroup(iconA), gB = _iconGroup(iconB);
+  if (!gA || !gB) return true; // unknown — let the AI decide
+  if (gA === gB) return true;
+  // dresses and tops share 👗/🩱 — allow cross-check
+  const dressLike = new Set(['tops','dresses']);
+  if (dressLike.has(gA) && dressLike.has(gB)) return true;
+  return false;
+}
+
 async function matchToWardrobe(newItems, wardrobeItems) {
   const key = S.apiKey.trim();
   if (!key || !wardrobeItems.length || !newItems.length) return { matches: [] };
@@ -3275,7 +3432,7 @@ async function matchToWardrobe(newItems, wardrobeItems) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001', max_tokens: 512,
         messages: [{ role: 'user', content:
-`You are matching outfit items detected in a photo against a user's saved wardrobe. Decide which detected items are the SAME PHYSICAL ITEM as a wardrobe item.
+`You are matching outfit items detected in a photo against a user's saved wardrobe. Your job is to identify which detected items are the SAME PHYSICAL PIECE already in the wardrobe.
 
 Wardrobe (existing items):
 ${JSON.stringify(wardrobeItems.map(i => ({ id: i.id, name: i.name, brand: i.brand||null, category: i.category||null, icon: i.icon||null, description: (i.description||'').slice(0,80) })))}
@@ -3283,16 +3440,29 @@ ${JSON.stringify(wardrobeItems.map(i => ({ id: i.id, name: i.name, brand: i.bran
 Detected outfit items (by index):
 ${JSON.stringify(newItems.map((i, idx) => ({ idx, name: i.name, icon: i.icon||null, description: (i.description||'').slice(0,80) })))}
 
-Rules:
-- Only match if you are confident it is the same physical garment (same type, colour, and likely the same item)
-- Match on name keywords, colour words, brand hints, category, and icon
-- Do NOT match "black jeans" to "black trousers" unless highly similar descriptions
-- Do NOT match if the category is clearly different (e.g. shoe vs top)
-- One detected item can only match one wardrobe item
+MATCHING RULES — read carefully:
+1. Only match if you are VERY confident it is the exact same physical item. When in doubt, do NOT match.
+2. Items must be the same clothing/accessory type. NEVER match across these groups:
+   - TOPS (shirts, blouses, t-shirts, sweaters, hoodies, jackets, blazers, bodysuits, bikini tops, bralettes)
+   - BOTTOMS (pants, jeans, shorts, skirts, leggings, trousers)
+   - DRESSES / JUMPSUITS / ROMPERS
+   - FOOTWEAR (shoes, boots, sandals, sneakers, heels, mules, loafers)
+   - BAGS (purses, handbags, totes, clutches, backpacks)
+   - JEWELRY (necklaces, bracelets, rings, earrings, pendants, chains, anklets)
+   - HATS / HEADWEAR
+   - BELTS
+   - SCARVES / WRAPS
+   - SUNGLASSES / EYEWEAR
+   - SWIMWEAR (bikinis, swimsuits, swim bottoms)
+3. A necklace can NEVER match a bikini, top, dress, or any non-jewelry item.
+4. Shoes can NEVER match bags, tops, bottoms, or jewelry.
+5. Match on: name keywords, colour, brand, category, icon, and description similarity.
+6. One detected item → at most one wardrobe item. No duplicate wardrobeIds.
+7. Similar colour + different type = NO match.
 
-Return ONLY valid JSON:
-{"matches":[{"newIdx":0,"wardrobeId":"abc","reason":"Same navy blazer, matching description"}]}
-Return {"matches":[]} if no confident matches.`
+Return ONLY valid JSON (no markdown, no explanation):
+{"matches":[{"newIdx":0,"wardrobeId":"abc","reason":"Same navy blazer — matching colour, cut, and brand"}]}
+Return {"matches":[]} if there are no confident matches.`
         }]
       }),
     });
@@ -3301,7 +3471,19 @@ Return {"matches":[]} if no confident matches.`
     const text = data.content?.[0]?.text || '';
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) return { matches: [] };
-    return JSON.parse(m[0]);
+    const parsed = JSON.parse(m[0]);
+
+    // Client-side sanity filter: reject any match where icons belong to incompatible groups
+    if (parsed.matches?.length) {
+      const wardrobeMap = Object.fromEntries(wardrobeItems.map(w => [w.id, w]));
+      parsed.matches = parsed.matches.filter(match => {
+        const outfitItem = newItems[match.newIdx];
+        const wardrobeItem = wardrobeMap[match.wardrobeId];
+        if (!outfitItem || !wardrobeItem) return false;
+        return _iconsCompatible(outfitItem.icon, wardrobeItem.icon);
+      });
+    }
+    return parsed;
   } catch { return { matches: [] }; }
 }
 
@@ -4576,10 +4758,22 @@ Rules:
 Return a JSON object (not an array):
 {
   "outfitId": "<id from outfit history, or null if remix>",
-  "items": ["ItemName", ...],
+  "groups": [
+    { "role": "Top", "items": ["item name"] },
+    { "role": "Bottom", "items": ["primary option", "alternate option if applicable"] },
+    { "role": "Shoes", "items": ["item name"] },
+    { "role": "Bag", "items": ["item name"] },
+    { "role": "Layer", "items": ["item name"] }
+  ],
   "reasoning": "2 sentences explaining why this works for the event",
   "weatherNote": "1 sentence on temperature suitability, or omit if no forecast"
 }
+Rules for groups:
+- Only include roles that have an actual item to suggest (skip empty roles).
+- If two items are genuine alternates for the same role (e.g. a dress OR pants+top), put both in that group's "items" array. Do NOT put alternates in separate groups.
+- A dress replaces both Top and Bottom — use role "Dress" with a single item.
+- Keep item names exactly as they appear in the wardrobe list above.
+- Maximum 2 items per group (primary + one alternate).
 Do not include emojis in item names. Return only the JSON object, no other text.`;
 
   try {
@@ -4602,13 +4796,27 @@ Do not include emojis in item names. Return only the JSON object, no other text.
     const jsonStr = text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
     const parsed = JSON.parse(jsonStr);
     // Accept either a single object or the first item of an array
-    return Array.isArray(parsed) ? parsed[0] : parsed;
+    const result = Array.isArray(parsed) ? parsed[0] : parsed;
+    // Derive flat items[] from groups for backward compat (event board chips)
+    if (result && result.groups && !result.items) {
+      result.items = result.groups.map(g => g.items[0]).filter(Boolean);
+    }
+    return result;
   } catch(e) { console.error('suggestOutfits error', e); return null; }
 }
 
 /* ================================================================
    SHOPPING LIST HELPERS
    ================================================================ */
+// Safe index-based tap handler — avoids inline string escaping entirely
+window._shopQ = []; // populated by viewShop() each render
+function _shopTap(idx) {
+  const q = window._shopQ[idx];
+  if (q === undefined) return;
+  S.shopSelectedQuery = S.shopSelectedQuery === q ? null : q;
+  renderRAF();
+}
+
 function buildShoppingList() {
   // Build a set of "owned" keywords from active wardrobe names so we can
   // suppress recs for items the user clearly already has
@@ -6076,19 +6284,19 @@ function iconCompass() {
 function tabBarHTML() {
   const t = S.activeTab;
   return `<div class="tab-bar">
-    <button class="tab-btn ${t==='profile'?'active':''}" onclick="switchTab('profile')" title="Portfolio">
+    <button class="tab-btn ${t==='profile'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('profile')" onclick="switchTab('profile')" title="Portfolio">
       ${iconPerson()} <span>Portfolio</span>
     </button>
-    <button class="tab-btn ${t==='wardrobe'?'active':''}" onclick="switchTab('wardrobe')">
+    <button class="tab-btn ${t==='wardrobe'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('wardrobe')" onclick="switchTab('wardrobe')">
       ${iconWardrobe()} <span>Closet</span>
     </button>
-    <button class="tab-btn ${t==='closet'?'active':''}" onclick="switchTab('closet')">
+    <button class="tab-btn ${t==='closet'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('closet')" onclick="switchTab('closet')">
       ${iconHanger()} <span>Fits</span>
     </button>
-    <button class="tab-btn ${t==='plan'?'active':''}" onclick="switchTab('plan')">
+    <button class="tab-btn ${t==='plan'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('plan')" onclick="switchTab('plan')">
       ${iconSparkle()} <span>Plan</span>
     </button>
-    <button class="tab-btn ${t==='shop'?'active':''}" onclick="switchTab('shop')">
+    <button class="tab-btn ${t==='shop'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('shop')" onclick="switchTab('shop')">
       ${iconBag()} <span>Shop</span>
     </button>
   </div>`;
@@ -8948,18 +9156,22 @@ function viewShop() {
   const showItems = S.shopExpanded ? activeItems : activeItems.slice(0, SHOP_LIMIT);
   const moreCount = activeItems.length - showItems.length;
 
+  // Expose queries by index so _shopTap(idx) can look them up without inline string escaping
+  window._shopQ = activeItems.map(i => i.query);
+
   const sel = S.shopSelectedQuery;
   const selItem = activeItems.find(i => i.query === sel);
 
   // ── Item row HTML (with inline accordion when selected) ──────
-  function itemRowHTML(item) {
+  function itemRowHTML(item, idx) {
     const isSelected = item.query === sel;
     const { bg, border } = shopItemBg(item.query);
     const emoji = shopItemEmoji(item.query);
-    const safeQ = esc(item.query).replace(/'/g,"\\'");
+    // activeItems index — used by _shopTap() so no string escaping needed
+    const activeIdx = activeItems.indexOf(item);
     const rowHTML = `<div
-      ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSelectedQuery=S.shopSelectedQuery==='${safeQ}' ? null : '${safeQ}';S.shopExpanded=false;render();"
-      onclick="S.shopSelectedQuery=S.shopSelectedQuery==='${safeQ}' ? null : '${safeQ}';S.shopExpanded=false;render();"
+      ontouchend="if(_touchMoved)return;event.preventDefault();_shopTap(${activeIdx});"
+      onclick="_shopTap(${activeIdx});"
       style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:${isSelected ? 'var(--gold-bg)' : 'var(--surface)'};border:${isSelected ? '2px solid var(--gold)' : '1.5px solid var(--border)'};border-radius:${isSelected ? 'var(--r-sm) var(--r-sm) 0 0' : 'var(--r-sm)'};margin-bottom:${isSelected ? '0' : '8px'};cursor:pointer;touch-action:manipulation;transition:all .15s;">
       <div style="width:44px;height:44px;border-radius:10px;background:${bg};border:1px solid ${border};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${emoji}</div>
       <div style="flex:1;min-width:0;">
@@ -9055,24 +9267,24 @@ function viewShop() {
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">What are you shopping from?</div>
       <div style="display:flex;gap:8px;margin-bottom:20px;">
         <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;render();"
-          onclick="S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;render()"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
+          onclick="S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
           style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${src==='wishlist'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='wishlist'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:16px;margin-bottom:3px;">♥</div>
           <div style="font-size:12px;font-weight:${src==='wishlist'?'800':'600'};color:${src==='wishlist'?'var(--gold-dk)':'var(--text-2)'};">Saved</div>
           <div style="font-size:10px;color:${src==='wishlist'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${wishItems.length} item${wishItems.length===1?'':'s'}</div>
         </button>
         <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;render();"
-          onclick="S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;render()"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
+          onclick="S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
           style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${src==='recs'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='recs'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:16px;margin-bottom:3px;">✦</div>
           <div style="font-size:12px;font-weight:${src==='recs'?'800':'600'};color:${src==='recs'?'var(--gold-dk)':'var(--text-2)'};">AI Picks</div>
           <div style="font-size:10px;color:${src==='recs'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${recsRaw.length} item${recsRaw.length===1?'':'s'}</div>
         </button>
         <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;render();"
-          onclick="S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;render()"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
+          onclick="S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
           style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${src==='spotted'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='spotted'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:16px;margin-bottom:3px;">📌</div>
           <div style="font-size:12px;font-weight:${src==='spotted'?'800':'600'};color:${src==='spotted'?'var(--gold-dk)':'var(--text-2)'};">Spotted</div>
@@ -9125,7 +9337,7 @@ function viewShop() {
           ? `<div style="text-align:center;padding:28px 16px;color:var(--text-3);font-size:13px;line-height:1.6;">${src==='wishlist' ? '♥ Heart items in your outfit recs to build your Wish List.' : 'Log outfits — Claude will recommend items based on your style gaps.'}</div>`
           : showItems.map(itemRowHTML).join('')
       )}
-      ${src !== 'spotted' && moreCount > 0 ? `<button class="show-more-btn" style="margin-bottom:16px;" ontouchend="if(_touchMoved)return;event.preventDefault();S.shopExpanded=true;render();" onclick="S.shopExpanded=true;render()">Show ${moreCount} more ↓</button>` : ''}
+      ${src !== 'spotted' && moreCount > 0 ? `<button class="show-more-btn" style="margin-bottom:16px;" ontouchend="if(_touchMoved)return;event.preventDefault();S.shopExpanded=true;renderRAF();" onclick="S.shopExpanded=true;renderRAF()">Show ${moreCount} more ↓</button>` : ''}
 
 
     </div>
@@ -9254,12 +9466,12 @@ function viewShop() {
       const QUICK = ['🎂 Birthday','🎄 Holiday','💍 Registry'];
       return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
           ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishShareOpen=false;S._wishShareItems=null;render();" onclick="S.shopWishShareOpen=false;S._wishShareItems=null;render()">
-        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:72dvh;display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.18);"
+        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:88dvh;display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.18);"
           ontouchend="event.stopPropagation();" onclick="event.stopPropagation()">
 
           <!-- Fixed header -->
-          <div style="padding:14px 20px 12px;flex-shrink:0;">
-            <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px;"></div>
+          <div style="padding:10px 20px 10px;flex-shrink:0;">
+            <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 10px;"></div>
             <div style="display:flex;align-items:baseline;justify-content:space-between;">
               <div style="font-size:18px;font-weight:900;">🎁 Share Wish List</div>
               <div style="font-size:12px;color:var(--text-3);">${selectedCount} of ${wishItems.length} selected</div>
@@ -9270,7 +9482,7 @@ function viewShop() {
           <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:0 20px;">
 
             <!-- Item picker -->
-            <div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:18px;max-height:260px;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+            <div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;">
               ${wishItems.map((item, idx) => {
                 const sel = item.selected;
                 const detail = item.spotted
@@ -9416,9 +9628,40 @@ function viewPlan() {
               <span style="font-size:11px;color:var(--text-3);font-style:italic;">${esc(autoTitle(p.eventDesc))}</span>
             </div>
             <div class="plan-rec-body">
-              <div class="plan-rec-items">
-                ${(p.suggestion.items||[]).map(it=>`<span class="plan-rec-chip">${esc(it)}</span>`).join('')}
-              </div>
+              ${(()=>{
+                const groups = p.suggestion.groups;
+                if (groups && groups.length) {
+                  // Visual outfit builder with wardrobe photos
+                  return `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
+                    ${groups.map(g => {
+                      const isAlternate = g.items.length > 1;
+                      return `<div>
+                        <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:6px;">${esc(g.role)}</div>
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                          ${g.items.map((itemName, idx) => {
+                            const wItem = _findWardrobeForPlanItem(itemName);
+                            const photoSrc = wItem ? (wItem.wearPhoto || wItem.photo || null) : null;
+                            const icon = wItem ? (wItem.icon || '👕') : '👕';
+                            const tile = `<div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:0;max-width:110px;">
+                              ${photoSrc
+                                ? `<div style="width:72px;height:88px;border-radius:10px;overflow:hidden;border:2px solid ${isAlternate?'var(--gold)':'var(--border)'};flex-shrink:0;"><img src="${esc(photoSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;" onerror="this.parentElement.innerHTML='<div style=\\'width:72px;height:88px;display:flex;align-items:center;justify-content:center;font-size:32px;\\'>${icon}</div>'"></div>`
+                                : `<div style="width:72px;height:88px;border-radius:10px;background:var(--surface-2);border:2px solid ${isAlternate?'var(--gold)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;">${icon}</div>`}
+                              <div style="font-size:11px;font-weight:600;color:var(--text);text-align:center;line-height:1.3;max-width:90px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${esc(itemName)}</div>
+                              ${wItem ? `<div style="font-size:9px;color:var(--text-3);text-align:center;">in wardrobe ✓</div>` : `<div style="font-size:9px;color:var(--gold-dk);text-align:center;">not in closet</div>`}
+                            </div>`;
+                            const orDivider = (isAlternate && idx < g.items.length - 1)
+                              ? `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;"><div style="width:1px;height:28px;background:var(--border);"></div><div style="font-size:9px;font-weight:800;color:var(--gold-dk);background:var(--gold-bg);border:1px solid var(--gold);border-radius:100px;padding:2px 6px;white-space:nowrap;">or</div><div style="width:1px;height:28px;background:var(--border);"></div></div>`
+                              : '';
+                            return tile + orDivider;
+                          }).join('')}
+                        </div>
+                      </div>`;
+                    }).join('')}
+                  </div>`;
+                }
+                // Fallback: flat chip list (old format)
+                return `<div class="plan-rec-items">${(p.suggestion.items||[]).map(it=>`<span class="plan-rec-chip">${esc(it)}</span>`).join('')}</div>`;
+              })()}
               ${p.suggestion.reasoning ? `<div class="plan-rec-reasoning">${esc(p.suggestion.reasoning)}</div>` : ''}
               ${p.suggestion.weatherNote ? `<div style="font-size:12px;color:var(--gold-dk);font-weight:600;margin-top:6px;">🌤 ${esc(p.suggestion.weatherNote)}</div>` : ''}
             </div>
@@ -9725,6 +9968,21 @@ async function doSuggestOutfits() {
     if (!result) toast('Something went wrong — try again');
   } catch(e) { console.error(e); toast('Something went wrong — try again'); }
   S.plan.loadingSuggest = false; render();
+}
+
+// Fuzzy-match a plan suggestion item name against S.wardrobe
+function _findWardrobeForPlanItem(name) {
+  if (!name || !S.wardrobe.length) return null;
+  const n = name.toLowerCase().trim();
+  // Exact match first
+  let hit = S.wardrobe.find(w => (w.name||'').toLowerCase() === n);
+  if (hit) return hit;
+  // Contains match (wardrobe name contains suggestion, or vice versa)
+  hit = S.wardrobe.find(w => {
+    const wn = (w.name||'').toLowerCase();
+    return (wn.length > 3 && n.includes(wn)) || (n.length > 3 && wn.includes(n));
+  });
+  return hit || null;
 }
 
 function eventEmojiFor(text) {
@@ -14366,10 +14624,55 @@ function viewWardrobeItem() {
           enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
       </div>
       <div>
-        <label class="form-label">Colour</label>
-        <input class="form-input" id="witemColor" type="text" placeholder="e.g. navy, cream, burgundy"
-          value="${esc(w.color||'')}" onchange="updateWardrobeColor('${w.id}',this.value)"
-          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+        ${(() => {
+          const scanRes = S._colorScanResult?.wardrobeId === w.id ? S._colorScanResult : null;
+          const autoDetect = !w.color && !scanRes ? _detectColorFromItem(w) : null;
+          const swatchHex = w.color ? (colorFromItemName(w.color) || '#ccc') : '#ccc';
+          return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label class="form-label" style="margin-bottom:0;">Colour</label>
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();scanFabricColor('${w.id}');"
+            onclick="scanFabricColor('${w.id}')"
+            style="display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:5px 11px;font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            🎨 Scan fabric
+          </button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${w.color ? `<div style="width:22px;height:22px;border-radius:50%;background:${swatchHex};border:1.5px solid rgba(0,0,0,.08);flex-shrink:0;"></div>` : ''}
+          <input class="form-input" id="witemColor" type="text" placeholder="e.g. navy, cream, burgundy"
+            value="${esc(w.color||'')}" onchange="updateWardrobeColor('${w.id}',this.value)"
+            enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+            style="flex:1;margin-bottom:0;">
+        </div>
+        ${autoDetect ? `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:7px;padding:8px 10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+          <div style="width:18px;height:18px;border-radius:50%;background:${autoDetect.hex};border:1px solid rgba(0,0,0,.1);flex-shrink:0;"></div>
+          <span style="font-size:12px;color:var(--text-2);flex:1;">Detected: <strong>${autoDetect.name}</strong></span>
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();updateWardrobeColor('${w.id}','${autoDetect.name}');render();"
+            onclick="updateWardrobeColor('${w.id}','${autoDetect.name}');render()"
+            style="font-size:11px;font-weight:700;color:var(--gold-dk);background:none;border:none;cursor:pointer;font-family:inherit;padding:2px 4px;touch-action:manipulation;white-space:nowrap;">Use ✓</button>
+        </div>` : ''}
+        ${scanRes ? `
+        <div style="display:flex;align-items:center;gap:10px;margin-top:7px;padding:10px 12px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:10px;">
+          <div style="width:32px;height:32px;border-radius:8px;background:${scanRes.hex};border:1.5px solid rgba(0,0,0,.12);flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.15);"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1px;">Scan result</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);">${scanRes.name}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();applyScannedColor('${w.id}');"
+              onclick="applyScannedColor('${w.id}')"
+              style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">Use</button>
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();S._colorScanResult=null;render();"
+              onclick="S._colorScanResult=null;render()"
+              style="background:none;color:var(--text-3);border:1px solid var(--border);border-radius:100px;padding:7px 10px;font-size:12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕</button>
+          </div>
+        </div>` : ''}`;
+        })()}
       </div>
       <div>
         <label class="form-label">Category</label>
@@ -14424,7 +14727,7 @@ function viewWardrobeItem() {
           </div>
           <div style="margin-top:14px;display:flex;gap:8px;">
             <button onclick="confirmOutfitLinks()" style="flex:1;padding:13px;border-radius:var(--r-sm);background:var(--gold);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
-              Save Links (${Object.values(ol.selected).filter(Boolean).length} selected)
+              Save Links (${(() => { const ids = new Set(allEntries.map(e => e.id)); return Object.entries(ol.selected).filter(([id, v]) => v && ids.has(id)).length; })()} selected)
             </button>
             <button onclick="S.outfitLinker=null;render()" style="padding:13px 16px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border);font-size:14px;cursor:pointer;font-family:inherit;">Cancel</button>
           </div>
@@ -15879,7 +16182,8 @@ function viewDetail() {
           const sortedWardrobe = S.wardrobe.slice()
             .sort((a,b) => (a.name||'').localeCompare(b.name))
             .filter(w => !_olSearch || (w.name||'').toLowerCase().includes(_olSearch) || (w.brand||'').toLowerCase().includes(_olSearch) || (w.category||'').toLowerCase().includes(_olSearch));
-          const selCount = Object.values(ol.selected).filter(Boolean).length;
+          const _wardrobeIds = new Set(S.wardrobe.map(w => w.id));
+          const selCount = Object.entries(ol.selected).filter(([id, v]) => v && _wardrobeIds.has(id)).length;
           return `<div class="section">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
               <div class="section-title" style="margin-bottom:0;">Select Wardrobe Items Worn</div>
