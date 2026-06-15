@@ -4954,7 +4954,6 @@ function featuresMenuHTML() {
         { icon: '📖', text: '<strong>Style Playbook</strong> — A living guide to your personal style: your aesthetic identity, what works, what to build next, and how to shop smarter.' },
         { icon: '✨', text: '<strong>Your Aura</strong> — Personal details (height, eye colour, scent, personality type, nail colour, hairstyle) that help Claude give you the most tailored advice possible.' },
         { icon: '⭐', text: '<strong>Best Outfits</strong> — All your 8+ rated looks in a swipeable carousel, alongside your 💎 Gem Pieces in a gold-accented showcase.' },
-        { icon: '⚔️', text: '<strong>Fashion Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best. Results are shared as a full scorecard card.' },
       ],
     },
     {
@@ -4988,6 +4987,8 @@ function featuresMenuHTML() {
       items: [
         { icon: '✨', text: '<strong>AI Outfit Ideas</strong> — Describe an event and get personalised outfit suggestions drawn from your actual wardrobe.' },
         { icon: '🌤', text: '<strong>Weather-Aware</strong> — Suggestions factor in today\'s forecast so you\'re never under- or over-dressed.' },
+        { icon: '🎲', text: '<strong>Style Roulette</strong> — Can\'t decide what to wear? Let Claude spin a surprise outfit from your wardrobe — a different pick every time.' },
+        { icon: '🗓', text: '<strong>Trip Packing</strong> — Tell Claude where you\'re going and for how long. It builds a day-by-day packing list from what you already own.' },
       ],
     },
     {
@@ -5000,12 +5001,25 @@ function featuresMenuHTML() {
       ],
     },
     {
-      title: 'Discover & Trends',
+      title: 'Evolve',
       items: [
-        { icon: '🔥', text: '<strong>What\'s Hot</strong> — Claude curates the top 10 fashion trends each week, broken down by category with styling tips.' },
-        { icon: '💡', text: '<strong>Styling Tips</strong> — Personalised style advice generated from your own wardrobe and aesthetic preferences.' },
-        { icon: '♥', text: '<strong>Saved Trends</strong> — Heart any trend to save it. Your saved trends live in a dedicated carousel you can revisit anytime.' },
+        { icon: '🎯', text: '<strong>Style Goals</strong> — Set personal fashion goals (e.g. More Feminine, Quiet Luxury, Punk Edge) and every Evolve feature bends toward helping you get there.' },
+        { icon: '🔥', text: '<strong>Trend Reports</strong> — Claude curates the top fashion trends each week, filtered toward your style goals with tips on how to wear them.' },
+        { icon: '💓', text: '<strong>Wardrobe Pulse</strong> — Claude reads your closet and surfaces which pieces are rising and which are fading — with actionable restyle tips.' },
+        { icon: '🏷️', text: '<strong>Brand Discovery</strong> — AI-curated brand recommendations tailored to your style goals, budget, and aesthetic.' },
+        { icon: '💡', text: '<strong>Styling Tips</strong> — Personalised style advice generated from your wardrobe and aesthetic, saved for you to revisit anytime.' },
+        { icon: '♥', text: '<strong>Saved Trends</strong> — Heart any trend to save it. Your saved trends live in a dedicated section you can revisit anytime.' },
+      ],
+    },
+    {
+      title: 'Fun',
+      items: [
+        { icon: '⚔️', text: '<strong>Fashion Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best. Results shared as a full scorecard card.' },
         { icon: '👯', text: '<strong>Friend\'s Fit Check</strong> — Rate a friend\'s outfit instantly — honest, fun, and never saved to your journal.' },
+        { icon: '💌', text: '<strong>Thank Someone</strong> — All the pieces you\'ve received as gifts in one place. Send a heartfelt note to the people who gave them to you.' },
+        { icon: '🌟', text: '<strong>Claude Compliments</strong> — Get one genuinely thoughtful compliment about your personal style, refreshed whenever you want.' },
+        { icon: '🥂', text: '<strong>Outfit × Drink Pairing</strong> — Pick an outfit and Claude suggests the perfect drink to have while wearing it (NA option included).' },
+        { icon: '📚', text: '<strong>Outfit × Book Pairing</strong> — Pick an outfit and Claude finds the book you should be reading while wearing it.' },
       ],
     },
     {
@@ -5016,13 +5030,6 @@ function featuresMenuHTML() {
         { icon: '🏆', text: '<strong>Top Picks</strong> — Most-worn piece, top brand, and top activity surface automatically from your real data.' },
         { icon: '🔥', text: '<strong>Streak & Logging</strong> — Track how many days in a row you\'ve been logging outfits.' },
         { icon: '📤', text: '<strong>Shareable Stats Card</strong> — Generate a styled PNG of your fashion stats to share with friends.' },
-      ],
-    },
-    {
-      title: 'Local',
-      items: [
-        { icon: '✦', text: '<strong>Featured Brands</strong> — Spotlight on local and independent brands worth knowing — starting with Neue Terra, San Francisco\'s modern fragrance label.' },
-        { icon: '📍', text: '<strong>Community Tab</strong> — Local storefronts, designers, pop-ups, and fashion events near you are coming soon.' },
       ],
     },
     {
@@ -13922,13 +13929,21 @@ function viewWardrobeItem() {
         `;})()}
       </div>
 
-      <!-- Subtle stats + compliment link -->
-      <div style="margin-top:12px;font-size:12px;color:var(--text-3);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;">
-        <span>${wears} wear${wears===1?'':'s'}${ppw ? ' · $'+ppw+'/wear' : ''}${w.paidOff ? ' · 💚 paid off' : ''}</span>
-        ${complimentCount > 0 ? `<span>· <span style="color:var(--gold-dk);">${complimentCount} compliment${complimentCount===1?'':'s'}</span></span>` : ''}
-        <span style="color:var(--border);">·</span>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();logCompliment('${w.id}')" onclick="logCompliment('${w.id}')"
-          style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;touch-action:manipulation;">Got a compliment?</button>
+      <!-- Quick wear + stats -->
+      <div style="margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:8px;">
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();logQuickWear('${w.id}')"
+          onclick="logQuickWear('${w.id}')"
+          style="display:flex;align-items:center;gap:7px;padding:10px 24px;border-radius:100px;border:none;background:linear-gradient(135deg,#2C7A2C,#3DAA3D);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;box-shadow:0 2px 10px rgba(44,122,44,0.28);">
+          👟 Wore Today
+        </button>
+        <div style="font-size:12px;color:var(--text-3);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;">
+          <span>${wears} wear${wears===1?'':'s'}${ppw ? ' · $'+ppw+'/wear' : ''}${w.paidOff ? ' · 💚 paid off' : ''}</span>
+          ${complimentCount > 0 ? `<span>· <span style="color:var(--gold-dk);">${complimentCount} compliment${complimentCount===1?'':'s'}</span></span>` : ''}
+          <span style="color:var(--border);">·</span>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();logCompliment('${w.id}')" onclick="logCompliment('${w.id}')"
+            style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;touch-action:manipulation;">Got a compliment?</button>
+        </div>
       </div>
     </div>
 
@@ -17630,6 +17645,15 @@ async function logWear(id) {
   // S.entries already contains mutated entry
   render();
   toast(`Logged! Worn ${entry.timesWorn}× total 👗`);
+}
+
+async function logQuickWear(id) {
+  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
+  if (!w.wears) w.wears = [];
+  w.wears.push({ outfitId: null, date: new Date().toISOString() });
+  render(); // optimistic
+  await DB.wardrobe.put(w);
+  toast(`Wear logged! ${w.name} — ${w.wears.length} wear${w.wears.length===1?'':'s'} total 👟`);
 }
 
 async function updateWardrobePrice(id, val) {
