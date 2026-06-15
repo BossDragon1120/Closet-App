@@ -2876,6 +2876,7 @@ const S = {
   _funComplimentLoading: false,
   funRoulette: null,        // { items: [...], generatedAt }
   _funRouletteLoading: false,
+  _rouletteOpen: false,
   _thankSomeoneExpanded: false,
   _thankSomeoneOrder: null,  // shuffled IDs, stable within session
   funPalette: null,         // { owned: [{color,hex,count,items}], explore: [{color,hex,why}], insight }
@@ -6810,6 +6811,7 @@ Return ONLY valid JSON with no markdown or extra text:
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('No JSON');
     S.funRoulette = JSON.parse(m[0]);
+    S._rouletteOpen = true;
   } catch(e) {
     console.error('generateRoulette:', e);
     toast('Couldn\'t generate — try again.');
@@ -7295,36 +7297,6 @@ function viewFun() {
     return itemsHTML + seeMoreBtn + historyLink;
   })();
 
-  // ── Roulette result ───────────────────────────────────
-  const rouletteResultHTML = (() => {
-    if (S._funRouletteLoading) return `<div style="display:flex;align-items:center;gap:10px;padding:16px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Styling your look…</span></div>`;
-    if (!S.funRoulette) return '';
-    const r = S.funRoulette;
-    return `<div style="margin-top:14px;background:linear-gradient(135deg,#1A1A1A 0%,#2A2010 100%);border-radius:16px;padding:18px;position:relative;overflow:hidden;">
-      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 20%,rgba(184,125,42,0.18) 0%,transparent 60%);pointer-events:none;"></div>
-      <div style="position:relative;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--gold);margin-bottom:4px;">Today's Look</div>
-        <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:2px;">${esc(r.vibe||'')}</div>
-        <div style="font-size:13px;color:rgba(255,255,255,.65);margin-bottom:14px;font-style:italic;">${esc(r.hype||'')}</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          ${(r.outfit||[]).map(p=>`<div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.06);border-radius:10px;padding:9px 12px;">
-            <span style="font-size:20px;flex-shrink:0;">${esc(p.emoji||'👕')}</span>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:700;color:#fff;line-height:1.25;">${esc(p.item||'')}</div>
-              <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.3;">${esc(p.reason||'')}</div>
-            </div>
-          </div>`).join('')}
-        </div>
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette()"
-          onclick="generateRoulette()"
-          style="margin-top:14px;width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:9px;font-size:12px;font-weight:700;color:rgba(255,255,255,.8);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          🔄 Spin again
-        </button>
-      </div>
-    </div>`;
-  })();
-
   // ── Compliment result ─────────────────────────────────
   const complimentHTML = (() => {
     if (S._funComplimentLoading) return `<div style="display:flex;align-items:center;gap:10px;padding:16px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Claude is thinking about you…</span></div>`;
@@ -7418,65 +7390,55 @@ function viewFun() {
         </div>
       </div>
 
-      <!-- ── GROUP 1: YOUR STYLE ─────────────────────────── -->
-      <div style="margin:20px 16px 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);">✦ Your Style</div>
-
-      <!-- Color Palette Analyzer -->
+      <!-- Thank Someone -->
       <div style="margin:10px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px;">
-          <div style="font-size:32px;line-height:1;">🎨</div>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+          <div style="font-size:32px;line-height:1;">💌</div>
           <div style="flex:1;">
-            <div style="font-size:16px;font-weight:800;color:var(--text);">Color Palette</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">See the colors you wear most — and discover what you should try next.</div>
+            <div style="font-size:16px;font-weight:800;color:var(--text);">Thank Someone</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">All the pieces you've received as gifts — send a little love to the people who got them for you.</div>
           </div>
         </div>
+        ${thankSomeoneHTML}
+      </div>
+
+      <!-- Claude Compliments -->
+      <div style="margin:10px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px;">
+          <div style="font-size:32px;line-height:1;">🌟</div>
+          <div style="flex:1;">
+            <div style="font-size:16px;font-weight:800;color:var(--text);">Claude Compliments</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Sometimes you just need a fresh perspective. Claude will say something genuinely nice about your style.</div>
+          </div>
+        </div>
+        ${!S.funCompliment && !S._funComplimentLoading ? `
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();generateCompliment()"
+          onclick="generateCompliment()"
+          style="margin-top:14px;width:100%;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:10px;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          ✨ Flatter me
+        </button>` : ''}
         ${(()=>{
-          if (!S.funPalette) return `<button
-            ontouchend="if(_touchMoved)return;event.preventDefault();analyzePalette()"
-            onclick="analyzePalette()"
-            style="margin-top:14px;width:100%;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:10px;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            🎨 Scan my colours
-          </button>`;
-          const p = S.funPalette;
-          return `<div style="margin-top:16px;">
-            ${p.insight ? `<div style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:14px;padding:12px 14px;background:var(--surface-2);border-radius:12px;border-left:3px solid var(--gold);">${esc(p.insight)}</div>` : ''}
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">Colour DNA</div>
-            <div style="display:flex;height:18px;border-radius:100px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 6px rgba(0,0,0,0.15);">
-              ${(p.owned||[]).map(c=>`<div style="flex:${c.count};background:${esc(c.hex)};transition:flex 0.3s;" title="${esc(c.color)}"></div>`).join('')}
+          if (S._funComplimentLoading) return `<div style="display:flex;align-items:center;gap:10px;padding:16px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Claude is thinking about you…</span></div>`;
+          if (!S.funCompliment?.lines?.length) return '';
+          const line = S.funCompliment.lines[0] || '';
+          return `<div style="margin-top:14px;">
+            <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;">
+              <span style="font-size:20px;flex-shrink:0;margin-top:1px;">💛</span>
+              <div style="font-size:13px;color:var(--text);line-height:1.6;font-style:italic;">"${esc(line)}"</div>
             </div>
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Your Colours</div>
-            <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
-              ${(p.owned||[]).map(c=>`
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;">
-                  <div style="width:44px;height:44px;border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2.5px solid var(--surface);flex-shrink:0;"></div>
-                  <div style="font-size:10px;font-weight:700;color:var(--text-2);text-align:center;line-height:1.25;">${esc(c.color)}</div>
-                  <div style="font-size:10px;color:var(--text-3);">${c.count} item${c.count!==1?'s':''}</div>
-                </div>`).join('')}
-            </div>
-            ${(p.explore||[]).length ? `
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Colours to Try</div>
-            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
-              ${(p.explore||[]).map(c=>`
-                <div style="display:flex;align-items:center;gap:12px;">
-                  <div style="width:44px;height:44px;border-radius:50%;background:${esc(c.hex)};box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2.5px solid var(--surface);flex-shrink:0;"></div>
-                  <div style="flex:1;min-width:0;">
-                    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${esc(c.color)}</div>
-                    <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(c.why)}</div>
-                  </div>
-                </div>`).join('')}
-            </div>` : ''}
             <button
-              ontouchend="if(_touchMoved)return;event.preventDefault();S.funPalette=null;analyzePalette()"
-              onclick="S.funPalette=null;analyzePalette()"
-              style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:2px 0;">
-              ↻ Re-scan
+              ontouchend="if(_touchMoved)return;event.preventDefault();generateCompliment()"
+              onclick="generateCompliment()"
+              style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;padding:8px 0;width:100%;">
+              ↻ New compliment
             </button>
           </div>`;
         })()}
       </div>
 
-      <!-- ── GROUP 2: PAIRINGS ──────────────────────────────── -->
-      <div style="margin:24px 16px 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);">✦ Pairings</div>
+      <!-- ── PAIRINGS ────────────────────────────────── -->
+      <div style="margin:20px 16px 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);">✦ Pairings</div>
 
       <!-- Outfit × Drink Pairing -->
       <div style="margin:8px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
@@ -7609,40 +7571,6 @@ function viewFun() {
 
           return pickerHTML + loadingHTML + resultHTML;
         })()}
-      </div>
-
-      <!-- ── GROUP 3: JUST FOR YOU ──────────────────────────── -->
-      <div style="margin:24px 16px 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);">✦ Just for You</div>
-
-      <!-- Claude Compliments -->
-      <div style="margin:8px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px;">
-          <div style="font-size:32px;line-height:1;">🌟</div>
-          <div style="flex:1;">
-            <div style="font-size:16px;font-weight:800;color:var(--text);">Claude Compliments</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Sometimes you just need a fresh perspective. Claude will say something genuinely nice about your style.</div>
-          </div>
-        </div>
-        ${!S.funCompliment && !S._funComplimentLoading ? `
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();generateCompliment()"
-          onclick="generateCompliment()"
-          style="margin-top:14px;width:100%;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:10px;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          ✨ Flatter me
-        </button>` : ''}
-        ${complimentHTML}
-      </div>
-
-      <!-- Thank Someone -->
-      <div style="margin:10px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
-          <div style="font-size:32px;line-height:1;">💌</div>
-          <div style="flex:1;">
-            <div style="font-size:16px;font-weight:800;color:var(--text);">Thank Someone</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">All the pieces you've received as gifts — send a little love to the people who got them for you.</div>
-          </div>
-        </div>
-        ${thankSomeoneHTML}
       </div>
 
       <!-- Share CTA -->
@@ -9227,7 +9155,7 @@ function viewPlan() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">📅 Plan</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette()" onclick="generateRoulette()" style="font-size:12px;">
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();S._rouletteOpen=true;generateRoulette();" onclick="S._rouletteOpen=true;generateRoulette();" style="font-size:12px;">
         🎲 Style Roulette
       </button>
     </div>
@@ -9504,7 +9432,56 @@ function viewPlan() {
       ` : ''}
 
     <div style="height:30px"></div>
-  </div>`;
+  </div>
+
+  ${(S._rouletteOpen || S._funRouletteLoading) ? `
+    <!-- STYLE ROULETTE BOTTOM SHEET -->
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
+      ontouchend="if(event.target===this){S._rouletteOpen=false;render();}"
+      onclick="if(event.target===this){S._rouletteOpen=false;render();}">
+      <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;">
+        <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="font-size:16px;font-weight:800;color:var(--text);">🎲 Style Roulette</div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._rouletteOpen=false;render();" onclick="S._rouletteOpen=false;render();"
+            style="background:none;border:none;font-size:20px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;line-height:1;touch-action:manipulation;">✕</button>
+        </div>
+        <div style="overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 20px 40px;">
+          ${S._funRouletteLoading ? `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px 0;">
+              <div class="spinner" style="width:28px;height:28px;border-width:3px;"></div>
+              <div style="font-size:14px;color:var(--text-3);">Styling your look…</div>
+            </div>
+          ` : S.funRoulette ? (() => {
+            const r = S.funRoulette;
+            return `<div style="background:linear-gradient(135deg,#1A1A1A 0%,#2A2010 100%);border-radius:16px;padding:20px;position:relative;overflow:hidden;">
+              <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 20%,rgba(184,125,42,0.18) 0%,transparent 60%);pointer-events:none;"></div>
+              <div style="position:relative;">
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--gold);margin-bottom:4px;">Today's Look</div>
+                <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px;">${esc(r.vibe||'')}</div>
+                <div style="font-size:14px;color:rgba(255,255,255,.65);margin-bottom:18px;font-style:italic;">${esc(r.hype||'')}</div>
+                <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
+                  ${(r.outfit||[]).map(p=>`<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;">
+                    <span style="font-size:24px;flex-shrink:0;">${esc(p.emoji||'👕')}</span>
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:14px;font-weight:700;color:#fff;line-height:1.25;">${esc(p.item||'')}</div>
+                      <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.35;margin-top:2px;">${esc(p.reason||'')}</div>
+                    </div>
+                  </div>`).join('')}
+                </div>
+                <button
+                  ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette();"
+                  onclick="generateRoulette();"
+                  style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:rgba(255,255,255,.8);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                  🔄 Spin again
+                </button>
+              </div>
+            </div>`;
+          })() : ''}
+        </div>
+      </div>
+    </div>
+  ` : ''}
+`;
 }
 
 async function geocodeLocation(name) {
