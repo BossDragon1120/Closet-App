@@ -2123,46 +2123,6 @@ body {
   letter-spacing: .02em;
 }
 .hero-share-btn:active { opacity: .8; }
-/* Hero Pieces hub */
-.hero-hub-card {
-  background: var(--surface); border-radius: var(--r);
-  border: 1.5px solid var(--border);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px;
-  margin: 0 16px 10px;
-  cursor: pointer; touch-action: manipulation;
-  transition: border-color .15s;
-}
-.hero-hub-card:active { opacity: .75; }
-.hero-hub-emoji {
-  font-size: 32px; width: 52px; height: 52px;
-  background: linear-gradient(135deg,#FFFAED,#FFF0B0);
-  border-radius: 10px; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; border: 1px solid rgba(184,125,42,.2);
-}
-.hero-hub-name { font-size: 15px; font-weight: 800; color: var(--text-1); line-height: 1.2; }
-.hero-hub-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 500; }
-.hero-hub-crown {
-  font-size: 10px; font-weight: 800; color: var(--gold-dk);
-  background: var(--gold-bg); border-radius: 100px;
-  padding: 3px 8px; letter-spacing: .04em; text-transform: uppercase;
-  white-space: nowrap;
-}
-.hero-hub-actions {
-  margin-left: auto; flex-shrink: 0;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 7px;
-}
-.hero-hub-share {
-  font-size: 11px; font-weight: 700; color: var(--gold-dk);
-  background: none; border: 1.5px solid var(--gold-dk);
-  border-radius: 100px; padding: 3px 8px;
-  cursor: pointer; touch-action: manipulation;
-  letter-spacing: .02em; white-space: nowrap;
-  transition: background .15s, color .15s;
-}
-.hero-hub-share:active { background: var(--gold-bg); }
 
 /* ── SIGNATURE PIECES ───────────────────────────────────── */
 :root {
@@ -2179,50 +2139,6 @@ body {
 .sig-toggle-box.active {
   background: linear-gradient(135deg, #F5F1EB, #EDE5D8);
   border-color: var(--sig-border);
-}
-.sig-badge {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: var(--sig-bg); color: var(--sig-dk);
-  border-radius: 100px; padding: 2px 9px;
-  font-size: 11px; font-weight: 800; border: 1px solid var(--sig-border);
-  letter-spacing: .03em;
-}
-.sig-hub-card {
-  background: var(--surface); border-radius: var(--r);
-  border: 1.5px solid var(--border);
-  box-shadow: var(--shadow);
-  display: flex; flex-direction: column;
-  padding: 14px 16px; margin: 0 16px 12px;
-  cursor: pointer; touch-action: manipulation;
-}
-.sig-hub-card.filled { border-color: var(--sig-border); background: linear-gradient(135deg,#F8F4EE,#F1EAE0); }
-.sig-hub-card-header { display: flex; align-items: center; gap: 12px; }
-.sig-hub-emoji {
-  font-size: 28px; width: 46px; height: 46px;
-  background: linear-gradient(135deg,#EDE5D8,#E2D8C8);
-  border-radius: 10px; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; border: 1px solid rgba(61,53,48,.12);
-}
-.sig-hub-name { font-size: 15px; font-weight: 800; color: var(--text-1); line-height: 1.2; }
-.sig-hub-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 500; }
-.sig-hub-why {
-  font-size: 13px; color: var(--sig-dk); font-style: italic; font-weight: 500;
-  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sig-border);
-  line-height: 1.5;
-}
-.sig-share-btn {
-  width: 100%; padding: 14px; border-radius: var(--r);
-  background: var(--sig); color: #fff; border: none;
-  font-size: 15px; font-weight: 800; cursor: pointer;
-  font-family: inherit; letter-spacing: .02em;
-  transition: opacity .15s; touch-action: manipulation;
-}
-.sig-share-btn:active { opacity: .82; }
-.sig-slot-empty {
-  border: 1.5px dashed var(--sig-border); border-radius: var(--r);
-  padding: 16px; margin: 0 16px 12px;
-  text-align: center; color: var(--sig-border);
-  font-size: 13px; font-weight: 600;
 }
 
 /* ── FEATURE MENU ────────────────────────────────────────── */
@@ -3015,7 +2931,7 @@ const S = {
   // ui
   loading: false, loadingMsg: '', error: null,
   filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'recs', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false,
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'wishlist', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
   // Style Persona
@@ -5239,7 +5155,7 @@ async function signOut() {
 /* ================================================================
    RENDER ROUTER
    ================================================================ */
-const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','hot','local','returns','fun']);
+const TAB_VIEWS = new Set(['home','profile','closet','wardrobe','shop','plan','dashboard','settings','local','returns','fun']);
 
 /* ================================================================
    FASHION WORD OF THE DAY
@@ -6211,11 +6127,11 @@ function render() {
     case 'new-piece':    html = viewNewPiece();     break;
     case 'bulk-add':     html = viewBulkAdd();      break;
     case 'onboarding':   html = viewOnboarding();   break;
-    case 'hot':          html = viewHot();          break;
     case 'local':        html = viewLocal();        break;
     case 'returns':      html = viewReturns();      break;
     case 'fun':          html = viewFun();          break;
     case 'thanked-log':   html = viewThankedLog();   break;
+    case 'hot':               navigate('home'); return; // merged into Discover trends
     case 'hero-pieces':       navigate('wardrobe'); return; // merged into Gems
     case 'signature-pieces':  navigate('wardrobe'); return; // merged into Gems
     case 'brands':            html = viewBrands();            break;
@@ -7780,77 +7696,6 @@ const HOT_CATEGORIES = [
   { key: 'bags',      label: 'Bags',      icon: '👜' },
 ];
 
-function viewHot() {
-  const trends = S.hotTrends;
-  const loading = S._trendsLoading;
-  const reactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
-
-  let updatedNote = '';
-  if (trends?.updated) {
-    const diffMs = Date.now() - new Date(trends.updated).getTime();
-    const diffDays = Math.floor(diffMs / 86400000);
-    updatedNote = diffDays === 0 ? 'Updated today' : diffDays === 1 ? 'Updated yesterday' : `Updated ${diffDays} days ago`;
-  }
-
-  let bodyHTML = '';
-
-  if (!trends && !loading) {
-    bodyHTML = `<div class="hot-empty">
-      <div class="hot-empty-icon">🔥</div>
-      <div class="hot-empty-title">No trends loaded yet</div>
-      <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:4px;">Tap below and Claude will curate the top 10 fashion trends for you — a quick cheat sheet, updated weekly.</div>
-      <button class="hot-gen-btn" ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()">✦ Generate Trend Report</button>
-    </div>`;
-  } else if (loading) {
-    bodyHTML = `<div class="hot-empty">
-      <div style="margin-bottom:16px;"><div class="spinner"></div></div>
-      <div class="hot-empty-title">Curating trends…</div>
-      <div style="font-size:13px;color:var(--text-3);">Claude is scanning the style scene.</div>
-    </div>`;
-  } else {
-    // Render by category
-    HOT_CATEGORIES.forEach(cat => {
-      const catTrends = (trends.trends || []).filter(t => t.category === cat.key);
-      if (!catTrends.length) return;
-      bodyHTML += `<div class="hot-category-label">${cat.icon} ${cat.label}</div>`;
-      catTrends.forEach(trend => {
-        const rid = trend.id;
-        const r = reactions[rid];
-        bodyHTML += `<div class="hot-trend-card">
-          <div class="hot-trend-top">
-            <div class="hot-trend-emoji">${esc(trend.emoji||cat.icon)}</div>
-            <div class="hot-trend-content">
-              <div class="hot-trend-name">${esc(trend.name)}</div>
-              <div class="hot-trend-desc">${esc(trend.description)}</div>
-            </div>
-          </div>
-          ${trend.tip ? `<div class="hot-trend-tip"><span class="hot-trend-tip-icon">💡</span><span>${esc(trend.tip)}</span></div>` : ''}
-          <div class="hot-trend-footer">
-            <button class="hot-vote-btn ${r==='up'?'voted-up':''}"
-              ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(rid)}','up')"
-              onclick="setTrendReaction('${esc(rid)}','up')">👍</button>
-            <button class="hot-vote-btn ${r==='down'?'voted-down':''}"
-              ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(rid)}','down')"
-              onclick="setTrendReaction('${esc(rid)}','down')">👎</button>
-          </div>
-        </div>`;
-      });
-    });
-    if (updatedNote) bodyHTML += `<div class="hot-updated-note">${esc(updatedNote)} · AI-curated snapshot</div>`;
-    bodyHTML += `<div style="height:8px;"></div>`;
-  }
-
-  return `<div class="view">
-    <div class="nav">
-      <span class="nav-logo">What's Hot 🔥</span>
-      ${trends && !loading
-        ? `<button class="hot-refresh-btn" ${loading?'disabled':''} ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()">↻ Refresh</button>`
-        : ''}
-    </div>
-    ${newsFlashHTML()}
-    ${bodyHTML}
-  </div>`;
-}
 
 async function generateHotTrends() {
   if (S._trendsLoading) return;
@@ -8136,70 +7981,8 @@ async function toggleGem(id) {
 }
 
 /* ================================================================
-   HERO PIECES — TOGGLE, SHARE, VIEW (legacy — kept for share cards)
+   HERO PIECES — SHARE CARD (used from wardrobe item view)
    ================================================================ */
-async function toggleHeroPiece(id) {
-  const w = S.wardrobe.find(i => i.id === id);
-  if (!w) return;
-  w.isHero = !w.isHero;
-  toast(w.isHero ? '👑 Marked as a Hero Piece!' : 'Removed from Hero Pieces');
-  render(); // optimistic — badge updates immediately
-  await DB.wardrobe.put(w);
-}
-
-function viewHeroPieces() {
-  const heroes = S.wardrobe.filter(w => w.isHero && !w.retiredFromCloset);
-
-  let bodyHTML = '';
-  if (!heroes.length) {
-    bodyHTML = `<div style="text-align:center;padding:56px 32px;color:var(--text-3);">
-      <div style="font-size:44px;margin-bottom:14px;">💎</div>
-      <div style="font-size:18px;font-weight:800;color:var(--text-1);margin-bottom:8px;">No Hero Pieces yet</div>
-      <div style="font-size:13px;line-height:1.65;">A Hero Piece is a standout garment that anchors an outfit — a bold blazer, a great coat, the bag everyone asks about. Open any wardrobe item and toggle it as a Hero Piece.</div>
-      <button onclick="switchTab('wardrobe')" style="margin-top:20px;background:var(--gold);color:#fff;border:none;border-radius:100px;padding:11px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">Go to Closet →</button>
-    </div>`;
-  } else {
-    bodyHTML = `<div style="padding:4px 16px 10px;">
-      <div style="font-size:13px;color:var(--text-3);line-height:1.6;">Your standout pieces — the anchors around which great outfits are built. Share this card with a stylist to get expert advice on how to wear them.</div>
-    </div>`;
-    heroes.forEach(w => {
-      const wears = w.wears?.length || 0;
-      const meta = [w.brand, w.category, wears > 0 ? `${wears} wear${wears===1?'':'s'}` : null].filter(Boolean).join(' · ');
-      bodyHTML += `<div class="hero-hub-card"
-        ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
-        onclick="openWardrobeItem('${w.id}')">
-        <div class="hero-hub-emoji">${w.icon || '👕'}</div>
-        <div style="flex:1;min-width:0;">
-          <div class="hero-hub-name">${esc(w.name)}</div>
-          ${meta ? `<div class="hero-hub-meta">${esc(meta)}</div>` : ''}
-          ${w.description ? `<div style="font-size:11.5px;color:var(--text-3);margin-top:3px;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.description)}</div>` : ''}
-        </div>
-        <div class="hero-hub-actions">
-          <div class="hero-hub-crown">Hero</div>
-          <button class="hero-hub-share"
-            ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();shareHeroPiece('${w.id}')"
-            onclick="event.stopPropagation();shareHeroPiece('${w.id}')">↗ Share</button>
-        </div>
-      </div>`;
-    });
-    bodyHTML += `<div style="padding:4px 16px 20px;">
-      <button class="hero-share-btn" ontouchend="if(_touchMoved)return;event.preventDefault();shareAllHeroPieces()" onclick="shareAllHeroPieces()">
-        💎 Share All with Stylist
-      </button>
-      <div style="text-align:center;font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5;">Generates a visual card of all your Hero Pieces — screenshot and send to your stylist.</div>
-    </div>`;
-  }
-
-  return `<div class="view">
-    <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">${iconBack()} Portfolio</button>
-      <span class="nav-title">Hero Pieces 👑</span>
-      <span style="width:72px;display:inline-block;"></span>
-    </div>
-    ${bodyHTML}
-  </div>`;
-}
-
 // ── Share a single hero piece as a visual card ────────────────────
 function shareHeroPiece(id) {
   const w = S.wardrobe.find(i => i.id === id);
@@ -8468,100 +8251,6 @@ async function shareWardrobeItem(id) {
   }
 }
 
-// ── Share all hero pieces as a collection card ────────────────────
-function shareAllHeroPieces() {
-  const heroes = S.wardrobe.filter(w => w.isHero && !w.retiredFromCloset);
-  if (!heroes.length) { toast('No Hero Pieces to share yet'); return; }
-
-  const COLS = 2, ROW_H = 170, PAD = 40, CARD_GAP = 16;
-  const rows = Math.ceil(heroes.length / COLS);
-  const W = 750, H = PAD + 120 + rows * (ROW_H + CARD_GAP) + 100;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-
-  // Background
-  ctx.fillStyle = '#1C1A18';
-  ctx.fillRect(0, 0, W, H);
-
-  // Subtle grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
-  // Gold top bar
-  const grd = ctx.createLinearGradient(0, 0, W, 0);
-  grd.addColorStop(0, '#B8860B'); grd.addColorStop(1, '#D4A820');
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, W, 6);
-
-  // Title
-  ctx.textAlign = 'center';
-  ctx.font = '800 13px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(212,168,32,0.85)';
-  ctx.fillText('✦ HERO PIECES', W/2, 44);
-
-  ctx.font = '800 38px -apple-system,sans-serif';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText('My Standout Pieces', W/2, 90);
-
-  ctx.font = '400 16px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.42)';
-  ctx.fillText('Help me style these — they anchor my outfits', W/2, 115);
-
-  // Cards
-  const cardW = (W - PAD * 2 - CARD_GAP) / COLS;
-  heroes.forEach((w, i) => {
-    const col = i % COLS, row = Math.floor(i / COLS);
-    const cx = PAD + col * (cardW + CARD_GAP);
-    const cy = 136 + row * (ROW_H + CARD_GAP);
-
-    // Card bg
-    ctx.fillStyle = 'rgba(255,255,255,0.055)';
-    roundRect(ctx, cx, cy, cardW, ROW_H, 14);
-    ctx.fill();
-
-    // Gold border
-    ctx.strokeStyle = 'rgba(184,125,42,0.35)';
-    ctx.lineWidth = 1.5;
-    roundRect(ctx, cx, cy, cardW, ROW_H, 14);
-    ctx.stroke();
-
-    // Emoji
-    ctx.font = '52px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(w.icon || '👕', cx + cardW/2, cy + 64);
-
-    // Name
-    ctx.font = '700 17px -apple-system,sans-serif';
-    ctx.fillStyle = '#FFFFFF';
-    const nm = w.name.length > 18 ? w.name.slice(0, 18) + '…' : w.name;
-    ctx.fillText(nm, cx + cardW/2, cy + 92);
-
-    // Brand / category
-    const sub = w.brand || w.category || '';
-    ctx.font = '400 13px -apple-system,sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.42)';
-    ctx.fillText(sub.slice(0, 20), cx + cardW/2, cy + 112);
-
-    // Hero badge
-    ctx.font = '700 10px -apple-system,sans-serif';
-    ctx.fillStyle = 'rgba(212,168,32,0.9)';
-    ctx.fillText('HERO', cx + cardW/2, cy + 145);
-  });
-
-  // Bottom branding
-  ctx.textAlign = 'center';
-  ctx.font = '600 15px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(184,125,42,0.7)';
-  ctx.fillText('✦ Closet', W/2, H - 36);
-  ctx.font = '400 13px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  ctx.fillText(new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}), W/2, H - 16);
-
-  _downloadOrShareCanvas(canvas, 'hero-pieces.png');
-}
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -8600,16 +8289,7 @@ async function _downloadOrShareCanvas(canvas, filename) {
 function openWishShareSheet() {
   const wishItems = [];
   const wishNames = new Set();
-  // Spotted items first (they have richer data + photos)
-  (S.spottedItems || []).forEach(sp => {
-    if (!sp.name) return;
-    const key = sp.name.toLowerCase().trim();
-    if (!wishNames.has(key)) {
-      wishNames.add(key);
-      wishItems.push({ name: sp.name, brand: sp.brand || '', price: sp.price || '', photo: sp.photo || null, spotted: true, spottedId: sp.id, selected: true });
-    }
-  });
-  // Hearted purchase recs
+  // Saved (hearted) purchase recs only
   S.entries.forEach(e => {
     if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
     e.purchaseRecs.forEach((r, i) => {
@@ -9466,7 +9146,7 @@ function viewShop() {
       const QUICK = ['🎂 Birthday','🎄 Holiday','💍 Registry'];
       return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
           ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishShareOpen=false;S._wishShareItems=null;render();" onclick="S.shopWishShareOpen=false;S._wishShareItems=null;render()">
-        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:88dvh;display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.18);"
+        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:min(88dvh,85vh);display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.18);"
           ontouchend="event.stopPropagation();" onclick="event.stopPropagation()">
 
           <!-- Fixed header -->
@@ -12145,209 +11825,6 @@ async function shareStatsCard() {
 
 
 
-/* ================================================================
-   SIGNATURE PIECES — TOGGLE, VIEW, SHARE
-   ================================================================ */
-const SIG_MAX = 3;
-
-async function toggleSignaturePiece(id) {
-  const w = S.wardrobe.find(i => i.id === id);
-  if (!w) return;
-  const sigs = S.wardrobe.filter(i => i.isSignature);
-  if (!w.isSignature && sigs.length >= SIG_MAX) {
-    toast(`You've already chosen your ${SIG_MAX} signature pieces. Remove one to swap.`);
-    return;
-  }
-  w.isSignature = !w.isSignature;
-  if (!w.isSignature) delete w.signatureNote;
-  toast(w.isSignature ? '💎 Added as a Signature Piece!' : 'Removed from Signature Pieces');
-  render(); // optimistic — badge updates immediately
-  await DB.wardrobe.put(w);
-}
-
-async function saveSignatureNote(id, note) {
-  const w = S.wardrobe.find(i => i.id === id);
-  if (!w) return;
-  w.signatureNote = note.trim();
-  await DB.wardrobe.put(w); // w is a reference in S.wardrobe
-}
-
-function viewSignaturePieces() {
-  const sigs = S.wardrobe.filter(w => w.isSignature && !w.retiredFromCloset);
-  const userName = S.profileName ? esc(S.profileName) : 'You';
-  const slots = [0,1,2];
-
-  let bodyHTML = `<div style="padding:4px 16px 14px;">
-    <div style="font-size:13px;color:var(--text-3);line-height:1.65;">The pieces people remember you by — the ones that make someone say "that's so ${userName}." Choose up to three. They don't have to be your most expensive or most worn. They just have to be unmistakably you.</div>
-  </div>`;
-
-  if (sigs.length < SIG_MAX) {
-    bodyHTML += `<div style="margin:0 16px 14px;background:var(--sig-bg);border:1.5px dashed var(--sig-border);border-radius:var(--r);padding:11px 14px;display:flex;align-items:center;gap:10px;">
-      <span style="font-size:16px;flex-shrink:0;">✦</span>
-      <div style="font-size:12.5px;color:var(--sig-dk);font-weight:600;line-height:1.4;">
-        ${sigs.length === 0 ? 'No signature pieces yet.' : `${sigs.length} of ${SIG_MAX} chosen.`}
-        Open any wardrobe piece and mark it as a Signature Piece.
-      </div>
-    </div>`;
-  }
-
-  slots.forEach(i => {
-    const w = sigs[i];
-    if (!w) {
-      bodyHTML += `<div style="margin:0 16px 12px;border:1.5px dashed var(--sig-border);border-radius:var(--r);padding:18px;text-align:center;">
-        <div style="font-size:22px;margin-bottom:6px;opacity:.35;">✦</div>
-        <div style="font-size:12px;color:var(--sig-border);font-weight:600;">Slot ${i+1} · Open any wardrobe item to add</div>
-      </div>`;
-      return;
-    }
-    const wears = w.wears?.length || 0;
-    const meta = [w.brand, w.category, wears > 0 ? `${wears} wear${wears===1?'':'s'}` : null].filter(Boolean).join(' · ');
-    bodyHTML += `<div class="sig-hub-card filled"
-      ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
-      onclick="openWardrobeItem('${w.id}')">
-      <div class="sig-hub-card-header">
-        <div class="sig-hub-emoji">${w.icon || '👕'}</div>
-        <div style="flex:1;min-width:0;">
-          <div class="sig-hub-name">${esc(w.name)}</div>
-          ${meta ? `<div class="sig-hub-meta">${esc(meta)}</div>` : ''}
-        </div>
-        <div class="sig-badge">✦ ${i+1}</div>
-      </div>
-      ${w.signatureNote ? `<div class="sig-hub-why">"${esc(w.signatureNote)}"</div>` : `<div style="font-size:12px;color:var(--sig-border);margin-top:10px;padding-top:10px;border-top:1px dashed var(--sig-border);font-style:italic;">Tap to add why this piece is yours →</div>`}
-    </div>`;
-  });
-
-  if (sigs.length === SIG_MAX) {
-    bodyHTML += `<div style="padding:4px 16px 16px;">
-      <button class="sig-share-btn"
-        ontouchend="if(_touchMoved)return;event.preventDefault();shareSignaturePieces()"
-        onclick="shareSignaturePieces()">
-        ✦ Share My Signature Style
-      </button>
-      <div style="text-align:center;font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5;">Creates a visual card you can send to your stylist or save as a keepsake.</div>
-    </div>`;
-  }
-
-  return `<div class="view view-notab">
-    <div class="nav">
-      <button class="nav-back" onclick="navigate('profile')">${iconBack()} Portfolio</button>
-      <span class="nav-title" style="color:var(--sig-dk);">💎 Signature Pieces</span>
-      <span style="width:72px"></span>
-    </div>
-    <div style="background:linear-gradient(135deg,var(--sig),#C2185B);padding:18px 20px 20px;">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.7);margin-bottom:5px;">Your Style Identity</div>
-      <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-.3px;line-height:1.2;">${sigs.length === SIG_MAX ? `All ${SIG_MAX} pieces chosen` : `${sigs.length} of ${SIG_MAX} pieces`}</div>
-      <div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:4px;">The pieces that are unmistakably ${userName}.</div>
-    </div>
-    ${bodyHTML}
-  </div>`;
-}
-
-async function shareSignaturePieces() {
-  const sigs = S.wardrobe.filter(w => w.isSignature && !w.retiredFromCloset).slice(0, SIG_MAX);
-  if (!sigs.length) { toast('Mark some Signature Pieces first!'); return; }
-
-  const W = 800, H = 520 + sigs.length * 120;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-
-  // Background
-  ctx.fillStyle = '#FFF8FA';
-  ctx.fillRect(0, 0, W, H);
-
-  // Header gradient
-  const grad = ctx.createLinearGradient(0, 0, W, 0);
-  grad.addColorStop(0, '#9D174D'); grad.addColorStop(1, '#C2185B');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, 180);
-
-  // Header text
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.font = '700 24px -apple-system, sans-serif';
-  ctx.fillText('MY SIGNATURE STYLE', 48, 62);
-
-  const displayName = S.profileName?.trim() || 'My';
-  ctx.fillStyle = '#fff';
-  ctx.font = '800 52px -apple-system, sans-serif';
-  ctx.fillText(`${displayName}'s Pieces`, 48, 128);
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.font = '500 22px -apple-system, sans-serif';
-  ctx.fillText('The ones that are unmistakably me.', 48, 162);
-
-  // Cards
-  let y = 210;
-  for (let i = 0; i < sigs.length; i++) {
-    const w = sigs[i];
-    // Card bg
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.roundRect(36, y, W - 72, 110, 16);
-    ctx.fill();
-    // Rose left accent
-    ctx.fillStyle = '#9D174D';
-    ctx.beginPath();
-    ctx.roundRect(36, y, 6, 110, [16, 0, 0, 16]);
-    ctx.fill();
-    // Number badge
-    ctx.fillStyle = '#FFF1F6';
-    ctx.beginPath();
-    ctx.arc(80, y + 36, 22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#9D174D';
-    ctx.font = '800 20px -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`✦${i+1}`, 80, y + 43);
-    ctx.textAlign = 'left';
-    // Icon
-    ctx.font = '36px sans-serif';
-    ctx.fillText(w.icon || '👕', 116, y + 50);
-    // Name
-    ctx.fillStyle = '#111';
-    ctx.font = '800 26px -apple-system, sans-serif';
-    ctx.fillText(w.name.length > 32 ? w.name.slice(0,32)+'…' : w.name, 172, y + 38);
-    // Why note
-    if (w.signatureNote) {
-      ctx.fillStyle = '#9D174D';
-      ctx.font = 'italic 500 18px -apple-system, sans-serif';
-      const note = `"${w.signatureNote}"`;
-      ctx.fillText(note.length > 58 ? note.slice(0,58)+'…"' : note, 172, y + 70);
-    } else if (w.brand) {
-      ctx.fillStyle = '#888';
-      ctx.font = '500 18px -apple-system, sans-serif';
-      ctx.fillText(w.brand, 172, y + 70);
-    }
-    // Wears
-    const wears = w.wears?.length || 0;
-    if (wears > 0) {
-      ctx.fillStyle = '#bbb';
-      ctx.font = '500 16px -apple-system, sans-serif';
-      ctx.fillText(`${wears} wear${wears===1?'':'s'}`, 172, y + 95);
-    }
-    y += 128;
-  }
-
-  // Footer
-  ctx.fillStyle = '#F5B3CB';
-  ctx.fillRect(0, H - 54, W, 1);
-  ctx.fillStyle = '#9D174D';
-  ctx.font = '600 18px -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('closet.app  ·  Your AI-Powered Style Journal', W/2, H - 18);
-
-  const dataUrl = canvas.toDataURL('image/png');
-  try {
-    const blob = await (await fetch(dataUrl)).blob();
-    const file = new File([blob], 'signature-style.png', { type: 'image/png' });
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ title: 'My Signature Style', files: [file] });
-      return;
-    }
-  } catch(e) {}
-  const a = document.createElement('a');
-  a.href = dataUrl; a.download = 'signature-style.png'; a.click();
-  toast('Signature style card saved! ✦');
-}
 
 /* ================================================================
    WARDROBE SELECT MODE — long-press bulk delete
@@ -16090,7 +15567,6 @@ function viewDetail() {
           ${entry.weather ? `<div class="weather-chip" style="margin-bottom:8px;">${entry.weather.icon} ${entry.weather.tempF}°F · ${esc(entry.weather.condition)}</div>` : ''}
           <div class="rating-big"><span class="rating-num">${entry.rating}</span><span class="rating-denom">/10</span></div>
         </div>
-        <button class="worn-btn" onclick="logWear('${entry.id}')">${iconClock(14)} Worn ${entry.timesWorn||0}×</button>
       </div>
       ${entry.ratingNote?`<p class="rating-note">"${esc(entry.ratingNote)}"</p>`:''}
 
