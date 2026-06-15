@@ -2870,6 +2870,8 @@ const S = {
   cyclePeriodDays: parseInt(localStorage.getItem('closet-cycle-pdur') || '5'),
   battleDraft: null, // { photo, person1, person2, verdict, winner }
   discoverTab: 'trends', // 'trends' | 'brands' | 'tips'
+  styleGoals: JSON.parse(localStorage.getItem('closet-style-goals') || '[]'),
+  catRackLevels: JSON.parse(localStorage.getItem('closet-cat-rack-levels') || '{}'),
   funCompliment: null,      // { lines: [...], generatedAt }
   _funComplimentLoading: false,
   funRoulette: null,        // { items: [...], generatedAt }
@@ -7691,7 +7693,8 @@ async function generateHotTrends() {
   render();
 
   const today = new Date().toISOString().slice(0, 10);
-  const prompt = `You are a fashion editor. Today is ${today}. Return a JSON object (no markdown, no explanation) with this exact shape:
+  const goalsLine = (S.styleGoals||[]).length ? `The user's personal style goals are: ${S.styleGoals.join(', ')}. Prioritise trends that help them move toward these goals.\n` : '';
+  const prompt = `You are a fashion editor. Today is ${today}. ${goalsLine}Return a JSON object (no markdown, no explanation) with this exact shape:
 {
   "updated": "${today}",
   "trends": [
@@ -7779,7 +7782,8 @@ async function generateWardrobePulse() {
   render();
 
   const today = new Date().toISOString().slice(0, 10);
-  const prompt = `You are a fashion trend analyst. Today is ${today}. A user has shared their wardrobe inventory. Based on current fashion trends, identify which items are trending UP (gaining fashion relevance) and which are fading OUT (becoming outdated).
+  const pulseGoalsLine = (S.styleGoals||[]).length ? `The user's style goals are: ${S.styleGoals.join(', ')}. Frame rising/fading judgements in the context of these goals.\n` : '';
+  const prompt = `You are a fashion trend analyst. Today is ${today}. A user has shared their wardrobe inventory. ${pulseGoalsLine}Based on current fashion trends, identify which items are trending UP (gaining fashion relevance) and which are fading OUT (becoming outdated).
 
 Wardrobe items:
 ${JSON.stringify(items, null, 2)}
@@ -7893,9 +7897,10 @@ async function generateBrandDiscovery() {
   if (!brands.length) { toast('Add brands to your wardrobe items first'); return; }
 
   S._brandDiscoveryLoading = true; render();
-  const prompt = `You are a personal stylist. A fashion enthusiast's current favourite brands are: ${brands.join(', ')}.
+  const goalsCtx = (S.styleGoals||[]).length ? ` Their current style goals are: ${S.styleGoals.join(', ')}. Weight suggestions toward brands that help them achieve these goals.` : '';
+  const prompt = `You are a personal stylist. A fashion enthusiast's current favourite brands are: ${brands.join(', ')}.${goalsCtx}
 Suggest 5 brands they would genuinely love that are NOT in their current collection.
-Focus on aesthetic coherence — brands that naturally complement their existing taste.
+Focus on aesthetic coherence — brands that naturally complement their existing taste and goals.
 Return ONLY a JSON array with no markdown or explanation:
 [{"name":"Brand Name","reason":"One sentence why this fits their aesthetic.","vibe":"3-4 word aesthetic label","emoji":"single emoji capturing the brand vibe"}]
 Be specific and thoughtful. Prefer real, discoverable brands. Mix price points slightly for variety.`;
@@ -10297,34 +10302,6 @@ function viewProfile() {
       </div>`;
     })() : ''}
 
-    <!-- ══ Brand Discovery ══ -->
-    ${topBrands.length ? `<div style="margin:10px 16px 0;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">✨ Explore Similar Brands</div>
-        ${S.brandDiscovery?.suggestions?.length ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↻</button>` : ''}
-      </div>
-      ${S._brandDiscoveryLoading ? `<div style="display:flex;align-items:center;gap:8px;padding:10px 0;">
-        <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>
-        <span style="font-size:12px;color:var(--text-3);">Finding brands that match your aesthetic…</span>
-      </div>` : S.brandDiscovery?.suggestions?.length ? `
-        <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-          ${S.brandDiscovery.suggestions.map(s=>`
-            <div style="flex-shrink:0;width:140px;scroll-snap-align:start;background:var(--surface);border-radius:12px;border:1.5px solid var(--border);padding:11px 12px;display:flex;flex-direction:column;gap:5px;">
-              <div style="font-size:18px;line-height:1;">${s.emoji||'✦'}</div>
-              <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(s.name)}</div>
-              <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 7px;align-self:flex-start;">${esc(s.vibe)}</div>
-              <div style="font-size:11px;color:var(--text-3);line-height:1.4;flex:1;">${esc(s.reason)}</div>
-              <a href="${brandInstagramUrl(s.name)}" target="_blank" rel="noopener"
-                style="margin-top:3px;display:inline-flex;align-items:center;gap:4px;color:var(--text-3);text-decoration:none;font-size:11px;font-weight:600;">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-                Instagram
-              </a>
-            </div>`).join('')}
-        </div>
-      ` : `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
-          style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:100px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">✦ Find similar brands</button>`}
-    </div>` : ''}
-
     <!-- ══ Divider ══ -->
     <div style="height:1px;background:var(--border);margin:20px 16px;"></div>
 
@@ -11232,21 +11209,78 @@ function viewHome() {
     </div>`;
   })() : '';
 
-  // ── Sub-tab pill bar ──────────────────────────────────────
+  // ── Style Goals + Visual Tab Cards ───────────────────────
   const dTab = S.discoverTab || 'trends';
+  const GOAL_PRESETS = [
+    { label:'Feminine',    emoji:'🌸' },
+    { label:'Punk Rock',   emoji:'🤘' },
+    { label:'Executive',   emoji:'💼' },
+    { label:'Minimalist',  emoji:'🖤' },
+    { label:'Maximalist',  emoji:'✨' },
+    { label:'Streetwear',  emoji:'🛹' },
+    { label:'Bohemian',    emoji:'🌿' },
+    { label:'Classic',     emoji:'👑' },
+    { label:'Edgy',        emoji:'⚡' },
+    { label:'Romantic',    emoji:'💕' },
+    { label:'Athletic',    emoji:'🏃' },
+    { label:'Artsy',       emoji:'🎨' },
+  ];
+  const activeGoals = S.styleGoals || [];
+
+  const goalsHero = `
+    <div style="margin:14px 16px 0;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
+        <div style="font-size:13px;font-weight:800;color:var(--text);letter-spacing:-.1px;">Your Style Goals</div>
+        ${activeGoals.length ? `<div style="font-size:11px;color:var(--text-3);">${activeGoals.length} active · AI uses these</div>` : `<div style="font-size:11px;color:var(--text-3);">Tap to set your direction</div>`}
+      </div>
+      ${activeGoals.length ? `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+        ${activeGoals.map(g => {
+          const preset = GOAL_PRESETS.find(p => p.label === g);
+          const emoji = preset ? preset.emoji : '✦';
+          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();toggleStyleGoal('${g}')" onclick="toggleStyleGoal('${g}')"
+            style="display:inline-flex;align-items:center;gap:5px;background:var(--gold);border-radius:100px;padding:6px 13px;cursor:pointer;touch-action:manipulation;">
+            <span style="font-size:14px;line-height:1;">${emoji}</span>
+            <span style="font-size:12px;font-weight:800;color:#fff;">${esc(g)}</span>
+            <span style="font-size:11px;color:rgba(255,255,255,.65);margin-left:1px;">✕</span>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">
+        ${GOAL_PRESETS.filter(p => !activeGoals.includes(p.label)).map(p => `
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleStyleGoal('${p.label}')" onclick="toggleStyleGoal('${p.label}')"
+            style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1.5px solid var(--border);border-radius:100px;padding:5px 12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            <span style="font-size:13px;line-height:1;">${p.emoji}</span>
+            <span style="font-size:12px;font-weight:600;color:var(--text-2);">${p.label}</span>
+          </button>`).join('')}
+      </div>
+    </div>
+    <div style="margin:14px 16px 0;height:1px;background:var(--border);"></div>`;
+
+  // Counts for tab card subtitles
+  const trendCount = S.hotTrends?.trends?.length || 0;
+  const brandCount = (() => { const bc = {}; S.wardrobe.forEach(w => { if (w.brand) bc[w.brand] = 1; }); return Object.keys(bc).length; })();
+  const tipsCount = (() => { let n = 0; S.entries.forEach(e => { if (!e.recReactions) return; if (e.stylingTips?.length) { e.stylingTips.forEach((_,i) => { if (e.recReactions[String(i)] === 'liked') n++; }); } else { (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') n++; }); } }); return n; })();
+
+  const tabCards = [
+    { key:'trends', icon:'🔥', label:'Trends',  sub: trendCount ? `${trendCount} trends loaded` : 'What\'s hot in fashion now' },
+    { key:'brands', icon:'✨', label:'Brands',  sub: brandCount ? `${brandCount} brand${brandCount===1?'':'s'} in your closet` : 'Discover your aesthetic' },
+    { key:'tips',   icon:'✂️', label:'Tips',    sub: tipsCount  ? `${tipsCount} tip${tipsCount===1?'':'s'} saved` : 'Style tips from your fits' },
+  ];
+
   const subTabPills = `
-    <div style="display:flex;gap:8px;padding:12px 16px 4px;">
-      ${[
-        { key:'trends', icon:'🔥', label:'Trends'  },
-        { key:'brands', icon:'✨', label:'Brands'  },
-        { key:'tips',   icon:'✂️', label:'Tips'    },
-      ].map(t => `<button
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.discoverTab='${t.key}';render()"
-        onclick="S.discoverTab='${t.key}';render()"
-        style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${dTab===t.key?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${dTab===t.key?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
-        <div style="font-size:18px;margin-bottom:4px;">${t.icon}</div>
-        <div style="font-size:12px;font-weight:${dTab===t.key?'800':'600'};color:${dTab===t.key?'var(--gold-dk)':'var(--text-2)'};">${t.label}</div>
-      </button>`).join('')}
+    <div style="display:flex;gap:10px;padding:14px 16px 0;">
+      ${tabCards.map(t => {
+        const active = dTab === t.key;
+        return `<button
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.discoverTab='${t.key}';render()"
+          onclick="S.discoverTab='${t.key}';render()"
+          style="flex:1;padding:12px 8px 10px;border-radius:var(--r);border:${active?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${active?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div style="font-size:22px;line-height:1;">${t.icon}</div>
+          <div style="font-size:13px;font-weight:${active?'800':'700'};color:${active?'var(--gold-dk)':'var(--text)'};">${t.label}</div>
+          <div style="font-size:10px;color:${active?'var(--gold-dk)':'var(--text-3)'};line-height:1.3;font-weight:${active?'600':'400'};">${t.sub}</div>
+        </button>`;
+      }).join('')}
     </div>`;
 
   // ── Trends tab content ─────────────────────────────────
@@ -11512,6 +11546,7 @@ function viewHome() {
       <span class="nav-logo">✦ Evolve</span>
       <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload')" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
     </div>
+    ${goalsHero}
     ${subTabPills}
     ${!hasData && dTab === 'trends' ? `<div class="empty" style="padding-top:52px;">
       <div class="empty-icon">✨</div>
@@ -11917,6 +11952,7 @@ function viewWardrobe() {
     (S._wearFlipped ? [...S._wearFlipped].sort().join(',') : ''),
     S.wardrobe.map(w=>w.id+'|'+(w.wears?.length||0)+'|'+(w.inMaybePile?1:0)+'|'+(w.tailoringNeeded?1:0)+'|'+(w.retiredFromCloset?1:0)+'|'+(!!w.photo?1:0)+'|'+(!!w.wearPhoto?1:0)+'|'+(w.name||'')+'|'+(w.category||'')+'|'+(w.brand||'')+'|'+(w.isGem?1:0)).join(';'),
     (S.customCategories||[]).join(','),
+    JSON.stringify(S.catRackLevels||{}),
   ].join('§');
   if (S._vwCache && S._vwCache.key === _vwKey) return S._vwCache.html;
 
@@ -12170,9 +12206,27 @@ function shelfCardHTML(w, fallbackIcon, _siblings) {
 }
 
 function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackIcon, bg) {
-  const levels = Math.max(1, Math.min(4, S[stateKey] || 2));
-  const _lsKey = {'shoeRackLevels':'closet-shoe-shelves','bagRackLevels':'closet-bag-shelves','accessoryRackLevels':'closet-acc-shelves','sweatRackLevels':'closet-sweat-shelves','intRackLevels':'closet-int-shelves'}[stateKey];
-  const _saveShelfLevel = (v) => { if (_lsKey) localStorage.setItem(_lsKey, v); };
+  // Legacy named keys live directly on S; generic category keys use S.catRackLevels
+  const _legacyKeys = {'shoeRackLevels':true,'bagRackLevels':true,'accessoryRackLevels':true,'sweatRackLevels':true,'intRackLevels':true};
+  const _isLegacy = _legacyKeys[stateKey];
+  const _defaultLevels = _isLegacy ? 2 : 1;
+  const levels = Math.max(1, Math.min(6, _isLegacy ? (S[stateKey] || _defaultLevels) : ((S.catRackLevels || {})[stateKey] || _defaultLevels)));
+  const _lsKeyMap = {'shoeRackLevels':'closet-shoe-shelves','bagRackLevels':'closet-bag-shelves','accessoryRackLevels':'closet-acc-shelves','sweatRackLevels':'closet-sweat-shelves','intRackLevels':'closet-int-shelves'};
+  const _saveShelfLevel = (v) => {
+    if (_isLegacy) {
+      const k = _lsKeyMap[stateKey]; if (k) localStorage.setItem(k, v);
+    } else {
+      S.catRackLevels = {...(S.catRackLevels||{}), [stateKey]: v};
+      localStorage.setItem('closet-cat-rack-levels', JSON.stringify(S.catRackLevels));
+    }
+  };
+  // For +/- buttons: use S[stateKey] for legacy, S.catRackLevels[stateKey] for generic
+  const _incExpr = _isLegacy
+    ? `S.${stateKey}=Math.min(6,S.${stateKey}+1);_saveShelfLevel(S.${stateKey});render()`
+    : `S.catRackLevels['${stateKey}']=Math.min(6,((S.catRackLevels||{})['${stateKey}']||1)+1);_saveShelfLevel(S.catRackLevels['${stateKey}']);render()`;
+  const _decExpr = _isLegacy
+    ? `S.${stateKey}=Math.max(1,S.${stateKey}-1);_saveShelfLevel(S.${stateKey});render()`
+    : `S.catRackLevels['${stateKey}']=Math.max(1,((S.catRackLevels||{})['${stateKey}']||1)-1);_saveShelfLevel(S.catRackLevels['${stateKey}']);render()`;
   const perShelf = Math.ceil(catItems.length / levels);
   const cost = catCost(catItems);
   const costStr = fmtCost(cost);
@@ -12189,9 +12243,9 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
         <span class="shoe-rack-meta">${catItems.length} ${countLabel}${costStr?' · '+costStr:''}</span>
       </div>
       <div class="shoe-rack-controls">
-        <span class="shoe-rack-level-label">${levels===1?'1 shelf':levels+' shelves'}</span>
-        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();S.${stateKey}=Math.max(1,S.${stateKey}-1);_saveShelfLevel(S.${stateKey});render();" onclick="S.${stateKey}=Math.max(1,S.${stateKey}-1);_saveShelfLevel(S.${stateKey});render()" ${levels<=1?'disabled':''} title="Fewer shelves">−</button>
-        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();S.${stateKey}=Math.min(4,S.${stateKey}+1);_saveShelfLevel(S.${stateKey});render();" onclick="S.${stateKey}=Math.min(4,S.${stateKey}+1);_saveShelfLevel(S.${stateKey});render()" ${levels>=4?'disabled':''} title="More shelves">+</button>
+        <span class="shoe-rack-level-label">${levels===1?'1 row':levels+' rows'}</span>
+        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();${_decExpr}" onclick="${_decExpr}" ${levels<=1?'disabled':''} title="Fewer rows">−</button>
+        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();${_incExpr}" onclick="${_incExpr}" ${levels>=6?'disabled':''} title="More rows">+</button>
       </div>
     </div>
     <div class="shoe-shelf-wrap">${shelves}</div>
@@ -12204,29 +12258,24 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
   } else if (S.wardrobeCategory !== 'All') {
     // Filtered: shelf categories stay on shelves, others get a rod
     const _SHELF_CONFIG = {
-      Shoes:       ['👠', 'Shoes',         items.length===1?'pair':'pairs',  'shoeRackLevels',        '👠', 'rgba(139,101,56,0.08)'],
-      Bags:        ['👜', 'Bags',           items.length===1?'bag':'bags',    'bagRackLevels',         '👜', 'rgba(110,75,45,0.08)'],
-      Accessories: ['✨', 'Accessories',    items.length===1?'item':'items',  'accessoryRackLevels',   '💍', 'rgba(120,95,175,0.08)'],
-      Sweats:      ['🩳', 'Sweats & Comfy', items.length===1?'item':'items',  'sweatRackLevels',       '🩳', 'rgba(100,130,180,0.08)'],
-      Intimates:   ['🩱', 'Intimates',       items.length===1?'item':'items',  'intRackLevels',         '🩱', 'rgba(255,180,200,0.08)'],
+      Shoes:       ['👠', 'Shoes',         items.length===1?'pair':'pairs',  'shoeRackLevels',      '👠', 'rgba(139,101,56,0.08)'],
+      Bags:        ['👜', 'Bags',           items.length===1?'bag':'bags',    'bagRackLevels',       '👜', 'rgba(110,75,45,0.08)'],
+      Accessories: ['✨', 'Accessories',    items.length===1?'item':'items',  'accessoryRackLevels', '💍', 'rgba(120,95,175,0.08)'],
+      Sweats:      ['🩳', 'Sweats & Comfy', items.length===1?'item':'items',  'sweatRackLevels',     '🩳', 'rgba(100,130,180,0.08)'],
+      Intimates:   ['🩱', 'Intimates',      items.length===1?'item':'items',  'intRackLevels',       '🩱', 'rgba(255,180,200,0.08)'],
+      Tops:        ['👕', 'Tops',           items.length===1?'item':'items',  'Tops',                '👕', 'rgba(100,90,80,0.05)'],
+      Jackets:     ['🧥', 'Jackets',        items.length===1?'item':'items',  'Jackets',             '🧥', 'rgba(100,90,80,0.05)'],
+      Pants:       ['👖', 'Bottoms',        items.length===1?'item':'items',  'Pants',               '👖', 'rgba(100,90,80,0.05)'],
+      Dresses:     ['👗', 'Dresses',        items.length===1?'item':'items',  'Dresses',             '👗', 'rgba(100,90,80,0.05)'],
+      Jewelry:     ['💍', 'Jewelry',        items.length===1?'item':'items',  'Jewelry',             '💍', 'rgba(100,90,80,0.05)'],
+      Other:       ['🏷️', 'Other',          items.length===1?'item':'items',  'Other',               '🏷️', 'rgba(100,90,80,0.05)'],
     };
     const _shelfCfg = _SHELF_CONFIG[S.wardrobeCategory];
     if (_shelfCfg) {
       gridHTML = shelfSectionHTML(items, ..._shelfCfg);
     } else {
-      const cost = catCost(items);
-      const costStr = fmtCost(cost);
-      gridHTML = `<div class="rod-section" style="background:rgba(100,90,80,0.05);">
-        <div class="rod-section-header">
-          <span class="rod-section-cat">${S.wardrobeCategory}</span>
-          <span class="rod-section-meta">${items.length} item${items.length===1?'':'s'}${costStr?' · '+costStr:''}</span>
-        </div>
-        <div class="rod-track">
-          <div class="rod-items-inner">
-            ${items.map(w => hangerHTML(w, items)).join('')}
-          </div>
-        </div>
-      </div>`;
+      // Custom shelf or unknown category
+      gridHTML = shelfSectionHTML(items, '🏷️', S.wardrobeCategory, items.length===1?'item':'items', S.wardrobeCategory, '🏷️', 'rgba(100,90,80,0.05)');
     }
 
   } else {
@@ -12280,34 +12329,14 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
         return;
       }
 
-      const cost = catCost(catItems);
-      const costStr = fmtCost(cost);
-      const catLabel = cat === 'Pants' ? 'Bottoms' : cat;
-      sections += `<div class="rod-section" style="background:rgba(100,90,80,0.05);">
-        <div class="rod-section-header">
-          <span class="rod-section-cat">${catLabel}</span>
-          <span class="rod-section-meta">${catItems.length} item${catItems.length===1?'':'s'}${costStr?' · '+costStr:''}</span>
-        </div>
-        <div class="rod-track">
-          <div class="rod-items-inner">
-            ${catItems.map(w => hangerHTML(w, catItems)).join('')}
-          </div>
-        </div>
-      </div>`;
+      const _catIcons = {Tops:'👕',Jackets:'🧥',Pants:'👖',Dresses:'👗',Jewelry:'💍',Other:'🏷️'};
+      const _catLabel = cat === 'Pants' ? 'Bottoms' : cat;
+      const _catIcon = _catIcons[cat] || '👕';
+      sections += shelfSectionHTML(catItems, _catIcon, _catLabel, catItems.length===1?'item':'items', cat, _catIcon, 'rgba(100,90,80,0.05)');
     });
 
     if (uncategorized.length) {
-      sections += `<div class="rod-section" style="background:rgba(100,90,80,0.05);">
-        <div class="rod-section-header">
-          <span class="rod-section-cat">Other</span>
-          <span class="rod-section-meta">${uncategorized.length} item${uncategorized.length===1?'':'s'}</span>
-        </div>
-        <div class="rod-track">
-          <div class="rod-items-inner">
-            ${uncategorized.map(w => hangerHTML(w, uncategorized)).join('')}
-          </div>
-        </div>
-      </div>`;
+      sections += shelfSectionHTML(uncategorized, '🏷️', 'Other', uncategorized.length===1?'item':'items', 'Other', '🏷️', 'rgba(100,90,80,0.05)');
     }
 
     const totalCost = catCost(items);
@@ -16654,6 +16683,19 @@ function openOutfitLinker(entryId) {
 }
 
 // Toggle a single outfit or wardrobe item in the linker
+function toggleStyleGoal(goal) {
+  const goals = [...(S.styleGoals || [])];
+  const idx = goals.indexOf(goal);
+  if (idx >= 0) {
+    goals.splice(idx, 1);
+  } else {
+    goals.push(goal);
+  }
+  S.styleGoals = goals;
+  localStorage.setItem('closet-style-goals', JSON.stringify(goals));
+  render();
+}
+
 function filterOutfitLinkerItems(val) {
   if (!S.outfitLinker) return;
   S.outfitLinker.search = val;
