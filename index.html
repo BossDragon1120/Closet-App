@@ -3242,7 +3242,7 @@ MANDATORY rules — violating any of these makes the response unusable:
 • Pick an accurate emoji icon per item
 • Use the SCORING CRITERIA from the user message — do not fall back to generic fashion scoring when an occasion is provided
 • "stylingTips": 1–3 actionable tips using items they ALREADY OWN (tucking, swapping a logged wardrobe piece, adjusting proportions, etc.) — never suggest buying something here
-• "purchaseRecs": 1–3 items NOT in their wardrobe that would visibly elevate this outfit. Each entry must have "item" (specific name), "reason" (one sentence), and "query" (retail search term). Price tier and blocked categories are specified in the user message.
+• "purchaseRecs": 1–3 items NOT in their wardrobe that would visibly elevate this outfit. Each entry must have "item" (specific name), "reason" (one sentence), and "query" (retail search term). Price tier and blocked categories are specified in the user message. CRITICAL: never recommend any item that is already visible in the photo — if it appears in the "items" array of your response, the person is already wearing it and likely owns it. Only suggest pieces that are entirely absent from the outfit.
 • "suggestedOccasion": Pick the single best-matching tag from the occasion list in the user message. Return exactly one tag from that list.
 • Output ONLY the JSON object — no text before or after, no code fences`;
 
@@ -4500,6 +4500,20 @@ async function initWeatherPin() {
 }
 
 /* ================================================================
+   FASHION RSS FEEDS
+   ================================================================ */
+const FASHION_RSS_FEEDS = [
+  { url: 'https://fashionista.com/feed',                          source: 'Fashionista'   },
+  { url: 'https://www.refinery29.com/en-us/rss.xml',             source: 'Refinery29'    },
+  { url: 'https://www.thecut.com/rss/index.xml',                 source: 'The Cut'       },
+  { url: 'https://hypebae.com/feed',                             source: 'Hypebae'       },
+  { url: 'https://www.byrdie.com/news-rss.xml',                  source: 'Byrdie'        },
+  { url: 'https://www.whowhatwear.com/rss',                      source: 'Who What Wear' },
+  { url: 'https://manrepeller.com/feed',                         source: 'Man Repeller'  },
+  { url: 'https://nymag.com/fashion/rss.xml',                    source: 'NY Mag Fashion'},
+];
+
+/* ================================================================
    SQUAD MODE
    ================================================================ */
 
@@ -4642,9 +4656,10 @@ async function suggestOutfits(eventDesc, forecast) {
     if (e.weatherFeel)  parts.push(`felt:${e.weatherFeel}`);
     return `{id:${e.id}, ${parts.join(', ')}}`;
   }).join('\n');
-  // Wardrobe snapshot (exclude retiring items)
-  const wardSnap = S.wardrobe.filter(w=>!w.retiring).map(w =>
-    `{name:"${w.icon||''}${w.name}", cat:${w.category||'?'}, wears:${w.wears?.length||0}${w.brand?`, brand:${w.brand}`:''}}`
+  // Wardrobe snapshot (exclude retiring items) — shuffled to prevent Claude always picking the same pieces
+  const wardSnap = S.wardrobe.filter(w=>!w.retiring)
+    .slice().sort(() => Math.random() - 0.5)
+    .map(w => `{name:"${w.icon||''}${w.name}", cat:${w.category||'?'}, wears:${w.wears?.length||0}${w.brand?`, brand:${w.brand}`:''}}`
   ).join('\n');
 
   const weatherLine = forecast
@@ -4655,11 +4670,29 @@ async function suggestOutfits(eventDesc, forecast) {
     S.profileName   ? `Name: ${S.profileName}`     : '',
     S.profileAge    ? `Age: ${S.profileAge}`        : '',
   ].filter(Boolean).join(', ');
-  const prompt = `You are a personal stylist with access to a client's full wardrobe and outfit history. Suggest the single best outfit for an upcoming event.
+  // Rolling history of recently suggested items — avoid repeating the same picks
+  if (!S._planSuggestHistory) S._planSuggestHistory = [];
+  const avoidPlanLine = S._planSuggestHistory.length
+    ? `\nAVOID these items from recent suggestions — make this feel fresh:\n${S._planSuggestHistory.map(n=>`• ${n}`).join('\n')}\n`
+    : '';
+
+  // Random creative nudge to push variety
+  const planDirectives = [
+    'Look for an underused or rarely-worn piece to build around — give it a moment.',
+    'Consider a slightly bolder or more unexpected combination than the obvious choice.',
+    'Prioritise items the person hasn\'t worn together before.',
+    'Think about texture contrast — mix a structured piece with something relaxed.',
+    'Look for a colour or pattern in the wardrobe that hasn\'t featured much recently.',
+    'Push the formality slightly — either dress it up more or dress it down more than expected.',
+  ];
+  const planDirective = planDirectives[Math.floor(Math.random() * planDirectives.length)];
+
+  const prompt = `You are a creative personal stylist with access to a client's full wardrobe and outfit history. Suggest the single best outfit for an upcoming event.
 ${profileParts ? `\nCLIENT PROFILE: ${profileParts}` : ''}
 EVENT: "${eventDesc}"
 ${weatherLine}
-
+CREATIVE DIRECTIVE: ${planDirective}
+${avoidPlanLine}
 OUTFIT HISTORY (most recent 30):
 ${outfitSnap || '(none yet)'}
 
@@ -4719,6 +4752,11 @@ Do not include emojis in item names. Return only the JSON object, no other text.
     // Derive flat items[] from groups for backward compat (event board chips)
     if (result && result.groups && !result.items) {
       result.items = result.groups.map(g => g.items[0]).filter(Boolean);
+    }
+    // Track suggested items so next call avoids the same picks
+    if (result?.items?.length) {
+      if (!S._planSuggestHistory) S._planSuggestHistory = [];
+      S._planSuggestHistory = [...S._planSuggestHistory, ...result.items].slice(-12);
     }
     return result;
   } catch(e) { console.error('suggestOutfits error', e); return null; }
@@ -6780,9 +6818,31 @@ async function generateRoulette() {
   S._funRouletteLoading = true;
   S.funRoulette = null;
   render();
-  const itemList = activeWardrobe.slice(0, 60).map(w =>
+
+  // Shuffle so Claude doesn't always see (and pick) the same items first
+  const shuffled = activeWardrobe.slice().sort(() => Math.random() - 0.5);
+  const itemList = shuffled.slice(0, 60).map(w =>
     `${w.icon||'👕'} ${w.name}${w.brand?' ('+w.brand+')':''}${w.category?' ['+w.category+']':''}`
   ).join('\n');
+
+  // Rolling history of recently used items — avoid repeats across spins
+  if (!S._rouletteHistory) S._rouletteHistory = [];
+  const avoidLine = S._rouletteHistory.length
+    ? `\nAVOID these items from recent spins — pick something fresh:\n${S._rouletteHistory.map(n=>`• ${n}`).join('\n')}\n`
+    : '';
+
+  // Pick a random style direction to push creativity
+  const directions = [
+    'Go unexpected — combine pieces that wouldn\'t obviously go together but work.',
+    'Lean into a specific mood: choose pieces that tell a cohesive story.',
+    'Prioritise a statement piece and build the rest around it.',
+    'Mix textures or silhouettes in an interesting way.',
+    'Go monochromatic or tonal — pick items in the same colour family.',
+    'Choose something the wearer probably underuses — underrated pieces deserve love.',
+    'Build around the most eye-catching item in the wardrobe.',
+  ];
+  const directive = directions[Math.floor(Math.random() * directions.length)];
+
   const weather = S.weatherPin ? `Current weather: ${S.weatherPin.tempF}°F, ${S.weatherPin.description||''}` : '';
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -6796,8 +6856,10 @@ async function generateRoulette() {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 600,
-        messages: [{ role: 'user', content: `You are a personal stylist. Pick a complete, stylish outfit from this person's actual wardrobe items. Be specific and enthusiastic. ${weather}
+        messages: [{ role: 'user', content: `You are a creative personal stylist with a flair for unexpected combinations. Pick a complete outfit from this person's wardrobe. ${weather}
 
+STYLE DIRECTIVE for this spin: ${directive}
+${avoidLine}
 Wardrobe:
 ${itemList}
 
@@ -6810,8 +6872,12 @@ Return ONLY valid JSON with no markdown or extra text:
     const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('No JSON');
-    S.funRoulette = JSON.parse(m[0]);
+    const result = JSON.parse(m[0]);
+    S.funRoulette = result;
     S._rouletteOpen = true;
+    // Add used items to history, keep last 12 to avoid for next few spins
+    const usedNames = (result.outfit || []).map(p => p.item).filter(Boolean);
+    S._rouletteHistory = [...S._rouletteHistory, ...usedNames].slice(-12);
   } catch(e) {
     console.error('generateRoulette:', e);
     toast('Couldn\'t generate — try again.');
@@ -7297,25 +7363,6 @@ function viewFun() {
     return itemsHTML + seeMoreBtn + historyLink;
   })();
 
-  // ── Compliment result ─────────────────────────────────
-  const complimentHTML = (() => {
-    if (S._funComplimentLoading) return `<div style="display:flex;align-items:center;gap:10px;padding:16px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Claude is thinking about you…</span></div>`;
-    if (!S.funCompliment?.lines?.length) return '';
-    const emojis = ['💛','✨','🌟','💃','👏'];
-    return `<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">
-      ${S.funCompliment.lines.map((line,i)=>`
-        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;">
-          <span style="font-size:20px;flex-shrink:0;margin-top:1px;">${emojis[i%emojis.length]}</span>
-          <div style="font-size:13px;color:var(--text);line-height:1.6;font-style:italic;">"${esc(line)}"</div>
-        </div>`).join('')}
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();generateCompliment()"
-        onclick="generateCompliment()"
-        style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;padding:4px 0;">
-        ↻ Get new compliments
-      </button>
-    </div>`;
-  })();
 
   return `<div class="view">
     <div class="nav">
@@ -9055,7 +9102,7 @@ function viewShop() {
       const QUICK = ['🎂 Birthday','🎄 Holiday','💍 Registry'];
       return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
           ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishShareOpen=false;S._wishShareItems=null;render();" onclick="S.shopWishShareOpen=false;S._wishShareItems=null;render()">
-        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:min(88dvh,85vh);display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.18);"
+        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:min(88dvh,85vh);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 30px rgba(0,0,0,.18);"
           ontouchend="event.stopPropagation();" onclick="event.stopPropagation()">
 
           <!-- Fixed header -->
@@ -9068,7 +9115,7 @@ function viewShop() {
           </div>
 
           <!-- Scrollable content -->
-          <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding:0 20px;">
+          <div style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;padding:0 20px;">
 
             <!-- Item picker -->
             <div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;">
@@ -11922,7 +11969,7 @@ function viewWardrobe() {
     S.wardrobeCategory, S.wardrobeSubCategory, S.wardrobeSort, S.wardrobeSearch,
     S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0,
     S.wardrobeTailoringFilter?1:0,
-    S.wardrobeExpanded?1:0, S.wardrobeRetiredExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0,
+    S.wardrobeExpanded?1:0, S.wardrobeRetiredExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0, S._hiddenGemsExpanded?1:0,
     S._addingShelf?1:0, S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels, S.sweatRackLevels, S.intRackLevels, S.showIntimatesShelf?1:0,
     S.weatherPin ? S.weatherPin.city+S.weatherPin.tempF : '',
     (S._wardrobeSelected||[]).join(','),
@@ -12924,7 +12971,7 @@ function viewOnboarding() {
     // 4 — Plan
     { label:'Plan', dark:false,
       headline:'Never scramble\nbefore an event again.',
-      sub:'Tell Claude your occasion and it builds an outfit from your actual wardrobe — weather-aware and personalised to what you actually own.',
+      sub:'Tell Claude your occasion and it builds an outfit from your actual wardrobe — weather-aware and personalised to what you own. Or spin Style Roulette for a surprise pick when you can\'t decide.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
           <div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:11px;padding:12px 14px;margin-bottom:12px;">
@@ -12966,50 +13013,65 @@ function viewOnboarding() {
       </div>`
     },
 
-    // 6 — Discover
-    { label:'Discover', dark:true,
-      headline:'Stay ahead of trends\nwithout losing yourself.',
-      sub:'Weekly AI-curated trend reports, personalised style tips, and Saved Trends you can heart and come back to.',
+    // 6 — Evolve
+    { label:'Evolve', dark:true,
+      headline:'Set goals. Track trends.\nLevel up your style.',
+      sub:'Declare your style goals and let AI-curated trends, brand picks, and styling tips bend toward them. Evolve is your personal fashion growth engine.',
       mock:`<div style="padding:0 24px;">
         <div style="background:#1C1A18;border-radius:18px;padding:16px;">
-          <div style="font-size:9px;font-weight:800;color:rgba(201,168,76,.65);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;">This Week's Top Trends</div>
+          <div style="font-size:9px;font-weight:800;color:rgba(201,168,76,.65);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">✦ Your Style Goals</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+            ${['More Feminine','Elevated Basics','Quiet Luxury'].map(g=>`<div style="background:rgba(201,168,76,.18);border:1px solid rgba(201,168,76,.4);border-radius:100px;padding:4px 11px;font-size:10px;font-weight:700;color:#C9A84C;">${g}</div>`).join('')}
+            <div style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);border-radius:100px;padding:4px 11px;font-size:10px;font-weight:700;color:rgba(255,255,255,.3);">+ Add goal</div>
+          </div>
+          <div style="font-size:9px;font-weight:800;color:rgba(201,168,76,.65);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">🔥 Trending Toward Your Goals</div>
           ${[
-            {n:1,e:'🤍',t:'Quiet Luxury',d:'Understated basics, impeccable cuts'},
-            {n:2,e:'🌊',t:'Coastal Cool',d:'Linen, texture & effortless ease'},
-            {n:3,e:'🎨',t:'Dopamine Dressing',d:'Bold colour as your mood-booster'},
-          ].map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);">
-            <div style="width:24px;height:24px;border-radius:100px;background:rgba(201,168,76,.14);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <span style="font-size:11px;font-weight:900;color:#C9A84C;">${r.n}</span>
-            </div>
+            {e:'🤍',t:'Quiet Luxury',d:'Understated basics, impeccable cuts'},
+            {e:'🌊',t:'Coastal Feminine',d:'Flowing silhouettes, soft neutrals'},
+            {e:'✨',t:'Polished Minimalism',d:'One statement piece, everything else clean'},
+          ].map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);">
             <div style="font-size:16px;flex-shrink:0;">${r.e}</div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:12px;font-weight:800;color:#fff;">${r.t}</div>
               <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px;">${r.d}</div>
             </div>
-            <div style="font-size:14px;color:rgba(255,255,255,.2);">♡</div>
+            <div style="font-size:14px;color:rgba(201,168,76,.5);">♡</div>
           </div>`).join('')}
         </div>
       </div>`
     },
 
-    // 7 — Local
-    { label:'Local', dark:false,
-      headline:'Style is local.\nCommunity is everything.',
-      sub:'Discover the best brands near you, follow local designers, find pop-ups and fashion events — and book a virtual styling session when you\'re ready.',
+    // 7 — Fun
+    { label:'Fun', dark:false,
+      headline:'Fashion battles,\ncompliments & more.',
+      sub:'Challenge a friend to a Fashion Battle, get a genuine Claude compliment about your style, pair outfits with drinks or books, and send love to the people who gifted your favourite pieces.',
       mock:`<div style="padding:0 24px;">
-        <div style="border-radius:18px;overflow:hidden;border:1.5px solid var(--border);">
-          <div style="background:linear-gradient(135deg,#2C1A0E 0%,#5C3317 50%,#3A2010 100%);padding:16px 18px 14px;position:relative;">
-            <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(200,160,0,.15) 0%,transparent 65%);"></div>
-            <div style="position:relative;">
-              <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:5px;">✦ Featured Local Brand</div>
-              <div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-.3px;">Neue Terra</div>
-              <div style="font-size:11px;color:rgba(255,255,255,.6);font-style:italic;margin-top:2px;">A modern fragrance of the American landscape</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="background:linear-gradient(135deg,#1A1010 0%,#3A1010 100%);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px;">
+            <div style="font-size:28px;line-height:1;flex-shrink:0;">⚔️</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:900;color:#fff;margin-bottom:2px;">Fashion Battle</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.5);line-height:1.4;">Upload two looks — Claude picks a winner</div>
+            </div>
+            <div style="background:rgba(220,50,50,.75);border-radius:100px;padding:5px 12px;font-size:10px;font-weight:800;color:#fff;white-space:nowrap;">Start →</div>
+          </div>
+          <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px;">
+            <div style="font-size:28px;line-height:1;flex-shrink:0;">🌟</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px;">Claude Compliments</div>
+              <div style="font-size:10px;color:var(--text-3);line-height:1.4;">Something genuinely nice about your style</div>
             </div>
           </div>
-          <div style="background:var(--surface);padding:12px 16px;">
-            <div style="font-size:11px;color:var(--text-2);line-height:1.6;margin-bottom:10px;">The right scent completes the look. Rooted in the Pacific Coast, Neue Terra is San Francisco's fragrance story.</div>
-            <div style="display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,#833ab4,#fd1d1d,#fcb045);border-radius:9px;padding:8px 12px;">
-              <span style="font-size:12px;font-weight:800;color:#fff;">@neueterra · Follow on Instagram</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:11px 12px;text-align:center;">
+              <div style="font-size:22px;margin-bottom:4px;">🥂</div>
+              <div style="font-size:10px;font-weight:800;color:var(--text);">Outfit × Drink</div>
+              <div style="font-size:9px;color:var(--text-3);margin-top:1px;">Perfect pairing</div>
+            </div>
+            <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:11px 12px;text-align:center;">
+              <div style="font-size:22px;margin-bottom:4px;">📚</div>
+              <div style="font-size:10px;font-weight:800;color:var(--text);">Outfit × Book</div>
+              <div style="font-size:9px;color:var(--text-3);margin-top:1px;">Your next read</div>
             </div>
           </div>
         </div>
@@ -15643,7 +15705,12 @@ function viewDetail() {
         return `<div class="section">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <div class="section-title" style="margin-bottom:0;">Items in This Outfit</div>
-            <button onclick="openOutfitLinker('${entry.id}')" style="font-size:12px;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer;font-family:inherit;font-weight:600;">✏️ Edit links</button>
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();openOutfitLinker('${entry.id}');"
+              onclick="openOutfitLinker('${entry.id}')"
+              style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:5px 12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              🔗 Link Items
+            </button>
           </div>
           ${entry.items.map(it => {
             const wm = findWardrobeMatch(it);
@@ -15676,7 +15743,7 @@ function viewDetail() {
               <div class="item-icon">${it.icon||'👕'}</div>
               <div class="item-info">
                 <div class="item-name">${esc(it.name)}</div>
-                <div class="item-no-price" style="cursor:pointer;" onclick="openOutfitLinker('${entry.id}')">Not linked to wardrobe — tap Edit links</div>
+                <div class="item-no-price" style="cursor:pointer;" onclick="openOutfitLinker('${entry.id}')">Not linked — tap Link Items to connect</div>
               </div>
             </div>`;
           }).join('')}
@@ -15814,11 +15881,6 @@ function viewEdit() {
       <div class="rating-edit" id="confPicker">
         ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="conf-btn${(d.confidence||null)===n?' sel':''}" onclick="setConfidence(${n})">${n}</button>`).join('')}
       </div>
-    </div>
-    <div class="form-section">
-      <label class="form-label">Items</label>
-      <div id="itemsList">${d.items.map((it,i)=>editItemHTML(it,i)).join('')}</div>
-      <button class="add-item-btn" onclick="addItem()">${iconPlus()} Add Item</button>
     </div>
     ${(()=>{
       const tips = d.stylingTips||d.recommendations||[];
