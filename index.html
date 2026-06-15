@@ -2869,7 +2869,7 @@ const S = {
   cycleLength:     parseInt(localStorage.getItem('closet-cycle-len') || '28'),
   cyclePeriodDays: parseInt(localStorage.getItem('closet-cycle-pdur') || '5'),
   battleDraft: null, // { photo, person1, person2, verdict, winner }
-  discoverTab: 'trends', // 'trends' | 'brands' | 'local'
+  discoverTab: 'trends', // 'trends' | 'brands' | 'tips'
   funCompliment: null,      // { lines: [...], generatedAt }
   _funComplimentLoading: false,
   funRoulette: null,        // { items: [...], generatedAt }
@@ -6173,8 +6173,8 @@ function render() {
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
     });
   }
-  // Post-render: re-focus outfit linker search input when user is actively typing
-  if (S.outfitLinker?.search) {
+  // Post-render: re-focus outfit linker search only if it was previously focused
+  if (S.outfitLinker && document.activeElement?.id === 'outfit-linker-search') {
     requestAnimationFrame(() => {
       const inp = document.getElementById('outfit-linker-search');
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
@@ -6233,8 +6233,8 @@ function bottomBarHTML() {
     </button>
     <button class="bottom-btn ${S.view==='home'?'bottom-btn-active':''}"
       ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('home')"
-      onclick="switchTab('home')" title="Discover">
-      ${iconCompass()} <span>Discover</span>
+      onclick="switchTab('home')" title="Evolve">
+      ${iconCompass()} <span>Evolve</span>
     </button>
     <button class="bottom-btn ${S.view==='fun'?'bottom-btn-active':''}"
       ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('fun')"
@@ -7418,30 +7418,6 @@ function viewFun() {
 
       <!-- ── GROUP 1: YOUR STYLE ─────────────────────────── -->
       <div style="margin:20px 16px 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);">✦ Your Style</div>
-
-      <!-- Style Roulette -->
-      <div style="margin:8px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px;">
-          <div style="font-size:32px;line-height:1;">🎲</div>
-          <div style="flex:1;">
-            <div style="font-size:16px;font-weight:800;color:var(--text);">Style Roulette</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Can't decide what to wear? Claude picks a complete outfit from your actual wardrobe.</div>
-          </div>
-        </div>
-        ${!S.funRoulette && !S._funRouletteLoading ? (
-          !S.apiKey ? `
-          <div style="margin-top:14px;background:var(--surface-2);border:1px dashed var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
-            <span style="font-size:18px;flex-shrink:0;">🔑</span>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.4;flex:1;">Needs your Claude API key — <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('settings')" onclick="navigate('settings')" style="background:none;border:none;color:var(--gold-dk);font-weight:700;cursor:pointer;font-family:inherit;font-size:12px;padding:0;touch-action:manipulation;">add it in Settings →</button></div>
-          </div>` : `
-          <button
-            ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette()"
-            onclick="generateRoulette()"
-            style="margin-top:14px;width:100%;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:10px;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            🎲 Spin the roulette
-          </button>`) : ''}
-        ${rouletteResultHTML}
-      </div>
 
       <!-- Color Palette Analyzer -->
       <div style="margin:10px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
@@ -9246,8 +9222,8 @@ function viewPlan() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">📅 Plan</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('closet-assistant')" onclick="navigate('closet-assistant')" style="font-size:12px;">
-        🌿 Closet Therapy
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette()" onclick="generateRoulette()" style="font-size:12px;">
+        🎲 Style Roulette
       </button>
     </div>
 
@@ -10352,31 +10328,8 @@ function viewProfile() {
     <!-- ══ Divider ══ -->
     <div style="height:1px;background:var(--border);margin:20px 16px;"></div>
 
-    <!-- ══ Saved Styling Tips + Fashion Stats ══ -->
+    <!-- ══ Fashion Stats ══ -->
     <div style="margin:0 16px;display:flex;flex-direction:column;gap:10px;">
-      ${(()=>{
-        const tips = [];
-        S.entries.forEach(e => {
-          if (!e.recReactions) return;
-          if (e.stylingTips?.length) {
-            e.stylingTips.forEach((r, i) => { if (e.recReactions[String(i)] === 'liked') tips.push(r); });
-          } else {
-            (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') tips.push(r); });
-          }
-        });
-        const count = tips.length;
-        return `<button
-          ontouchend="if(_touchMoved)return;event.preventDefault();navigate('saved-tips')"
-          onclick="navigate('saved-tips')"
-          style="width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;box-sizing:border-box;">
-          <div style="width:40px;height:40px;border-radius:12px;background:rgba(100,74,138,0.1);border:1px solid rgba(100,74,138,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">✂️</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:1px;">Saved Styling Tips</div>
-            <div style="font-size:12px;color:var(--text-3);">${count > 0 ? count+' tip'+(count===1?'':'s')+' saved from your fit checks' : 'Like tips from your fit checks to save them here'}</div>
-          </div>
-          <div style="font-size:18px;color:var(--text-3);">›</div>
-        </button>`;
-      })()}
       <button
         ontouchend="if(_touchMoved)return;event.preventDefault();navigate('dashboard')"
         onclick="navigate('dashboard')"
@@ -11286,7 +11239,7 @@ function viewHome() {
       ${[
         { key:'trends', icon:'🔥', label:'Trends'  },
         { key:'brands', icon:'✨', label:'Brands'  },
-        { key:'local',  icon:'📍', label:'Local'   },
+        { key:'tips',   icon:'✂️', label:'Tips'    },
       ].map(t => `<button
         ontouchend="if(_touchMoved)return;event.preventDefault();S.discoverTab='${t.key}';render()"
         onclick="S.discoverTab='${t.key}';render()"
@@ -11504,77 +11457,63 @@ function viewHome() {
       </button>
     </div>`;
 
-  // ── Local tab content (embedded from viewLocal) ────────
-  const localContent = (()=>{
-    const city = S.profileLocation ? S.profileLocation.split(',')[0].trim() : null;
-    const locationLine = city ? `📍 ${esc(city)}` : '📍 Your City';
-    const localFeatures = [
-      { icon:'🏪', title:'Support Local Storefronts', desc:'Discover independent boutiques, consignment shops, and local retailers near you.', tag:'Coming Soon' },
-      { icon:'🎨', title:'Support Local Brands', desc:'Find and follow designers and labels rooted in your city — shop close to home.', tag:'Coming Soon' },
-      { icon:'🎪', title:'Local Fashion Events', desc:'Trunk shows, sample sales, pop-ups, and community style events happening near you.', tag:'Coming Soon' },
-    ];
-    const localCards = localFeatures.map(f=>`
-      <div style="display:flex;align-items:flex-start;gap:14px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;">
-        <div style="width:44px;height:44px;border-radius:12px;background:var(--gold-bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">${f.icon}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <div style="font-size:14px;font-weight:800;color:var(--text);">${f.title}</div>
-            <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:2px 7px;flex-shrink:0;">${f.tag}</div>
-          </div>
-          <div style="font-size:12px;color:var(--text-3);line-height:1.55;">${f.desc}</div>
-        </div>
-      </div>`).join('');
+  // ── Tips tab content ───────────────────────────────────
+  const tipsContent = (()=>{
+    const likedRecs = [];
+    S.entries.forEach(e => {
+      if (!e.recReactions) return;
+      if (e.stylingTips?.length) {
+        e.stylingTips.forEach((r, i) => { if (e.recReactions[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e }); });
+      } else {
+        (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') likedRecs.push({ rec: r, entry: e }); });
+      }
+    });
+    const count = likedRecs.length;
     return `
-      <div style="margin:20px 16px 6px;display:flex;align-items:center;gap:10px;">
-        <div style="flex:1;">
-          <div style="font-size:22px;font-weight:900;letter-spacing:-.4px;color:var(--text);">${locationLine}</div>
-          <div style="font-size:13px;color:var(--text-3);margin-top:3px;">Style is local. Community is everything.</div>
-        </div>
-      </div>
-      <div style="margin:16px 16px 0;height:1px;background:var(--border);"></div>
-      <div style="margin:20px 16px 0;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">✦ Featured Local Brand</div>
-        <div style="border-radius:18px;overflow:hidden;border:1.5px solid var(--border);box-shadow:var(--shadow);">
-          <div style="background:linear-gradient(135deg,#2C1A0E 0%,#5C3317 45%,#3A2010 100%);padding:22px 20px 18px;position:relative;">
-            <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(200,160,0,.18) 0%,transparent 65%);"></div>
-            <div style="position:relative;">
-              <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:6px;">San Francisco · Fragrance</div>
-              <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-.5px;line-height:1.1;margin-bottom:4px;">Neue Terra</div>
-              <div style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.45;font-style:italic;">A modern fragrance of the American landscape</div>
-            </div>
+      <div class="home-section">
+        <div style="font-size:13px;color:var(--text-3);line-height:1.55;margin-bottom:16px;">Style tips you've saved from your fit checks. Use these to level up your look and get closer to the wardrobe you want.</div>
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();navigate('saved-tips')"
+          onclick="navigate('saved-tips')"
+          style="width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;box-sizing:border-box;">
+          <div style="width:40px;height:40px;border-radius:12px;background:rgba(100,74,138,0.1);border:1px solid rgba(100,74,138,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">✂️</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:1px;">Saved Styling Tips</div>
+            <div style="font-size:12px;color:var(--text-3);">${count > 0 ? count+' tip'+(count===1?'':'s')+' saved from your fit checks' : 'Like tips from your fit checks to save them here'}</div>
           </div>
-          <div style="background:var(--surface);padding:16px 20px 18px;">
-            <div style="font-size:13px;color:var(--text-2);line-height:1.65;margin-bottom:14px;">Rooted in the textures of the Pacific Coast, high desert, and redwood groves — Neue Terra makes scent a statement. The right fragrance doesn't just smell great; it completes the look.</div>
-            <a href="https://www.instagram.com/neueterra/" target="_blank" rel="noopener"
-              ontouchend="if(_touchMoved)return;event.preventDefault();window.open('https://www.instagram.com/neueterra/','_blank')"
-              style="display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,#833ab4,#fd1d1d,#fcb045);border-radius:12px;padding:11px 16px;text-decoration:none;touch-action:manipulation;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1" fill="#fff" stroke="none"/></svg>
-              <div style="flex:1;"><div style="font-size:13px;font-weight:800;color:#fff;">@neueterra</div><div style="font-size:11px;color:rgba(255,255,255,.8);">Follow on Instagram</div></div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-            </a>
+          <div style="font-size:18px;color:var(--text-3);">›</div>
+        </button>
+        ${count > 0 ? `
+        <div style="margin-top:16px;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">✂️ Recent Tips</div>
+          <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+            ${likedRecs.slice(0,8).map(({rec, entry}) => `
+              <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')"
+                onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:210px;cursor:pointer;
+                border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
+                ${entry.photo
+                  ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
+                  : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
+                <div style="padding:10px 12px 12px;flex:1;">
+                  <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Styling tip</div>
+                  <div style="font-size:13px;color:var(--text);line-height:1.45;">${esc(rec)}</div>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:6px;">⭐ ${entry.rating}/10 · ${entry.occasionTag ? esc(entry.occasionTag) : fmtDateLong(entry.createdAt)}</div>
+                </div>
+              </div>`).join('')}
           </div>
-        </div>
-      </div>
-      <div style="margin:24px 16px 10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">Coming Soon to Local</div>
-      <div style="padding:0 16px;display:flex;flex-direction:column;gap:12px;">${localCards}</div>
-      <div style="margin:28px 16px 0;padding:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;display:flex;align-items:flex-start;gap:12px;">
-        <div style="font-size:20px;flex-shrink:0;">✉️</div>
-        <div>
-          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;">Have ideas for Local?</div>
-          <div style="font-size:12px;color:var(--text-3);line-height:1.55;">We're shaping this tab around what our community wants. What would make your local fashion scene more accessible?</div>
-        </div>
+        </div>` : ''}
       </div>`;
   })();
 
-  const tabContent = dTab === 'brands' ? brandsContent : dTab === 'local' ? localContent : trendsContent;
+  const tabContent = dTab === 'brands' ? brandsContent : dTab === 'tips' ? tipsContent : trendsContent;
 
   return `<div class="view">
     <div class="nav">
-      <span class="nav-logo">✨ Discover</span>
+      <span class="nav-logo">✦ Evolve</span>
       <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload')" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
     </div>
     ${subTabPills}
-    ${!hasData && dTab !== 'local' ? `<div class="empty" style="padding-top:52px;">
+    ${!hasData && dTab === 'trends' ? `<div class="empty" style="padding-top:52px;">
       <div class="empty-icon">✨</div>
       <h2>Welcome to your Closet!</h2>
       <p>Log your first outfit or add wardrobe items to get started. Your style portrait will come to life as you use the app.</p>
@@ -11972,7 +11911,7 @@ function viewWardrobe() {
     S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0,
     S.wardrobeTailoringFilter?1:0,
     S.wardrobeExpanded?1:0, S.wardrobeRetiredExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0,
-    S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels, S.sweatRackLevels, S.intRackLevels, S.showIntimatesShelf?1:0,
+    S._addingShelf?1:0, S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels, S.sweatRackLevels, S.intRackLevels, S.showIntimatesShelf?1:0,
     S.weatherPin ? S.weatherPin.city+S.weatherPin.tempF : '',
     (S._wardrobeSelected||[]).join(','),
     (S._wearFlipped ? [...S._wearFlipped].sort().join(',') : ''),
@@ -15667,9 +15606,10 @@ function viewDetail() {
             </div>
             <p style="font-size:12px;color:var(--text-3);margin-bottom:12px;">Tap each wardrobe item you're wearing in this outfit. This records a wear on those items.</p>
             <input id="outfit-linker-search" type="search" value="${esc(ol.search||'')}"
-              oninput="S.outfitLinker.search=this.value;render()"
+              oninput="filterOutfitLinkerItems(this.value)"
               placeholder="Search items…"
               style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:16px;font-family:inherit;background:var(--bg);color:var(--text);outline:none;margin-bottom:12px;-webkit-appearance:none;appearance:none;">
+            <div id="outfit-linker-items">
             ${sortedWardrobe.map(w => {
               const sel = !!ol.selected[w.id];
               return `<div onclick="toggleOutfitLink('${w.id}')" style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-sm);margin-bottom:6px;cursor:pointer;
@@ -15684,6 +15624,7 @@ function viewDetail() {
                 </div>
               </div>`;
             }).join('')}
+            </div>
             <div style="display:flex;gap:8px;margin-top:8px;">
               <button onclick="confirmOutfitLinks()" style="flex:1;padding:13px;border-radius:var(--r-sm);background:var(--gold);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
                 Save (${selCount} item${selCount===1?'':'s'})
@@ -16713,6 +16654,32 @@ function openOutfitLinker(entryId) {
 }
 
 // Toggle a single outfit or wardrobe item in the linker
+function filterOutfitLinkerItems(val) {
+  if (!S.outfitLinker) return;
+  S.outfitLinker.search = val;
+  const container = document.getElementById('outfit-linker-items');
+  if (!container) return;
+  const _s = val.toLowerCase().trim();
+  const ol = S.outfitLinker;
+  const filtered = S.wardrobe.slice()
+    .sort((a,b) => (a.name||'').localeCompare(b.name))
+    .filter(w => !_s || (w.name||'').toLowerCase().includes(_s) || (w.brand||'').toLowerCase().includes(_s) || (w.category||'').toLowerCase().includes(_s));
+  container.innerHTML = filtered.map(w => {
+    const sel = !!ol.selected[w.id];
+    return `<div onclick="toggleOutfitLink('${w.id}')" style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-sm);margin-bottom:6px;cursor:pointer;
+      background:${sel?'var(--gold-bg)':'var(--surface)'};border:${sel?'1.5px solid var(--gold)':'1.5px solid var(--border)'};transition:all .15s;">
+      <div style="width:36px;height:36px;background:var(--surface-2);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${w.icon||'👕'}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:600;color:${sel?'var(--gold-dk)':'var(--text)'};">${esc(w.name)}</div>
+        ${w.brand ? `<div style="font-size:12px;color:var(--text-3);">${esc(w.brand)}</div>` : ''}
+      </div>
+      <div style="width:22px;height:22px;border-radius:50%;border:2px solid ${sel?'var(--gold)':'var(--border)'};background:${sel?'var(--gold)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;">
+        ${sel?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function toggleOutfitLink(id) {
   if (!S.outfitLinker) return;
   S.outfitLinker.selected[id] = !S.outfitLinker.selected[id];
