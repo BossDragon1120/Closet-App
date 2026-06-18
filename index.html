@@ -2373,7 +2373,8 @@ function subCategoryFromName(name, category) {
     if (/tee|t-shirt|tshirt|graphic/.test(n)) return 'Tees';
     if (/long.?sleeve|longsleeve|thermal/.test(n)) return 'Long Sleeve';
     if (/blouse|shirt|button|tunic/.test(n)) return 'Blouses & Shirts';
-    if (/sweater|knit|cardigan|pullover|jumper|hoodie|crewneck/.test(n)) return 'Sweaters';
+    if (/sweatshirt|hoodie/.test(n)) return 'Sweatshirts';
+    if (/sweater|knit|cardigan|pullover|jumper|crewneck/.test(n)) return 'Sweaters';
     if (/bodysuit/.test(n)) return 'Bodysuits';
     return 'Tops'; // fallback stays in category
   }
@@ -2383,6 +2384,7 @@ function subCategoryFromName(name, category) {
     return 'Jackets';
   }
   if (cat === 'Pants') {
+    if (/jogger|sweatpant|sweat pant|track ?pant|tracksuit/.test(n)) return 'Joggers';
     if (/short/.test(n)) return 'Shorts';
     if (/jean|denim/.test(n)) return 'Jeans';
     if (/skirt/.test(n)) return 'Skirts';
@@ -2395,22 +2397,18 @@ function subCategoryFromName(name, category) {
     if (/formal|evening|gown|cocktail|midi|maxi|mini/.test(n)) return 'Dressy';
     return 'Casual';
   }
-  if (cat === 'Intimates') {
+  if (cat === 'Other') {
+    if (/swim|bikini|bathing|one.?piece|boardshort/.test(n)) return 'Swimwear';
+    if (/workout|athletic|sport|gym|yoga|legging|activewear/.test(n)) return 'Activewear';
+    if (/pajama|pj|lounge|robe|sleep/.test(n)) return 'Loungewear';
     if (/bralette/.test(n)) return 'Bralettes';
-    if (/sport|athletic|gym/.test(n)) return 'Sports Bras';
+    if (/sports? bra|athletic bra|gym bra/.test(n)) return 'Sports Bras';
     if (/wireless|no.?wire|wire.?free/.test(n)) return 'Wireless';
     if (/bra/.test(n)) return 'Bras';
     if (/underwear|brief|thong|panty|panties|boxer/.test(n)) return 'Underwear';
     if (/shaper|shapewear|bodyshaper/.test(n)) return 'Shapewear';
     if (/cami|camisole/.test(n)) return 'Camisoles';
     if (/bodysuit/.test(n)) return 'Bodysuits';
-    return 'Bras';
-  }
-  if (cat === 'Other') {
-    if (/swim|bikini|bathing|one.?piece|boardshort/.test(n)) return 'Swimwear';
-    if (/workout|athletic|sport|gym|yoga|legging|activewear/.test(n)) return 'Activewear';
-    if (/pajama|pj|lounge|robe|sleep/.test(n)) return 'Loungewear';
-    if (/bra|underwear|brief|boxer|lingerie|under/.test(n)) return 'Undergarments';
     return 'Swimwear';
   }
   if (cat === 'Shoes') {
@@ -2452,13 +2450,12 @@ function subCategoryFromName(name, category) {
 // camis → tees → long sleeve → sweaters, pants going shorts → jeans → dress pants,
 // etc., instead of an arbitrary "newest first" order.
 const _GARMENT_WEIGHT_ORDER = {
-  Tops:      ['Camis', 'Bodysuits', 'Tees', 'Blouses & Shirts', 'Long Sleeve', 'Sweaters'],
+  Tops:      ['Camis', 'Bodysuits', 'Tees', 'Blouses & Shirts', 'Long Sleeve', 'Sweaters', 'Sweatshirts'],
   Jackets:   ['Blazers', 'Jackets', 'Coats'],
-  Pants:     ['Shorts', 'Skirts', 'Leggings', 'Jeans', 'Dressy Pants', 'Dress Pants'],
+  Pants:     ['Shorts', 'Skirts', 'Leggings', 'Jeans', 'Dressy Pants', 'Dress Pants', 'Joggers'],
   Dresses:   ['Casual', 'Jumpsuits', 'Dressy'],
-  Sweats:    ['Loungewear', 'Joggers', 'Sweatpants', 'Hoodies', 'Sets'],
+  Other:     ['Camisoles', 'Bralettes', 'Wireless', 'Bras', 'Sports Bras', 'Underwear', 'Shapewear', 'Swimwear', 'Activewear', 'Loungewear'],
   Shoes:     ['Sandals & Mules', 'Flats & Loafers', 'Sneakers', 'Heels & Pumps', 'Boots'],
-  Intimates: ['Camisoles', 'Bralettes', 'Wireless', 'Bras', 'Sports Bras', 'Underwear', 'Shapewear'],
 };
 function garmentWeightRank(w) {
   const cat = normalizeCat(w.category || categoryFromIcon(w.icon, w.name));
@@ -2641,7 +2638,9 @@ function categoryFromIcon(icon, name) {
   };
   if (icon && iconMap[icon]) return iconMap[icon];
   const n = (name || '').toLowerCase();
-  if (/sweat|hoodie|jogger|lounge|athleisure|fleece|tracksuit|track pant|comfy|cozy/.test(n)) return 'Sweats';
+  if (/sweatshirt|hoodie|fleece pullover/.test(n)) return 'Tops';
+  if (/jogger|tracksuit|track ?pant|sweatpant/.test(n)) return 'Pants';
+  if (/lounge|athleisure|comfy|cozy/.test(n)) return 'Other';
   if (/shirt|blouse|top|tee|tank|cami|cardigan|sweater|jumper|knit|long.?sleeve/.test(n)) return 'Tops';
   if (/pant|trouser|jean|denim|skirt|short|legging/.test(n)) return 'Pants';
   if (/dress|gown/.test(n)) return 'Dresses';
@@ -6314,7 +6313,13 @@ function render() {
   if (S.showShareCard) html += shareCardModalHTML();
   if (S.wordOfDay) html += wordOfDaySheetHTML();
   if (S._closetLightbox) html += closetLightboxHTML();
-  if (S.toast) html += `<div class="toast">${esc(S.toast)}</div>`;
+  if (S.toast) {
+    // Rate Mode's star row sits low on screen — the default bottom toast would
+    // cover it for ~2.6s and look like the stars are slow to load. Anchor near
+    // the top there instead.
+    const _toastTop = S.view === 'rate-mode';
+    html += `<div class="toast"${_toastTop ? ' style="top:64px;bottom:auto;"' : ''}>${esc(S.toast)}</div>`;
+  }
   root.innerHTML = html;
   attachListeners();
   // Post-render: local map init
@@ -11057,7 +11062,7 @@ function viewAura() {
         ${auraFieldHTML('hairstyle',         'closet-hairstyle',        '💇', 'Hairstyle',        'e.g. Long waves, blunt bob…',     S.hairstyle)}
       </div>
 
-      <!-- Intimates fit notes -->
+      <!-- Bra/intimates fit notes (lives under the "Other" shelf now) -->
       ${(() => {
         const isEditing = S._auraEdit === 'braFitNotes';
         return `<div style="background:var(--surface);border:1.5px solid ${isEditing?'var(--gold)':'var(--border)'};border-radius:12px;padding:12px 14px;margin-bottom:8px;">
@@ -11080,19 +11085,9 @@ function viewAura() {
                 : `<div style="font-size:12px;color:var(--text-3);font-style:italic;">Tap to add fit notes, go-to brands, sizing quirks…</div>`}
             </div>
             <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                <button ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeCategory='Intimates';switchTab('wardrobe')"
-                  onclick="S.wardrobeCategory='Intimates';switchTab('wardrobe')"
-                  style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">View shelf →</button>
-                <div style="display:flex;align-items:center;gap:6px;">
-                  <span style="font-size:11px;color:var(--text-3);">Show in Closet</span>
-                  <div ontouchend="if(_touchMoved)return;event.preventDefault();S.showIntimatesShelf=!S.showIntimatesShelf;localStorage.setItem('closet-int-shelf-visible',S.showIntimatesShelf);S._vwCache=null;render()"
-                    onclick="S.showIntimatesShelf=!S.showIntimatesShelf;localStorage.setItem('closet-int-shelf-visible',S.showIntimatesShelf);S._vwCache=null;render()"
-                    style="width:36px;height:20px;border-radius:100px;background:${S.showIntimatesShelf?'var(--gold)':'var(--border)'};position:relative;cursor:pointer;transition:background .2s;touch-action:manipulation;flex-shrink:0;">
-                    <div style="position:absolute;top:2px;left:${S.showIntimatesShelf?'18px':'2px'};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></div>
-                  </div>
-                </div>
-              </div>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeCategory='Other';S.wardrobeSubCategory='Bras';switchTab('wardrobe')"
+                onclick="S.wardrobeCategory='Other';S.wardrobeSubCategory='Bras';switchTab('wardrobe')"
+                style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">View in Other shelf →</button>
             </div>`}
         </div>`;
       })()}
@@ -12103,7 +12098,7 @@ function viewWardrobe() {
     S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0,
     S.wardrobeTailoringFilter?1:0,
     S.wardrobeExpanded?1:0, S.wardrobeRetiredExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0, S._hiddenGemsExpanded?1:0,
-    S._addingShelf?1:0, S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels, S.sweatRackLevels, S.intRackLevels, S.showIntimatesShelf?1:0,
+    S._addingShelf?1:0, S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels,
     S.weatherPin ? S.weatherPin.city+S.weatherPin.tempF : '',
     (S._wardrobeSelected||[]).join(','),
     (S._wearFlipped ? [...S._wearFlipped].sort().join(',') : ''),
@@ -12366,28 +12361,46 @@ function shelfCardHTML(w, fallbackIcon, _siblings) {
   </div>`;
 }
 
+// Legacy named keys live directly on S; generic category keys use S.catRackLevels
+const _SHELF_LEGACY_KEYS = {'shoeRackLevels':true,'bagRackLevels':true,'accessoryRackLevels':true,'sweatRackLevels':true,'intRackLevels':true};
+const _SHELF_LS_KEY_MAP = {'shoeRackLevels':'closet-shoe-shelves','bagRackLevels':'closet-bag-shelves','accessoryRackLevels':'closet-acc-shelves','sweatRackLevels':'closet-sweat-shelves','intRackLevels':'closet-int-shelves'};
+function _shelfLevelFor(stateKey) {
+  const isLegacy = _SHELF_LEGACY_KEYS[stateKey];
+  const defaultLevels = isLegacy ? 2 : 1;
+  return Math.max(1, Math.min(6, isLegacy ? (S[stateKey] || defaultLevels) : ((S.catRackLevels || {})[stateKey] || defaultLevels)));
+}
+function _saveShelfLevel(stateKey, v) {
+  if (_SHELF_LEGACY_KEYS[stateKey]) {
+    S[stateKey] = v;
+    const k = _SHELF_LS_KEY_MAP[stateKey]; if (k) localStorage.setItem(k, v);
+  } else {
+    S.catRackLevels = {...(S.catRackLevels||{}), [stateKey]: v};
+    localStorage.setItem('closet-cat-rack-levels', JSON.stringify(S.catRackLevels));
+  }
+}
+// Registry populated each time a shelf section is built, so +/- taps can
+// regenerate just that one section's DOM instead of forcing a full app
+// re-render (which was the source of the lag on rapid taps).
+function bumpRackLevel(stateKey, delta) {
+  const cur = _shelfLevelFor(stateKey);
+  const next = Math.max(1, Math.min(6, cur + delta));
+  if (next === cur) return;
+  _saveShelfLevel(stateKey, next);
+  const reg = S._shelfRegistry && S._shelfRegistry[stateKey];
+  const el = document.getElementById('rack-section-' + stateKey);
+  if (reg && el) {
+    el.outerHTML = shelfSectionHTML(reg.catItems, reg.icon, reg.label, reg.countLabel, reg.stateKey, reg.fallbackIcon, reg.bg);
+  } else {
+    render();
+  }
+}
 function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackIcon, bg) {
-  // Legacy named keys live directly on S; generic category keys use S.catRackLevels
-  const _legacyKeys = {'shoeRackLevels':true,'bagRackLevels':true,'accessoryRackLevels':true,'sweatRackLevels':true,'intRackLevels':true};
-  const _isLegacy = _legacyKeys[stateKey];
-  const _defaultLevels = _isLegacy ? 2 : 1;
-  const levels = Math.max(1, Math.min(6, _isLegacy ? (S[stateKey] || _defaultLevels) : ((S.catRackLevels || {})[stateKey] || _defaultLevels)));
-  const _lsKeyMap = {'shoeRackLevels':'closet-shoe-shelves','bagRackLevels':'closet-bag-shelves','accessoryRackLevels':'closet-acc-shelves','sweatRackLevels':'closet-sweat-shelves','intRackLevels':'closet-int-shelves'};
-  const _saveShelfLevel = (v) => {
-    if (_isLegacy) {
-      const k = _lsKeyMap[stateKey]; if (k) localStorage.setItem(k, v);
-    } else {
-      S.catRackLevels = {...(S.catRackLevels||{}), [stateKey]: v};
-      localStorage.setItem('closet-cat-rack-levels', JSON.stringify(S.catRackLevels));
-    }
-  };
-  // For +/- buttons: use S[stateKey] for legacy, S.catRackLevels[stateKey] for generic
-  const _incExpr = _isLegacy
-    ? `S.${stateKey}=Math.min(6,S.${stateKey}+1);_saveShelfLevel(S.${stateKey});render()`
-    : `S.catRackLevels['${stateKey}']=Math.min(6,((S.catRackLevels||{})['${stateKey}']||1)+1);_saveShelfLevel(S.catRackLevels['${stateKey}']);render()`;
-  const _decExpr = _isLegacy
-    ? `S.${stateKey}=Math.max(1,S.${stateKey}-1);_saveShelfLevel(S.${stateKey});render()`
-    : `S.catRackLevels['${stateKey}']=Math.max(1,((S.catRackLevels||{})['${stateKey}']||1)-1);_saveShelfLevel(S.catRackLevels['${stateKey}']);render()`;
+  S._shelfRegistry = S._shelfRegistry || {};
+  S._shelfRegistry[stateKey] = { catItems, icon, label, countLabel, stateKey, fallbackIcon, bg };
+  const levels = _shelfLevelFor(stateKey);
+  const _skEsc = String(stateKey).replace(/'/g, "\\'");
+  const _incExpr = `bumpRackLevel('${_skEsc}',1)`;
+  const _decExpr = `bumpRackLevel('${_skEsc}',-1)`;
   const perShelf = Math.ceil(catItems.length / levels);
   const cost = catCost(catItems);
   const costStr = fmtCost(cost);
@@ -12397,7 +12410,7 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
     if (!batch.length) continue;
     shelves += `<div class="shoe-shelf">${batch.map(w => shelfCardHTML(w, fallbackIcon, catItems)).join('')}</div>`;
   }
-  return `<div class="shoe-rack-section"${bg ? ` style="background:${bg};"` : ''}>
+  return `<div class="shoe-rack-section" id="rack-section-${esc(String(stateKey))}"${bg ? ` style="background:${bg};"` : ''}>
     <div class="shoe-rack-header">
       <div class="shoe-rack-title">
         <span class="shoe-rack-cat">${icon} ${label}</span>
@@ -12422,8 +12435,6 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
       Shoes:       ['👠', 'Shoes',         items.length===1?'pair':'pairs',  'shoeRackLevels',      '👠', 'rgba(139,101,56,0.08)'],
       Bags:        ['👜', 'Bags',           items.length===1?'bag':'bags',    'bagRackLevels',       '👜', 'rgba(110,75,45,0.08)'],
       Accessories: ['✨', 'Accessories',    items.length===1?'item':'items',  'accessoryRackLevels', '💍', 'rgba(120,95,175,0.08)'],
-      Sweats:      ['🩳', 'Sweats & Comfy', items.length===1?'item':'items',  'sweatRackLevels',     '🩳', 'rgba(100,130,180,0.08)'],
-      Intimates:   ['🩱', 'Intimates',      items.length===1?'item':'items',  'intRackLevels',       '🩱', 'rgba(255,180,200,0.08)'],
       Tops:        ['👕', 'Tops',           items.length===1?'item':'items',  'Tops',                '👕', 'rgba(100,90,80,0.05)'],
       Jackets:     ['🧥', 'Jackets',        items.length===1?'item':'items',  'Jackets',             '🧥', 'rgba(100,90,80,0.05)'],
       Pants:       ['👖', 'Bottoms',        items.length===1?'item':'items',  'Pants',               '👖', 'rgba(100,90,80,0.05)'],
@@ -12441,7 +12452,7 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
 
   } else {
     // All — hero section first, then getting-dressed category order, shoes as rack
-    const CATEGORY_ORDER = ['Tops','Jackets','Pants','Dresses','Sweats','Shoes','Bags','Jewelry',...(S.showIntimatesShelf?['Intimates']:[]),'Accessories','Other'];
+    const CATEGORY_ORDER = ['Tops','Jackets','Pants','Dresses','Shoes','Bags','Jewelry','Accessories','Other'];
     const grouped = {};
     CATEGORY_ORDER.forEach(c => grouped[c] = []);
     const uncategorized = [];
@@ -12469,14 +12480,6 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
         }
       }
 
-      if (cat === 'Sweats') {
-        sections += shelfSectionHTML(catItems, '🩳', 'Sweats & Comfy', catItems.length===1?'item':'items', 'sweatRackLevels', '🩳', 'rgba(100,130,180,0.08)');
-        return;
-      }
-      if (cat === 'Intimates') {
-        sections += shelfSectionHTML(catItems, '🩱', 'Intimates', catItems.length===1?'item':'items', 'intRackLevels', '🩱', 'rgba(255,180,200,0.08)');
-        return;
-      }
       if (cat === 'Shoes') {
         sections += shelfSectionHTML(catItems, '👠', 'Shoes', catItems.length===1?'pair':'pairs', 'shoeRackLevels', '👠', 'rgba(139,101,56,0.08)');
         return;
@@ -14034,7 +14037,7 @@ async function rateModeCommit(dir) {
       fsSet('restockQueries', [...S.restockQueries]);
       toast(`🔍 Looking for similar ${w.name}…`);
     } else if (dir === 'keep') {
-      toast(`✓ ${w.name} is good for now.`);
+      toast('✓ Good for now!');
     }
     try { await DB.wardrobe.put(w); } catch(e) { console.error('rateModeCommit save failed:', e); }
   }
@@ -14161,10 +14164,12 @@ function viewRateMode() {
     : photoBlobUrl(w.wearPhoto || w.photo || null);
   const remaining = rm.ids.length - rm.idx;
   const goalFit = itemGoalFit(w);
+  // A subtle inline chip next to the name/brand line — sits with the rest of the
+  // item info instead of a loud alarm-colored banner across the top of the photo.
   const goalBadge = goalFit ? (
     goalFit.offGoal
-      ? `<div style="position:absolute;top:28px;left:50%;transform:translateX(-50%);background:rgba(255,82,82,.92);color:#fff;font-size:11px;font-weight:800;padding:6px 13px;border-radius:100px;white-space:nowrap;">🎯 Doesn't match your goals</div>`
-      : `<div style="position:absolute;top:28px;left:50%;transform:translateX(-50%);background:rgba(76,217,100,.92);color:#fff;font-size:11px;font-weight:800;padding:6px 13px;border-radius:100px;white-space:nowrap;">✓ Fits ${esc(goalFit.matched[0])}</div>`
+      ? `<div style="display:inline-flex;align-items:center;gap:4px;margin-top:7px;background:rgba(255,255,255,.16);color:rgba(255,255,255,.9);font-size:11px;font-weight:700;padding:4px 11px;border-radius:100px;">🎯 Off your style goals</div>`
+      : `<div style="display:inline-flex;align-items:center;gap:4px;margin-top:7px;background:rgba(255,255,255,.16);color:rgba(255,255,255,.9);font-size:11px;font-weight:700;padding:4px 11px;border-radius:100px;">✓ Fits ${esc(goalFit.matched[0])}</div>`
   ) : '';
   const helpOverlay = !S.rateModeSeenHelp ? `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;">
@@ -14201,12 +14206,12 @@ function viewRateMode() {
         ${photo
           ? `<img src="${esc(photo)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;pointer-events:none;">`
           : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:64px;pointer-events:none;">👕</div>`}
-        ${goalBadge}
         <div id="rate-badge-right" style="position:absolute;top:28px;right:24px;opacity:0;padding:8px 16px;border:3px solid #4CD964;border-radius:10px;color:#4CD964;font-size:22px;font-weight:900;transform:rotate(12deg);letter-spacing:.05em;">FIND</div>
         <div id="rate-badge-left" style="position:absolute;top:28px;left:24px;opacity:0;padding:8px 16px;border:3px solid #FF5252;border-radius:10px;color:#FF5252;font-size:22px;font-weight:900;transform:rotate(-12deg);letter-spacing:.05em;">DONE</div>
         <div style="position:absolute;bottom:0;left:0;right:0;padding:18px 18px 16px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.82));pointer-events:none;">
           <div style="font-size:19px;font-weight:800;color:#fff;margin-bottom:3px;">${esc(w.name||'')}</div>
           <div style="font-size:13px;color:rgba(255,255,255,.7);">${[w.brand, w.size].filter(Boolean).map(esc).join(' · ')}</div>
+          ${goalBadge}
         </div>
       </div>
     </div>
@@ -17400,7 +17405,7 @@ async function bulkAnalyzeCurrent() {
           { type: 'image', source: { type: 'base64', media_type: imageMime, data: imageData } },
           { type: 'text', text: `You are a fashion expert. Look at this clothing/accessory item and return ONLY valid JSON — no markdown, no code fences.
 
-{"name":"Specific descriptive name e.g. White Leather Sneakers","category":"exactly one of: Tops Jackets Pants Dresses Sweats Shoes Bags Jewelry Accessories Other","icon":"single clothing emoji"}
+{"name":"Specific descriptive name e.g. White Leather Sneakers","category":"exactly one of: Tops Jackets Pants Dresses Shoes Bags Jewelry Accessories Other","icon":"single clothing emoji"}
 
 Do NOT include a brand field unless the brand name is explicitly readable as text in this photo (on a visible label, hangtag, logo, or tag). Never infer or guess the brand from style or appearance.` }
         ]}]
@@ -17614,7 +17619,7 @@ async function analyzeItemPhoto() {
 {
   "name": "Specific descriptive name, e.g. 'Navy Wool Blazer' or 'Ivory Linen Wide-Leg Trousers'",
   "brand": "ONLY if the brand name is explicitly readable as text in this photo (on a label, tag, logo, or packaging). Use empty string if you cannot clearly read the brand name — do NOT guess or infer from style, fabric, or silhouette",
-  "category": "exactly one of: Tops, Jackets, Pants, Dresses, Sweats, Shoes, Bags, Jewelry, Accessories, Other",
+  "category": "exactly one of: Tops, Jackets, Pants, Dresses, Shoes, Bags, Jewelry, Accessories, Other",
   "icon": "single most fitting clothing emoji",
   "description": "Color, material, fit, and notable details in 1-2 sentences"
 }` }
@@ -18562,7 +18567,7 @@ async function analyzeSpottedItem() {
     let prompt = 'You are analyzing a fashion item captured while shopping. ';
     if (cap.type === 'online') { if (cap.url) prompt += `Product URL: ${cap.url}. `; }
     else { prompt += 'This is a photo taken in-store — it may show a fitting room try-on or a product tag/label. '; }
-    prompt += 'Extract: item name (specific and descriptive), brand (if visible), price (if visible, include currency symbol), category (one of: Tops Jackets Pants Dresses Sweats Shoes Bags Jewelry Accessories Other). Respond ONLY with JSON: {"name":"...","brand":"...","price":"...","category":"..."}';
+    prompt += 'Extract: item name (specific and descriptive), brand (if visible), price (if visible, include currency symbol), category (one of: Tops Jackets Pants Dresses Shoes Bags Jewelry Accessories Other). Respond ONLY with JSON: {"name":"...","brand":"...","price":"...","category":"..."}';
     content.push({ type: 'text', text: prompt });
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
