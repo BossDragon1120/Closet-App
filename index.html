@@ -19394,7 +19394,7 @@ function viewRIP() {
         ${w.memorialNote ? `<div class="rip-card-note">"${esc(w.memorialNote)}"</div>` : ''}
         <div class="rip-card-footer">
           <span class="rip-card-epitaph">Loved &amp; remembered</span>
-          <button class="rip-card-view-btn" onclick="openWardrobeItem('${w.id}')">View item →</button>
+          <button class="rip-card-view-btn" style="touch-action:manipulation;" ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')" onclick="openWardrobeItem('${w.id}')">View item →</button>
         </div>
       </div>
     </div>`;
@@ -19487,7 +19487,7 @@ function viewRIP() {
 
   return `<div class="view view-notab" style="background:linear-gradient(180deg,#0F0D0C 0%,var(--bg) 320px);">
     <div class="nav" style="background:rgba(15,13,12,0.9);">
-      <button class="nav-back" onclick="navigate('wardrobe')" style="color:rgba(255,255,255,0.7);">${iconBack()} Wardrobe</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="color:rgba(255,255,255,0.7);touch-action:manipulation;">${iconBack()} Wardrobe</button>
       <span class="nav-title" style="color:#fff;">Memorial Garden</span>
       <span style="width:72px"></span>
     </div>
@@ -19521,6 +19521,7 @@ function handleQuickMemPhoto(input) {
 }
 let quickMemCropState = null, _quickMemCropCleanup = null;
 function initQuickMemCrop() {
+  if (_quickMemCropCleanup) { _quickMemCropCleanup(); _quickMemCropCleanup = null; }
   const wrap = document.getElementById('qmCropWrap');
   const img  = document.getElementById('qmCropImg');
   const box  = document.getElementById('qmCropBox');
