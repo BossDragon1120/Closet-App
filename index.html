@@ -278,6 +278,7 @@ body {
   color: rgba(255,255,255,0.75); font-size: 13px; font-weight: 800;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   line-height: 1; font-family: inherit; transition: background .15s, border-color .15s;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
 }
 .outfit-card-dnr-btn.active { background: rgba(80,70,60,0.75); border-color: rgba(180,160,140,0.5); color: #fff; }
 .outfit-card-dnr-btn:active { transform: scale(1.15); }
@@ -334,12 +335,12 @@ body {
 }
 .wgc-info { flex: 1; min-width: 0; }
 .wgc-name {
-  font-size: 14px; font-weight: 600; color: var(--text);
+  font-size: 15.5px; font-weight: 600; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;
 }
-.wgc-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.wgc-meta { font-size: 13px; color: var(--text-3); margin-top: 2px; }
 .wgc-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.wgc-wear { font-size: 12px; color: var(--text-3); font-weight: 500; white-space: nowrap; }
+.wgc-wear { font-size: 13px; color: var(--text-3); font-weight: 500; white-space: nowrap; }
 .wgc-edit-btn {
   background: none; border: none; cursor: pointer; padding: 4px 2px;
   color: var(--border); font-size: 14px; line-height: 1; transition: color .12s;
@@ -368,10 +369,10 @@ body {
   display: flex; align-items: baseline; gap: 8px;
 }
 .shoe-rack-cat {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--text-2);
 }
-.shoe-rack-meta { font-size: 11px; color: var(--text-3); }
+.shoe-rack-meta { font-size: 12.5px; color: var(--text-3); }
 .shoe-rack-controls {
   display: flex; align-items: center; gap: 6px;
 }
@@ -410,12 +411,12 @@ body {
 .shoe-shelf + .shoe-shelf { margin-top: 4px; }
 .shoe-card {
   display: flex; flex-direction: column; align-items: center;
-  width: 72px; flex-shrink: 0; cursor: pointer;
+  width: 84px; flex-shrink: 0; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 .shoe-card-img-wrap {
-  width: 68px; height: 54px;
+  width: 80px; height: 64px;
   border-radius: 10px;
   background: #fff;
   border: 1.5px solid var(--border);
@@ -432,16 +433,16 @@ body {
   display: block; background: #fff;
 }
 .shoe-card-emoji {
-  font-size: 26px; line-height: 1;
+  font-size: 30px; line-height: 1;
 }
 .shoe-card-name {
-  font-size: 9px; font-weight: 600; color: var(--text-2);
-  text-align: center; margin-top: 4px;
-  width: 68px; overflow: hidden; white-space: nowrap;
-  text-overflow: ellipsis; line-height: 1.2;
+  font-size: 11px; font-weight: 600; color: var(--text-2);
+  text-align: center; margin-top: 5px;
+  width: 80px; overflow: hidden; white-space: nowrap;
+  text-overflow: ellipsis; line-height: 1.25;
 }
 .shoe-card-wears {
-  font-size: 8px; color: var(--text-3); margin-top: 1px;
+  font-size: 9.5px; color: var(--text-3); margin-top: 1px;
 }
 .rod-track {
   overflow-x: auto; overflow-y: visible;
@@ -2966,6 +2967,15 @@ const S = {
   _tripFlow: null, // { step:'naming', name:'' } — inline trip creation
   newsFlash: null, // { headline, summary, url, source, fetchedAt }
   _newsFlashDismissed: false, // session-only dismiss flag
+  // Dress Me — daily AI outfit recommendation, surfaced as a dismissible invite on the Fits landing page
+  dressMeDismissedDate: localStorage.getItem('closet-dressme-dismissed-date') || null, // yyyy-mm-dd — re-invites the next day
+  _dressMeOpen: false,          // bottom-sheet modal visible
+  _dressMeStage: 'context',     // 'context' | 'result'
+  _dressMeContext: '',          // user's one-line context, e.g. "coffee with friends"
+  _dressMeLoading: false,
+  dressMeResult: null,          // { outfit:[{item,emoji,reason}], vibe, hype }
+  _dressMeHistory: [],          // recently suggested item names — avoid repeats across refreshes
+  dressMeActive: null,          // { context, outfit, vibe } — set once user accepts a look, carried into the upload/analyze flow for credit
   purchasedQueries: new Set(JSON.parse(localStorage.getItem('closet-purchased') || '[]')),
   shopBlocked: new Set(JSON.parse(localStorage.getItem('closet-shop-blocked') || '[]')),
   shopCache: JSON.parse(localStorage.getItem('closet-shop-cache') || '{}'), // key → {results,ts}
@@ -3756,15 +3766,16 @@ Respond with ONLY a JSON object — no markdown, no preamble:
 }
 
 // ── Generic share helper ──────────────────────────────────────────────────────
-async function shareText(title, text) {
+async function shareText(title, text, url) {
+  const fullText = url ? `${text}\n\n${url}` : text;
   if (navigator.share) {
-    try { await navigator.share({ title, text }); return; }
+    try { await navigator.share(url ? { title, text, url } : { title, text }); return; }
     catch(e) { if (e.name === 'AbortError') return; }
   }
   // Fallback: copy to clipboard
   try {
-    await navigator.clipboard.writeText(text);
-    _recordThank(w); toast('Copied to clipboard ✓');
+    await navigator.clipboard.writeText(fullText);
+    toast('Copied to clipboard ✓');
   } catch(e) { toast('Could not share — try copying manually'); }
 }
 
@@ -5123,6 +5134,8 @@ function photoBlobUrl(dataUrl) {
 function fmtDate(iso)     { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
 function fmtDateLong(iso) { return new Date(iso).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtMonth(ym)     { if (!ym) return ''; const [y,m] = ym.split('-'); const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m,10)-1]; return mn ? `${mn} ${y}` : ym; }
+function daysSince(iso)   { return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
+function fmtDaysAgo(iso)  { const d = daysSince(iso); return d===0?'Updated today':d===1?'Updated yesterday':'Updated '+d+' days ago'; }
 
 let _toastTimer;
 function toast(msg) {
@@ -5340,7 +5353,7 @@ function featuresMenuHTML() {
         ${menuRow('📊', 'Your Fashion Stats', 'Tiles of your style data — shareable at a tap', "closeMenu();navigate('dashboard')")}
         ${menuRow('✦', "Closet's Features", 'Everything built into your style journal', "S.menuSection='about';render()")}
         ${menuRow('✨', 'Onboarding Flow', 'Take the feature tour or set up your style', "closeMenu();S.onboardStep=0;navigate('onboarding')")}
-        ${menuRow('💌', 'Share with Friends <span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:100px;background:var(--gold-bg);color:var(--gold-dk);font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;vertical-align:middle;">New</span>', 'Send a friend the app, they will thank you later', "closeMenu();shareText(&quot;Closet, my personal style journal&quot;, &quot;I have been using this app called Closet to track my wardrobe, get outfit ideas, and actually know what I wear. Thought you would like it.&quot;)")}
+        ${menuRow('💌', 'Share with Friends <span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:100px;background:var(--gold-bg);color:var(--gold-dk);font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;vertical-align:middle;">New</span>', 'Send a friend the app, they will thank you later', "closeMenu();shareText(&quot;Closet — your personal style journal&quot;, &quot;Okay I need to tell you about Closet \u{1F497} it's basically a wardrobe brain — it tracks everything I own, tells me what to wear, and somehow makes getting dressed actually fun. You'd love it.&quot;, location.href)")}
         ${menuRow('⚙️', 'Settings', 'API key, sync, and app preferences', "closeMenu();switchTab('settings')")}
       </div>
       <div style="padding:12px 16px calc(12px + var(--safe-b));border-top:1px solid var(--border);flex-shrink:0;">
@@ -7108,6 +7121,100 @@ Return ONLY valid JSON with no markdown or extra text:
   render();
 }
 
+// ── Dress Me — daily AI outfit recommendation ───────────────────────────────
+
+function dismissDressMe() {
+  const todayKey = new Date().toISOString().slice(0,10);
+  S.dressMeDismissedDate = todayKey;
+  localStorage.setItem('closet-dressme-dismissed-date', todayKey);
+  render();
+}
+
+function openDressMe() {
+  S._dressMeOpen = true;
+  S._dressMeStage = 'context';
+  S.dressMeResult = null;
+  S._dressMeContext = '';
+  render();
+}
+
+function closeDressMe() { S._dressMeOpen = false; render(); }
+
+async function generateDressMe() {
+  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (S._dressMeLoading) return;
+  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+  if (activeWardrobe.length < 3) { toast('Add more wardrobe items first!'); return; }
+  S._dressMeLoading = true;
+  S._dressMeStage = 'result';
+  S.dressMeResult = null;
+  render();
+
+  const shuffled = activeWardrobe.slice().sort(() => Math.random() - 0.5);
+  const itemList = shuffled.slice(0, 60).map(w =>
+    `${w.icon||'👕'} ${w.name}${w.brand?' ('+w.brand+')':''}${w.category?' ['+w.category+']':''}`
+  ).join('\n');
+
+  const avoidLine = S._dressMeHistory.length
+    ? `\nAVOID these items from recent suggestions — pick something fresh:\n${S._dressMeHistory.map(n=>`• ${n}`).join('\n')}\n`
+    : '';
+
+  const context = (S._dressMeContext || '').trim();
+  const contextLine = context ? `What they're getting dressed for today: ${context}` : `No specific plans given — pick a solid, versatile everyday look.`;
+  const weather = S.weatherPin ? `Current weather: ${S.weatherPin.tempF}°F, ${S.weatherPin.description||''}` : '';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 600,
+        messages: [{ role: 'user', content: `You are a thoughtful personal stylist picking a complete outfit for this person to wear today, from their own wardrobe. ${weather}
+
+${contextLine}
+${avoidLine}
+Wardrobe:
+${itemList}
+
+Return ONLY valid JSON with no markdown or extra text:
+{"outfit":[{"item":"exact item name from list","emoji":"emoji","reason":"why this piece"}],"vibe":"2-4 word vibe e.g. Effortlessly Cool","hype":"one punchy sentence hyping this look"}` }],
+      }),
+    });
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const data = await res.json();
+    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('No JSON');
+    const result = JSON.parse(m[0]);
+    S.dressMeResult = result;
+    const usedNames = (result.outfit || []).map(p => p.item).filter(Boolean);
+    S._dressMeHistory = [...S._dressMeHistory, ...usedNames].slice(-12);
+  } catch(e) {
+    console.error('generateDressMe:', e);
+    toast('Couldn\'t generate — try again.');
+    S._dressMeStage = 'context';
+  }
+  S._dressMeLoading = false;
+  render();
+}
+
+// User taps the thumbs-up on a Dress Me suggestion — lock it in and head to the camera
+function acceptDressMe() {
+  const r = S.dressMeResult; if (!r) return;
+  S.dressMeActive = { context: (S._dressMeContext||'').trim(), outfit: r.outfit||[], vibe: r.vibe||'' };
+  const summary = r.vibe ? `Dress Me: ${r.vibe}${S.dressMeActive.context ? ' — ' + S.dressMeActive.context : ''}` : (S.dressMeActive.context || '');
+  S.pendingContext = summary;
+  S._dressMeOpen = false;
+  toast('✨ Locked in — now put it on and snap a photo!');
+  navigate('upload');
+}
+
 function _restoreBookCarousel() {
   requestAnimationFrame(() => {
     const el = document.getElementById('book-picker-carousel');
@@ -8812,7 +8919,23 @@ function viewCloset() {
     ${(() => {
       const todayKey = new Date().toISOString().slice(0,10);
       const loggedToday = S.entries.some(e => e.createdAt && e.createdAt.slice(0,10) === todayKey);
-      return (!loggedToday && S.entries.length > 0) ? `
+      const activeWardrobeCount = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile).length;
+      const showDressMeInvite = !loggedToday && activeWardrobeCount >= 3 && S.dressMeDismissedDate !== todayKey;
+      const inviteHTML = showDressMeInvite ? `
+        <div style="margin:10px 16px 0;display:flex;align-items:center;gap:10px;padding:12px 14px;background:linear-gradient(135deg,#1C1A18 0%,#2a2520 100%);border-radius:var(--r-sm);">
+          <span style="font-size:22px;flex-shrink:0;">✨</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:#fff;">Want Claude to dress you today?</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:1px;">Tell me what's on your plate and I'll pick the look.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();openDressMe();" onclick="openDressMe();"
+              style="background:var(--gold);border:none;border-radius:100px;padding:7px 14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">Dress me →</button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissDressMe();" onclick="dismissDressMe();"
+              style="background:none;border:none;padding:2px 6px;font-size:11px;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;touch-action:manipulation;">Not today</button>
+          </div>
+        </div>` : '';
+      const ctaHTML = (!loggedToday && S.entries.length > 0) ? `
         <div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload')"
           onclick="navigate('upload')" style="margin:10px 16px 0;display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,var(--gold-bg),var(--surface));border-radius:var(--r-sm);border:1px solid var(--gold);cursor:pointer;touch-action:manipulation;">
           <span style="font-size:20px;">📸</span>
@@ -8822,11 +8945,92 @@ function viewCloset() {
           </div>
           <span style="font-size:18px;color:var(--gold);">+</span>
         </div>` : '';
+      return inviteHTML + ctaHTML;
     })()}
     ${outfitCountHTML}
     ${filterHTML}${gridHTML}
     <div style="height:8px"></div>
+    ${dressMeModalHTML()}
   </div>`;
+}
+
+function dressMeModalHTML() {
+  if (!S._dressMeOpen) return '';
+  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+  const norm = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
+  const matchWardrobeItem = name => {
+    const target = norm(name);
+    if (!target) return null;
+    let best = activeWardrobe.find(w => norm(w.name) === target);
+    if (best) return best;
+    best = activeWardrobe.find(w => norm(w.name).includes(target) || target.includes(norm(w.name)));
+    return best || null;
+  };
+  return `
+    <!-- DRESS ME BOTTOM SHEET -->
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
+      ontouchend="if(event.target===this){closeDressMe();}"
+      onclick="if(event.target===this){closeDressMe();}">
+      <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;">
+        <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="font-size:16px;font-weight:800;color:var(--text);">✨ Dress Me</div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();closeDressMe();" onclick="closeDressMe();"
+            style="background:none;border:none;font-size:20px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;line-height:1;touch-action:manipulation;">✕</button>
+        </div>
+        <div style="overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 20px 40px;">
+          ${S._dressMeStage === 'context' ? `
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">What are you up to today?</div>
+            <input type="text" value="${esc(S._dressMeContext||'')}"
+              placeholder="e.g. coffee with friends, big presentation, lazy Sunday…"
+              oninput="S._dressMeContext=this.value"
+              style="width:100%;box-sizing:border-box;padding:11px 13px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:inherit;color:var(--text);background:var(--bg);outline:none;">
+            <div style="margin-top:6px;font-size:11px;color:var(--text-3);">Optional — leave blank for a solid everyday look.</div>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();generateDressMe();" onclick="generateDressMe();"
+              style="width:100%;margin-top:16px;background:var(--gold);border:none;border-radius:100px;padding:12px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">✨ Get my outfit</button>
+          ` : S._dressMeLoading ? `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px 0;">
+              <div class="spinner" style="width:28px;height:28px;border-width:3px;"></div>
+              <div style="font-size:14px;color:var(--text-3);">Styling your day…</div>
+            </div>
+          ` : S.dressMeResult ? (() => {
+            const r = S.dressMeResult;
+            return `<div style="background:linear-gradient(135deg,#1A1A1A 0%,#2A2010 100%);border-radius:16px;padding:20px;position:relative;overflow:hidden;">
+              <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 20%,rgba(184,125,42,0.18) 0%,transparent 60%);pointer-events:none;"></div>
+              <div style="position:relative;">
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--gold);margin-bottom:4px;">Today's Look</div>
+                <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px;">${esc(r.vibe||'')}</div>
+                <div style="font-size:14px;color:rgba(255,255,255,.65);margin-bottom:18px;font-style:italic;">${esc(r.hype||'')}</div>
+                <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
+                  ${(r.outfit||[]).map(p=>{
+                    const match = matchWardrobeItem(p.item);
+                    const thumbHTML = (match && match.photo)
+                      ? `<img src="${esc(photoBlobUrl(match.photo))}" alt="${esc(p.item||'')}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0;" loading="lazy">`
+                      : `<span style="font-size:24px;flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;">${esc(p.emoji||'👕')}</span>`;
+                    return `<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;">
+                    ${thumbHTML}
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:14px;font-weight:700;color:#fff;line-height:1.25;">${esc(p.item||'')}</div>
+                      <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.35;margin-top:2px;">${esc(p.reason||'')}</div>
+                    </div>
+                  </div>`;
+                  }).join('')}
+                </div>
+                <div style="display:flex;gap:10px;">
+                  <button ontouchend="if(_touchMoved)return;event.preventDefault();generateDressMe();" onclick="generateDressMe();"
+                    style="flex:1;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:rgba(255,255,255,.8);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                    🔄 Try another
+                  </button>
+                  <button ontouchend="if(_touchMoved)return;event.preventDefault();acceptDressMe();" onclick="acceptDressMe();"
+                    style="flex:1;background:var(--gold);border:none;border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                    👍 Love it
+                  </button>
+                </div>
+              </div>
+            </div>`;
+          })() : ''}
+        </div>
+      </div>
+    </div>`;
 }
 
 function outfitCardHTML(e) {
@@ -8839,9 +9043,11 @@ function outfitCardHTML(e) {
       <img class="outfit-card-photo" src="${e.photo}" alt="Outfit" loading="lazy"${(e.doNotRepeat||retired)?` style="${photoStyle}"`:''}>
       ${e.doNotRepeat ? `<div class="outfit-card-dnr-overlay"></div>` : ''}
       <button class="outfit-card-dnr-btn${e.doNotRepeat?' active':''}"
+        ontouchend="if(_touchMoved)return;event.stopPropagation();event.preventDefault();toggleDoNotRepeat('${e.id}')"
         onclick="event.stopPropagation();toggleDoNotRepeat('${e.id}')"
         title="${e.doNotRepeat?'Remove flag':'Flag: won\'t wear again'}">✕</button>
       ${retired ? `<div style="position:absolute;bottom:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);backdrop-filter:blur(4px);">📦 Retired</div>` : ''}
+      ${e.claudeRecommended ? `<div style="position:absolute;top:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:var(--gold);backdrop-filter:blur(4px);">✨ Claude's Pick</div>` : ''}
     </div>
     <div class="outfit-card-body">
       <div class="outfit-card-date">${fmtDate(e.createdAt)}</div>
@@ -9731,6 +9937,16 @@ function viewPlan() {
             </div>
           ` : S.funRoulette ? (() => {
             const r = S.funRoulette;
+            const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+            const norm = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
+            const matchWardrobeItem = name => {
+              const target = norm(name);
+              if (!target) return null;
+              let best = activeWardrobe.find(w => norm(w.name) === target);
+              if (best) return best;
+              best = activeWardrobe.find(w => norm(w.name).includes(target) || target.includes(norm(w.name)));
+              return best || null;
+            };
             return `<div style="background:linear-gradient(135deg,#1A1A1A 0%,#2A2010 100%);border-radius:16px;padding:20px;position:relative;overflow:hidden;">
               <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 20%,rgba(184,125,42,0.18) 0%,transparent 60%);pointer-events:none;"></div>
               <div style="position:relative;">
@@ -9738,13 +9954,22 @@ function viewPlan() {
                 <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px;">${esc(r.vibe||'')}</div>
                 <div style="font-size:14px;color:rgba(255,255,255,.65);margin-bottom:18px;font-style:italic;">${esc(r.hype||'')}</div>
                 <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
-                  ${(r.outfit||[]).map(p=>`<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;">
-                    <span style="font-size:24px;flex-shrink:0;">${esc(p.emoji||'👕')}</span>
+                  ${(r.outfit||[]).map(p=>{
+                    const match = matchWardrobeItem(p.item);
+                    const thumbHTML = (match && match.photo)
+                      ? `<img src="${esc(photoBlobUrl(match.photo))}" alt="${esc(p.item||'')}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0;cursor:pointer;" loading="lazy">`
+                      : `<span style="font-size:24px;flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;">${esc(p.emoji||'👕')}</span>`;
+                    const openAttr = match ? `S.selectedWardrobeId='${match.id}';S._rouletteOpen=false;navigate('wardrobe-item')` : '';
+                    return `<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;${match?'cursor:pointer;':''}"
+                      ${match ? `ontouchend="if(_touchMoved)return;event.preventDefault();${openAttr}" onclick="${openAttr}"` : ''}>
+                    ${thumbHTML}
                     <div style="flex:1;min-width:0;">
                       <div style="font-size:14px;font-weight:700;color:#fff;line-height:1.25;">${esc(p.item||'')}</div>
                       <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.35;margin-top:2px;">${esc(p.reason||'')}</div>
                     </div>
-                  </div>`).join('')}
+                    ${match ? `<span style="color:rgba(255,255,255,.35);font-size:13px;flex-shrink:0;">›</span>` : ''}
+                  </div>`;
+                  }).join('')}
                 </div>
                 <button
                   ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette();"
@@ -10259,15 +10484,15 @@ function viewProfile() {
 
   // ── Portrait card ─────────────────────────────────────────
   const isSaved = !!S.personaHistory.find(h=>h.ts===persona?.ts);
-  const btnStyle = `background:rgba(255,255,255,0.08);border:1px solid ${colors.accent}44;border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;color:${colors.accent};white-space:nowrap;`;
+  const btnStyle = `background:rgba(255,255,255,0.08);border:1px solid ${colors.accent}44;border-radius:100px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;color:${colors.accent};white-space:nowrap;touch-action:manipulation;`;
   const portraitHTML = persona ? `
     <div style="background:linear-gradient(135deg,${colors.bg1},${colors.bg2});border-radius:14px;padding:13px 14px 14px;border:1px solid ${colors.accent}33;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;">
         <div style="font-size:9px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:${colors.accent};padding-top:2px;">✦ Style Portrait</div>
-        <div style="display:flex;gap:4px;flex-shrink:0;">
-          <button onclick="heartPersona()" style="${btnStyle}">${isSaved?'❤️':'♡'}</button>
-          <button onclick="openShareCard()" style="${btnStyle}">↗</button>
-          <button onclick="generateStylePersona()" style="${btnStyle}">⟳</button>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();heartPersona()" onclick="heartPersona()" style="${btnStyle}">${isSaved?'❤️':'♡'}</button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();openShareCard()" onclick="openShareCard()" style="${btnStyle}">↗</button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();generateStylePersona()" onclick="generateStylePersona()" style="${btnStyle}">⟳</button>
         </div>
       </div>
       <div style="font-family:Georgia,serif;font-size:16px;font-weight:800;line-height:1.25;color:${colors.text};margin-bottom:8px;">${esc(persona.headline)}</div>
@@ -11914,7 +12139,7 @@ function viewHome() {
             </div>`;
           }).join('')}
         </div>
-        ${trends.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right;">AI-curated · ${(() => { const d = Math.floor((Date.now()-new Date(trends.updated).getTime())/86400000); return d===0?'Updated today':d===1?'Updated yesterday':'Updated '+d+' days ago'; })()}</div>` : ''}
+        ${trends.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right;">AI-curated · ${fmtDaysAgo(trends.updated)}</div>` : ''}
       </div>`;
     })()}
 
@@ -11987,7 +12212,7 @@ function viewHome() {
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">${risingCards}</div>
         <div style="margin-bottom:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">📉 Fading Out</div>
         <div style="display:flex;flex-direction:column;gap:8px;">${fadingCards}</div>
-        ${pulse.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:8px;text-align:right;">${(() => { const d = Math.floor((Date.now()-new Date(pulse.updated).getTime())/86400000); return d===0?'Updated today':d===1?'Updated yesterday':'Updated '+d+' days ago'; })()}</div>` : ''}
+        ${pulse.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:8px;text-align:right;">${fmtDaysAgo(pulse.updated)}</div>` : ''}
       </div>`;
     })()}
 
@@ -13208,7 +13433,7 @@ function wardrobeCardHTML(w) {
     ? `<span class="paid-off-badge">💚 Paid Off</span>`
     : ppw
       ? `<span class="ppw-badge">${ppw}</span>`
-      : w.price ? `<span class="ppw-badge" style="background:var(--surface-2);color:var(--text-3);">$${parseFloat(w.price).toFixed(2)}</span>` : '';
+      : w.price ? `<span class="ppw-badge" style="background:var(--surface-2);color:var(--text-3);">$${parseFloat(w.price).toFixed(0)}</span>` : '';
   const wSel = S._wardrobeSelectMode && S._wardrobeSelected.includes(w.id);
   return `<div class="wardrobe-card${w.retiring?' retiring':''}"
     onclick="${S._wardrobeSelectMode ? `toggleWardrobeSelect('${w.id}')` : `openClosetLightbox('${w.id}',${JSON.stringify(_siblings?_siblings.map(s=>String(s.id)):[])})`}"
@@ -13489,10 +13714,14 @@ function viewOnboarding() {
   }
 
   // ── Feature slides 1–7 ───────────────────────────────────────
+  // Each slide can have a real photo: drop a file at the path in `img`
+  // (relative to index.html, e.g. an "onboarding/" folder next to it) and
+  // it will automatically replace the placeholder mockup below — no code
+  // changes needed. If the file isn't there yet, the mockup keeps showing.
   const slides = [
 
     // 1 — Fits
-    { label:'Fits', dark:true,
+    { label:'Fits', dark:true, img:'onboarding/fits.jpg',
       headline:'Your daily look,\nobjectively rated.',
       sub:'Snap your outfit, get Claude\'s honest style feedback, and build a personal log of your best looks over time.',
       mock:`<div style="padding:0 24px;">
@@ -13518,7 +13747,7 @@ function viewOnboarding() {
     },
 
     // 2 — Closet
-    { label:'Closet', dark:false,
+    { label:'Closet', dark:false, img:'onboarding/closet.jpg',
       headline:'Everything you own.\nFinally organised.',
       sub:'Log your full wardrobe, track wears, flag Hero Pieces, crown your Signature style, and surface Hidden Gems you\'ve been sleeping on.',
       mock:`<div style="padding:0 24px;">
@@ -13549,7 +13778,7 @@ function viewOnboarding() {
     },
 
     // 3 — Portfolio
-    { label:'Portfolio', dark:true,
+    { label:'Portfolio', dark:true, img:'onboarding/portfolio.jpg',
       headline:'Your style story,\nbeautifully told.',
       sub:'Portfolio is your command centre — best outfits, Gem Pieces, fashion battle wins, style identity, and a stat snapshot that grows with you.',
       mock:`<div style="padding:0 24px;">
@@ -13573,7 +13802,7 @@ function viewOnboarding() {
     },
 
     // 4 — Plan
-    { label:'Plan', dark:false,
+    { label:'Plan', dark:false, img:'onboarding/plan.jpg',
       headline:'Never scramble\nbefore an event again.',
       sub:'Tell Claude your occasion and it builds an outfit from your actual wardrobe — weather-aware and personalised to what you own. Or spin Style Roulette for a surprise pick when you can\'t decide.',
       mock:`<div style="padding:0 24px;">
@@ -13593,7 +13822,7 @@ function viewOnboarding() {
     },
 
     // 5 — Shop
-    { label:'Shop', dark:false,
+    { label:'Shop', dark:false, img:'onboarding/shop.jpg',
       headline:'Spend with intention.\nClose the gaps.',
       sub:'Claude studies your actual wardrobe and surfaces only what\'s missing — then links you straight to shop it. Build a Wish List so nothing slips away.',
       mock:`<div style="padding:0 24px;">
@@ -13618,7 +13847,7 @@ function viewOnboarding() {
     },
 
     // 6 — Evolve
-    { label:'Evolve', dark:true,
+    { label:'Evolve', dark:true, img:'onboarding/evolve.jpg',
       headline:'Set goals. Track trends.\nLevel up your style.',
       sub:'Declare your style goals and let AI-curated trends, brand picks, and styling tips bend toward them. Evolve is your personal fashion growth engine.',
       mock:`<div style="padding:0 24px;">
@@ -13646,7 +13875,7 @@ function viewOnboarding() {
     },
 
     // 7 — Fun
-    { label:'Fun', dark:false,
+    { label:'Fun', dark:false, img:'onboarding/fun.jpg',
       headline:'Fashion battles,\ncompliments & more.',
       sub:'Challenge a friend to a Fashion Battle, get a genuine Claude compliment about your style, pair outfits with drinks or books, and send love to the people who gifted your favourite pieces.',
       mock:`<div style="padding:0 24px;">
@@ -13692,9 +13921,16 @@ function viewOnboarding() {
         <span style="width:72px;"></span>
       </div>
 
-      <!-- Illustration area -->
-      <div style="background:${sl.dark?'linear-gradient(180deg,#1C1A18 0%,#242018 100%)':'var(--surface-2)'};padding:58px 0 26px;min-height:240px;display:flex;align-items:center;">
-        ${sl.mock}
+      <!-- Illustration area: real photo (if present at sl.img) layers over the
+           placeholder mockup; onerror removes the broken <img> so the mockup
+           shows through untouched until the real file is dropped in. -->
+      <div style="background:${sl.dark?'linear-gradient(180deg,#1C1A18 0%,#242018 100%)':'var(--surface-2)'};min-height:240px;position:relative;overflow:hidden;">
+        <div style="padding:58px 0 26px;min-height:240px;display:flex;align-items:center;">
+          ${sl.mock}
+        </div>
+        ${sl.img ? `<img src="${esc(sl.img)}" alt="${esc(sl.label)}" loading="lazy"
+          style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;"
+          onerror="this.remove();">` : ''}
       </div>
 
       <!-- Content -->
@@ -15169,7 +15405,7 @@ function viewWardrobeItem() {
             <div style="font-weight:700;font-size:13.5px;color:${w.inMaybePile?'#5B3FBF':'var(--text)'};display:flex;align-items:center;gap:6px;">🤔 Purgatory</div>
             <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;line-height:1.45;">
               ${w.inMaybePile
-                ? `In since ${fmtDate(w.maybePileAt)} — ${Math.floor((Date.now()-new Date(w.maybePileAt).getTime())/(24*60*60*1000))} days unworn.`
+                ? `In since ${fmtDate(w.maybePileAt)} — ${daysSince(w.maybePileAt)} days unworn.`
                 : "Not ready to part with it? Park it here for 60 days and see if you reach for it."}
             </div>
           </div>
@@ -15178,7 +15414,7 @@ function viewWardrobeItem() {
             onclick="toggleMaybePile('${w.id}')"></button>
         </div>
         ${w.inMaybePile ? (() => {
-          const daysIn = Math.floor((Date.now()-new Date(w.maybePileAt).getTime())/(24*60*60*1000));
+          const daysIn = daysSince(w.maybePileAt);
           const daysLeft = Math.max(0, 60-daysIn);
           return `<div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
             <div style="flex:1;background:rgba(155,127,224,0.2);border-radius:100px;height:4px;overflow:hidden;">
@@ -16787,6 +17023,7 @@ function viewDetail() {
       <div class="detail-header">
         <div>
           <div class="detail-date">${fmtDateLong(entry.createdAt)}</div>
+          ${entry.claudeRecommended ? `<div style="display:inline-flex;align-items:center;gap:4px;background:var(--gold-bg);color:var(--gold-dk);border-radius:100px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:8px;">✨ Claude's Pick${entry.dressMeVibe ? ' · ' + esc(entry.dressMeVibe) : ''}</div>` : ''}
           ${entry.occasionTag ? `<div class="occasion-tag" style="margin-bottom:8px;">${entry.occasionTag===WFH_TAG?'🏠':'🏷'} ${esc(entry.occasionTag)}</div>` : ''}
           ${isWFH(entry) ? `<div style="font-size:12px;color:var(--text-3);margin-bottom:6px;">🙈 Comfort first — not counted in your style score</div>` : ''}
           ${entry.weather ? `<div class="weather-chip" style="margin-bottom:8px;">${entry.weather.icon} ${entry.weather.tempF}°F · ${esc(entry.weather.condition)}</div>` : ''}
@@ -16947,7 +17184,7 @@ function viewDetail() {
                   </div>
                   ${wm.brand ? `<div style="font-size:12px;color:var(--text-3);margin-bottom:2px;">${esc(wm.brand)}</div>` : ''}
                   <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;align-items:center;">
-                    ${wmPrice > 0 ? `<span style="font-size:12px;color:var(--text-2);font-weight:600;">$${wmPrice.toFixed(2)}</span>` : ''}
+                    ${wmPrice > 0 ? `<span style="font-size:12px;color:var(--text-2);font-weight:600;">$${wmPrice.toFixed(0)}</span>` : ''}
                     ${wmWears > 0 ? `<span style="font-size:12px;color:var(--text-3);">Worn ${wmWears}×</span>` : ''}
                     ${wmPpw ? `<span style="font-size:11px;color:var(--gold-dk);background:var(--gold-bg);padding:2px 7px;border-radius:100px;font-weight:600;">$${wmPpw}/wear</span>` : ''}
                     ${wm.tailoringNeeded ? `<span style="font-size:11px;color:#7C3AED;background:#FAF5FF;padding:2px 7px;border-radius:100px;">🧵 Needs tailoring</span>` : ''}
@@ -16966,7 +17203,7 @@ function viewDetail() {
             </div>`;
           }).join('')}
           ${totalCost>0?`
-            <div class="total-row"><span class="total-label">Total Outfit Cost</span><span class="total-value">$${totalCost.toFixed(2)}</span></div>
+            <div class="total-row"><span class="total-label">Total Outfit Cost</span><span class="total-value">$${totalCost.toFixed(0)}</span></div>
             ${ppw?`<div class="ppw-chip"><div><div class="ppw-value">$${ppw}</div><div class="ppw-label">price per wear</div></div><div class="ppw-note">Worn ${entry.timesWorn}×<br>Tap "Worn" to update</div></div>`:`<p style="font-size:13px;color:var(--text-3);margin-top:10px;">Log a wear above to see price per wear.</p>`}`:''}
         </div>`;
       })()}
@@ -17447,7 +17684,7 @@ function editItemHTML(it, i) {
 /* ================================================================
    ACTIONS
    ================================================================ */
-function clearPending() { S.pendingPhoto=null; S.pendingMime=null; S.pendingOccasion=null; S.pendingContext=''; S.draft=null; S.error=null; S.friendRatingMode=false; S.friendRating=null; S.friendName=''; }
+function clearPending() { S.pendingPhoto=null; S.pendingMime=null; S.pendingOccasion=null; S.pendingContext=''; S.draft=null; S.error=null; S.friendRatingMode=false; S.friendRating=null; S.friendName=''; S.dressMeActive=null; }
 
 /* ── Occasion tag management ─────────────────────────────── */
 function addOccasionTag() {
@@ -18611,6 +18848,10 @@ async function doAnalyze() {
         // suggestedOccasion from Claude — user confirms/overrides in viewReview
         suggestedOccasion: analysis.suggestedOccasion || null,
         occasionTag: null, // confirmed by user in viewReview before save
+        // Dress Me credit — set if this photo follows an accepted Dress Me recommendation
+        claudeRecommended: !!S.dressMeActive,
+        dressMeOutfit: S.dressMeActive ? S.dressMeActive.outfit : null,
+        dressMeVibe: S.dressMeActive ? S.dressMeActive.vibe : null,
       };
       Object.assign(S, { loading:false, view:'review', error:null }); render();
     }
