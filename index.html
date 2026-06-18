@@ -2334,19 +2334,17 @@ function styleScore(entries) {
    WARDROBE CATEGORIES
    Edit this list to add or rename item categories.
    ================================================================ */
-const WARDROBE_CATEGORIES = ['All','Tops','Jackets','Bottoms','Dresses','Sweats','Shoes','Bags','Jewelry','Intimates','Other','Accessories'];
+const WARDROBE_CATEGORIES = ['All','Tops','Jackets','Bottoms','Dresses','Shoes','Bags','Jewelry','Other','Accessories'];
 
 const WARDROBE_SUBCATEGORIES = {
-  Tops:        ['All','Camis','Tees','Long Sleeve','Blouses & Shirts','Sweaters','Bodysuits'],
+  Tops:        ['All','Camis','Tees','Long Sleeve','Blouses & Shirts','Sweaters','Sweatshirts','Bodysuits'],
   Jackets:     ['All','Blazers','Jackets','Coats'],
-  Bottoms:     ['All','Shorts','Jeans','Dress Pants','Skirts','Leggings'],
+  Bottoms:     ['All','Shorts','Jeans','Dress Pants','Skirts','Leggings','Joggers'],
   Dresses:     ['All','Casual','Dressy','Jumpsuits'],
-  Sweats:      ['All','Hoodies','Sweatpants','Joggers','Loungewear','Sets'],
   Shoes:       ['All','Heels & Pumps','Boots','Sneakers','Sandals & Mules','Flats & Loafers'],
   Bags:        ['All','Handbags','Totes','Crossbody','Clutches','Backpacks'],
   Jewelry:     ['All','Necklaces','Earrings','Rings','Bracelets','Watches'],
-  Other:       ['All','Swimwear','Activewear','Loungewear','Undergarments'],
-  Intimates:   ['All','Bras','Bralettes','Sports Bras','Wireless','Underwear','Shapewear','Camisoles','Bodysuits'],
+  Other:       ['All','Swimwear','Activewear','Loungewear','Bras','Bralettes','Sports Bras','Wireless','Underwear','Shapewear','Camisoles','Bodysuits'],
   Accessories: ['All','Scarves','Belts','Hats','Sunglasses','Hair Accessories'],
 };
 
@@ -2359,8 +2357,11 @@ function getAllCategories() {
 function normalizeCat(cat) {
   if (cat === 'Outerwear') return 'Jackets';
   if (cat === 'Bottoms')   return 'Pants';
-  if (cat === 'Comfy' || cat === 'Loungewear' || cat === 'Athleisure') return 'Sweats';
-  if (cat === 'Undergarments' || cat === 'Lingerie') return 'Intimates';
+  // Sweats & Intimates were retired as standalone shelves — fold legacy/AI-tagged
+  // items into the closest real shelf so nothing goes missing.
+  if (cat === 'Sweats')    return 'Tops';
+  if (cat === 'Comfy' || cat === 'Loungewear' || cat === 'Athleisure') return 'Other';
+  if (cat === 'Intimates' || cat === 'Undergarments' || cat === 'Lingerie') return 'Other';
   return cat || 'Other';
 }
 
@@ -3241,6 +3242,11 @@ async function analyzeOutfit(photoBase64, mime, occasion, isFriend = false, frie
         .join('\n') + '\n'
     : '';
 
+  // Style Goals — bend the rating note, styling tips, and purchase recs toward the user's declared direction
+  const goalsLine = (!isFriend && (S.styleGoals||[]).length)
+    ? `\nSTYLE GOALS: The user is actively working toward: ${S.styleGoals.join(', ')}. In "ratingNote", briefly call out whether this look supports or works against these goals. Weight "stylingTips" and "purchaseRecs" toward choices that move them closer to these goals.\n`
+    : '';
+
   // Context-aware scoring instructions based on user's freeform description
   const occasionLine = occasion
     ? `\nOCCASION CONTEXT: "${occasion}"\nSCORING CRITERIA: Analyze this outfit specifically against the stated occasion/context. Score on fit, cohesion, and appropriateness for this specific scenario. Tailor all recommendations and the suggestedOccasion to this context.\n`
@@ -3248,7 +3254,7 @@ async function analyzeOutfit(photoBase64, mime, occasion, isFriend = false, frie
 
   // Static system prompt — eligible for Anthropic prompt caching (same profile + wardrobe across calls)
   const sysText = `You are an expert fashion stylist and judge. Analyze this outfit photo and respond with ONLY a raw JSON object — no markdown, no code fences, no commentary before or after.
-${profileLine ? `\nCLIENT PROFILE: ${profileLine}\n` : ''}${wardrobeSummary}
+${profileLine ? `\nCLIENT PROFILE: ${profileLine}\n` : ''}${wardrobeSummary}${goalsLine}
 FIRST: count the number of people in the photo.
 
 IF EXACTLY ONE PERSON — respond with exactly this JSON shape:
@@ -3298,7 +3304,7 @@ MANDATORY rules — violating any of these makes the response unusable:
 • "stylingTips": 1–3 actionable tips using items they ALREADY OWN (tucking, swapping a logged wardrobe piece, adjusting proportions, etc.) — never suggest buying something here
 • "purchaseRecs": 1–3 items NOT in their wardrobe that would visibly elevate this outfit. Each entry must have "item" (specific name), "reason" (one sentence), and "query" (retail search term). Price tier and blocked categories are specified in the user message. CRITICAL: never recommend any item that is already visible in the photo — if it appears in the "items" array of your response, the person is already wearing it and likely owns it. Only suggest pieces that are entirely absent from the outfit.
 • "suggestedOccasion": Pick the single best-matching tag from the occasion list in the user message. Return exactly one tag from that list.
-• Output ONLY the JSON object — no text before or after, no code fences`;
+${goalsLine ? '• If STYLE GOALS are provided above, weave a brief, specific reference to them into "ratingNote" (e.g. "leans into your Quiet Luxury goal" or "fights your Minimalist goal with all the print mixing") — don\'t force it if genuinely irrelevant.\n' : ''}• Output ONLY the JSON object — no text before or after, no code fences`;
 
   // Dynamic user text — changes per call (occasion context, shop budget/blocked, occasion tag list)
   const userText = `${occasionLine}PURCHASE RECS — PRICE TIER: ${{ 1:'under $50 (budget/affordable)', 2:'$50–$200 (mid-range)', 3:'$200+ (luxury/designer)' }[S.shopBudget]} — tailor purchase rec search terms to this price point.${S.shopBlocked.size > 0 ? `\nNEVER suggest any of these item types the user has explicitly rejected: ${[...S.shopBlocked].join(', ')} — avoid these categories entirely.` : ''}
@@ -13917,6 +13923,44 @@ function viewReceiptAdd() {
 /* ================================================================
    RATE MODE — dating-app-style full-screen swipe/rate/purgatory flow
    ================================================================ */
+// Lightweight keyword signal for whether a wardrobe item fits a given Style Goal preset.
+// Returns true/false for recognized presets, or null for unrecognized/custom goal strings
+// (so we never penalize an item against a goal we can't actually evaluate).
+const GOAL_KEYWORDS = {
+  'Feminine':    ['floral','lace','ruffle','pastel','bow','dress','skirt','silk','flowy'],
+  'Punk Rock':   ['leather','studded','plaid','combat','distressed','chain','denim','band'],
+  'Executive':   ['blazer','tailored','trouser','button-down','structured','suit','pump','loafer'],
+  'Minimalist':  ['plain','solid','neutral','simple','clean','basic','black','white','grey','gray'],
+  'Maximalist':  ['print','bold','sequin','embellished','statement','bright','pattern','colorful'],
+  'Streetwear':  ['graphic','oversized','sneaker','hoodie','cargo','logo','baggy'],
+  'Bohemian':    ['floral','fringe','crochet','flowy','embroidered','suede','paisley','maxi'],
+  'Classic':     ['tailored','trench','blazer','button-down','pump','loafer','structured'],
+  'Edgy':        ['leather','studded','black','combat','zipper','distressed'],
+  'Romantic':    ['floral','lace','ruffle','pastel','bow','tulle','silk'],
+  'Athletic':    ['sport','athletic','jogger','sneaker','performance','legging','track'],
+  'Artsy':       ['print','sculptural','asymmetric','unique','statement','colorblock'],
+};
+function itemMatchesGoal(w, goal) {
+  const kws = GOAL_KEYWORDS[goal];
+  if (!kws) return null; // unrecognized/custom goal — no signal
+  const text = `${w.name||''} ${w.brand||''} ${w.category||''} ${w.subCategory||''}`.toLowerCase();
+  return kws.some(k => text.includes(k));
+}
+function itemGoalFit(w) {
+  const goals = S.styleGoals || [];
+  if (!goals.length) return null;
+  const matched = [];
+  let anyKnown = false;
+  for (const g of goals) {
+    const m = itemMatchesGoal(w, g);
+    if (m === null) continue;
+    anyKnown = true;
+    if (m) matched.push(g);
+  }
+  if (!anyKnown) return null;
+  return { matched, offGoal: matched.length === 0 };
+}
+
 function startRateMode() {
   const hasAny = S.wardrobe.some(w => !w.retiredFromCloset && !w.inMaybePile);
   if (!hasAny) { toast('Nothing left to rate — your closet is all caught up! ✨'); return; }
@@ -13931,10 +13975,18 @@ function setRateModePhotoMode(mode) {
 }
 
 function confirmRateModeSetup() {
-  const ids = S.wardrobe
-    .filter(w => !w.retiredFromCloset && !w.inMaybePile)
-    .sort((a,b) => (a.lastRatedAt||'').localeCompare(b.lastRatedAt||''))
-    .map(w => w.id);
+  const hasGoals = (S.styleGoals||[]).length > 0;
+  const items = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+  items.sort((a,b) => {
+    if (hasGoals) {
+      const fa = itemGoalFit(a), fb = itemGoalFit(b);
+      const offA = fa?.offGoal ? 0 : 1; // surface off-goal pieces first so they get re-evaluated sooner
+      const offB = fb?.offGoal ? 0 : 1;
+      if (offA !== offB) return offA - offB;
+    }
+    return (a.lastRatedAt||'').localeCompare(b.lastRatedAt||'');
+  });
+  const ids = items.map(w => w.id);
   if (!ids.length) { toast('Nothing left to rate — your closet is all caught up! ✨'); navigate('wardrobe'); return; }
   S.rateMode = { ids, idx: 0, count: 0 };
   render();
@@ -13959,7 +14011,10 @@ async function setStyleRating(id, n) {
 
 function _restockQueryFor(w) {
   const parts = [w.brand, w.size, w.subCategory || w.category, w.name].filter(Boolean);
-  return parts.join(' ').trim() || w.name || 'similar item';
+  let q = parts.join(' ').trim() || w.name || 'similar item';
+  const fit = itemGoalFit(w);
+  if (fit && fit.matched.length) q += ' ' + fit.matched[0].toLowerCase(); // bias the search toward the goal aesthetic this piece already nails
+  return q;
 }
 
 async function rateModeCommit(dir) {
@@ -13978,6 +14033,8 @@ async function rateModeCommit(dir) {
       localStorage.setItem('closet-restock', JSON.stringify([...S.restockQueries]));
       fsSet('restockQueries', [...S.restockQueries]);
       toast(`🔍 Looking for similar ${w.name}…`);
+    } else if (dir === 'keep') {
+      toast(`✓ ${w.name} is good for now.`);
     }
     try { await DB.wardrobe.put(w); } catch(e) { console.error('rateModeCommit save failed:', e); }
   }
@@ -14103,6 +14160,12 @@ function viewRateMode() {
     ? photoBlobUrl(w.photo || w.wearPhoto || null)
     : photoBlobUrl(w.wearPhoto || w.photo || null);
   const remaining = rm.ids.length - rm.idx;
+  const goalFit = itemGoalFit(w);
+  const goalBadge = goalFit ? (
+    goalFit.offGoal
+      ? `<div style="position:absolute;top:28px;left:50%;transform:translateX(-50%);background:rgba(255,82,82,.92);color:#fff;font-size:11px;font-weight:800;padding:6px 13px;border-radius:100px;white-space:nowrap;">🎯 Doesn't match your goals</div>`
+      : `<div style="position:absolute;top:28px;left:50%;transform:translateX(-50%);background:rgba(76,217,100,.92);color:#fff;font-size:11px;font-weight:800;padding:6px 13px;border-radius:100px;white-space:nowrap;">✓ Fits ${esc(goalFit.matched[0])}</div>`
+  ) : '';
   const helpOverlay = !S.rateModeSeenHelp ? `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;">
       <div style="background:#fff;border-radius:20px;padding:26px 22px;max-width:340px;text-align:center;">
@@ -14112,6 +14175,7 @@ function viewRateMode() {
           <div style="margin-bottom:10px;">⭐ Tap stars to rate how much you love each piece, 1–5.</div>
           <div style="margin-bottom:10px;">👉 Swipe <b>right</b> if you want us to search for a similar item — same brand, size &amp; style.</div>
           <div style="margin-bottom:10px;">👈 Swipe <b>left</b> if you're done with it — it'll move to Purgatory.</div>
+          <div style="margin-bottom:10px;">✓ Tap <b>Good for now</b> to just move on without flagging anything.</div>
           <div>Use the buttons below the card if swiping isn't your thing.</div>
         </div>
         <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissRateModeHelp();" onclick="dismissRateModeHelp()"
@@ -14137,6 +14201,7 @@ function viewRateMode() {
         ${photo
           ? `<img src="${esc(photo)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;pointer-events:none;">`
           : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:64px;pointer-events:none;">👕</div>`}
+        ${goalBadge}
         <div id="rate-badge-right" style="position:absolute;top:28px;right:24px;opacity:0;padding:8px 16px;border:3px solid #4CD964;border-radius:10px;color:#4CD964;font-size:22px;font-weight:900;transform:rotate(12deg);letter-spacing:.05em;">FIND</div>
         <div id="rate-badge-left" style="position:absolute;top:28px;left:24px;opacity:0;padding:8px 16px;border:3px solid #FF5252;border-radius:10px;color:#FF5252;font-size:22px;font-weight:900;transform:rotate(-12deg);letter-spacing:.05em;">DONE</div>
         <div style="position:absolute;bottom:0;left:0;right:0;padding:18px 18px 16px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.82));pointer-events:none;">
@@ -14153,13 +14218,17 @@ function viewRateMode() {
       `).join('')}
     </div>
 
-    <div style="display:flex;gap:14px;padding:6px 24px 36px;">
+    <div style="display:flex;gap:10px;padding:6px 18px 36px;">
       <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('left');" onclick="rateModeCommit('left')"
-        style="flex:1;padding:15px 0;background:rgba(255,82,82,.12);border:2px solid #FF5252;border-radius:100px;font-size:14px;font-weight:800;color:#FF5252;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-        ← Done, to Purgatory
+        style="flex:1;padding:15px 0;background:rgba(255,82,82,.12);border:2px solid #FF5252;border-radius:100px;font-size:13px;font-weight:800;color:#FF5252;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        ← Purgatory
+      </button>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('keep');" onclick="rateModeCommit('keep')"
+        style="flex:1;padding:15px 0;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.3);border-radius:100px;font-size:13px;font-weight:800;color:rgba(255,255,255,.85);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        ✓ Good for now
       </button>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('right');" onclick="rateModeCommit('right')"
-        style="flex:1;padding:15px 0;background:rgba(76,217,100,.12);border:2px solid #4CD964;border-radius:100px;font-size:14px;font-weight:800;color:#4CD964;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        style="flex:1;padding:15px 0;background:rgba(76,217,100,.12);border:2px solid #4CD964;border-radius:100px;font-size:13px;font-weight:800;color:#4CD964;cursor:pointer;font-family:inherit;touch-action:manipulation;">
         Find similar →
       </button>
     </div>
