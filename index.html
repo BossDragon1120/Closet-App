@@ -1658,8 +1658,8 @@ body {
 }
 .persona-refresh-btn {
   background: rgba(184,125,42,0.2); border: 1px solid rgba(184,125,42,0.38);
-  color: var(--gold); border-radius: 100px; padding: 6px 14px;
-  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+  color: var(--gold); border-radius: 100px; padding: 9px 18px;
+  font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
   transition: background .15s;
 }
 .persona-refresh-btn:active { background: rgba(184,125,42,0.38); }
@@ -1668,8 +1668,8 @@ body {
   font-size: 10px; color: rgba(255,255,255,0.25); font-weight: 500;
 }
 .persona-heart-btn {
-  background: none; border: none; cursor: pointer; padding: 4px 5px;
-  font-size: 22px; line-height: 1; color: rgba(255,255,255,0.35);
+  background: none; border: none; cursor: pointer; padding: 6px 7px;
+  font-size: 28px; line-height: 1; color: rgba(255,255,255,0.35);
   transition: color .15s, transform .12s; flex-shrink: 0;
 }
 .persona-heart-btn.hearted { color: #E05070; }
@@ -2945,6 +2945,8 @@ const S = {
   plan: { eventDesc: '', suggestion: null, loadingSuggest: false, tripPickerOpen: false, activeTripId: null, savedSuccess: false, soloMode: null, tripDestination: '', tripDays: 5, tripSuggestions: null, tripGaps: null, loadingTrip: false },
   eventBoard: JSON.parse(localStorage.getItem('closet-event-board') || '[]'), // [{id, desc, suggestion, tripId, addedAt}]
   eventTrips: JSON.parse(localStorage.getItem('closet-event-trips') || '[]'), // [{id, name, createdAt}]
+  savedTripPlans: JSON.parse(localStorage.getItem('closet-trip-plans') || '[]'), // [{id, destination, days, suggestions, gaps, createdAt}] — saved day-by-day wardrobe plans, condensed by default
+  _openTripPlanId: null, // which saved trip plan card is expanded (condensed list otherwise)
   returnItems: JSON.parse(localStorage.getItem('closet-return-items') || '[]'),   // [{id,photo,store,channel,deadline,notes,createdAt}]
   _returnForm: null, // active return form state
   _tripFlow: null, // { step:'naming', name:'' } — inline trip creation
@@ -2987,8 +2989,8 @@ const S = {
   selectedWardrobeId: null,
   // ui
   loading: false, loadingMsg: '', error: null,
-  filter: 'all', wardrobeSort: 'smart', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'wishlist', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false,
+  filter: 'all', wardrobeSort: 'smart', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeRatingFilter: null, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'wishlist', shopSelectedQuery: null, shopRateModeOnly: false, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
   // Style Persona
@@ -3254,6 +3256,7 @@ async function analyzeOutfit(photoBase64, mime, occasion, isFriend = false, frie
   // Static system prompt — eligible for Anthropic prompt caching (same profile + wardrobe across calls)
   const sysText = `You are an expert fashion stylist and judge. Analyze this outfit photo and respond with ONLY a raw JSON object — no markdown, no code fences, no commentary before or after.
 ${profileLine ? `\nCLIENT PROFILE: ${profileLine}\n` : ''}${wardrobeSummary}${goalsLine}
+${(profileLine || wardrobeSummary || goalsLine) ? 'IMPORTANT — SCOPE OF THE ABOVE: The CLIENT PROFILE, WARDROBE, and STYLE GOALS information belongs ONLY to the primary app user, and applies ONLY to the single-person ("battle": false) case below. If this photo contains TWO people (a fashion battle), you are judging two different outfits on general styling merit — one or both people may not be the primary user. In that case, COMPLETELY IGNORE the client profile, owned wardrobe, and style goals: do not reference them, weight ratings toward them, or mention them in either person\'s ratingNote, stylingTips, purchaseRecs, or the verdict.\n' : ''}
 FIRST: count the number of people in the photo.
 
 IF EXACTLY ONE PERSON — respond with exactly this JSON shape:
@@ -3300,10 +3303,10 @@ MANDATORY rules — violating any of these makes the response unusable:
 • Item names must be specific: "Ivory Linen Wide-Leg Trouser" not "pants"
 • Pick an accurate emoji icon per item
 • Use the SCORING CRITERIA from the user message — do not fall back to generic fashion scoring when an occasion is provided
-• "stylingTips": 1–3 actionable tips using items they ALREADY OWN (tucking, swapping a logged wardrobe piece, adjusting proportions, etc.) — never suggest buying something here
+• "stylingTips": 1–3 actionable tips using items they ALREADY OWN (tucking, swapping a logged wardrobe piece, adjusting proportions, etc.) — never suggest buying something here. In a two-person battle, base tips on general styling only, not the primary user's owned wardrobe.
 • "purchaseRecs": 1–3 items NOT in their wardrobe that would visibly elevate this outfit. Each entry must have "item" (specific name), "reason" (one sentence), and "query" (retail search term). Price tier and blocked categories are specified in the user message. CRITICAL: never recommend any item that is already visible in the photo — if it appears in the "items" array of your response, the person is already wearing it and likely owns it. Only suggest pieces that are entirely absent from the outfit.
 • "suggestedOccasion": Pick the single best-matching tag from the occasion list in the user message. Return exactly one tag from that list.
-${goalsLine ? '• If STYLE GOALS are provided above, weave a brief, specific reference to them into "ratingNote" (e.g. "leans into your Quiet Luxury goal" or "fights your Minimalist goal with all the print mixing") — don\'t force it if genuinely irrelevant.\n' : ''}• Output ONLY the JSON object — no text before or after, no code fences`;
+${goalsLine ? '• If STYLE GOALS are provided above AND exactly one person is in the photo ("battle": false), weave a brief, specific reference to them into "ratingNote" (e.g. "leans into your Quiet Luxury goal" or "fights your Minimalist goal with all the print mixing") — don\'t force it if genuinely irrelevant. NEVER reference style goals in a two-person battle.\n' : ''}• Output ONLY the JSON object — no text before or after, no code fences`;
 
   // Dynamic user text — changes per call (occasion context, shop budget/blocked, occasion tag list)
   const userText = `${occasionLine}PURCHASE RECS — PRICE TIER: ${{ 1:'under $50 (budget/affordable)', 2:'$50–$200 (mid-range)', 3:'$200+ (luxury/designer)' }[S.shopBudget]} — tailor purchase rec search terms to this price point.${S.shopBlocked.size > 0 ? `\nNEVER suggest any of these item types the user has explicitly rejected: ${[...S.shopBlocked].join(', ')} — avoid these categories entirely.` : ''}
@@ -6296,6 +6299,9 @@ function render() {
     case 'import':            html = viewImport();            break;
     case 'outfit-builder':    html = viewOutfitBuilder();     break;
     case 'rate-mode':         html = viewRateMode();          break;
+    case 'rating-summary':    html = viewRatingSummary();     break;
+    case 'style-score-history': html = viewStyleScoreHistory(); break;
+    case 'confidence-history': html = viewConfidenceHistory(); break;
   }
   // Inject tab bar right after the .nav block on every tab view
   // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
@@ -8583,8 +8589,8 @@ function buildPersonaHTML() {
         <button class="persona-refresh-btn" onclick="generateStylePersona()">⟳ Refresh</button>
         <div style="display:flex;align-items:center;gap:4px;">
           <button class="persona-heart-btn${isHearted?' hearted':''}" onclick="heartPersona()" title="${isHearted?'Remove from journey':'Save to Style Journey'}">${isHearted?'♥':'♡'}</button>
-          <button onclick="sharePersona()" title="Share portrait" style="background:none;border:none;cursor:pointer;padding:4px 5px;line-height:1;color:rgba(255,255,255,0.35);transition:color .15s;" onmouseenter="this.style.color='rgba(255,255,255,0.7)'" onmouseleave="this.style.color='rgba(255,255,255,0.35)'">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          <button onclick="sharePersona()" title="Share portrait" style="background:none;border:none;cursor:pointer;padding:6px 7px;line-height:1;color:rgba(255,255,255,0.35);transition:color .15s;" onmouseenter="this.style.color='rgba(255,255,255,0.7)'" onmouseleave="this.style.color='rgba(255,255,255,0.35)'">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           </button>
           ${ago ? `<span class="persona-stamp">${ago}</span>` : ''}
         </div>
@@ -8903,9 +8909,11 @@ function viewShop() {
   });
 
   // Claude's Recs: shopping list from outfit queries, filtered/sorted
-  const recsRaw = [...list]
+  const recsRawAll = [...list]
     .filter(i => !S.shopBlocked.has(i.query.toLowerCase().trim()))
     .sort((a, b) => b.count - a.count);
+  const rateModeCount = recsRawAll.filter(i => i.restock).length;
+  const recsRaw = (S.shopSource === 'recs' && S.shopRateModeOnly) ? recsRawAll.filter(i => i.restock) : recsRawAll;
 
   const src = S.shopSource || 'wishlist';
   const activeItems = src === 'wishlist'
@@ -9040,7 +9048,7 @@ function viewShop() {
           style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${src==='recs'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='recs'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:16px;margin-bottom:3px;">✦</div>
           <div style="font-size:12px;font-weight:${src==='recs'?'800':'600'};color:${src==='recs'?'var(--gold-dk)':'var(--text-2)'};">AI Picks</div>
-          <div style="font-size:10px;color:${src==='recs'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${recsRaw.length} item${recsRaw.length===1?'':'s'}</div>
+          <div style="font-size:10px;color:${src==='recs'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${recsRawAll.length} item${recsRawAll.length===1?'':'s'}</div>
         </button>
         <button
           ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
@@ -9054,6 +9062,14 @@ function viewShop() {
 
       <!-- Step 2: Item list -->
       ${src !== 'spotted' ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Pick an item</div>` : ''}
+      ${src === 'recs' && rateModeCount > 0 ? `
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.shopRateModeOnly=!S.shopRateModeOnly;S.shopSelectedQuery=null;renderRAF();"
+        onclick="S.shopRateModeOnly=!S.shopRateModeOnly;S.shopSelectedQuery=null;renderRAF()"
+        style="display:inline-flex;align-items:center;gap:6px;padding:7px 13px;margin-bottom:14px;border-radius:100px;border:${S.shopRateModeOnly?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${S.shopRateModeOnly?'var(--gold-bg)':'var(--surface)'};color:${S.shopRateModeOnly?'var(--gold-dk)':'var(--text-2)'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        🔍 From Rate Mode${S.shopRateModeOnly ? '' : ` (${rateModeCount})`}
+        ${S.shopRateModeOnly ? '✕' : ''}
+      </button>` : ''}
       ${src === 'spotted' ? (() => {
         const spotted = S.spottedItems || [];
         if (!spotted.length) return `
@@ -9224,9 +9240,9 @@ function viewShop() {
       const wishItems = S._wishShareItems;
       const selectedCount = wishItems.filter(x => x.selected).length;
       const QUICK = ['🎂 Birthday','🎄 Holiday','💍 Registry'];
-      return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
+      return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;"
           ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishShareOpen=false;S._wishShareItems=null;render();" onclick="S.shopWishShareOpen=false;S._wishShareItems=null;render()">
-        <div style="background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-height:min(88dvh,85vh);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 30px rgba(0,0,0,.18);"
+        <div style="background:var(--surface);border-radius:24px;width:100%;max-width:420px;max-height:min(80dvh,640px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.25);"
           ontouchend="event.stopPropagation();" onclick="event.stopPropagation()">
 
           <!-- Fixed header -->
@@ -9287,7 +9303,7 @@ function viewShop() {
           </div>
 
           <!-- Sticky action button — never scrolls away -->
-          <div style="flex-shrink:0;padding:12px 20px max(20px,env(safe-area-inset-bottom,20px));border-top:1px solid var(--border);background:var(--surface);">
+          <div style="flex-shrink:0;padding:14px 20px 18px;border-top:1px solid var(--border);background:var(--surface);">
             <button
               ontouchend="if(_touchMoved)return;event.preventDefault();shareWishListCard();"
               onclick="shareWishListCard()"
@@ -9493,43 +9509,42 @@ function viewPlan() {
         ${p.tripSuggestions?.length ? `
           <!-- TRIP RESULT — day-by-day -->
           <div style="padding:0 16px;">
-            <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">📅 Your ${p.tripDays||p.tripSuggestions.length}-Day Wardrobe Plan</div>
-            ${p.tripSuggestions.map((day,i) => `
-              <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                  <div style="background:var(--gold);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:100px;">Day ${i+1}</div>
-                  ${day.occasion ? `<div style="font-size:12px;color:var(--text-2);font-weight:600;">${esc(day.occasion)}</div>` : ''}
-                </div>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:${day.reasoning||day.packingTip?'10px':'0'};">
-                  ${(day.items||[]).map(it=>`<span class="plan-rec-chip">${esc(it)}</span>`).join('')}
-                </div>
-                ${day.reasoning ? `<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:${day.packingTip?'6px':'0'};">${esc(day.reasoning)}</div>` : ''}
-                ${day.packingTip ? `<div style="font-size:11px;color:var(--gold-dk);font-weight:600;margin-top:4px;">💡 ${esc(day.packingTip)}</div>` : ''}
-              </div>
-            `).join('')}
-
-            ${p.tripGaps?.length ? `
-              <!-- WHAT TO BUY -->
-              <div style="margin-top:6px;margin-bottom:16px;">
-                <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">🛍 What to Buy</div>
-                ${p.tripGaps.map(g => `
-                  <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:13px 16px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px;">
-                    <div style="flex:1;min-width:0;">
-                      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;">${esc(g.item)}</div>
-                      <div style="font-size:12px;color:var(--text-2);line-height:1.4;">${esc(g.reason)}</div>
-                    </div>
-                    ${g.searchQuery ? `
-                      <a href="https://www.google.com/search?q=${encodeURIComponent(g.searchQuery)}&tbm=shop" target="_blank"
-                        style="flex-shrink:0;padding:7px 13px;border-radius:100px;border:1.5px solid var(--border);background:var(--bg);font-size:12px;font-weight:700;color:var(--accent);text-decoration:none;white-space:nowrap;">
-                        🛍 Shop
-                      </a>
-                    ` : ''}
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
+            ${tripPlanBodyHTML(p.tripSuggestions, p.tripGaps, `Your ${p.tripDays||p.tripSuggestions.length}-Day Wardrobe Plan`)}
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();saveTripPlan();" onclick="saveTripPlan()"
+              style="width:100%;padding:13px 0;border-radius:var(--r-sm);border:none;background:var(--gold);font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:20px;">
+              💾 Save Trip Plan
+            </button>
           </div>
         ` : ''}
+      ` : ''}
+
+      ${S.savedTripPlans.length > 0 ? `
+        <!-- SAVED TRIP PLANS — condensed list, tap to expand/collapse -->
+        <div class="event-board-section">
+          <div class="event-board-header">
+            <span>✈️ Saved Trip Plans</span>
+            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${S.savedTripPlans.length} plan${S.savedTripPlans.length===1?'':'s'}</span>
+          </div>
+          ${S.savedTripPlans.map(tp => {
+            const isOpen = S._openTripPlanId === tp.id;
+            const d = new Date(tp.createdAt);
+            const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+            return `<div class="event-card">
+              <div class="event-card-header" style="cursor:pointer;touch-action:manipulation;"
+                ontouchend="if(_touchMoved)return;event.preventDefault();toggleTripPlan('${tp.id}');" onclick="toggleTripPlan('${tp.id}')">
+                <div class="event-card-desc">
+                  ✈️ ${esc(tp.destination)}
+                  <div style="font-size:11.5px;font-weight:600;color:var(--text-3);margin-top:2px;">${tp.days} day${tp.days===1?'':'s'} · ${dateLabel}</div>
+                </div>
+                <span style="font-size:12px;color:var(--text-3);transform:rotate(${isOpen?'180deg':'0deg'});transition:transform .15s;flex-shrink:0;">▾</span>
+                <button class="event-card-delete" title="Delete plan"
+                  ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteTripPlan('${tp.id}');"
+                  onclick="event.stopPropagation();deleteTripPlan('${tp.id}')">✕</button>
+              </div>
+              ${isOpen ? `<div class="event-card-body">${tripPlanBodyHTML(tp.suggestions, tp.gaps, `${tp.days}-Day Wardrobe Plan`)}</div>` : ''}
+            </div>`;
+          }).join('')}
+        </div>
       ` : ''}
 
       <!-- Post-trip-save success nudge -->
@@ -9765,6 +9780,75 @@ Return ONLY a valid JSON object (no markdown):
     if (!S.plan.tripSuggestions?.length) toast('Could not parse trip plan — try again');
   } catch(e) { console.error(e); toast('Trip planning failed — try again'); }
   S.plan.loadingTrip = false; render();
+}
+
+// ── Saved Trip Plans: persist a generated day-by-day wardrobe plan so it can
+// be condensed into a list and reopened later, instead of disappearing the
+// moment you navigate away (S.plan.tripSuggestions was always ephemeral). ──
+function saveTripPlan() {
+  const p = S.plan;
+  if (!p.tripSuggestions?.length) { toast('Nothing to save yet!'); return; }
+  const entry = {
+    id: 'trip-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    destination: p.tripDestination.trim() || 'Trip',
+    days: p.tripDays || p.tripSuggestions.length,
+    suggestions: p.tripSuggestions,
+    gaps: p.tripGaps || [],
+    createdAt: new Date().toISOString(),
+  };
+  S.savedTripPlans = [entry, ...S.savedTripPlans];
+  localStorage.setItem('closet-trip-plans', JSON.stringify(S.savedTripPlans));
+  S._openTripPlanId = null; // keep new save condensed in the list, like the rest
+  toast(`✓ Saved "${entry.destination}" trip plan!`);
+  render();
+}
+function deleteTripPlan(id) {
+  S.savedTripPlans = S.savedTripPlans.filter(t => t.id !== id);
+  localStorage.setItem('closet-trip-plans', JSON.stringify(S.savedTripPlans));
+  if (S._openTripPlanId === id) S._openTripPlanId = null;
+  render();
+}
+function toggleTripPlan(id) {
+  S._openTripPlanId = S._openTripPlanId === id ? null : id;
+  render();
+}
+// Shared renderer for a day-by-day plan body (used by both the live result
+// and an expanded saved-plan card) so the markup only lives in one place.
+function tripPlanBodyHTML(suggestions, gaps, dayCountLabel) {
+  return `
+    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">📅 ${dayCountLabel}</div>
+    ${suggestions.map((day,i) => `
+      <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <div style="background:var(--gold);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:100px;">Day ${i+1}</div>
+          ${day.occasion ? `<div style="font-size:12px;color:var(--text-2);font-weight:600;">${esc(day.occasion)}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:${day.reasoning||day.packingTip?'10px':'0'};">
+          ${(day.items||[]).map(it=>`<span class="plan-rec-chip">${esc(it)}</span>`).join('')}
+        </div>
+        ${day.reasoning ? `<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:${day.packingTip?'6px':'0'};">${esc(day.reasoning)}</div>` : ''}
+        ${day.packingTip ? `<div style="font-size:11px;color:var(--gold-dk);font-weight:600;margin-top:4px;">💡 ${esc(day.packingTip)}</div>` : ''}
+      </div>
+    `).join('')}
+    ${gaps?.length ? `
+      <div style="margin-top:6px;margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">🛍 What to Buy</div>
+        ${gaps.map(g => `
+          <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:13px 16px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;">${esc(g.item)}</div>
+              <div style="font-size:12px;color:var(--text-2);line-height:1.4;">${esc(g.reason)}</div>
+            </div>
+            ${g.searchQuery ? `
+              <a href="https://www.google.com/search?q=${encodeURIComponent(g.searchQuery)}&tbm=shop" target="_blank"
+                style="flex-shrink:0;padding:7px 13px;border-radius:100px;border:1.5px solid var(--border);background:var(--bg);font-size:12px;font-weight:700;color:var(--accent);text-decoration:none;white-space:nowrap;">
+                🛍 Shop
+              </a>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}`;
 }
 
 async function doSuggestOutfits() {
@@ -10061,6 +10145,18 @@ function viewProfile() {
     return { val: cVal, arrow: diff>0.4?'↑':diff<-0.4?'↓':'→', color: diff>0.4?'#2E9E6B':diff<-0.4?'#C0392B':'var(--text-3)' };
   })();
 
+  // ── Precompute: style score trend (same recent-5-vs-overall pattern as confidence) ──
+  const ratedScored = soloEntries.filter(e => e.rating != null);
+  const scoreStat = (() => {
+    if (ratedScored.length < 2) return null;
+    const rsorted = [...ratedScored].sort((a,b)=>new Date(a.createdAt||0)-new Date(b.createdAt||0));
+    const rRecent = rsorted.slice(-5);
+    const rOverall = ratedScored.reduce((s,e)=>s+e.rating,0)/ratedScored.length;
+    const rVal = rRecent.reduce((s,e)=>s+e.rating,0)/rRecent.length;
+    const diff = rVal - rOverall;
+    return { arrow: diff>0.4?'↑':diff<-0.4?'↓':'→', color: diff>0.4?'#2E9E6B':diff<-0.4?'#C0392B':'var(--text-3)' };
+  })();
+
   // ── Precompute: style chips ───────────────────────────────
   const styleWords = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
 
@@ -10298,7 +10394,8 @@ function viewProfile() {
 
     <!-- Stats bar: Style Score · Confidence · Streak -->
     <div style="margin:14px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 0;display:flex;align-items:center;">
-      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;touch-action:manipulation;"
+        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('style-score-history');" onclick="navigate('style-score-history')">
         <div style="position:relative;width:50px;height:50px;">
           <svg width="50" height="50" viewBox="0 0 90 90">
             <circle cx="45" cy="45" r="38" fill="none" stroke="var(--border)" stroke-width="9"/>
@@ -10309,11 +10406,15 @@ function viewProfile() {
           <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
             <span style="font-size:13px;font-weight:900;color:var(--text);">${isNaN(scoreNum) ? '—' : avgRating}</span>
           </div>
+          ${scoreStat ? `<div style="position:absolute;bottom:-4px;right:-4px;background:var(--surface);border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.15);">
+            <span style="font-size:11px;font-weight:900;color:${scoreStat.color};line-height:1;">${scoreStat.arrow}</span>
+          </div>` : ''}
         </div>
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">Style Score</div>
       </div>
       <div style="width:1px;height:48px;background:var(--border);flex-shrink:0;"></div>
-      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;touch-action:manipulation;"
+        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('confidence-history');" onclick="navigate('confidence-history')">
         <div style="display:flex;align-items:baseline;gap:2px;line-height:1;">
           <span style="font-size:26px;font-weight:900;color:#4A8FA8;">${confStat ? confStat.val.toFixed(1) : '—'}</span>
           ${confStat ? `<span style="font-size:16px;font-weight:900;color:${confStat.color};">${confStat.arrow}</span>` : ''}
@@ -11470,6 +11571,10 @@ function viewHome() {
                 <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(trend.name)}</div>
                 <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(trend.description)}</div>
                 ${trend.tip ? `<div style="margin-top:8px;font-size:11px;color:var(--gold-dk);font-weight:600;background:var(--gold-bg);border-radius:6px;padding:5px 8px;line-height:1.4;">💡 ${esc(trend.tip)}</div>` : ''}
+                <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(trend.name)}" target="_blank" rel="noopener"
+                  style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:11px;font-weight:700;color:var(--gold-dk);text-decoration:none;">
+                  🔗 Shop this look
+                </a>
               </div>
               <div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border);margin-top:auto;">
                 <button ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(trend.id)}','up')" onclick="setTrendReaction('${esc(trend.id)}','up')"
@@ -12091,18 +12196,88 @@ async function deleteSelectedItems() {
 /* ================================================================
    VIEW: WARDROBE
    ================================================================ */
+// Legacy named keys live directly on S; generic category keys use S.catRackLevels
+const _SHELF_LEGACY_KEYS = {'shoeRackLevels':true,'bagRackLevels':true,'accessoryRackLevels':true,'sweatRackLevels':true,'intRackLevels':true};
+const _SHELF_LS_KEY_MAP = {'shoeRackLevels':'closet-shoe-shelves','bagRackLevels':'closet-bag-shelves','accessoryRackLevels':'closet-acc-shelves','sweatRackLevels':'closet-sweat-shelves','intRackLevels':'closet-int-shelves'};
+function _shelfLevelFor(stateKey) {
+  const isLegacy = _SHELF_LEGACY_KEYS[stateKey];
+  const defaultLevels = isLegacy ? 2 : 1;
+  return Math.max(1, Math.min(6, isLegacy ? (S[stateKey] || defaultLevels) : ((S.catRackLevels || {})[stateKey] || defaultLevels)));
+}
+function _saveShelfLevel(stateKey, v) {
+  if (_SHELF_LEGACY_KEYS[stateKey]) {
+    S[stateKey] = v;
+    const k = _SHELF_LS_KEY_MAP[stateKey]; if (k) localStorage.setItem(k, v);
+  } else {
+    S.catRackLevels = {...(S.catRackLevels||{}), [stateKey]: v};
+    localStorage.setItem('closet-cat-rack-levels', JSON.stringify(S.catRackLevels));
+  }
+}
+// Registry populated each time a shelf section is built, so +/- taps can
+// regenerate just that one section's DOM instead of forcing a full app
+// re-render (which was the source of the lag on rapid taps).
+// NOTE: these helpers (and shelfSectionHTML below) must stay top-level —
+// inline onclick="" handlers run in global scope, so a function nested
+// inside viewWardrobe() is invisible to them and the +/- buttons silently
+// no-op. (This was the actual cause of the "+/- doesn't work" report.)
+function bumpRackLevel(stateKey, delta) {
+  const cur = _shelfLevelFor(stateKey);
+  const next = Math.max(1, Math.min(6, cur + delta));
+  if (next === cur) return;
+  _saveShelfLevel(stateKey, next);
+  const reg = S._shelfRegistry && S._shelfRegistry[stateKey];
+  const el = document.getElementById('rack-section-' + stateKey);
+  if (reg && el) {
+    el.outerHTML = shelfSectionHTML(reg.catItems, reg.icon, reg.label, reg.countLabel, reg.stateKey, reg.fallbackIcon, reg.bg);
+  } else {
+    render();
+  }
+}
+function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackIcon, bg) {
+  S._shelfRegistry = S._shelfRegistry || {};
+  S._shelfRegistry[stateKey] = { catItems, icon, label, countLabel, stateKey, fallbackIcon, bg };
+  const levels = _shelfLevelFor(stateKey);
+  const _skEsc = String(stateKey).replace(/'/g, "\\'");
+  const _incExpr = `bumpRackLevel('${_skEsc}',1)`;
+  const _decExpr = `bumpRackLevel('${_skEsc}',-1)`;
+  const perShelf = Math.ceil(catItems.length / levels);
+  const cost = catCost(catItems);
+  const costStr = fmtCost(cost);
+  let shelves = '';
+  for (let i = 0; i < levels; i++) {
+    const batch = catItems.slice(i * perShelf, (i + 1) * perShelf);
+    if (!batch.length) continue;
+    shelves += `<div class="shoe-shelf">${batch.map(w => shelfCardHTML(w, fallbackIcon, catItems)).join('')}</div>`;
+  }
+  return `<div class="shoe-rack-section" id="rack-section-${esc(String(stateKey))}"${bg ? ` style="background:${bg};"` : ''}>
+    <div class="shoe-rack-header">
+      <div class="shoe-rack-title">
+        <span class="shoe-rack-cat">${icon} ${label}</span>
+        <span class="shoe-rack-meta">${catItems.length} ${countLabel}${costStr?' · '+costStr:''}</span>
+      </div>
+      <div class="shoe-rack-controls">
+        <span class="shoe-rack-level-label">${levels===1?'1 row':levels+' rows'}</span>
+        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();${_decExpr}" onclick="${_decExpr}" ${levels<=1?'disabled':''} title="Fewer rows">−</button>
+        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();${_incExpr}" onclick="${_incExpr}" ${levels>=6?'disabled':''} title="More rows">+</button>
+      </div>
+    </div>
+    <div class="shoe-shelf-wrap">${shelves}</div>
+  </div>`;
+}
+
 function viewWardrobe() {
   // Memoization: skip expensive rebuild if wardrobe state hasn't changed
   const _vwKey = [
     S.wardrobeCategory, S.wardrobeSubCategory, S.wardrobeSort, S.wardrobeSearch,
-    S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0,
+    S._wardrobeSearchOpen?1:0,
+    S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0, S._wardrobeRatingFilter ?? 'none',
     S.wardrobeTailoringFilter?1:0,
     S.wardrobeExpanded?1:0, S.wardrobeRetiredExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0, S._hiddenGemsExpanded?1:0,
     S._addingShelf?1:0, S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels,
     S.weatherPin ? S.weatherPin.city+S.weatherPin.tempF : '',
     (S._wardrobeSelected||[]).join(','),
     (S._wearFlipped ? [...S._wearFlipped].sort().join(',') : ''),
-    S.wardrobe.map(w=>w.id+'|'+(w.wears?.length||0)+'|'+(w.inMaybePile?1:0)+'|'+(w.tailoringNeeded?1:0)+'|'+(w.retiredFromCloset?1:0)+'|'+(!!w.photo?1:0)+'|'+(!!w.wearPhoto?1:0)+'|'+(w.name||'')+'|'+(w.category||'')+'|'+(w.brand||'')+'|'+(w.isGem?1:0)).join(';'),
+    S.wardrobe.map(w=>w.id+'|'+(w.wears?.length||0)+'|'+(w.inMaybePile?1:0)+'|'+(w.tailoringNeeded?1:0)+'|'+(w.retiredFromCloset?1:0)+'|'+(!!w.photo?1:0)+'|'+(!!w.wearPhoto?1:0)+'|'+(w.name||'')+'|'+(w.category||'')+'|'+(w.brand||'')+'|'+(w.isGem?1:0)+'|'+(w.styleRating||0)).join(';'),
     (S.customCategories||[]).join(','),
     JSON.stringify(S.catRackLevels||{}),
   ].join('§');
@@ -12139,6 +12314,11 @@ function viewWardrobe() {
     items = items.filter(w => w.inMaybePile);
   }
 
+  // Apply rating filter (set from Ratings Summary — 0 means "not yet rated")
+  if (S._wardrobeRatingFilter != null) {
+    items = items.filter(w => S._wardrobeRatingFilter === 0 ? !w.styleRating : w.styleRating === S._wardrobeRatingFilter);
+  }
+
   // Apply for-sale filter
   if (false) {
     // For Sale filter removed
@@ -12147,7 +12327,7 @@ function viewWardrobe() {
 
   // Apply category filter (skip if tailoring, hero, maybe pile, or for-sale filter is active)
   // normalizeCat(S.wardrobeCategory) handles 'Bottoms' → 'Pants' so existing items match
-  if (!S.wardrobeTailoringFilter && !S._wardrobeHeroFilter && !S._wardrobeMaybePileFilter && S.wardrobeCategory !== 'All') {
+  if (!S.wardrobeTailoringFilter && !S._wardrobeHeroFilter && !S._wardrobeMaybePileFilter && S._wardrobeRatingFilter == null && S.wardrobeCategory !== 'All') {
     items = items.filter(w => normalizeCat(w.category || categoryFromIcon(w.icon, w.name)) === normalizeCat(S.wardrobeCategory));
   }
 
@@ -12276,6 +12456,14 @@ function viewWardrobe() {
     const wornSinceFlag = (w.wears || []).some(wr => new Date(wr.date || wr).getTime() > flaggedAt);
     return !wornSinceFlag;
   });
+  const ratingFilterBanner = S._wardrobeRatingFilter != null ? `
+    <div style="margin:0 16px 10px;padding:10px 14px;background:var(--gold-bg,#FBF1DE);border:1.5px solid var(--gold);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div style="font-size:13px;font-weight:700;color:var(--gold-dk,#8a5e1c);">
+        ${S._wardrobeRatingFilter === 0 ? '☆ Showing not-yet-rated items' : `${'★'.repeat(S._wardrobeRatingFilter)}${'☆'.repeat(5-S._wardrobeRatingFilter)} Showing ${S._wardrobeRatingFilter}-star items`}
+      </div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeRatingFilter=null;renderRAF()" onclick="S._wardrobeRatingFilter=null;render()"
+        style="background:none;border:none;color:var(--gold-dk,#8a5e1c);font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;flex-shrink:0;">✕ Clear</button>
+    </div>` : '';
   const maybePileNudge = maybePileOverdue.length > 0 && !S._wardrobeMaybePileFilter ? `
     <div style="margin:0 16px 10px;padding:12px 14px;background:#F0EFFE;border:1.5px solid #9B7FE0;border-radius:var(--r-sm);display:flex;align-items:center;gap:12px;cursor:pointer;"
       ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeMaybePileFilter=true;S._wardrobeHeroFilter=false;S.wardrobeCategory='All';S.wardrobeSubCategory='All';renderRAF()"
@@ -12358,71 +12546,6 @@ function shelfCardHTML(w, fallbackIcon, _siblings) {
     </div>
     <div class="shoe-card-name">${esc(w.name)}</div>
     ${wears >= 10 ? `<div class="shoe-card-wears" style="color:var(--gold);font-weight:700;">${wears}w</div>` : ''}
-  </div>`;
-}
-
-// Legacy named keys live directly on S; generic category keys use S.catRackLevels
-const _SHELF_LEGACY_KEYS = {'shoeRackLevels':true,'bagRackLevels':true,'accessoryRackLevels':true,'sweatRackLevels':true,'intRackLevels':true};
-const _SHELF_LS_KEY_MAP = {'shoeRackLevels':'closet-shoe-shelves','bagRackLevels':'closet-bag-shelves','accessoryRackLevels':'closet-acc-shelves','sweatRackLevels':'closet-sweat-shelves','intRackLevels':'closet-int-shelves'};
-function _shelfLevelFor(stateKey) {
-  const isLegacy = _SHELF_LEGACY_KEYS[stateKey];
-  const defaultLevels = isLegacy ? 2 : 1;
-  return Math.max(1, Math.min(6, isLegacy ? (S[stateKey] || defaultLevels) : ((S.catRackLevels || {})[stateKey] || defaultLevels)));
-}
-function _saveShelfLevel(stateKey, v) {
-  if (_SHELF_LEGACY_KEYS[stateKey]) {
-    S[stateKey] = v;
-    const k = _SHELF_LS_KEY_MAP[stateKey]; if (k) localStorage.setItem(k, v);
-  } else {
-    S.catRackLevels = {...(S.catRackLevels||{}), [stateKey]: v};
-    localStorage.setItem('closet-cat-rack-levels', JSON.stringify(S.catRackLevels));
-  }
-}
-// Registry populated each time a shelf section is built, so +/- taps can
-// regenerate just that one section's DOM instead of forcing a full app
-// re-render (which was the source of the lag on rapid taps).
-function bumpRackLevel(stateKey, delta) {
-  const cur = _shelfLevelFor(stateKey);
-  const next = Math.max(1, Math.min(6, cur + delta));
-  if (next === cur) return;
-  _saveShelfLevel(stateKey, next);
-  const reg = S._shelfRegistry && S._shelfRegistry[stateKey];
-  const el = document.getElementById('rack-section-' + stateKey);
-  if (reg && el) {
-    el.outerHTML = shelfSectionHTML(reg.catItems, reg.icon, reg.label, reg.countLabel, reg.stateKey, reg.fallbackIcon, reg.bg);
-  } else {
-    render();
-  }
-}
-function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackIcon, bg) {
-  S._shelfRegistry = S._shelfRegistry || {};
-  S._shelfRegistry[stateKey] = { catItems, icon, label, countLabel, stateKey, fallbackIcon, bg };
-  const levels = _shelfLevelFor(stateKey);
-  const _skEsc = String(stateKey).replace(/'/g, "\\'");
-  const _incExpr = `bumpRackLevel('${_skEsc}',1)`;
-  const _decExpr = `bumpRackLevel('${_skEsc}',-1)`;
-  const perShelf = Math.ceil(catItems.length / levels);
-  const cost = catCost(catItems);
-  const costStr = fmtCost(cost);
-  let shelves = '';
-  for (let i = 0; i < levels; i++) {
-    const batch = catItems.slice(i * perShelf, (i + 1) * perShelf);
-    if (!batch.length) continue;
-    shelves += `<div class="shoe-shelf">${batch.map(w => shelfCardHTML(w, fallbackIcon, catItems)).join('')}</div>`;
-  }
-  return `<div class="shoe-rack-section" id="rack-section-${esc(String(stateKey))}"${bg ? ` style="background:${bg};"` : ''}>
-    <div class="shoe-rack-header">
-      <div class="shoe-rack-title">
-        <span class="shoe-rack-cat">${icon} ${label}</span>
-        <span class="shoe-rack-meta">${catItems.length} ${countLabel}${costStr?' · '+costStr:''}</span>
-      </div>
-      <div class="shoe-rack-controls">
-        <span class="shoe-rack-level-label">${levels===1?'1 row':levels+' rows'}</span>
-        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();${_decExpr}" onclick="${_decExpr}" ${levels<=1?'disabled':''} title="Fewer rows">−</button>
-        <button class="shoe-rack-btn" ontouchend="if(_touchMoved)return;event.preventDefault();${_incExpr}" onclick="${_incExpr}" ${levels>=6?'disabled':''} title="More rows">+</button>
-      </div>
-    </div>
-    <div class="shoe-shelf-wrap">${shelves}</div>
   </div>`;
 }
 
@@ -12575,15 +12698,19 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
           placeholder="Brand, name, category…"
           oninput="S.wardrobeSearch=this.value;clearTimeout(window._wsDebounce);window._wsDebounce=setTimeout(()=>render(),280);"
           style="flex:1;border:none;background:transparent;font-size:15px;color:var(--text);outline:none;padding:0 6px;font-family:inherit;min-width:0;">
-        <span style="width:44px;"></span>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('new-piece')" onclick="navigate('new-piece')" title="New Piece" style="background:none;border:none;cursor:pointer;width:33px;height:33px;display:flex;align-items:center;justify-content:center;color:var(--gold-dk,#8a5e1c);touch-action:manipulation;line-height:0;flex-shrink:0;">
+          ${iconPlus()}
+        </button>
       ` : `
         <span class="nav-logo">🪞 Closet</span>
-        <span style="display:flex;align-items:center;gap:4px;">
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeSearchOpen=true;render()" onclick="S._wardrobeSearchOpen=true;render()" style="background:none;border:none;cursor:pointer;padding:7px;color:var(--text-2);touch-action:manipulation;line-height:0;">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span style="display:flex;align-items:center;gap:2px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeSearchOpen=true;render()" onclick="S._wardrobeSearchOpen=true;render()" title="Search" style="background:none;border:none;cursor:pointer;width:33px;height:33px;display:flex;align-items:center;justify-content:center;color:var(--text-2);touch-action:manipulation;line-height:0;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeSelectMode=true;render()" onclick="S._wardrobeSelectMode=true;render()" style="font-size:12px;font-weight:700;color:var(--text-2);background:none;border:none;cursor:pointer;padding:4px 6px;font-family:inherit;touch-action:manipulation;">Select</button>
-          <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('new-piece')" onclick="navigate('new-piece')" style="touch-action:manipulation;">${iconPlus()} New Piece</button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeSelectMode=true;render()" onclick="S._wardrobeSelectMode=true;render()" title="Select items" style="background:none;border:none;cursor:pointer;width:33px;height:33px;display:flex;align-items:center;justify-content:center;color:var(--text-2);touch-action:manipulation;line-height:0;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><polyline points="8 12 11 15 16 9"/></svg>
+          </button>
+          <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('new-piece')" onclick="navigate('new-piece')" style="touch-action:manipulation;flex-shrink:0;">${iconPlus()} New Piece</button>
         </span>
       `}
     </div>
@@ -12641,12 +12768,18 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
         <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${activeWardrobe.length}</span>
         <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">piece${activeWardrobe.length===1?'':'s'} in your closet</span>
       </div>
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();startRateMode();" onclick="startRateMode()"
-        style="flex-shrink:0;padding:8px 14px;background:#1a1a1a;border:none;border-radius:100px;font-size:12px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
-        💫 Rate Mode
-      </button>
+      <div style="display:flex;gap:8px;flex-shrink:0;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('rating-summary');" onclick="navigate('rating-summary')" title="Ratings summary"
+          style="flex-shrink:0;padding:8px 12px;background:none;border:1.5px solid var(--border);border-radius:100px;font-size:12px;font-weight:800;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
+          ⭐ Summary
+        </button>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();startRateMode();" onclick="startRateMode()"
+          style="flex-shrink:0;padding:8px 14px;background:#1a1a1a;border:none;border-radius:100px;font-size:12px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
+          💫 Rate Mode
+        </button>
+      </div>
     </div>` : ''}
-    ${catBar}${subCatBar}${maybePileNudge}${sortBar}
+    ${catBar}${subCatBar}${ratingFilterBanner}${maybePileNudge}${sortBar}
     ${S._wardrobeReorderMode ? `
     <div style="position:sticky;top:0;z-index:90;margin:0 0 4px;padding:10px 16px;background:#9B7FE0;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.12);">
       <div style="font-size:13px;font-weight:700;color:#fff;">✥ Hold &amp; drag a hanger to reorder</div>
@@ -14007,7 +14140,14 @@ function dismissRateModeHelp() {
 
 async function setStyleRating(id, n) {
   const w = S.wardrobe.find(i => i.id === id); if (!w) return;
-  w.styleRating = (w.styleRating === n) ? null : n; // tap again to clear
+  const cleared = w.styleRating === n;
+  w.styleRating = cleared ? null : n; // tap again to clear
+  if (!cleared) {
+    // Track how feelings about this piece evolve over time — each rating is a timestamped
+    // snapshot, not just an overwrite, so we can later show trend/history per item.
+    if (!Array.isArray(w.styleRatingHistory)) w.styleRatingHistory = [];
+    w.styleRatingHistory.push({ rating: n, at: new Date().toISOString() });
+  }
   render();
   try { await DB.wardrobe.put(w); } catch(e) { console.error('setStyleRating save failed:', e); }
 }
@@ -14035,7 +14175,7 @@ async function rateModeCommit(dir) {
       S.restockQueries.add(q);
       localStorage.setItem('closet-restock', JSON.stringify([...S.restockQueries]));
       fsSet('restockQueries', [...S.restockQueries]);
-      toast(`🔍 Looking for similar ${w.name}…`);
+      toast(`🔍 Added to "Shop" page!`);
     } else if (dir === 'keep') {
       toast('✓ Good for now!');
     }
@@ -14177,7 +14317,7 @@ function viewRateMode() {
         <div style="font-size:36px;margin-bottom:10px;">👗💫</div>
         <div style="font-size:17px;font-weight:800;color:#222;margin-bottom:14px;">Rate &amp; Refresh</div>
         <div style="font-size:13.5px;color:#555;line-height:1.6;text-align:left;">
-          <div style="margin-bottom:10px;">⭐ Tap stars to rate how much you love each piece, 1–5.</div>
+          <div style="margin-bottom:10px;">⭐ Tap stars for how this piece makes you feel <b>right now</b> — happy to wear it? 1–5. Rate it again anytime to see how your feelings change over time.</div>
           <div style="margin-bottom:10px;">👉 Swipe <b>right</b> if you want us to search for a similar item — same brand, size &amp; style.</div>
           <div style="margin-bottom:10px;">👈 Swipe <b>left</b> if you're done with it — it'll move to Purgatory.</div>
           <div style="margin-bottom:10px;">✓ Tap <b>Good for now</b> to just move on without flagging anything.</div>
@@ -14216,6 +14356,10 @@ function viewRateMode() {
       </div>
     </div>
 
+    <div style="text-align:center;padding:0 24px 8px;">
+      <div style="font-size:13.5px;font-weight:700;color:rgba(255,255,255,.88);">💭 How does this make you feel right now?</div>
+      <div style="font-size:11.5px;color:rgba(255,255,255,.5);margin-top:2px;">Does it bring you joy? Do you reach for it?</div>
+    </div>
     <div style="display:flex;justify-content:center;gap:10px;padding:4px 18px 14px;">
       ${[1,2,3,4,5].map(n => `
         <button ontouchend="if(_touchMoved)return;event.preventDefault();setStyleRating('${w.id}',${n});" onclick="setStyleRating('${w.id}',${n})"
@@ -14235,6 +14379,175 @@ function viewRateMode() {
       <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('right');" onclick="rateModeCommit('right')"
         style="flex:1;padding:15px 0;background:rgba(76,217,100,.12);border:2px solid #4CD964;border-radius:100px;font-size:13px;font-weight:800;color:#4CD964;cursor:pointer;font-family:inherit;touch-action:manipulation;">
         Find similar →
+      </button>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   VIEW: METRIC HISTORY — shared weekly line-graph builder, used by
+   Style Score History and Confidence History
+   ================================================================ */
+function _weeklyMetricHistoryHTML({ field, title, countLabel, accent }) {
+  const soloEntries = S.entries.filter(e => !e.battleId && e[field] != null)
+    .sort((a,b) => new Date(a.createdAt||0) - new Date(b.createdAt||0));
+
+  // Bin by ISO week so the trend reads as a smooth line instead of noisy daily points
+  const weekKey = d => {
+    const dt = new Date(d);
+    const onejan = new Date(dt.getFullYear(), 0, 1);
+    const week = Math.ceil((((dt - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+    return `${dt.getFullYear()}-W${String(week).padStart(2,'0')}`;
+  };
+  const byWeek = {};
+  soloEntries.forEach(e => {
+    const k = weekKey(e.createdAt);
+    if (!byWeek[k]) byWeek[k] = { sum: 0, count: 0, firstDate: e.createdAt };
+    byWeek[k].sum += e[field];
+    byWeek[k].count++;
+  });
+  const weeks = Object.keys(byWeek).sort().map(k => ({
+    key: k,
+    avg: byWeek[k].sum / byWeek[k].count,
+    date: byWeek[k].firstDate,
+  })).slice(-16); // last 16 weeks of activity
+
+  const overallAvg = soloEntries.reduce((s,e)=>s+e[field],0) / (soloEntries.length || 1);
+
+  let chartHTML;
+  if (weeks.length < 2) {
+    chartHTML = `<div style="padding:40px 20px;text-align:center;color:var(--text-3);font-size:13px;">
+      Log a few more outfits to start seeing your trend line — you need at least two different weeks of entries.
+    </div>`;
+  } else {
+    const W = 340, H = 160, padX = 12, padY = 18;
+    const minV = 1, maxV = 10;
+    const xStep = (W - padX*2) / (weeks.length - 1);
+    const yFor = v => padY + (H - padY*2) * (1 - (v - minV)/(maxV - minV));
+    const points = weeks.map((w,i) => `${padX + i*xStep},${yFor(w.avg)}`).join(' ');
+    const avgY = yFor(overallAvg);
+    const dots = weeks.map((w,i) => {
+      const x = padX + i*xStep, y = yFor(w.avg);
+      return `<circle cx="${x}" cy="${y}" r="3.5" fill="${accent}" stroke="#fff" stroke-width="1.5"/>`;
+    }).join('');
+    chartHTML = `
+      <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;">
+        <line x1="${padX}" y1="${avgY}" x2="${W-padX}" y2="${avgY}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4"/>
+        <polyline points="${points}" fill="none" stroke="${accent}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        ${dots}
+      </svg>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-3);margin-top:2px;">
+        <span>${new Date(weeks[0].date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+        <span>${new Date(weeks[weeks.length-1].date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+      </div>`;
+  }
+
+  const best = weeks.length ? weeks.reduce((a,b)=> b.avg > a.avg ? b : a) : null;
+
+  return `<div style="padding:18px 16px 6px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:18px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">Weekly average</div>
+          <div style="font-size:20px;font-weight:900;color:var(--text);">${overallAvg ? overallAvg.toFixed(1) : '—'}</div>
+        </div>
+        ${chartHTML}
+      </div>
+
+      ${best ? `<div style="display:flex;gap:10px;margin-bottom:24px;">
+        <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;text-align:center;">
+          <div style="font-size:18px;font-weight:900;color:var(--text);">${best.avg.toFixed(1)}</div>
+          <div style="font-size:10px;color:var(--text-3);margin-top:2px;">Best week</div>
+        </div>
+        <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;text-align:center;">
+          <div style="font-size:18px;font-weight:900;color:var(--text);">${soloEntries.length}</div>
+          <div style="font-size:10px;color:var(--text-3);margin-top:2px;">${countLabel}</div>
+        </div>
+      </div>` : ''}
+
+      <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-bottom:30px;">Each point is your average ${title.toLowerCase()} for that week. Log and rate outfits regularly to see a clearer trend.</div>
+    </div>`;
+}
+
+function viewStyleScoreHistory() {
+  return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">${iconBack()} Profile</button>
+      <span class="nav-title">Style Score History</span>
+      <span style="width:30px;"></span>
+    </div>
+    ${_weeklyMetricHistoryHTML({ field: 'rating', title: 'Style Score', countLabel: 'Outfits rated', accent: 'var(--gold)' })}
+  </div>`;
+}
+
+function viewConfidenceHistory() {
+  return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">${iconBack()} Profile</button>
+      <span class="nav-title">Confidence History</span>
+      <span style="width:30px;"></span>
+    </div>
+    ${_weeklyMetricHistoryHTML({ field: 'confidence', title: 'Confidence', countLabel: 'Outfits logged', accent: '#4A8FA8' })}
+  </div>`;
+}
+
+/* ================================================================
+   VIEW: RATINGS SUMMARY — how items are tracking over time
+   ================================================================ */
+function viewRatingSummary() {
+  const active = S.wardrobe.filter(w => !w.retiredFromCloset);
+  const counts = { 5:0, 4:0, 3:0, 2:0, 1:0, 0:0 };
+  active.forEach(w => { counts[w.styleRating || 0]++; });
+  const maxCount = Math.max(1, ...Object.values(counts));
+  const ratedCount = active.length - counts[0];
+  const avg = ratedCount > 0
+    ? (active.reduce((sum, w) => sum + (w.styleRating || 0), 0) / ratedCount).toFixed(1)
+    : null;
+
+  const row = (n, label, color) => {
+    const c = counts[n];
+    const pct = Math.round((c / maxCount) * 100);
+    const isFiltered = S._wardrobeRatingFilter === n;
+    return `<div ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeRatingFilter=${n};switchTab('wardrobe');" onclick="S._wardrobeRatingFilter=${n};switchTab('wardrobe')"
+      style="display:flex;align-items:center;gap:12px;padding:10px 4px;cursor:pointer;touch-action:manipulation;${isFiltered?'background:var(--gold-bg,#FBF1DE);border-radius:var(--r-sm);':''}">
+      <div style="width:64px;flex-shrink:0;font-size:13px;font-weight:700;color:var(--text-2);">${label}</div>
+      <div style="flex:1;height:10px;background:var(--border);border-radius:100px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:100px;transition:width .3s;"></div>
+      </div>
+      <div style="width:30px;flex-shrink:0;text-align:right;font-size:13px;font-weight:800;color:var(--text);">${c}</div>
+    </div>`;
+  };
+
+  return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')">${iconBack()} Wardrobe</button>
+      <span class="nav-title">Ratings Summary</span>
+      <span style="width:30px;"></span>
+    </div>
+
+    <div style="padding:18px 16px 6px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 16px;margin-bottom:18px;text-align:center;">
+        <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">How your closet feels lately</div>
+        ${avg ? `
+          <div style="font-size:32px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${avg} <span style="font-size:16px;color:var(--text-3);font-weight:700;">avg ★</span></div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:4px;">${ratedCount} of ${active.length} piece${active.length===1?'':'s'} rated</div>
+        ` : `
+          <div style="font-size:14px;color:var(--text-2);">No ratings yet — head into Rate Mode to check in on a few pieces.</div>
+        `}
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">By rating · tap to filter Wardrobe</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:8px 12px;margin-bottom:24px;">
+        ${row(5, '★★★★★', '#4CD964')}
+        ${row(4, '★★★★☆', '#8FD96B')}
+        ${row(3, '★★★☆☆', '#E0B84A')}
+        ${row(2, '★★☆☆☆', '#E8915A')}
+        ${row(1, '★☆☆☆☆', '#FF5252')}
+        ${row(0, 'Not yet rated', 'var(--text-3)')}
+      </div>
+
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();startRateMode();" onclick="startRateMode()"
+        style="width:100%;padding:14px 0;background:#1a1a1a;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:30px;">
+        💫 Check in with a few pieces
       </button>
     </div>
   </div>`;
