@@ -2810,6 +2810,17 @@ const DB = {
     put: (e) => DB.entries._queue(e.id, async () => { await userCol('entries').doc(String(e.id)).set(e); return e; }),
     del: async (id) => { await userCol('entries').doc(String(id)).delete(); },
   },
+  therapySessions: {
+    // Only transcript text + lightweight metadata sync via Firestore.
+    // Raw audio (if any) lives in AudioDB on-device — see hasAudio flag.
+    getAll: async () => {
+      const snap = await userCol('therapySessions').get();
+      return snap.docs.map(d => d.data()).sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
+    },
+    _queue: _makeWriteQueue(),
+    put: (s) => DB.therapySessions._queue(s.id, async () => { await userCol('therapySessions').doc(String(s.id)).set(s); return s; }),
+    del: async (id) => { await userCol('therapySessions').doc(String(id)).delete(); await AudioDB.del(id); },
+  },
   wardrobe: {
     getAll: async () => {
       const snap = await userCol('wardrobe').get();
@@ -2919,6 +2930,9 @@ const S = {
   battleDraft: null, // { photo, person1, person2, verdict, winner }
   discoverTab: 'trends', // 'trends' | 'brands' | 'tips'
   styleGoals: JSON.parse(localStorage.getItem('closet-style-goals') || '[]'),
+  therapySessions: [], // [{id, createdAt, season, transcript, hasAudio, source}] — loaded from Firestore on sign-in
+  _therapyDraft: null,  // { id, season, transcript, audioDataUrl, hasAudio, source, recording, recordSeconds }
+  _therapyRecorder: null, // live MediaRecorder + SpeechRecognition handles, not persisted
   catRackLevels: JSON.parse(localStorage.getItem('closet-cat-rack-levels') || '{}'),
   funCompliment: null,      // { lines: [...], generatedAt }
   _funComplimentLoading: false,
@@ -3152,6 +3166,65 @@ const PhotoDB = (() => {
 })();
 
 /* ================================================================
+   THERAPY AUDIO STORAGE — IndexedDB
+   Same rationale as PhotoDB: voice recordings / uploaded audio files
+   for Closet Therapy Session notes can be several MB — too big for
+   localStorage or a Firestore doc field, so they live in IndexedDB
+   keyed by therapy session id. Only the transcript text + metadata
+   sync to Firestore (and therefore across devices); the raw audio
+   stays local to the device it was recorded/uploaded on.
+   ================================================================ */
+const AudioDB = (() => {
+  const DB_NAME = 'closet-therapy-audio';
+  const STORE   = 'audio';
+  const VERSION = 1;
+  let _db = null;
+
+  function openDB() {
+    if (_db) return Promise.resolve(_db);
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, VERSION);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess = e => { _db = e.target.result; res(_db); };
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  async function get(id) {
+    try {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(String(id));
+        req.onsuccess = () => res(req.result || null);
+        req.onerror   = e => rej(e.target.error);
+      });
+    } catch(e) { console.warn('AudioDB.get', e); return null; }
+  }
+
+  async function put(id, data) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(data, String(id));
+      req.onsuccess = () => res();
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  async function del(id) {
+    try {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const req = db.transaction(STORE, 'readwrite').objectStore(STORE).delete(String(id));
+        req.onsuccess = () => res();
+        req.onerror   = e => rej(e.target.error);
+      });
+    } catch(e) { console.warn('AudioDB.del', e); }
+  }
+
+  return { get, put, del };
+})();
+
+/* ================================================================
    FIREBASE STORAGE — cross-device photo sync
    Photos uploaded as data URLs are pushed to Firebase Storage so
    they are accessible on every device (desktop, other phones, etc.).
@@ -3248,6 +3321,23 @@ async function analyzeOutfit(photoBase64, mime, occasion, isFriend = false, frie
     ? `\nSTYLE GOALS: The user is actively working toward: ${S.styleGoals.join(', ')}. In "ratingNote", briefly call out whether this look supports or works against these goals. Weight "stylingTips" and "purchaseRecs" toward choices that move them closer to these goals.\n`
     : '';
 
+  // Closet Therapy Session notes — transcripts/recordings from styling sessions give Claude
+  // longer-term context (likes/dislikes, fit quirks, goals discussed in person, etc.)
+  const therapyLine = (() => {
+    if (isFriend) return '';
+    const sessions = [...(S.therapySessions||[])]
+      .filter(s => s.transcript && s.transcript.trim())
+      .sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))
+      .slice(0, 3);
+    if (!sessions.length) return '';
+    const notes = sessions.map(s => {
+      const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-US',{month:'short',year:'numeric'}) : '';
+      const text = s.transcript.length > 600 ? s.transcript.slice(0,600) + '…' : s.transcript;
+      return `[${dateStr}${s.season ? ' · ' + s.season : ''}] ${text}`;
+    }).join('\n');
+    return `\nCLOSET THERAPY SESSION NOTES: Transcript excerpts from the user's in-person styling sessions — use these for personal context (likes/dislikes, fit preferences, things they've said about their style) when relevant to "ratingNote", "stylingTips", and "purchaseRecs":\n${notes}\n`;
+  })();
+
   // Context-aware scoring instructions based on user's freeform description
   const occasionLine = occasion
     ? `\nOCCASION CONTEXT: "${occasion}"\nSCORING CRITERIA: Analyze this outfit specifically against the stated occasion/context. Score on fit, cohesion, and appropriateness for this specific scenario. Tailor all recommendations and the suggestedOccasion to this context.\n`
@@ -3255,8 +3345,8 @@ async function analyzeOutfit(photoBase64, mime, occasion, isFriend = false, frie
 
   // Static system prompt — eligible for Anthropic prompt caching (same profile + wardrobe across calls)
   const sysText = `You are an expert fashion stylist and judge. Analyze this outfit photo and respond with ONLY a raw JSON object — no markdown, no code fences, no commentary before or after.
-${profileLine ? `\nCLIENT PROFILE: ${profileLine}\n` : ''}${wardrobeSummary}${goalsLine}
-${(profileLine || wardrobeSummary || goalsLine) ? 'IMPORTANT — SCOPE OF THE ABOVE: The CLIENT PROFILE, WARDROBE, and STYLE GOALS information belongs ONLY to the primary app user, and applies ONLY to the single-person ("battle": false) case below. If this photo contains TWO people (a fashion battle), you are judging two different outfits on general styling merit — one or both people may not be the primary user. In that case, COMPLETELY IGNORE the client profile, owned wardrobe, and style goals: do not reference them, weight ratings toward them, or mention them in either person\'s ratingNote, stylingTips, purchaseRecs, or the verdict.\n' : ''}
+${profileLine ? `\nCLIENT PROFILE: ${profileLine}\n` : ''}${wardrobeSummary}${goalsLine}${therapyLine}
+${(profileLine || wardrobeSummary || goalsLine || therapyLine) ? 'IMPORTANT — SCOPE OF THE ABOVE: The CLIENT PROFILE, WARDROBE, STYLE GOALS, and CLOSET THERAPY SESSION NOTES information belongs ONLY to the primary app user, and applies ONLY to the single-person ("battle": false) case below. If this photo contains TWO people (a fashion battle), you are judging two different outfits on general styling merit — one or both people may not be the primary user. In that case, COMPLETELY IGNORE the client profile, owned wardrobe, style goals, and session notes: do not reference them, weight ratings toward them, or mention them in either person\'s ratingNote, stylingTips, purchaseRecs, or the verdict.\n' : ''}
 FIRST: count the number of people in the photo.
 
 IF EXACTLY ONE PERSON — respond with exactly this JSON shape:
@@ -6302,6 +6392,7 @@ function render() {
     case 'rating-summary':    html = viewRatingSummary();     break;
     case 'style-score-history': html = viewStyleScoreHistory(); break;
     case 'confidence-history': html = viewConfidenceHistory(); break;
+    case 'therapy-session-edit': html = viewTherapySessionEdit(); break;
   }
   // Inject tab bar right after the .nav block on every tab view
   // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
@@ -11099,6 +11190,240 @@ function viewSavedTips() {
 }
 
 /* ================================================================
+   CLOSET THERAPY SESSIONS — transcript/recording notes
+   Replaces the old single "Fit Notes" field with a running log of
+   context from each Closet Therapy visit (or any styling conversation),
+   so Claude has richer, longer-term context about the user.
+   ================================================================ */
+function openTherapySessionEditor(sessionId) {
+  const existing = sessionId ? S.therapySessions.find(s => s.id === sessionId) : null;
+  S._therapyDraft = existing
+    ? { id: existing.id, season: existing.season || '', transcript: existing.transcript || '', hasAudio: !!existing.hasAudio, audioDataUrl: null, source: existing.source || 'paste', recording: false, recordSeconds: 0 }
+    : { id: uid(), season: '', transcript: '', hasAudio: false, audioDataUrl: null, source: 'paste', recording: false, recordSeconds: 0 };
+  navigate('therapy-session-edit');
+}
+
+async function pickTherapyAudioFile(input) {
+  const file = input.files && input.files[0];
+  if (!file || !S._therapyDraft) return;
+  if (!file.type.startsWith('audio/')) { toast('Please choose an audio file'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (!S._therapyDraft) return;
+    S._therapyDraft.audioDataUrl = reader.result;
+    S._therapyDraft.hasAudio = true;
+    S._therapyDraft.source = 'upload';
+    render();
+    toast('🎧 Audio attached');
+  };
+  reader.onerror = () => toast('Could not read that file');
+  reader.readAsDataURL(file);
+}
+
+async function startTherapyRecording() {
+  if (!S._therapyDraft) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Recording isn\'t supported on this device/browser'); return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const chunks = [];
+    const recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (S._therapyDraft) {
+          S._therapyDraft.audioDataUrl = reader.result;
+          S._therapyDraft.hasAudio = true;
+          S._therapyDraft.source = 'record';
+          S._therapyDraft.recording = false;
+        }
+        render();
+      };
+      reader.readAsDataURL(blob);
+    };
+
+    // Live speech-to-text while recording, where the browser supports it —
+    // appends directly into the transcript textarea as the user talks.
+    let recognition = null;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      recognition = new SR();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.onresult = (e) => {
+        if (!S._therapyDraft) return;
+        let added = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) added += e.results[i][0].transcript + ' ';
+        }
+        if (added) {
+          S._therapyDraft.transcript = (S._therapyDraft.transcript ? S._therapyDraft.transcript + ' ' : '') + added.trim();
+          render();
+        }
+      };
+      recognition.onerror = () => {};
+      try { recognition.start(); } catch(e) {}
+    }
+
+    const timerId = setInterval(() => {
+      if (!S._therapyDraft || !S._therapyDraft.recording) { clearInterval(timerId); return; }
+      S._therapyDraft.recordSeconds = (S._therapyDraft.recordSeconds || 0) + 1;
+      render();
+    }, 1000);
+
+    S._therapyRecorder = { recorder, recognition, timerId };
+    S._therapyDraft.recording = true;
+    S._therapyDraft.recordSeconds = 0;
+    render();
+    recorder.start();
+  } catch(e) {
+    console.error('startTherapyRecording', e);
+    toast('Couldn\'t access the microphone');
+  }
+}
+
+function stopTherapyRecording() {
+  if (!S._therapyRecorder) return;
+  const { recorder, recognition, timerId } = S._therapyRecorder;
+  try { recorder.stop(); } catch(e) {}
+  try { recognition && recognition.stop(); } catch(e) {}
+  clearInterval(timerId);
+  S._therapyRecorder = null;
+  if (S._therapyDraft) S._therapyDraft.recording = false;
+  render();
+}
+
+function removeTherapyDraftAudio() {
+  if (!S._therapyDraft) return;
+  S._therapyDraft.audioDataUrl = null;
+  S._therapyDraft.hasAudio = false;
+  render();
+}
+
+async function saveTherapySession() {
+  const d = S._therapyDraft;
+  if (!d) return;
+  const ta = document.getElementById('therapy-transcript');
+  const transcript = (ta ? ta.value : d.transcript || '').trim();
+  if (!transcript && !d.hasAudio) { toast('Add a transcript or a recording first'); return; }
+
+  const existing = S.therapySessions.find(s => s.id === d.id);
+  const session = {
+    id: d.id,
+    createdAt: existing ? existing.createdAt : new Date().toISOString(),
+    season: d.season || null,
+    transcript,
+    hasAudio: !!d.hasAudio,
+    source: d.source || 'paste',
+  };
+
+  if (d.audioDataUrl) {
+    try { await AudioDB.put(d.id, d.audioDataUrl); } catch(e) { console.error('AudioDB.put failed:', e); }
+  } else if (!d.hasAudio && existing && existing.hasAudio) {
+    try { await AudioDB.del(d.id); } catch(e) {}
+  }
+
+  if (existing) { Object.assign(existing, session); }
+  else { S.therapySessions.unshift(session); }
+  S._therapyDraft = null;
+  navigate('aura');
+  try { await DB.therapySessions.put(session); toast('🌿 Session saved'); }
+  catch(e) { console.error('saveTherapySession failed:', e); toast('Saved locally — sync failed, check your connection'); }
+}
+
+async function deleteTherapySession(id) {
+  S.therapySessions = S.therapySessions.filter(s => s.id !== id);
+  S._therapyDraft = null;
+  navigate('aura');
+  try { await DB.therapySessions.del(id); toast('Session deleted'); }
+  catch(e) { console.error('deleteTherapySession failed:', e); }
+}
+
+async function playTherapySessionAudio(id) {
+  try {
+    const dataUrl = await AudioDB.get(id);
+    if (!dataUrl) { toast('Audio not available on this device'); return; }
+    new Audio(dataUrl).play();
+  } catch(e) { toast('Could not play audio'); }
+}
+
+function viewTherapySessionEdit() {
+  const d = S._therapyDraft;
+  if (!d) { navigate('aura'); return ''; }
+  const isEditing = !!S.therapySessions.find(s => s.id === d.id);
+
+  const seasonChips = THERAPY_SEASONS.map(s => `
+    <button ontouchend="if(_touchMoved)return;event.preventDefault();S._therapyDraft.season='${s.id}';render()"
+      onclick="S._therapyDraft.season='${s.id}';render()"
+      style="padding:6px 12px;border-radius:100px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${d.season===s.id?'#3A7D5C':'var(--border)'};background:${d.season===s.id?'#EDF7F2':'none'};color:${d.season===s.id?'#3A7D5C':'var(--text-2)'};">${s.emoji} ${s.name}</button>
+  `).join('');
+
+  const mins = Math.floor((d.recordSeconds||0)/60), secs = (d.recordSeconds||0)%60;
+  const timeStr = `${mins}:${String(secs).padStart(2,'0')}`;
+  const speechSupported = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();stopTherapyRecording();S._therapyDraft=null;navigate('aura')" onclick="stopTherapyRecording();S._therapyDraft=null;navigate('aura')">${iconBack()} Aura</button>
+      <span class="nav-title">🌿 Therapy Session</span>
+      <span style="width:30px;"></span>
+    </div>
+
+    <div style="padding:18px 16px 100px;">
+      <div style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:16px;">
+        Paste a transcript, type notes, or record/upload audio from your Closet Therapy session. Private — used only to help Claude style you better.
+      </div>
+
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:8px;">Season (optional)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;">${seasonChips}</div>
+
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:8px;">Transcript / notes</div>
+      <textarea id="therapy-transcript" rows="7" placeholder="Paste or type what was discussed — likes/dislikes, fit preferences, goals, anything that helps Claude style you better…"
+        style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13.5px;color:var(--text);resize:vertical;font-family:inherit;line-height:1.55;margin-bottom:14px;"
+        oninput="S._therapyDraft.transcript=this.value">${esc(d.transcript)}</textarea>
+
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:8px;">Audio</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        ${d.recording ? `
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();stopTherapyRecording()" onclick="stopTherapyRecording()"
+            style="display:flex;align-items:center;gap:6px;padding:9px 16px;background:#C0392B;color:#fff;border:none;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">⏹ Stop · ${timeStr}</button>
+        ` : `
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();startTherapyRecording()" onclick="startTherapyRecording()"
+            style="display:flex;align-items:center;gap:6px;padding:9px 16px;background:#3A7D5C;color:#fff;border:none;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">🎤 Record</button>
+        `}
+        <label style="display:flex;align-items:center;gap:6px;padding:9px 16px;background:none;border:1.5px solid var(--border);border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--text-2);touch-action:manipulation;">
+          📎 Upload audio
+          <input type="file" accept="audio/*" style="display:none;" onchange="pickTherapyAudioFile(this)">
+        </label>
+      </div>
+      ${d.hasAudio ? `
+        <div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:16px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();playTherapySessionAudio('${d.id}')" onclick="playTherapySessionAudio('${d.id}')"
+            style="background:none;border:none;font-size:18px;cursor:pointer;font-family:inherit;touch-action:manipulation;">▶️</button>
+          <span style="flex:1;font-size:12.5px;color:var(--text-2);">Audio attached${d.source==='record'?' (recorded)':d.source==='upload'?' (uploaded)':''}</span>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();removeTherapyDraftAudio()" onclick="removeTherapyDraftAudio()"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove</button>
+        </div>
+      ` : ''}
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:16px;line-height:1.5;">${speechSupported
+        ? 'While recording, your words are auto-transcribed into the notes box above.'
+        : '🎤 Recording saves audio for playback. This browser can\'t auto-transcribe while recording — type or paste notes above too so Claude can use them as context.'}</div>
+
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();saveTherapySession()" onclick="saveTherapySession()"
+          style="flex:1;padding:13px 0;background:#3A7D5C;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">Save Session</button>
+        ${isEditing ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();deleteTherapySession('${d.id}')" onclick="deleteTherapySession('${d.id}')"
+          style="padding:13px 16px;background:none;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-weight:700;color:#C0392B;cursor:pointer;font-family:inherit;touch-action:manipulation;">Delete</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
    VIEW: AURA
    ================================================================ */
 function viewAura() {
@@ -11133,9 +11458,9 @@ function viewAura() {
 
   const filledCount = [
     S.profileZodiac, S.profileMBTI, S.profileHeight, S.braSize, S.braStyle,
-    S.profileWeight, S.signatureNailColor, S.signatureScent, S.hairstyle, S.eyeColor, S.braFitNotes
+    S.profileWeight, S.signatureNailColor, S.signatureScent, S.hairstyle, S.eyeColor
   ].filter(v => v && v.trim()).length;
-  const total = 11;
+  const total = 10;
 
   return `<div class="view">
     <div class="nav">
@@ -11163,33 +11488,35 @@ function viewAura() {
         ${auraFieldHTML('hairstyle',         'closet-hairstyle',        '💇', 'Hairstyle',        'e.g. Long waves, blunt bob…',     S.hairstyle)}
       </div>
 
-      <!-- Bra/intimates fit notes (lives under the "Other" shelf now) -->
+      <!-- Closet Therapy Session notes — transcripts/recordings from styling sessions,
+           replaces the old single "Fit Notes" field with a running log over time -->
       ${(() => {
-        const isEditing = S._auraEdit === 'braFitNotes';
-        return `<div style="background:var(--surface);border:1.5px solid ${isEditing?'var(--gold)':'var(--border)'};border-radius:12px;padding:12px 14px;margin-bottom:8px;">
-          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:8px;">🩱 Fit Notes <span style="font-weight:500;text-transform:none;letter-spacing:0;margin-left:6px;font-size:10px;color:var(--text-3);">Private — helps Claude style you better</span></div>
-          ${isEditing ? `
-            <textarea id="aura-braFitNotes" rows="3" placeholder="e.g. Underwire bothers me · Need full coverage · 32C in Natori · Backless need adhesive…"
-              style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;color:var(--text);resize:none;font-family:inherit;line-height:1.5;">${esc(S.braFitNotes)}</textarea>
-            <div style="display:flex;gap:6px;margin-top:6px;">
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();saveAuraField('braFitNotes','closet-bra-fit-notes',document.getElementById('aura-braFitNotes').value)"
-                onclick="saveAuraField('braFitNotes','closet-bra-fit-notes',document.getElementById('aura-braFitNotes').value)"
-                style="flex:1;padding:7px 0;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">Save</button>
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();S._auraEdit=null;render()"
-                onclick="S._auraEdit=null;render()"
-                style="padding:7px 12px;background:none;border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);touch-action:manipulation;">✕</button>
-            </div>` : `
-            <div ontouchend="if(_touchMoved)return;event.preventDefault();S._auraEdit='braFitNotes';render()"
-              onclick="S._auraEdit='braFitNotes';render()" style="cursor:pointer;min-height:42px;">
-              ${S.braFitNotes
-                ? `<div style="font-size:13px;color:var(--text);line-height:1.55;">${esc(S.braFitNotes)}</div>`
-                : `<div style="font-size:12px;color:var(--text-3);font-style:italic;">Tap to add fit notes, go-to brands, sizing quirks…</div>`}
+        const sessions = [...S.therapySessions].sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
+        const seasonMeta = id => THERAPY_SEASONS.find(s => s.id === id);
+        const rows = sessions.map(s => {
+          const sm = seasonMeta(s.season);
+          const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+          const snippet = s.transcript
+            ? (s.transcript.length > 90 ? s.transcript.slice(0,90) + '…' : s.transcript)
+            : (s.hasAudio ? '🎧 Audio recording, no transcript yet' : '');
+          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openTherapySessionEditor('${s.id}')" onclick="openTherapySessionEditor('${s.id}')"
+            style="padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
+            <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:3px;">
+              <span style="font-size:12px;font-weight:800;color:var(--text);">${sm ? sm.emoji + ' ' + sm.name : '🌿 Session'}</span>
+              <span style="font-size:10.5px;color:var(--text-3);">${dateStr}</span>
+              ${s.hasAudio ? '<span style="font-size:11px;">🎧</span>' : ''}
             </div>
-            <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeCategory='Other';S.wardrobeSubCategory='Bras';switchTab('wardrobe')"
-                onclick="S.wardrobeCategory='Other';S.wardrobeSubCategory='Bras';switchTab('wardrobe')"
-                style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">View in Other shelf →</button>
-            </div>`}
+            ${snippet ? `<div style="font-size:12.5px;color:var(--text-2);line-height:1.4;">${esc(snippet)}</div>` : ''}
+          </div>`;
+        }).join('');
+
+        return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;">
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:${sessions.length?'4':'8'}px;">🌿 Closet Therapy Notes <span style="font-weight:500;text-transform:none;letter-spacing:0;margin-left:6px;font-size:10px;color:var(--text-3);">Private — helps Claude style you better</span></div>
+          ${sessions.length ? rows : `<div style="font-size:12px;color:var(--text-3);font-style:italic;margin-bottom:8px;">No sessions logged yet — add a transcript or recording from your Closet Therapy visit.</div>`}
+          <div style="margin-top:${sessions.length?'10':'0'}px;">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();openTherapySessionEditor(null)" onclick="openTherapySessionEditor(null)"
+              style="background:none;border:none;font-size:12px;font-weight:700;color:#3A7D5C;cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">+ Add Session</button>
+          </div>
         </div>`;
       })()}
 
@@ -19779,9 +20106,10 @@ auth.onAuthStateChanged(async (user) => {
     // Load profile settings from Firestore (overrides localStorage defaults)
     await loadProfileFromFirestore();
     // Load entries and wardrobe from Firestore
-    [S.entries, S.wardrobe] = await Promise.all([
+    [S.entries, S.wardrobe, S.therapySessions] = await Promise.all([
       DB.entries.getAll(),
       DB.wardrobe.getAll(),
+      DB.therapySessions.getAll().catch(() => []),
     ]);
     const alreadyOnboarded = localStorage.getItem('closet-onboarded');
     if (false) {
