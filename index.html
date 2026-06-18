@@ -2446,6 +2446,28 @@ function subCategoryFromName(name, category) {
   return null;
 }
 
+// ── Smart default ordering: lightest → heaviest within each shelf ──────────────
+// Used as the wardrobe's default sort so a fresh session opens with tops going
+// camis → tees → long sleeve → sweaters, pants going shorts → jeans → dress pants,
+// etc., instead of an arbitrary "newest first" order.
+const _GARMENT_WEIGHT_ORDER = {
+  Tops:      ['Camis', 'Bodysuits', 'Tees', 'Blouses & Shirts', 'Long Sleeve', 'Sweaters'],
+  Jackets:   ['Blazers', 'Jackets', 'Coats'],
+  Pants:     ['Shorts', 'Skirts', 'Leggings', 'Jeans', 'Dressy Pants', 'Dress Pants'],
+  Dresses:   ['Casual', 'Jumpsuits', 'Dressy'],
+  Sweats:    ['Loungewear', 'Joggers', 'Sweatpants', 'Hoodies', 'Sets'],
+  Shoes:     ['Sandals & Mules', 'Flats & Loafers', 'Sneakers', 'Heels & Pumps', 'Boots'],
+  Intimates: ['Camisoles', 'Bralettes', 'Wireless', 'Bras', 'Sports Bras', 'Underwear', 'Shapewear'],
+};
+function garmentWeightRank(w) {
+  const cat = normalizeCat(w.category || categoryFromIcon(w.icon, w.name));
+  const order = _GARMENT_WEIGHT_ORDER[cat];
+  if (!order) return 0; // categories without a meaningful "weight" (Bags, Jewelry, etc.) stay as-is
+  const sub = w.subCategory || subCategoryFromName(w.name, cat);
+  const idx = order.indexOf(sub);
+  return idx === -1 ? order.length : idx; // unrecognized sub-categories sink to the end of their shelf
+}
+
 function colorFromItemName(name) {
   const n = (name || '').toLowerCase();
   // Order matters — longer/more-specific phrases first
@@ -2697,6 +2719,7 @@ async function saveProfileToFirestore() {
       shopBudget: S.shopBudget,
       shopBlocked: [...S.shopBlocked],
       purchased: [...S.purchasedQueries],
+      restockQueries: [...S.restockQueries],
       shopCache: S.shopCache,
       weatherPin: S.weatherPin || null,
       customCategories: S.customCategories || [],
@@ -2750,6 +2773,7 @@ async function loadProfileFromFirestore() {
     if (p.weatherPin    != null) { S.weatherPin      = p.weatherPin;                        localStorage.setItem('closet-weather-pin',     JSON.stringify(p.weatherPin)); }
     if (p.purchased     != null) { S.purchasedQueries= new Set(p.purchased);                localStorage.setItem('closet-purchased',       JSON.stringify(p.purchased)); }
     if (p.shopBlocked   != null) { S.shopBlocked     = new Set(p.shopBlocked);              localStorage.setItem('closet-shop-blocked',    JSON.stringify(p.shopBlocked)); }
+    if (p.restockQueries!= null) { S.restockQueries  = new Set(p.restockQueries);           localStorage.setItem('closet-restock',         JSON.stringify(p.restockQueries)); }
     if (p.shopCache     != null) { S.shopCache       = p.shopCache;                         localStorage.setItem('closet-shop-cache',      JSON.stringify(p.shopCache)); }
     if (p.occasionTags     != null) { localStorage.setItem('closet-occasion-tags', JSON.stringify(p.occasionTags)); }
     if (p.customCategories != null) { S.customCategories = p.customCategories; localStorage.setItem('closet-custom-categories', JSON.stringify(p.customCategories)); }
@@ -2757,6 +2781,24 @@ async function loadProfileFromFirestore() {
 }
 
 /* Firestore-backed DB — same interface as the old IndexedDB wrapper */
+// Per-document write queues — guarantee saves for the SAME item complete in the
+// order they were started. Without this, two quick edits to the same item (e.g.
+// typing a name, then a moment later a color) fire two independent network writes;
+// if the network reorders them and the OLDER write happens to finish last, it
+// silently overwrites the newer edit with stale data ("my field disappeared").
+// Queuing the actual write behind a per-id promise chain makes completion order
+// match call order, so the most recent edit always wins.
+function _makeWriteQueue() {
+  const queues = {};
+  return (id, fn) => {
+    const key = String(id);
+    const prev = queues[key] || Promise.resolve();
+    const run = prev.then(fn, fn); // run fn regardless of whether the prior write failed
+    queues[key] = run.catch(() => {}); // keep the chain alive even if this write errors
+    return run;
+  };
+}
+
 const DB = {
   init: () => Promise.resolve(),
   entries: {
@@ -2764,7 +2806,8 @@ const DB = {
       const snap = await userCol('entries').get();
       return snap.docs.map(d => d.data()).sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
     },
-    put: async (e) => { await userCol('entries').doc(String(e.id)).set(e); return e; },
+    _queue: _makeWriteQueue(),
+    put: (e) => DB.entries._queue(e.id, async () => { await userCol('entries').doc(String(e.id)).set(e); return e; }),
     del: async (id) => { await userCol('entries').doc(String(id)).delete(); },
   },
   wardrobe: {
@@ -2802,7 +2845,12 @@ const DB = {
       } catch(e) {}
       return items;
     },
-    put: async (w) => {
+    _queue: _makeWriteQueue(),
+    // Queued per-item: if a field edit comes in while a previous save for the SAME
+    // item is still in flight, it waits its turn instead of racing it. The item
+    // object (w) is read fresh each time this function actually runs, so it always
+    // picks up the latest in-memory edits — nothing typed gets clobbered or lost.
+    put: (w) => DB.wardrobe._queue(w.id, async () => {
       const photo = w.photo;
       const { photo: _ph, ...firestoreItem } = w;
       if (photo) {
@@ -2830,7 +2878,7 @@ const DB = {
       if (!firestoreItem.photoUrl && w.photoUrl) firestoreItem.photoUrl = w.photoUrl;
       await userCol('wardrobe').doc(String(w.id)).set(firestoreItem);
       return w; // return with photo intact for in-memory use
-    },
+    }),
     del: async (id) => {
       await userCol('wardrobe').doc(String(id)).delete();
       await PhotoDB.del(id);
@@ -2906,6 +2954,12 @@ const S = {
   shopBlocked: new Set(JSON.parse(localStorage.getItem('closet-shop-blocked') || '[]')),
   shopCache: JSON.parse(localStorage.getItem('closet-shop-cache') || '{}'), // key → {results,ts}
   shopBudget: parseInt(localStorage.getItem('closet-shop-budget') || '2', 10), // 1=Budget 2=Mid 3=Luxury
+  // Rate Mode — dating-app-style swipe/rate/purgatory flow over the wardrobe
+  restockQueries: new Set(JSON.parse(localStorage.getItem('closet-restock') || '[]')), // queries flagged for "find similar" agent search
+  rateModeSeenHelp: localStorage.getItem('closet-ratemode-help-seen') === 'true',
+  rateModePhotoMode: localStorage.getItem('closet-ratemode-photo') || 'worn', // 'worn' | 'product' — chosen each session
+  rateMode: null, // { ids: [wardrobeId,...], idx, count } — active session state
+  rateModeCelebrate: null, // milestone count (e.g. 20) currently being celebrated, or null
   // new outfit flow
   pendingPhoto: null, pendingMime: null, pendingOccasion: null, pendingContext: '', draft: null,
   friendRatingMode: false, friendRating: null, friendName: '', battleMode: false,
@@ -2913,7 +2967,7 @@ const S = {
   featureMenuOpen: false, menuSection: null,
   outfitLinker: null, // { mode:'from-wardrobe'|'from-outfit', wardrobeId?, entryId?, selected:{[id]:bool} }
   outfitBuilder: null, // { wardrobeId, occasion, loading, result }
-  wardrobePickerFor: null, // { unmatchedIdx } — wardrobe item picker in match review
+  wardrobePickerFor: null, // { unmatchedIdx, query } — wardrobe item picker/search in match review
   receiptFlow: null, // { step:'input'|'parsing'|'preview', imageData, imageMime, pasteText, preview:{name,brand,price,description,category,icon} }
   _flipCardFlipped: false, // tracks flip card side so render() doesn't snap it back
   _pendingWitemPhoto: null, // { wId, data } — preview before explicit save
@@ -2933,7 +2987,7 @@ const S = {
   selectedWardrobeId: null,
   // ui
   loading: false, loadingMsg: '', error: null,
-  filter: 'all', wardrobeSort: 'newest', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
+  filter: 'all', wardrobeSort: 'smart', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
   closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'wishlist', shopSelectedQuery: null, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false,
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
@@ -4819,6 +4873,19 @@ function buildShoppingList() {
       }
     }
   }
+  // Rate Mode "find similar" requests — surfaced alongside outfit-derived recs
+  for (const rawQ of S.restockQueries) {
+    const q = cleanShopQuery(rawQ);
+    const key = q.toLowerCase().trim();
+    if (!key || S.purchasedQueries.has(key)) continue;
+    if (!map[key]) {
+      let results = S.shopCache[key] ? S.shopCache[key].results : [];
+      map[key] = { query: q, count: 0, outfitIds: [], results, restock: true };
+    }
+    map[key].count++;
+    map[key].restock = true;
+  }
+
   // Secondary pass: collapse near-duplicates where one query is a superset of another.
   // e.g. "gold chain necklace" and "delicate gold chain" both collapse into "gold chain".
   const vals = Object.values(map);
@@ -4918,6 +4985,43 @@ async function fetchShopQuery(query) {
    ================================================================ */
 function uid()  { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// Wardrobe photos are stored as huge base64 data: URIs. Every render() does a full
+// innerHTML replacement, so embedding that base64 text directly in <img src="..."> means
+// the browser re-parses and re-decodes every photo's full byte string on every re-render —
+// even when nothing about that photo changed. That's the main cause of lag when the wardrobe
+// grid re-renders (e.g. returning to Closet after viewing/editing an item).
+// Fix: convert each data: URI to a tiny `blob:` URL once and cache it, so repeat renders
+// just reuse the same short URL string and the browser's already-decoded image bitmap.
+const _photoBlobCache = new Map(); // data: URI string -> blob: URL
+function photoBlobUrl(dataUrl) {
+  if (!dataUrl) return '';
+  if (!dataUrl.startsWith('data:')) return dataUrl; // already a normal/blob URL — nothing to do
+  const cached = _photoBlobCache.get(dataUrl);
+  if (cached) return cached;
+  let url = dataUrl;
+  try {
+    const commaIdx = dataUrl.indexOf(',');
+    const header = dataUrl.slice(0, commaIdx);
+    const base64 = dataUrl.slice(commaIdx + 1);
+    const mimeMatch = /data:(.*?);base64/.exec(header);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  } catch(e) { url = dataUrl; /* fall back to the raw data URI if conversion fails */ }
+  _photoBlobCache.set(dataUrl, url);
+  // Cheap cap so a very long session doesn't accumulate unbounded blob URLs
+  if (_photoBlobCache.size > 600) {
+    const firstKey = _photoBlobCache.keys().next().value;
+    const firstUrl = _photoBlobCache.get(firstKey);
+    if (firstUrl && firstUrl.startsWith('blob:')) URL.revokeObjectURL(firstUrl);
+    _photoBlobCache.delete(firstKey);
+  }
+  return url;
+}
 function fmtDate(iso)     { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
 function fmtDateLong(iso) { return new Date(iso).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
 function fmtMonth(ym)     { if (!ym) return ''; const [y,m] = ym.split('-'); const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m,10)-1]; return mn ? `${mn} ${y}` : ym; }
@@ -5134,10 +5238,11 @@ function featuresMenuHTML() {
         <button class="feat-close" onclick="closeMenu()">✕</button>
       </div>
       <div class="feat-body" style="padding:0;">
-        ${menuRow('🌿', 'Closet Therapy', 'Seasonal in-person visit — photograph, organise & digitise your wardrobe', "S.menuSection='services';render()")}
+        ${menuRow('🌿', 'Book Closet Therapy', 'Seasonal in-person visit — photograph, organise & digitise your wardrobe', "S.menuSection='services';render()")}
         ${menuRow('📊', 'Your Fashion Stats', 'Tiles of your style data — shareable at a tap', "closeMenu();navigate('dashboard')")}
-        ${menuRow('✨', 'Onboarding', 'Take the feature tour or set up your style', "closeMenu();S.onboardStep=0;navigate('onboarding')")}
-        ${menuRow('✦', 'About Closet', 'Everything built into your style journal', "S.menuSection='about';render()")}
+        ${menuRow('✦', "Closet's Features", 'Everything built into your style journal', "S.menuSection='about';render()")}
+        ${menuRow('✨', 'Onboarding Flow', 'Take the feature tour or set up your style', "closeMenu();S.onboardStep=0;navigate('onboarding')")}
+        ${menuRow('💌', 'Share with Friends <span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:100px;background:var(--gold-bg);color:var(--gold-dk);font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;vertical-align:middle;">New</span>', 'Send a friend the app, they will thank you later', "closeMenu();shareText(&quot;Closet, my personal style journal&quot;, &quot;I have been using this app called Closet to track my wardrobe, get outfit ideas, and actually know what I wear. Thought you would like it.&quot;)")}
         ${menuRow('⚙️', 'Settings', 'API key, sync, and app preferences', "closeMenu();switchTab('settings')")}
       </div>
       <div style="padding:12px 16px calc(12px + var(--safe-b));border-top:1px solid var(--border);flex-shrink:0;">
@@ -5773,7 +5878,7 @@ function viewOutfitBuilder() {
           ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
           onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')">
           ${w.photo
-            ? `<img src="${esc(w.photo)}" style="width:56px;height:74px;object-fit:cover;object-position:top;border-radius:8px;flex-shrink:0;">`
+            ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:56px;height:74px;object-fit:cover;object-position:top;border-radius:8px;flex-shrink:0;">`
             : `<div style="width:56px;height:74px;border-radius:8px;background:rgba(108,62,191,0.1);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">${w.icon||'👕'}</div>`}
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:800;color:#6C3EBF;">${esc(w.name)}</div>
@@ -5872,7 +5977,7 @@ function viewOutfitBuilder() {
     <!-- Anchor piece header -->
     <div style="padding:20px 20px 0;display:flex;align-items:center;gap:14px;">
       ${w.photo
-        ? `<img src="${esc(w.photo)}" style="width:64px;height:85px;object-fit:cover;object-position:top;border-radius:10px;flex-shrink:0;border:1.5px solid rgba(108,62,191,0.25);">`
+        ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:64px;height:85px;object-fit:cover;object-position:top;border-radius:10px;flex-shrink:0;border:1.5px solid rgba(108,62,191,0.25);">`
         : `<div style="width:64px;height:85px;border-radius:10px;background:rgba(108,62,191,0.08);display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;">${w.icon||'👕'}</div>`}
       <div style="flex:1;min-width:0;">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(108,62,191,0.7);margin-bottom:3px;">Anchor piece</div>
@@ -6185,6 +6290,7 @@ function render() {
     case 'brands':            html = viewBrands();            break;
     case 'import':            html = viewImport();            break;
     case 'outfit-builder':    html = viewOutfitBuilder();     break;
+    case 'rate-mode':         html = viewRateMode();          break;
   }
   // Inject tab bar right after the .nav block on every tab view
   // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
@@ -7322,7 +7428,7 @@ function viewFun() {
 
     const itemsHTML = visible.map(w => {
       const giverName = w.giftedBy ? esc(w.giftedBy) : 'someone special';
-      const displaySrc = w.wearPhoto || w.photo || null;
+      const displaySrc = photoBlobUrl(w.wearPhoto || w.photo || null);
       const photoEl = displaySrc
         ? `<div style="width:44px;height:56px;border-radius:8px;overflow:hidden;background:var(--surface-2);flex-shrink:0;position:relative;">
              <img src="${esc(displaySrc)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<span style=\\'font-size:24px;display:flex;align-items:center;justify-content:center;height:100%;\\'>${w.icon||'🎁'}</span>'">
@@ -8793,7 +8899,7 @@ function viewShop() {
   const src = S.shopSource || 'wishlist';
   const activeItems = src === 'wishlist'
     ? wishItems.map(w => ({ label: w.label, query: w.query, sub: w.reason, entry: w.entry, recIdx: w.recIdx, outfitIds: [w.entry?.id].filter(Boolean) }))
-    : recsRaw.map(i => ({ label: i.query, query: i.query, sub: i.count > 1 ? `×${i.count} outfits` : '×1 outfit', priority: i.count > 1, outfitIds: i.outfitIds || [] }));
+    : recsRaw.map(i => ({ label: i.query, query: i.query, sub: i.restock ? '🔍 From Rate Mode' : (i.count > 1 ? `×${i.count} outfits` : '×1 outfit'), priority: i.count > 1, outfitIds: i.outfitIds || [] }));
 
   const SHOP_LIMIT = 5;
   const showItems = S.shopExpanded ? activeItems : activeItems.slice(0, SHOP_LIMIT);
@@ -9283,7 +9389,7 @@ function viewPlan() {
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                           ${g.items.map((itemName, idx) => {
                             const wItem = _findWardrobeForPlanItem(itemName);
-                            const photoSrc = wItem ? (wItem.wearPhoto || wItem.photo || null) : null;
+                            const photoSrc = wItem ? photoBlobUrl(wItem.wearPhoto || wItem.photo || null) : null;
                             const icon = wItem ? (wItem.icon || '👕') : '👕';
                             const tile = `<div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:0;max-width:110px;">
                               ${photoSrc
@@ -10240,7 +10346,7 @@ function viewProfile() {
                 style="flex-shrink:0;width:88px;scroll-snap-align:start;cursor:pointer;touch-action:manipulation;">
                 <div style="width:88px;height:117px;border-radius:12px;overflow:hidden;position:relative;background:var(--surface-2);border:1.5px solid rgba(184,125,42,.3);">
                   ${w.photo
-                    ? `<img src="${esc(w.photo)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                    ? `<img src="${esc(photoBlobUrl(w.photo))}" loading="lazy" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
                     : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${w.icon||'👕'}</div>`}
                   <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,rgba(0,0,0,.6) 100%);pointer-events:none;"></div>
                   <div style="position:absolute;top:5px;right:5px;font-size:12px;line-height:1;">💎</div>
@@ -10275,7 +10381,7 @@ function viewProfile() {
                 style="flex-shrink:0;width:88px;scroll-snap-align:start;cursor:pointer;touch-action:manipulation;">
                 <div style="width:88px;height:117px;border-radius:12px;overflow:hidden;position:relative;background:var(--surface-2);border:1.5px solid rgba(30,132,73,0.35);">
                   ${w.photo
-                    ? `<img src="${esc(w.photo)}" loading="${i<3?'eager':'lazy'}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                    ? `<img src="${esc(photoBlobUrl(w.photo))}" loading="${i<3?'eager':'lazy'}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
                     : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${w.icon||'👕'}</div>`}
                   <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,rgba(0,0,0,.6) 100%);pointer-events:none;"></div>
                   <div style="position:absolute;top:5px;right:5px;font-size:13px;line-height:1;">💚</div>
@@ -10416,7 +10522,7 @@ function viewProfile() {
       const gardenHTML = memorialized.length ? (() => {
         const thumbs = memorialized.slice(0,4).map(w =>
           w.photo
-            ? `<img src="${esc(w.photo)}" style="width:40px;height:40px;border-radius:7px;object-fit:cover;border:1.5px solid rgba(150,80,220,0.2);filter:saturate(0.5);opacity:0.75;">`
+            ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:40px;height:40px;border-radius:7px;object-fit:cover;border:1.5px solid rgba(150,80,220,0.2);filter:saturate(0.5);opacity:0.75;">`
             : `<div style="width:40px;height:40px;border-radius:7px;background:rgba(150,80,220,0.1);border:1.5px solid rgba(150,80,220,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;">${w.icon||'👕'}</div>`
         ).join('');
         return `<button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('rip')" onclick="navigate('rip')"
@@ -11617,13 +11723,19 @@ function viewDashboard() {
 
   // top items
   const mostWorn = [...S.wardrobe].filter(w=>(w.wears?.length||0)>0).sort((a,b)=>b.wears.length-a.wears.length)[0];
-  const brandCounts = {};
-  S.wardrobe.forEach(w=>{ if(w.brand) brandCounts[w.brand]=(brandCounts[w.brand]||0)+(w.wears?.length||1); });
-  const topBrand = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1])[0];
+  // Two distinct "top brand" stats: most items owned vs. most times worn
+  const brandItemCounts = {};
+  S.wardrobe.forEach(w=>{ if(w.brand && !w.retiredFromCloset) brandItemCounts[w.brand]=(brandItemCounts[w.brand]||0)+1; });
+  const topBrandByItems = Object.entries(brandItemCounts).sort((a,b)=>b[1]-a[1])[0];
+  const brandWearCounts = {};
+  S.wardrobe.forEach(w=>{ if(w.brand) brandWearCounts[w.brand]=(brandWearCounts[w.brand]||0)+(w.wears?.length||0); });
+  const topBrandByWears = Object.entries(brandWearCounts).sort((a,b)=>b[1]-a[1])[0];
+  const topBrand = topBrandByWears; // kept for back-compat references below
   const tagCounts = {};
   S.entries.forEach(e=>{ if(e.occasionTag) tagCounts[e.occasionTag]=(tagCounts[e.occasionTag]||0)+1; });
   const topActivity = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1])[0];
   const costPerWear = totalWears > 0 && closetValue > 0 ? (closetValue/totalWears).toFixed(2) : null;
+  const totalBrands = Object.keys(brandItemCounts).length;
 
   // sale stats
   const saleItems = S.wardrobe.filter(w => w.onSale);
@@ -11661,6 +11773,7 @@ function viewDashboard() {
     tile('👗', S.entries.length, 'Outfits Logged', streak > 0 ? `🔥 ${streak}-day streak` : 'start a streak!'),
     tile('🧺', activeCount, 'Pieces in Closet', unworn > 0 ? `${unworn} never worn` : activeCount ? 'all worn ✓' : 'add your first piece'),
     tile('🔄', totalWears, 'Total Wears', activeCount ? `avg ${(totalWears/Math.max(activeCount,1)).toFixed(1)}/piece` : ''),
+    ...(totalBrands > 0 ? [tile('🏷', totalBrands, 'Brands', topBrand ? `top: ${topBrand[0]}` : '', '', `navigate('brands')`)] : []),
     ...(closetValue > 0 ? [tile('💰', '$'+Math.round(closetValue).toLocaleString(), 'Closet Value', costPerWear ? `$${costPerWear}/wear avg` : '')] : []),
     ...(wastedTotal > 0 ? [tile('💸', '$'+Math.round(wastedTotal), "Didn't Suit Me", `${wastedItems.length} piece${wastedItems.length===1?'':'s'} retired`)] : []),
     ...(gifted > 0 ? [tile('🎁', gifted, 'Gifted Pieces', `${Math.round(gifted/Math.max(activeCount,1)*100)}% of closet`)] : []),
@@ -11686,7 +11799,8 @@ function viewDashboard() {
 
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${mostWorn ? wideTile('🏆', 'Most Worn Piece', esc(mostWorn.name), `${mostWorn.wears.length} wear${mostWorn.wears.length===1?'':'s'}${mostWorn.price ? ' · $'+(mostWorn.price/mostWorn.wears.length).toFixed(2)+'/wear' : ''}`) : ''}
-        ${topBrand ? wideTile('🏷', 'Top Brand', esc(topBrand[0]), `${topBrand[1]} total wear${topBrand[1]===1?'':'s'}`) : ''}
+        ${topBrandByItems ? wideTile('🏷', 'Top Brand · # Items', esc(topBrandByItems[0]), `${topBrandByItems[1]} piece${topBrandByItems[1]===1?'':'s'} owned`) : ''}
+        ${topBrandByWears ? wideTile('🏷', 'Top Brand · Times Worn', esc(topBrandByWears[0]), `${topBrandByWears[1]} total wear${topBrandByWears[1]===1?'':'s'}`) : ''}
         ${topActivity ? wideTile('🎭', 'Top Activity', esc(topActivity[0]), `${topActivity[1]} outfit${topActivity[1]===1?'':'s'} logged`) : ''}
         ${bestDeal ? `<div style="background:#F0FDF4;border:1.5px solid rgba(22,163,74,0.3);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
           <div style="font-size:28px;line-height:1;flex-shrink:0;">🏷️</div>
@@ -11708,9 +11822,13 @@ async function shareStatsCard() {
   const totalWears = S.wardrobe.reduce((s,w)=>s+(w.wears?.length||0),0);
   const closetValue = S.wardrobe.reduce((s,w)=>s+(parseFloat(w.price)||0),0);
   const unworn = S.wardrobe.filter(w=>!(w.wears?.length)).length;
-  const brandCounts = {};
-  S.wardrobe.forEach(w=>{ if(w.brand) brandCounts[w.brand]=(brandCounts[w.brand]||0)+(w.wears?.length||1); });
-  const topBrand = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1])[0];
+  const brandItemCounts = {};
+  S.wardrobe.forEach(w=>{ if(w.brand && !w.retiredFromCloset) brandItemCounts[w.brand]=(brandItemCounts[w.brand]||0)+1; });
+  const topBrandByItems = Object.entries(brandItemCounts).sort((a,b)=>b[1]-a[1])[0];
+  const brandWearCounts = {};
+  S.wardrobe.forEach(w=>{ if(w.brand) brandWearCounts[w.brand]=(brandWearCounts[w.brand]||0)+(w.wears?.length||0); });
+  const topBrandByWears = Object.entries(brandWearCounts).sort((a,b)=>b[1]-a[1])[0];
+  const topBrand = topBrandByWears; // back-compat alias
   const tagCounts = {};
   S.entries.forEach(e=>{ if(e.occasionTag) tagCounts[e.occasionTag]=(tagCounts[e.occasionTag]||0)+1; });
   const topActivity = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1])[0];
@@ -11799,6 +11917,7 @@ async function shareStatsCard() {
     ['👗', S.entries.length, 'Outfits', streak>0?`${streak}-day streak`:''],
     ['🧺', activeCount, 'In Closet', unworn>0?`${unworn} never worn`:''],
     ['🔄', totalWears, 'Total Wears', activeCount?`avg ${(totalWears/Math.max(activeCount,1)).toFixed(1)}/pc`:''],
+    ...(Object.keys(brandItemCounts).length>0?[['🏷',Object.keys(brandItemCounts).length,'Brands',topBrandByItems?`top: ${topBrandByItems[0]}`:'']]:[] ),
     ...(closetValue>0?[['💰','$'+Math.round(closetValue).toLocaleString(),'Closet Value',totalWears>0?`$${(closetValue/totalWears).toFixed(2)}/wear`:'']]:[] ),
     ...(streak>0?[['🔥',streak,'Day Streak','keep it going!']]:[] ),
   ];
@@ -11811,7 +11930,8 @@ async function shareStatsCard() {
   let wy=gy+rows*(gh+gap)+6;
 
   if(mostWorn){wideTileC(gx,wy,W-gx*2,50,'🏆','Most Worn',mostWorn.name,`${mostWorn.wears.length} wear${mostWorn.wears.length===1?'':'s'}`);wy+=58;}
-  if(topBrand){wideTileC(gx,wy,W-gx*2,50,'🏷','Top Brand',topBrand[0],`${topBrand[1]} wear${topBrand[1]===1?'':'s'}`);wy+=58;}
+  if(topBrandByItems){wideTileC(gx,wy,W-gx*2,50,'🏷','Top Brand · Items',topBrandByItems[0],`${topBrandByItems[1]} piece${topBrandByItems[1]===1?'':'s'} owned`);wy+=58;}
+  if(topBrandByWears){wideTileC(gx,wy,W-gx*2,50,'🏷','Top Brand · Worn',topBrandByWears[0],`${topBrandByWears[1]} wear${topBrandByWears[1]===1?'':'s'}`);wy+=58;}
   if(topActivity){wideTileC(gx,wy,W-gx*2,50,'🎭','Top Activity',topActivity[0],`${topActivity[1]} outfit${topActivity[1]===1?'':'s'}`);wy+=58;}
 
   ctx.fillStyle=text3;
@@ -12058,6 +12178,7 @@ function viewWardrobe() {
   }
   if (S.wardrobeSort === 'color-asc') items.sort((a,b) => _itemColorHue(a) - _itemColorHue(b)); // rainbow order (red→violet)
   if (S.wardrobeSort === 'color-desc') items.sort((a,b) => _itemColorHue(b) - _itemColorHue(a)); // reverse rainbow (violet→red)
+  if (S.wardrobeSort === 'smart') items.sort((a,b) => garmentWeightRank(a) - garmentWeightRank(b) || (a.name||'').localeCompare(b.name||'')); // lightest → heaviest per shelf
 
   // Search filter — applied after sort so results maintain sort order
   if (S.wardrobeSearch.trim()) {
@@ -12171,6 +12292,9 @@ function viewWardrobe() {
   const _colorNextSort   = S.wardrobeSort === 'color-asc' ? 'color-desc' : 'color-asc';
   const sortBar = S.wardrobe.length > 1 ? `
     <div style="padding:0 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+      <div class="filter-chip ${S.wardrobeSort==='smart'?'active':''}"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='smart';render()"
+        onclick="S.wardrobeSort='smart';render()">✨ Smart</div>
       <div class="filter-chip ${S.wardrobeSort==='newest'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='newest';render()"
         onclick="S.wardrobeSort='newest';render()">Newest</div>
@@ -12222,7 +12346,7 @@ function shelfCardHTML(w, fallbackIcon, _siblings) {
   const wears = w.wears?.length || 0;
   const isGem = isGemPiece(w);
   const imgHTML = w.photo
-    ? `<img src="${esc(w.photo)}" class="shoe-card-img" alt="${esc(w.name)}" loading="lazy">`
+    ? `<img src="${esc(photoBlobUrl(w.photo))}" class="shoe-card-img" alt="${esc(w.name)}" loading="lazy">`
     : `<span class="shoe-card-emoji">${w.icon || fallbackIcon}</span>`;
   return `<div class="shoe-card"
     ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
@@ -12503,9 +12627,15 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
       </div>`;
     })()}
 
-    ${activeWardrobe.length > 0 ? `<div style="padding:10px 16px 0;display:flex;align-items:baseline;gap:6px;">
-      <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${activeWardrobe.length}</span>
-      <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">piece${activeWardrobe.length===1?'':'s'} in your closet</span>
+    ${activeWardrobe.length > 0 ? `<div style="padding:10px 16px 0;display:flex;align-items:baseline;justify-content:space-between;gap:6px;">
+      <div style="display:flex;align-items:baseline;gap:6px;">
+        <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${activeWardrobe.length}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">piece${activeWardrobe.length===1?'':'s'} in your closet</span>
+      </div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();startRateMode();" onclick="startRateMode()"
+        style="flex-shrink:0;padding:8px 14px;background:#1a1a1a;border:none;border-radius:100px;font-size:12px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
+        💫 Rate Mode
+      </button>
     </div>` : ''}
     ${catBar}${subCatBar}${maybePileNudge}${sortBar}
     ${S._wardrobeReorderMode ? `
@@ -12670,7 +12800,7 @@ function closetLightboxHTML() {
     const wears = w.wears?.length || 0;
     const gemStyle  = isGemPiece(w) ? 'border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,125,42,.4);' : '';
     const imgBlock  = w.photo
-      ? `<img src="${esc(w.photo)}" style="width:100%;height:100%;object-fit:contain;border-radius:18px;display:block;" alt="${esc(w.name)}">`
+      ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:100%;height:100%;object-fit:contain;border-radius:18px;display:block;" alt="${esc(w.name)}">`
       : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:96px;border-radius:18px;">${w.icon||'👕'}</div>`;
 
     return `<div style="flex-shrink:0;width:100%;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px 24px 32px;box-sizing:border-box;height:100%;overflow:hidden;">
@@ -12742,7 +12872,7 @@ function hangerHTML(w, _siblings) {
   const hangerSVG = _HANGER_SVG;
   const hSel = S._wardrobeSelectMode && S._wardrobeSelected.includes(w.id);
   const isWearFlipped = (S._wearFlipped || new Set()).has(w.id);
-  const displayPhoto = isWearFlipped && w.wearPhoto ? w.wearPhoto : (w.photo || null);
+  const displayPhoto = photoBlobUrl(isWearFlipped && w.wearPhoto ? w.wearPhoto : (w.photo || null));
   const catKey = normalizeCat(w.category || categoryFromIcon(w.icon, w.name));
   const isReorder = S._wardrobeReorderMode;
   return `<div class="hanger${isReorder?' hanger-reorder':''}" data-hid="${w.id}" data-cat="${catKey}"
@@ -13785,6 +13915,258 @@ function viewReceiptAdd() {
 }
 
 /* ================================================================
+   RATE MODE — dating-app-style full-screen swipe/rate/purgatory flow
+   ================================================================ */
+function startRateMode() {
+  const hasAny = S.wardrobe.some(w => !w.retiredFromCloset && !w.inMaybePile);
+  if (!hasAny) { toast('Nothing left to rate — your closet is all caught up! ✨'); return; }
+  S.rateMode = null; // show setup/chooser screen first
+  navigate('rate-mode');
+}
+
+function setRateModePhotoMode(mode) {
+  S.rateModePhotoMode = mode;
+  localStorage.setItem('closet-ratemode-photo', mode);
+  render();
+}
+
+function confirmRateModeSetup() {
+  const ids = S.wardrobe
+    .filter(w => !w.retiredFromCloset && !w.inMaybePile)
+    .sort((a,b) => (a.lastRatedAt||'').localeCompare(b.lastRatedAt||''))
+    .map(w => w.id);
+  if (!ids.length) { toast('Nothing left to rate — your closet is all caught up! ✨'); navigate('wardrobe'); return; }
+  S.rateMode = { ids, idx: 0, count: 0 };
+  render();
+}
+
+function exitRateMode() { S.rateMode = null; S.rateModeCelebrate = null; navigate('wardrobe'); }
+
+function dismissRateModeCelebration() { S.rateModeCelebrate = null; render(); }
+
+function dismissRateModeHelp() {
+  S.rateModeSeenHelp = true;
+  localStorage.setItem('closet-ratemode-help-seen', 'true');
+  render();
+}
+
+async function setStyleRating(id, n) {
+  const w = S.wardrobe.find(i => i.id === id); if (!w) return;
+  w.styleRating = (w.styleRating === n) ? null : n; // tap again to clear
+  render();
+  try { await DB.wardrobe.put(w); } catch(e) { console.error('setStyleRating save failed:', e); }
+}
+
+function _restockQueryFor(w) {
+  const parts = [w.brand, w.size, w.subCategory || w.category, w.name].filter(Boolean);
+  return parts.join(' ').trim() || w.name || 'similar item';
+}
+
+async function rateModeCommit(dir) {
+  const rm = S.rateMode; if (!rm) return;
+  const id = rm.ids[rm.idx];
+  const w = S.wardrobe.find(i => i.id === id);
+  if (w) {
+    w.lastRatedAt = new Date().toISOString();
+    if (dir === 'left') {
+      w.inMaybePile = true;
+      w.maybePileAt = new Date().toISOString();
+      toast(`🤔 ${w.name} sent to Purgatory.`);
+    } else if (dir === 'right') {
+      const q = _restockQueryFor(w).toLowerCase().trim();
+      S.restockQueries.add(q);
+      localStorage.setItem('closet-restock', JSON.stringify([...S.restockQueries]));
+      fsSet('restockQueries', [...S.restockQueries]);
+      toast(`🔍 Looking for similar ${w.name}…`);
+    }
+    try { await DB.wardrobe.put(w); } catch(e) { console.error('rateModeCommit save failed:', e); }
+  }
+  rm.idx++;
+  rm.count = (rm.count || 0) + 1;
+  if (rm.count > 0 && rm.count % 20 === 0) S.rateModeCelebrate = rm.count;
+  render();
+}
+
+// ── Drag-to-swipe (pointer events cover touch + mouse + pen) ──────
+let _rateDrag = { active: false, startX: 0, startY: 0, dx: 0 };
+function _rateDragStart(e) {
+  _rateDrag = { active: true, startX: e.clientX, startY: e.clientY, dx: 0 };
+  const card = document.getElementById('rate-card');
+  if (card) { card.style.transition = 'none'; try { card.setPointerCapture(e.pointerId); } catch(err){} }
+}
+function _rateDragMove(e) {
+  if (!_rateDrag.active) return;
+  _rateDrag.dx = e.clientX - _rateDrag.startX;
+  const card = document.getElementById('rate-card');
+  if (!card) return;
+  const rot = _rateDrag.dx / 18;
+  card.style.transform = `translateX(${_rateDrag.dx}px) rotate(${rot}deg)`;
+  const likeBadge = document.getElementById('rate-badge-right');
+  const nopeBadge = document.getElementById('rate-badge-left');
+  const op = Math.min(Math.abs(_rateDrag.dx) / 90, 1);
+  if (likeBadge) likeBadge.style.opacity = _rateDrag.dx > 0 ? op : 0;
+  if (nopeBadge) nopeBadge.style.opacity = _rateDrag.dx < 0 ? op : 0;
+}
+function _rateDragEnd(e) {
+  if (!_rateDrag.active) return;
+  _rateDrag.active = false;
+  const card = document.getElementById('rate-card');
+  const dx = _rateDrag.dx;
+  if (Math.abs(dx) > 100) {
+    if (card) {
+      card.style.transition = 'transform .35s ease-out, opacity .35s ease-out';
+      card.style.transform = `translateX(${dx > 0 ? 600 : -600}px) rotate(${dx/18}deg)`;
+      card.style.opacity = '0';
+    }
+    setTimeout(() => rateModeCommit(dx > 0 ? 'right' : 'left'), 180);
+  } else if (card) {
+    card.style.transition = 'transform .25s ease-out';
+    card.style.transform = 'translateX(0) rotate(0)';
+    const likeBadge = document.getElementById('rate-badge-right');
+    const nopeBadge = document.getElementById('rate-badge-left');
+    if (likeBadge) likeBadge.style.opacity = 0;
+    if (nopeBadge) nopeBadge.style.opacity = 0;
+  }
+  _rateDrag = { active: false, startX: 0, startY: 0, dx: 0 };
+}
+
+function viewRateModeSetup() {
+  const mode = S.rateModePhotoMode || 'worn';
+  const optionCard = (val, icon, label, sub) => `
+    <button ontouchend="if(_touchMoved)return;event.preventDefault();setRateModePhotoMode('${val}');" onclick="setRateModePhotoMode('${val}')"
+      style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 12px;background:${mode===val?'rgba(255,255,255,.12)':'rgba(255,255,255,.04)'};border:2px solid ${mode===val?'#fff':'rgba(255,255,255,.15)'};border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+      <div style="font-size:30px;">${icon}</div>
+      <div style="font-size:14px;font-weight:800;color:#fff;">${label}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.55);text-align:center;line-height:1.4;">${sub}</div>
+    </button>`;
+
+  return `<div class="view view-notab" style="background:#1a1a1a;min-height:100vh;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 8px;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe');" onclick="navigate('wardrobe')"
+        style="background:none;border:none;color:rgba(255,255,255,.7);font-size:22px;cursor:pointer;line-height:1;padding:4px;touch-action:manipulation;">✕</button>
+      <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.06em;">Rate Mode</div>
+      <div style="width:30px;"></div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 24px 60px;text-align:center;">
+      <div style="font-size:44px;margin-bottom:14px;">💫</div>
+      <div style="font-size:19px;font-weight:800;color:#fff;margin-bottom:8px;">Which photo should we show?</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:26px;max-width:300px;line-height:1.5;">Pick how you'd like to see each piece while you rate.</div>
+      <div style="display:flex;gap:12px;width:100%;max-width:360px;margin-bottom:30px;">
+        ${optionCard('product', '🏷️', 'Product Photo', 'How it looked on the hanger / at purchase')}
+        ${optionCard('worn', '🧍', 'Worn Photo', 'How it looked styled on you, if available')}
+      </div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();confirmRateModeSetup();" onclick="confirmRateModeSetup()"
+        style="width:100%;max-width:360px;padding:15px;background:#fff;border:none;border-radius:100px;font-size:15px;font-weight:800;color:#1a1a1a;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        Start Rating →
+      </button>
+    </div>
+  </div>`;
+}
+
+function viewRateMode() {
+  const rm = S.rateMode;
+  if (!rm) return viewRateModeSetup();
+
+  if (S.rateModeCelebrate) {
+    const n = S.rateModeCelebrate;
+    return `<div class="view view-notab" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center;background:#1a1a1a;">
+      <div style="font-size:60px;margin-bottom:16px;">🎉✨🎊</div>
+      <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:8px;">${n} items rated!</div>
+      <div style="font-size:14px;color:rgba(255,255,255,.65);margin-bottom:30px;line-height:1.5;max-width:300px;">You're on a roll — your closet is getting some serious love.</div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissRateModeCelebration();" onclick="dismissRateModeCelebration()"
+        style="padding:14px 30px;background:#fff;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#1a1a1a;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:12px;">
+        Keep Going →
+      </button>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();exitRateMode();" onclick="exitRateMode()"
+        style="background:none;border:none;color:rgba(255,255,255,.55);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        I'm done for now
+      </button>
+    </div>`;
+  }
+
+  if (rm.idx >= rm.ids.length) {
+    return `<div class="view view-notab" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center;background:#1a1a1a;">
+      <div style="font-size:56px;margin-bottom:16px;">🎉</div>
+      <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:8px;">All caught up!</div>
+      <div style="font-size:14px;color:rgba(255,255,255,.6);margin-bottom:28px;line-height:1.5;">You've rated every active piece. Check Purgatory or Shop for what's next.</div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();exitRateMode();" onclick="exitRateMode()"
+        style="padding:13px 28px;background:#fff;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#1a1a1a;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        ← Back to Closet
+      </button>
+    </div>`;
+  }
+
+  const w = S.wardrobe.find(i => i.id === rm.ids[rm.idx]);
+  if (!w) { rm.idx++; return viewRateMode(); }
+
+  const photo = S.rateModePhotoMode === 'product'
+    ? photoBlobUrl(w.photo || w.wearPhoto || null)
+    : photoBlobUrl(w.wearPhoto || w.photo || null);
+  const remaining = rm.ids.length - rm.idx;
+  const helpOverlay = !S.rateModeSeenHelp ? `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="background:#fff;border-radius:20px;padding:26px 22px;max-width:340px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:10px;">👗💫</div>
+        <div style="font-size:17px;font-weight:800;color:#222;margin-bottom:14px;">Rate &amp; Refresh</div>
+        <div style="font-size:13.5px;color:#555;line-height:1.6;text-align:left;">
+          <div style="margin-bottom:10px;">⭐ Tap stars to rate how much you love each piece, 1–5.</div>
+          <div style="margin-bottom:10px;">👉 Swipe <b>right</b> if you want us to search for a similar item — same brand, size &amp; style.</div>
+          <div style="margin-bottom:10px;">👈 Swipe <b>left</b> if you're done with it — it'll move to Purgatory.</div>
+          <div>Use the buttons below the card if swiping isn't your thing.</div>
+        </div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissRateModeHelp();" onclick="dismissRateModeHelp()"
+          style="margin-top:18px;width:100%;padding:13px;background:#1a1a1a;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          Got it, let's go
+        </button>
+      </div>
+    </div>` : '';
+
+  return `<div class="view view-notab" style="background:#1a1a1a;min-height:100vh;display:flex;flex-direction:column;">
+    ${helpOverlay}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 8px;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();exitRateMode();" onclick="exitRateMode()"
+        style="background:none;border:none;color:rgba(255,255,255,.7);font-size:22px;cursor:pointer;line-height:1;padding:4px;touch-action:manipulation;">✕</button>
+      <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.06em;">${remaining} left</div>
+      <div style="width:30px;"></div>
+    </div>
+
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:4px 18px 10px;position:relative;">
+      <div id="rate-card"
+        onpointerdown="_rateDragStart(event)" onpointermove="_rateDragMove(event)" onpointerup="_rateDragEnd(event)" onpointercancel="_rateDragEnd(event)"
+        style="position:relative;width:100%;max-width:420px;height:min(68vh,620px);border-radius:22px;overflow:hidden;background:#2a2a2a;box-shadow:0 12px 40px rgba(0,0,0,.5);touch-action:none;cursor:grab;">
+        ${photo
+          ? `<img src="${esc(photo)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;pointer-events:none;">`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:64px;pointer-events:none;">👕</div>`}
+        <div id="rate-badge-right" style="position:absolute;top:28px;right:24px;opacity:0;padding:8px 16px;border:3px solid #4CD964;border-radius:10px;color:#4CD964;font-size:22px;font-weight:900;transform:rotate(12deg);letter-spacing:.05em;">FIND</div>
+        <div id="rate-badge-left" style="position:absolute;top:28px;left:24px;opacity:0;padding:8px 16px;border:3px solid #FF5252;border-radius:10px;color:#FF5252;font-size:22px;font-weight:900;transform:rotate(-12deg);letter-spacing:.05em;">DONE</div>
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:18px 18px 16px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.82));pointer-events:none;">
+          <div style="font-size:19px;font-weight:800;color:#fff;margin-bottom:3px;">${esc(w.name||'')}</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.7);">${[w.brand, w.size].filter(Boolean).map(esc).join(' · ')}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:center;gap:10px;padding:4px 18px 14px;">
+      ${[1,2,3,4,5].map(n => `
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();setStyleRating('${w.id}',${n});" onclick="setStyleRating('${w.id}',${n})"
+          style="background:none;border:none;font-size:30px;cursor:pointer;padding:2px;line-height:1;touch-action:manipulation;filter:${(w.styleRating||0) >= n ? 'none' : 'grayscale(1) opacity(0.35)'};">★</button>
+      `).join('')}
+    </div>
+
+    <div style="display:flex;gap:14px;padding:6px 24px 36px;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('left');" onclick="rateModeCommit('left')"
+        style="flex:1;padding:15px 0;background:rgba(255,82,82,.12);border:2px solid #FF5252;border-radius:100px;font-size:14px;font-weight:800;color:#FF5252;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        ← Done, to Purgatory
+      </button>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('right');" onclick="rateModeCommit('right')"
+        style="flex:1;padding:15px 0;background:rgba(76,217,100,.12);border:2px solid #4CD964;border-radius:100px;font-size:14px;font-weight:800;color:#4CD964;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        Find similar →
+      </button>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
    VIEW: WARDROBE ITEM DETAIL
    ================================================================ */
 function viewWardrobeItem() {
@@ -13834,7 +14216,7 @@ function viewWardrobeItem() {
         const autoWearSrc = w.wearPhoto || (linkedEntries.length ? linkedEntries[0].photo : null);
         const isAutoWear = !w.wearPhoto && !!autoWearSrc; // true = showing auto-pulled (not saved)
         const showWear = isFlipped && (pendingWear || autoWearSrc);
-        const displaySrc = showWear ? (pendingWear || autoWearSrc) : (pendingItem || w.photo);
+        const displaySrc = photoBlobUrl(showWear ? (pendingWear || autoWearSrc) : (pendingItem || w.photo));
         const hasBoth = (pendingItem || w.photo) && (pendingWear || autoWearSrc);
         const toggle = hasBoth ? `
           <div style="display:flex;justify-content:center;gap:4px;margin-bottom:10px;">
@@ -15384,13 +15766,22 @@ function viewMatchReview() {
       <p style="font-size:12px;color:var(--text-3);padding:0 16px;margin-bottom:10px;">Toggle on to add a piece — a few details now unlock cost-per-wear tracking over time.</p>
       ${mr.unmatched.map((u, i) => {
         const itemCat = u.selectedCat || categoryFromIcon(u.item.icon, u.item.name);
-        // Broader similar item detection: category match OR any non-trivial word overlap
+        // Tight similar-item detection: category match is a HARD requirement — a shoe should
+        // never be offered as a candidate match for a shirt, even if names share a word. Within
+        // the same category, rank by name/brand overlap so the closest matches surface first.
         const outfitWords = new Set((u.item.name||'').toLowerCase().split(/\s+/).filter(w=>w.length>3));
-        const similar = S.wardrobe.filter(w => !mr.matches.find(m=>m.on&&m.wardrobeId===w.id) && (
-          (w.category && w.category === itemCat) ||
-          (w.name||'').toLowerCase().split(/\s+/).some(ww => ww.length > 3 && outfitWords.has(ww)) ||
-          (w.brand && u.item.name.toLowerCase().includes(w.brand.toLowerCase()))
-        )).slice(0, 5);
+        const _wCat = w => normalizeCat(w.category || categoryFromIcon(w.icon, w.name));
+        const _closeness = w => {
+          let score = 0;
+          const wn = (w.name||'').toLowerCase();
+          if (wn.split(/\s+/).some(ww => ww.length > 3 && outfitWords.has(ww))) score += 2;
+          if (w.brand && u.item.name.toLowerCase().includes(w.brand.toLowerCase())) score += 2;
+          return score;
+        };
+        const similar = S.wardrobe
+          .filter(w => !mr.matches.find(m=>m.on&&m.wardrobeId===w.id) && _wCat(w) === itemCat)
+          .sort((a,b) => _closeness(b) - _closeness(a))
+          .slice(0, 5);
         const recoveredNote = u._recovered ? `<div style="font-size:11px;color:#B87030;margin-top:2px;font-weight:600;">↩ Moved here — was matched incorrectly?</div>` : '';
         return `<div class="match-card" style="flex-direction:column;align-items:stretch;gap:10px;${u._recovered?'border-color:#E8C060;background:#FFFDF5;':''}">
           <div style="display:flex;align-items:center;gap:12px;">
@@ -15403,20 +15794,37 @@ function viewMatchReview() {
           </div>
 
           ${(()=>{
-            const browsingAll = S.wardrobePickerFor?.unmatchedIdx === i;
-            const itemsToShow = browsingAll
-              ? S.wardrobe.slice().sort((a,b)=>(a.name||'').localeCompare(b.name))
-              : similar;
+            const picker = S.wardrobePickerFor?.unmatchedIdx === i ? S.wardrobePickerFor : null;
+            const searchQuery = (picker?.query || '').trim().toLowerCase();
+            const browsingAll = !!picker && !searchQuery;
+            let itemsToShow;
+            if (searchQuery) {
+              // Free-text search spans the WHOLE wardrobe (any category) — the explicit escape
+              // hatch for when none of the close-match suggestions are the right piece.
+              itemsToShow = S.wardrobe.filter(w =>
+                (w.name||'').toLowerCase().includes(searchQuery) ||
+                (w.brand||'').toLowerCase().includes(searchQuery)
+              ).slice(0, 8);
+            } else if (browsingAll) {
+              itemsToShow = S.wardrobe.slice().sort((a,b)=>(a.name||'').localeCompare(b.name));
+            } else {
+              itemsToShow = similar;
+            }
             if (u.addOn) return ''; // collapsed when adding as new piece
-            if (!itemsToShow.length && !browsingAll && !u.linkToId) return '';
+            if (!itemsToShow.length && !picker && !u.linkToId && !similar.length) return '';
             return `<div style="background:var(--surface-2);border-radius:var(--r-sm);padding:10px 12px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                 <div style="font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em;">Already in your wardrobe?</div>
-                <button onclick="${browsingAll?`S.wardrobePickerFor=null;render()`:`S.wardrobePickerFor={unmatchedIdx:${i}};render()`}"
+                <button onclick="${picker?`S.wardrobePickerFor=null;render()`:`S.wardrobePickerFor={unmatchedIdx:${i},query:''};render()`}"
                   style="background:none;border:none;font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;padding:0;font-family:inherit;">
-                  ${browsingAll?'Show suggestions ↑':'Browse all →'}
+                  ${picker?'Show suggestions ↑':'Browse all →'}
                 </button>
               </div>
+              <input class="form-input" type="text" placeholder="🔍 Search your closet…"
+                value="${esc(picker?.query || '')}"
+                oninput="S.wardrobePickerFor={unmatchedIdx:${i},query:this.value};render()"
+                style="font-size:14px;padding:9px 12px;margin-bottom:8px;">
+              ${searchQuery && !itemsToShow.length ? `<p style="font-size:12px;color:var(--text-3);margin:4px 0 8px;">No matches for "${esc(searchQuery)}".</p>` : ''}
               ${itemsToShow.map(sw => {
                 const isLinked = u.linkToId === sw.id;
                 return `<div onclick="linkUnmatchedToExisting(${i},'${sw.id}')"
@@ -15431,7 +15839,7 @@ function viewMatchReview() {
                   <span style="font-size:16px;">${isLinked?'✅':''}</span>
                 </div>`;
               }).join('')}
-              ${!itemsToShow.length && !u.linkToId ? `<p style="font-size:12px;color:var(--text-3);margin:4px 0;">No items in your wardrobe yet — add one below.</p>` : ''}
+              ${!itemsToShow.length && !u.linkToId && !searchQuery ? `<p style="font-size:12px;color:var(--text-3);margin:4px 0;">No items in your wardrobe yet — add one below.</p>` : ''}
               ${u.linkToId ? `<p style="font-size:11px;color:#1E8449;margin-top:4px;">✓ Wear logged on that item — no duplicate created.</p>` : ''}
             </div>`;
           })()}
@@ -15523,6 +15931,12 @@ function viewDetail() {
   // Find wardrobe items linked to this outfit (logged via wear records on confirm)
   const wornInOutfit = S.wardrobe.filter(w => w.wears?.some(wr => wr.outfitId === entry.id));
   function findWardrobeMatch(outfitItem) {
+    // Explicit link set during match review / "this is actually..." linking — always wins,
+    // since it reflects the user's own confirmation rather than a name guess.
+    if (outfitItem.wardrobeId) {
+      const direct = S.wardrobe.find(w => w.id === outfitItem.wardrobeId);
+      if (direct) return direct;
+    }
     const name = (outfitItem.name || '').toLowerCase().trim();
     // Exact name match first
     let m = wornInOutfit.find(w => w.name.toLowerCase().trim() === name);
@@ -17489,11 +17903,18 @@ async function doConfirmMatchReview() {
   if (!S.matchReview) return navigate('detail');
   const { entryId, matches, unmatched } = S.matchReview;
 
+  // The outfit's own item rows (entry.items) need to record exactly which wardrobe
+  // item they resolved to — "Items in This Outfit" on the detail page reads this
+  // wardrobeId directly rather than re-guessing from names, so it stays correct even
+  // when the linked piece's name doesn't closely match what Claude detected in the photo.
+  const entry = S.entries.find(e => e.id === entryId);
+
   // Collect all DB writes — run them all in parallel instead of sequentially
   const writePromises = [];
   const now = new Date();
   const nowISO = now.toISOString();
   const nowMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  let entryChanged = false;
 
   // Log wears for confirmed matches (mutate in-memory then write)
   for (const m of matches.filter(m => m.on)) {
@@ -17503,6 +17924,10 @@ async function doConfirmMatchReview() {
       if (!wItem.wears.find(wr => wr.outfitId === entryId)) {
         wItem.wears.push({ outfitId: entryId, date: nowISO });
         writePromises.push(DB.wardrobe.put(wItem));
+      }
+      if (entry?.items?.[m.newIdx] && entry.items[m.newIdx].wardrobeId !== wItem.id) {
+        entry.items[m.newIdx].wardrobeId = wItem.id;
+        entryChanged = true;
       }
     }
   }
@@ -17515,6 +17940,10 @@ async function doConfirmMatchReview() {
       if (!wItem.wears.find(wr => wr.outfitId === entryId)) {
         wItem.wears.push({ outfitId: entryId, date: nowISO });
         writePromises.push(DB.wardrobe.put(wItem));
+      }
+      if (entry?.items?.[u.idx] && entry.items[u.idx].wardrobeId !== wItem.id) {
+        entry.items[u.idx].wardrobeId = wItem.id;
+        entryChanged = true;
       }
     }
   }
@@ -17541,7 +17970,13 @@ async function doConfirmMatchReview() {
     newItems.push(newItem);
     S.wardrobe.push(newItem); // update in-memory immediately
     writePromises.push(DB.wardrobe.put(newItem));
+    if (entry?.items?.[u.idx] && entry.items[u.idx].wardrobeId !== newItem.id) {
+      entry.items[u.idx].wardrobeId = newItem.id;
+      entryChanged = true;
+    }
   }
+
+  if (entryChanged && entry) writePromises.push(DB.entries.put(entry));
 
   // Navigate immediately — don't make the user wait for Firestore
   S.matchReview = null;
