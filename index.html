@@ -1658,9 +1658,9 @@ body {
 }
 .persona-refresh-btn {
   background: rgba(184,125,42,0.2); border: 1px solid rgba(184,125,42,0.38);
-  color: var(--gold); border-radius: 100px; padding: 9px 18px;
-  font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
-  transition: background .15s;
+  color: var(--gold); border-radius: 100px; padding: 13px 26px;
+  font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit;
+  transition: background .15s; display: inline-flex; align-items: center; gap: 7px;
 }
 .persona-refresh-btn:active { background: rgba(184,125,42,0.38); }
 .persona-refresh-btn:disabled { opacity: .45; cursor: default; }
@@ -1668,8 +1668,8 @@ body {
   font-size: 10px; color: rgba(255,255,255,0.25); font-weight: 500;
 }
 .persona-heart-btn {
-  background: none; border: none; cursor: pointer; padding: 6px 7px;
-  font-size: 28px; line-height: 1; color: rgba(255,255,255,0.35);
+  background: none; border: none; cursor: pointer; padding: 8px 10px;
+  font-size: 38px; line-height: 1; color: rgba(255,255,255,0.45);
   transition: color .15s, transform .12s; flex-shrink: 0;
 }
 .persona-heart-btn.hearted { color: #E05070; }
@@ -6393,6 +6393,7 @@ function render() {
     case 'style-score-history': html = viewStyleScoreHistory(); break;
     case 'confidence-history': html = viewConfidenceHistory(); break;
     case 'therapy-session-edit': html = viewTherapySessionEdit(); break;
+    case 'streak-calendar': html = viewStreakCalendar(); break;
   }
   // Inject tab bar right after the .nav block on every tab view
   // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
@@ -8680,8 +8681,8 @@ function buildPersonaHTML() {
         <button class="persona-refresh-btn" onclick="generateStylePersona()">⟳ Refresh</button>
         <div style="display:flex;align-items:center;gap:4px;">
           <button class="persona-heart-btn${isHearted?' hearted':''}" onclick="heartPersona()" title="${isHearted?'Remove from journey':'Save to Style Journey'}">${isHearted?'♥':'♡'}</button>
-          <button onclick="sharePersona()" title="Share portrait" style="background:none;border:none;cursor:pointer;padding:6px 7px;line-height:1;color:rgba(255,255,255,0.35);transition:color .15s;" onmouseenter="this.style.color='rgba(255,255,255,0.7)'" onmouseleave="this.style.color='rgba(255,255,255,0.35)'">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          <button onclick="sharePersona()" title="Share portrait" style="background:none;border:none;cursor:pointer;padding:8px 10px;line-height:1;color:rgba(255,255,255,0.45);transition:color .15s;" onmouseenter="this.style.color='rgba(255,255,255,0.85)'" onmouseleave="this.style.color='rgba(255,255,255,0.45)'">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           </button>
           ${ago ? `<span class="persona-stamp">${ago}</span>` : ''}
         </div>
@@ -10501,7 +10502,7 @@ function viewProfile() {
             <span style="font-size:11px;font-weight:900;color:${scoreStat.color};line-height:1;">${scoreStat.arrow}</span>
           </div>` : ''}
         </div>
-        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">Style Score</div>
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);display:flex;align-items:center;gap:2px;">Style Score <span style="font-size:8px;color:var(--text-3);opacity:.55;">▸</span></div>
       </div>
       <div style="width:1px;height:48px;background:var(--border);flex-shrink:0;"></div>
       <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;touch-action:manipulation;"
@@ -10510,12 +10511,13 @@ function viewProfile() {
           <span style="font-size:26px;font-weight:900;color:#4A8FA8;">${confStat ? confStat.val.toFixed(1) : '—'}</span>
           ${confStat ? `<span style="font-size:16px;font-weight:900;color:${confStat.color};">${confStat.arrow}</span>` : ''}
         </div>
-        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">Confidence</div>
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);display:flex;align-items:center;gap:2px;">Confidence <span style="font-size:8px;color:var(--text-3);opacity:.55;">▸</span></div>
       </div>
       <div style="width:1px;height:48px;background:var(--border);flex-shrink:0;"></div>
-      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;touch-action:manipulation;"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S._streakCalOffset=0;navigate('streak-calendar');" onclick="S._streakCalOffset=0;navigate('streak-calendar')">
         <div style="font-size:26px;font-weight:900;color:var(--text);line-height:1;">${streak > 0 ? streak + ' 🔥' : streak}</div>
-        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">Day Streak</div>
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);display:flex;align-items:center;gap:2px;">Day Streak <span style="font-size:8px;color:var(--text-3);opacity:.55;">▸</span></div>
       </div>
     </div>
 
@@ -12560,6 +12562,25 @@ function bumpRackLevel(stateKey, delta) {
     render();
   }
 }
+function catCost(arr) { return arr.reduce((s,w) => s + (parseFloat(w.price)||0), 0); }
+function fmtCost(v) { return v > 0 ? `$${v % 1 === 0 ? v : v.toFixed(0)}` : null; }
+function shelfCardHTML(w, fallbackIcon, _siblings) {
+  const wears = w.wears?.length || 0;
+  const isGem = isGemPiece(w);
+  const imgHTML = w.photo
+    ? `<img src="${esc(photoBlobUrl(w.photo))}" class="shoe-card-img" alt="${esc(w.name)}" loading="lazy">`
+    : `<span class="shoe-card-emoji">${w.icon || fallbackIcon}</span>`;
+  return `<div class="shoe-card"
+    ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
+    onclick="openWardrobeItem('${w.id}')">
+    <div class="shoe-card-img-wrap${isGem?' hero':''}${S._newlyPaidOff===w.id?' paid-off-glow':''}">
+      ${imgHTML}
+      ${isGem ? `<div style="position:absolute;bottom:2px;right:3px;font-size:7px;font-weight:800;color:var(--gold-dk);background:rgba(255,255,255,.85);border-radius:3px;padding:1px 3px;">💎</div>` : ''}
+    </div>
+    <div class="shoe-card-name">${esc(w.name)}</div>
+    ${wears >= 10 ? `<div class="shoe-card-wears" style="color:var(--gold);font-weight:700;">${wears}w</div>` : ''}
+  </div>`;
+}
 function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackIcon, bg) {
   S._shelfRegistry = S._shelfRegistry || {};
   S._shelfRegistry[stateKey] = { catItems, icon, label, countLabel, stateKey, fallbackIcon, bg };
@@ -12835,10 +12856,6 @@ function viewWardrobe() {
         onclick="S._wardrobeReorderMode=!S._wardrobeReorderMode;if(S._wardrobeReorderMode){S.wardrobeSort='custom';}render()">⇄ Reorder</div>
     </div>` : '';
 
-  // ── Helper: total cost for a set of items ─────────────────
-  const catCost = arr => arr.reduce((s,w) => s + (parseFloat(w.price)||0), 0);
-  const fmtCost = v => v > 0 ? `$${v % 1 === 0 ? v : v.toFixed(0)}` : null;
-
   // ── Empty states ───────────────────────────────────────────
   const emptyMsg = S.wardrobeCategory !== 'All'
     ? `<div class="empty">
@@ -12857,25 +12874,6 @@ function viewWardrobe() {
 
 
 // ── Shoe rack renderer ────────────────────────────────────
-// ── Generic shelf card + section (Shoes, Bags, Accessories) ─
-function shelfCardHTML(w, fallbackIcon, _siblings) {
-  const wears = w.wears?.length || 0;
-  const isGem = isGemPiece(w);
-  const imgHTML = w.photo
-    ? `<img src="${esc(photoBlobUrl(w.photo))}" class="shoe-card-img" alt="${esc(w.name)}" loading="lazy">`
-    : `<span class="shoe-card-emoji">${w.icon || fallbackIcon}</span>`;
-  return `<div class="shoe-card"
-    ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')"
-    onclick="openWardrobeItem('${w.id}')">
-    <div class="shoe-card-img-wrap${isGem?' hero':''}${S._newlyPaidOff===w.id?' paid-off-glow':''}">
-      ${imgHTML}
-      ${isGem ? `<div style="position:absolute;bottom:2px;right:3px;font-size:7px;font-weight:800;color:var(--gold-dk);background:rgba(255,255,255,.85);border-radius:3px;padding:1px 3px;">💎</div>` : ''}
-    </div>
-    <div class="shoe-card-name">${esc(w.name)}</div>
-    ${wears >= 10 ? `<div class="shoe-card-wears" style="color:var(--gold);font-weight:700;">${wears}w</div>` : ''}
-  </div>`;
-}
-
   if (!items.length) {
     gridHTML = emptyMsg;
 
@@ -14814,6 +14812,83 @@ function viewConfidenceHistory() {
       <span style="width:30px;"></span>
     </div>
     ${_weeklyMetricHistoryHTML({ field: 'confidence', title: 'Confidence', countLabel: 'Outfits logged', accent: '#4A8FA8' })}
+  </div>`;
+}
+
+function viewStreakCalendar() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const toKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const todayKey = toKey(today);
+
+  // Most-notable entry per day (highest rating) so the cell can show a score
+  const byDay = {};
+  S.entries.forEach(e => {
+    if (!e.createdAt) return;
+    const k = toKey(new Date(e.createdAt));
+    if (!byDay[k] || (e.rating||0) > (byDay[k].rating||0)) byDay[k] = e;
+  });
+
+  // Current streak (same logic as the Portfolio tile)
+  let streak = 0;
+  const si = byDay[todayKey] ? 0 : 1;
+  for (let i = si; i < 365; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    if (byDay[toKey(d)]) streak++; else break;
+  }
+
+  const offset = S._streakCalOffset || 0; // months back from current month, 0 = current
+  const viewDate = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+  const monthName = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const firstDow = viewDate.getDay();
+  const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
+  const dowRow = ['S','M','T','W','T','F','S'].map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  let cells = '';
+  for (let i = 0; i < firstDow; i++) cells += `<div class="cal-day cal-empty"></div>`;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+    const k = toKey(d);
+    const entry = byDay[k];
+    const isToday = k === todayKey;
+    const isFuture = d > today;
+    if (entry) {
+      const r = entry.rating || 0;
+      const rCls = r >= 8 ? 'r-high' : r >= 5 ? 'r-mid' : 'r-low';
+      cells += `<div class="cal-day logged ${rCls}${isToday?' cal-today':''}"
+        ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')"
+        onclick="openEntry('${entry.id}')">
+        <div class="cal-day-num">${day}</div>
+        <div class="cal-day-score">${r || '✓'}</div>
+      </div>`;
+    } else {
+      cells += `<div class="cal-day${isFuture?' cal-future':''}${isToday?' cal-today':''}">
+        <div class="cal-day-num">${day}</div>
+      </div>`;
+    }
+  }
+
+  const canGoNext = offset < 0;
+  return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">${iconBack()} Profile</button>
+      <span class="nav-title">Logging Calendar</span>
+      <span style="width:30px;"></span>
+    </div>
+    <div style="padding:16px 16px 28px;">
+      <div class="cal-streak">${streak} day streak ${streak>0?'🔥':'📅'} <span>· days with a logged outfit are highlighted below</span></div>
+      <div class="cal-header">
+        <button class="cal-nav-btn" ontouchend="if(_touchMoved)return;event.preventDefault();S._streakCalOffset=(S._streakCalOffset||0)-1;render()" onclick="S._streakCalOffset=(S._streakCalOffset||0)-1;render()">‹</button>
+        <span class="cal-month-name">${monthName}</span>
+        <button class="cal-nav-btn" ${canGoNext?'':'disabled'} ontouchend="if(_touchMoved)return;event.preventDefault();S._streakCalOffset=Math.min(0,(S._streakCalOffset||0)+1);render()" onclick="S._streakCalOffset=Math.min(0,(S._streakCalOffset||0)+1);render()">›</button>
+      </div>
+      <div class="cal-dow-row">${dowRow}</div>
+      <div class="cal-grid">${cells}</div>
+      <div class="cal-legend">
+        <div class="cal-leg-item"><span class="cal-leg-dot r-high"></span>8–10</div>
+        <div class="cal-leg-item"><span class="cal-leg-dot r-mid"></span>5–7</div>
+        <div class="cal-leg-item"><span class="cal-leg-dot r-low"></span>1–4</div>
+      </div>
+    </div>
   </div>`;
 }
 
