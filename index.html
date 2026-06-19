@@ -16974,11 +16974,24 @@ function viewDetail() {
     return m || null;
   }
 
-  // Total outfit cost: sum prices from wardrobe-linked items (source of truth)
-  const totalCost = entry.items.reduce((s,it) => {
+  // Items list = photo-detected items (each matched to a wardrobe piece where possible)
+  // PLUS any items linked directly via the "Link Items" picker that have no name match
+  // in the photo list — without the second half, manually-linked items would silently
+  // vanish from the list and never count toward cost / price-per-wear below.
+  const matchedWardrobeIds = new Set();
+  const photoItemMatches = entry.items.map(it => {
     const wm = findWardrobeMatch(it);
+    if (wm) matchedWardrobeIds.add(wm.id);
+    return { it, wm };
+  });
+  const extraLinkedItems = wornInOutfit.filter(w => !matchedWardrobeIds.has(w.id));
+
+  // Total outfit cost: sum prices from ALL wardrobe-linked items (source of truth),
+  // counting each linked item once even if it also appears in the photo-detected list.
+  const totalCost = [...matchedWardrobeIds].reduce((s,id) => {
+    const wm = S.wardrobe.find(w => w.id === id);
     return s + (wm ? (parseFloat(wm.price)||0) : 0);
-  }, 0);
+  }, 0) + extraLinkedItems.reduce((s,w) => s + (parseFloat(w.price)||0), 0);
   const ppw = entry.timesWorn>0&&totalCost>0 ? (totalCost/entry.timesWorn).toFixed(2) : null;
 
   return `<div class="view view-notab">
@@ -17167,16 +17180,19 @@ function viewDetail() {
               🔗 Link Items
             </button>
           </div>
-          ${entry.items.map(it => {
-            const wm = findWardrobeMatch(it);
-            if (wm) {
+          ${(() => {
+            // Render a wardrobe-matched row (shared by both the photo-detected items below
+            // and any items linked directly via the picker that weren't in the original photo list).
+            // Reuses photoItemMatches/extraLinkedItems computed above so this list always
+            // agrees with the totalCost/ppw figures shown further down.
+            const wmRowHTML = (wm, displayIcon) => {
               const wmWears = wm.wears?.length || 0;
               const wmPrice = parseFloat(wm.price) || 0;
               const wmPpw = wmWears > 0 && wmPrice > 0 ? (wmPrice / wmWears).toFixed(2) : null;
               return `<div class="item-row"
                 ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${wm.id}')"
                 onclick="openWardrobeItem('${wm.id}')" style="cursor:pointer;">
-                <div class="item-icon">${it.icon||'👕'}</div>
+                <div class="item-icon">${displayIcon||wm.icon||'👕'}</div>
                 <div class="item-info" style="flex:1;min-width:0;">
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
                     <div class="item-name" style="flex:1;">${esc(wm.name)}</div>
@@ -17193,15 +17209,23 @@ function viewDetail() {
                   </div>
                 </div>
               </div>`;
-            }
-            return `<div class="item-row">
-              <div class="item-icon">${it.icon||'👕'}</div>
-              <div class="item-info">
-                <div class="item-name">${esc(it.name)}</div>
-                <div class="item-no-price" style="cursor:pointer;" onclick="openOutfitLinker('${entry.id}')">Not linked — tap Link Items to connect</div>
-              </div>
-            </div>`;
-          }).join('')}
+            };
+            const photoRows = photoItemMatches.map(({it, wm}) => {
+              if (wm) return wmRowHTML(wm, it.icon);
+              return `<div class="item-row">
+                <div class="item-icon">${it.icon||'👕'}</div>
+                <div class="item-info">
+                  <div class="item-name">${esc(it.name)}</div>
+                  <div class="item-no-price" style="cursor:pointer;" onclick="openOutfitLinker('${entry.id}')">Not linked — tap Link Items to connect</div>
+                </div>
+              </div>`;
+            }).join('');
+            // Items linked via the "Link Items" picker that don't correspond to any
+            // photo-detected item — without this, confirming a link here would silently
+            // have no visible effect on the list even though the wear/cost data updated.
+            const extraRows = extraLinkedItems.map(w => wmRowHTML(w)).join('');
+            return photoRows + extraRows;
+          })()}
           ${totalCost>0?`
             <div class="total-row"><span class="total-label">Total Outfit Cost</span><span class="total-value">$${totalCost.toFixed(0)}</span></div>
             ${ppw?`<div class="ppw-chip"><div><div class="ppw-value">$${ppw}</div><div class="ppw-label">price per wear</div></div><div class="ppw-note">Worn ${entry.timesWorn}×<br>Tap "Worn" to update</div></div>`:`<p style="font-size:13px;color:var(--text-3);margin-top:10px;">Log a wear above to see price per wear.</p>`}`:''}
