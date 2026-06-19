@@ -14675,6 +14675,11 @@ function confirmRateModeSetup() {
   const hasGoals = (S.styleGoals||[]).length > 0;
   const items = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
   items.sort((a,b) => {
+    // Never-rated pieces (no star rating yet) always come first, regardless of goal-fit
+    // or re-evaluation timing below — getting a first rating on every item takes priority.
+    const unratedA = a.styleRating ? 1 : 0;
+    const unratedB = b.styleRating ? 1 : 0;
+    if (unratedA !== unratedB) return unratedA - unratedB;
     if (hasGoals) {
       const fa = itemGoalFit(a), fb = itemGoalFit(b);
       const offA = fa?.offGoal ? 0 : 1; // surface off-goal pieces first so they get re-evaluated sooner
