@@ -2968,7 +2968,7 @@ const S = {
   newsFlash: null, // { headline, summary, url, source, fetchedAt }
   _newsFlashDismissed: false, // session-only dismiss flag
   // Dress Me — daily AI outfit recommendation, surfaced as a dismissible invite on the Fits landing page
-  dressMeDismissedDate: localStorage.getItem('closet-dressme-dismissed-date') || null, // yyyy-mm-dd — re-invites the next day
+  _dressMeDismissedSession: false, // session-only — NOT persisted, so the invite shows again every time the app is reopened
   _dressMeOpen: false,          // bottom-sheet modal visible
   _dressMeStage: 'context',     // 'context' | 'result'
   _dressMeContext: '',          // user's one-line context, e.g. "coffee with friends"
@@ -2976,6 +2976,11 @@ const S = {
   dressMeResult: null,          // { outfit:[{item,emoji,reason}], vibe, hype }
   _dressMeHistory: [],          // recently suggested item names — avoid repeats across refreshes
   dressMeActive: null,          // { context, outfit, vibe } — set once user accepts a look, carried into the upload/analyze flow for credit
+  // Sell It — AI-drafted Poshmark/Depop listing, nudged when a piece scores 2★ or lower in Rate Mode
+  sellDraft: null,        // { wardrobeId, loading, title, description, price, priceReasoning }
+  _sellDraftOpen: false,  // bottom-sheet modal visible
+  _sellSuggestId: null,   // wardrobeId currently showing the inline "list it?" nudge in Rate Mode
+  _sellDismissedIds: new Set(), // session-only — nudges dismissed this session, don't re-show for the same item
   purchasedQueries: new Set(JSON.parse(localStorage.getItem('closet-purchased') || '[]')),
   shopBlocked: new Set(JSON.parse(localStorage.getItem('closet-shop-blocked') || '[]')),
   shopCache: JSON.parse(localStorage.getItem('closet-shop-cache') || '{}'), // key → {results,ts}
@@ -6424,6 +6429,7 @@ function render() {
   if (S.showShareCard) html += shareCardModalHTML();
   if (S.wordOfDay) html += wordOfDaySheetHTML();
   if (S._closetLightbox) html += closetLightboxHTML();
+  if (S._sellDraftOpen) html += sellDraftModalHTML();
   if (S.toast) {
     // Rate Mode's star row sits low on screen — the default bottom toast would
     // cover it for ~2.6s and look like the stars are slow to load. Anchor near
@@ -7124,9 +7130,10 @@ Return ONLY valid JSON with no markdown or extra text:
 // ── Dress Me — daily AI outfit recommendation ───────────────────────────────
 
 function dismissDressMe() {
-  const todayKey = new Date().toISOString().slice(0,10);
-  S.dressMeDismissedDate = todayKey;
-  localStorage.setItem('closet-dressme-dismissed-date', todayKey);
+  // Session-only dismiss: hides the banner for the rest of this app session but
+  // is intentionally NOT persisted to localStorage, so the invite reliably shows
+  // again the next time the user opens/lands in the app (not just the next day).
+  S._dressMeDismissedSession = true;
   render();
 }
 
@@ -7213,6 +7220,160 @@ function acceptDressMe() {
   S._dressMeOpen = false;
   toast('✨ Locked in — now put it on and snap a photo!');
   navigate('upload');
+}
+
+// ── Sell It — AI-drafted Poshmark/Depop listing for pieces that aren't earning love ──
+// Neither Poshmark nor Depop offers a public API for third-party apps to post listings
+// on a user's behalf, so this drafts the listing + a smart price, copies it to the
+// clipboard, and opens the marketplace's own create-listing page to paste it into —
+// the closest thing to "direct" posting available without official API access.
+
+function dismissSellSuggestion() {
+  if (S._sellSuggestId) S._sellDismissedIds.add(S._sellSuggestId);
+  S._sellSuggestId = null;
+  render();
+}
+
+function openSellDraft(wardrobeId) {
+  S._sellDraftOpen = true;
+  S._sellSuggestId = null;
+  generateSellDraft(wardrobeId);
+}
+
+function closeSellDraft() {
+  S._sellDraftOpen = false;
+  S.sellDraft = null;
+  render();
+}
+
+async function generateSellDraft(wardrobeId) {
+  const w = S.wardrobe.find(i => i.id === wardrobeId);
+  if (!w) return;
+  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); S._sellDraftOpen = false; render(); return; }
+  S.sellDraft = { wardrobeId, loading: true };
+  render();
+
+  const wears = w.wears?.length || 0;
+  const details = [
+    w.name ? `Item: ${w.name}` : null,
+    w.brand ? `Brand: ${w.brand}` : null,
+    w.category ? `Category: ${w.category}` : null,
+    w.size ? `Size: ${w.size}` : null,
+    w.color ? `Color: ${w.color}` : null,
+    w.price ? `Original purchase price: $${parseFloat(w.price).toFixed(0)}` : null,
+    `Worn ${wears} time${wears===1?'':'s'}`,
+    w.tailoringNeeded ? 'Needs tailoring' : null,
+    w.styleRating ? `Owner's current style rating: ${w.styleRating}/5 (low — that's why they're reselling it)` : null,
+  ].filter(Boolean).join('\n');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: `You are helping someone resell a clothing item on Poshmark/Depop. Write a compelling listing and suggest a fair resale price based on typical secondhand resale value (factor in brand, condition/wear, and original price — secondhand items typically resell for 20-50% of retail unless the brand holds value especially well).
+
+${details}
+
+Return ONLY valid JSON, no markdown or extra text:
+{"title":"short punchy listing title, under 60 characters","description":"2-3 sentence listing description, casual marketplace tone, mention condition and fit","price":wholeNumberSuggestedPriceInDollars,"priceReasoning":"one short sentence explaining the price"}` }],
+      }),
+    });
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const data = await res.json();
+    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('No JSON');
+    const result = JSON.parse(m[0]);
+    S.sellDraft = {
+      wardrobeId, loading: false,
+      title: result.title || w.name || '',
+      description: result.description || '',
+      price: Math.round(result.price) || 0,
+      priceReasoning: result.priceReasoning || '',
+    };
+  } catch(e) {
+    console.error('generateSellDraft:', e);
+    toast("Couldn't generate a listing — try again.");
+    S.sellDraft = null;
+    S._sellDraftOpen = false;
+  }
+  render();
+}
+
+function listOnMarketplace(platform) {
+  const d = S.sellDraft; if (!d || d.loading) return;
+  const w = S.wardrobe.find(i => i.id === d.wardrobeId);
+  const title = (d.title || '').trim();
+  const description = (d.description || '').trim();
+  const price = (d.price || '').toString().trim();
+  const text = `${title}\n\n${description}\n\nPrice: $${price}${w?.size ? `\nSize: ${w.size}` : ''}${w?.brand ? `\nBrand: ${w.brand}` : ''}`;
+  const platformName = platform === 'poshmark' ? 'Poshmark' : 'Depop';
+
+  const finish = () => {
+    const url = platform === 'poshmark' ? 'https://poshmark.com/create-listing' : 'https://www.depop.com/sell/';
+    window.open(url, '_blank');
+    toast(`📋 Listing copied — paste it into ${platformName}!`);
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(finish).catch(finish);
+  } else {
+    finish();
+  }
+}
+
+function sellDraftModalHTML() {
+  if (!S._sellDraftOpen) return '';
+  const d = S.sellDraft;
+  return `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;"
+      ontouchend="if(event.target===this){closeSellDraft();}" onclick="if(event.target===this){closeSellDraft();}">
+      <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;">
+        <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="font-size:16px;font-weight:800;color:var(--text);">💸 List It</div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();closeSellDraft();" onclick="closeSellDraft();"
+            style="background:none;border:none;font-size:20px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;line-height:1;touch-action:manipulation;">✕</button>
+        </div>
+        <div style="overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 20px 32px;">
+          ${!d || d.loading ? `
+            <div style="display:flex;flex-direction:column;align-items:center;padding:40px 0;gap:12px;">
+              <div class="spinner"></div>
+              <div style="font-size:13px;color:var(--text-3);">Writing your listing &amp; pricing it…</div>
+            </div>
+          ` : `
+            <div style="margin-bottom:14px;">
+              <label style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px;">Title</label>
+              <input id="sell-draft-title" class="form-input" value="${esc(d.title||'')}" oninput="S.sellDraft.title=this.value">
+            </div>
+            <div style="margin-bottom:14px;">
+              <label style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px;">Description</label>
+              <textarea id="sell-draft-desc" class="form-input" rows="4" style="resize:vertical;" oninput="S.sellDraft.description=this.value">${esc(d.description||'')}</textarea>
+            </div>
+            <div style="margin-bottom:6px;">
+              <label style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px;">Suggested price</label>
+              <div class="price-wrap"><input id="sell-draft-price" class="form-input" type="number" min="0" step="1" value="${d.price||0}" oninput="S.sellDraft.price=this.value"></div>
+            </div>
+            <div style="font-size:11.5px;color:var(--text-3);margin-bottom:18px;">${d.priceReasoning ? `💡 ${esc(d.priceReasoning)}` : ''}</div>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();listOnMarketplace('poshmark');" onclick="listOnMarketplace('poshmark')"
+              style="width:100%;padding:13px;background:#822280;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:10px;">
+              List on Poshmark →
+            </button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();listOnMarketplace('depop');" onclick="listOnMarketplace('depop')"
+              style="width:100%;padding:13px;background:#FF2300;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              List on Depop →
+            </button>
+            <div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:12px;">We'll copy this listing and open the site so you can paste it in — neither platform allows posting straight from another app.</div>
+          `}
+        </div>
+      </div>
+    </div>`;
 }
 
 function _restoreBookCarousel() {
@@ -8920,7 +9081,7 @@ function viewCloset() {
       const todayKey = new Date().toISOString().slice(0,10);
       const loggedToday = S.entries.some(e => e.createdAt && e.createdAt.slice(0,10) === todayKey);
       const activeWardrobeCount = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile).length;
-      const showDressMeInvite = !loggedToday && activeWardrobeCount >= 3 && S.dressMeDismissedDate !== todayKey;
+      const showDressMeInvite = !loggedToday && activeWardrobeCount >= 3 && !S._dressMeDismissedSession;
       const inviteHTML = showDressMeInvite ? `
         <div style="margin:10px 16px 0;display:flex;align-items:center;gap:10px;padding:12px 14px;background:linear-gradient(135deg,#1C1A18 0%,#2a2520 100%);border-radius:var(--r-sm);">
           <span style="font-size:22px;flex-shrink:0;">✨</span>
@@ -14658,11 +14819,27 @@ function itemGoalFit(w) {
   return { matched, offGoal: matched.length === 0 };
 }
 
+// Absorb one browser/swipe "back" so leaving Rate Mode via a back-gesture exits
+// the mode (back to the Wardrobe tab) instead of exiting the whole app — the
+// app has no other history routing, so without this a back-gesture here would
+// navigate away from the page entirely.
+let _rateModeHistoryPushed = false;
+window.addEventListener('popstate', () => {
+  if (S.view === 'rate-mode') {
+    _rateModeHistoryPushed = false;
+    S.rateMode = null;
+    S.rateModeCelebrate = null;
+    navigate('wardrobe');
+  }
+});
+
 function startRateMode() {
   const hasAny = S.wardrobe.some(w => !w.retiredFromCloset && !w.inMaybePile);
   if (!hasAny) { toast('Nothing left to rate — your closet is all caught up! ✨'); return; }
   S.rateMode = null; // show setup/chooser screen first
   navigate('rate-mode');
+  history.pushState({ rateMode: true }, '', location.href);
+  _rateModeHistoryPushed = true;
 }
 
 function setRateModePhotoMode(mode) {
@@ -14694,7 +14871,13 @@ function confirmRateModeSetup() {
   render();
 }
 
-function exitRateMode() { S.rateMode = null; S.rateModeCelebrate = null; navigate('wardrobe'); }
+function exitRateMode() {
+  // If we pushed an extra history entry on entry, consume it via history.back()
+  // so the back-gesture/X-button stay in sync — the popstate handler above does
+  // the actual state cleanup + navigation once the browser fires the event.
+  if (_rateModeHistoryPushed) { _rateModeHistoryPushed = false; history.back(); return; }
+  S.rateMode = null; S.rateModeCelebrate = null; navigate('wardrobe');
+}
 
 function dismissRateModeCelebration() { S.rateModeCelebrate = null; render(); }
 
@@ -14713,6 +14896,14 @@ async function setStyleRating(id, n) {
     // snapshot, not just an overwrite, so we can later show trend/history per item.
     if (!Array.isArray(w.styleRatingHistory)) w.styleRatingHistory = [];
     w.styleRatingHistory.push({ rating: n, at: new Date().toISOString() });
+  }
+  // A piece that just scored 2★ or lower isn't getting worn/loved — nudge toward
+  // reselling it instead of leaving it to languish. Only on a fresh (non-cleared)
+  // low rating, and only once per item per session so it doesn't get naggy.
+  if (!cleared && n <= 2 && !S._sellDismissedIds.has(id)) {
+    S._sellSuggestId = id;
+  } else if (S._sellSuggestId === id) {
+    S._sellSuggestId = null;
   }
   render();
   try { await DB.wardrobe.put(w); } catch(e) { console.error('setStyleRating save failed:', e); }
@@ -14932,6 +15123,22 @@ function viewRateMode() {
           style="background:none;border:none;font-size:30px;cursor:pointer;padding:2px;line-height:1;touch-action:manipulation;filter:${(w.styleRating||0) >= n ? 'none' : 'grayscale(1) opacity(0.35)'};">★</button>
       `).join('')}
     </div>
+
+    ${S._sellSuggestId === w.id ? `
+      <div style="margin:0 18px 14px;padding:12px 14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:14px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;flex-shrink:0;">💸</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:700;color:#fff;">Not feeling it? Sell it instead of letting it sit.</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:1px;">Claude can draft a Poshmark/Depop listing and suggest a price.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();openSellDraft('${w.id}');" onclick="openSellDraft('${w.id}')"
+            style="background:#fff;border:none;border-radius:100px;padding:6px 13px;font-size:11.5px;font-weight:800;color:#1a1a1a;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">List it →</button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissSellSuggestion();" onclick="dismissSellSuggestion()"
+            style="background:none;border:none;padding:2px 6px;font-size:10.5px;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;touch-action:manipulation;">Not now</button>
+        </div>
+      </div>
+    ` : ''}
 
     <div style="display:flex;gap:10px;padding:6px 18px 36px;">
       <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('left');" onclick="rateModeCommit('left')"
