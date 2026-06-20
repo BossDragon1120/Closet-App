@@ -7335,7 +7335,7 @@ function sellDraftModalHTML() {
   return `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;"
       ontouchend="if(event.target===this){closeSellDraft();}" onclick="if(event.target===this){closeSellDraft();}">
-      <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;">
+      <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;animation:slideUp .32s cubic-bezier(.22,.68,0,1.2);">
         <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;">
           <div style="font-size:16px;font-weight:800;color:var(--text);">💸 List It</div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();closeSellDraft();" onclick="closeSellDraft();"
@@ -9062,7 +9062,12 @@ function viewCloset() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">📸 Fits</span>
-      <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();openDressMe();" onclick="openDressMe();"
+          title="Dress Me"
+          style="background:none;border:1.5px solid var(--border);border-radius:100px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;flex-shrink:0;">✨</button>
+        <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
+      </div>
     </div>
     ${S.weatherPin ? `
     <div ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('plan')"
@@ -9132,7 +9137,7 @@ function dressMeModalHTML() {
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
       ontouchend="if(event.target===this){closeDressMe();}"
       onclick="if(event.target===this){closeDressMe();}">
-      <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;">
+      <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;animation:slideUp .32s cubic-bezier(.22,.68,0,1.2);">
         <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;">
           <div style="font-size:16px;font-weight:800;color:var(--text);">✨ Dress Me</div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();closeDressMe();" onclick="closeDressMe();"
@@ -14834,8 +14839,8 @@ window.addEventListener('popstate', () => {
 });
 
 function startRateMode() {
-  const hasAny = S.wardrobe.some(w => !w.retiredFromCloset && !w.inMaybePile);
-  if (!hasAny) { toast('Nothing left to rate — your closet is all caught up! ✨'); return; }
+  const hasAny = S.wardrobe.some(w => !w.retiredFromCloset && !w.inMaybePile && !!w.wearPhoto);
+  if (!hasAny) { toast('No worn photos yet — add some to start rating! ✨'); return; }
   S.rateMode = null; // show setup/chooser screen first
   navigate('rate-mode');
   history.pushState({ rateMode: true }, '', location.href);
@@ -14850,7 +14855,7 @@ function setRateModePhotoMode(mode) {
 
 function confirmRateModeSetup() {
   const hasGoals = (S.styleGoals||[]).length > 0;
-  const items = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+  const items = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile && !!w.wearPhoto);
   items.sort((a,b) => {
     // Never-rated pieces (no star rating yet) always come first, regardless of goal-fit
     // or re-evaluation timing below — getting a first rating on every item takes priority.
@@ -14866,7 +14871,7 @@ function confirmRateModeSetup() {
     return (a.lastRatedAt||'').localeCompare(b.lastRatedAt||'');
   });
   const ids = items.map(w => w.id);
-  if (!ids.length) { toast('Nothing left to rate — your closet is all caught up! ✨'); navigate('wardrobe'); return; }
+  if (!ids.length) { toast('No worn photos yet — add some to start rating! ✨'); navigate('wardrobe'); return; }
   S.rateMode = { ids, idx: 0, count: 0 };
   render();
 }
