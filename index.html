@@ -2969,8 +2969,7 @@ const S = {
   _newsFlashDismissed: false, // session-only dismiss flag
   // Dress Me — daily AI outfit recommendation, surfaced as a dismissible invite on the Fits landing page
   _dressMeDismissedSession: false, // session-only — NOT persisted, so the invite shows again every time the app is reopened
-  _dressMeOpen: false,          // bottom-sheet modal visible
-  _dressMeStage: 'context',     // 'context' | 'result'
+  _dressMeStage: 'context',     // 'context' | 'result' — Dress Me is its own full page (view: 'dress-me'), not an overlay
   _dressMeContext: '',          // user's one-line context, e.g. "coffee with friends"
   _dressMeLoading: false,
   dressMeResult: null,          // { outfit:[{item,emoji,reason}], vibe, hype }
@@ -6412,6 +6411,7 @@ function render() {
     case 'confidence-history': html = viewConfidenceHistory(); break;
     case 'therapy-session-edit': html = viewTherapySessionEdit(); break;
     case 'streak-calendar': html = viewStreakCalendar(); break;
+    case 'dress-me':        html = viewDressMe();        break;
   }
   // Inject tab bar right after the .nav block on every tab view
   // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
@@ -7138,14 +7138,16 @@ function dismissDressMe() {
 }
 
 function openDressMe() {
-  S._dressMeOpen = true;
+  // Dress Me is a full page (not an overlay/bottom-sheet) — overlays were proving
+  // fragile across PWA/standalone display modes (stacking, animation, and dvh
+  // quirks), so this uses the same plain navigate() flow as every other page.
   S._dressMeStage = 'context';
   S.dressMeResult = null;
   S._dressMeContext = '';
-  render();
+  navigate('dress-me');
 }
 
-function closeDressMe() { S._dressMeOpen = false; render(); }
+function closeDressMe() { navigate('closet'); }
 
 async function generateDressMe() {
   if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
@@ -7217,7 +7219,6 @@ function acceptDressMe() {
   S.dressMeActive = { context: (S._dressMeContext||'').trim(), outfit: r.outfit||[], vibe: r.vibe||'' };
   const summary = r.vibe ? `Dress Me: ${r.vibe}${S.dressMeActive.context ? ' — ' + S.dressMeActive.context : ''}` : (S.dressMeActive.context || '');
   S.pendingContext = summary;
-  S._dressMeOpen = false;
   toast('✨ Locked in — now put it on and snap a photo!');
   navigate('upload');
 }
@@ -9062,12 +9063,12 @@ function viewCloset() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">📸 Fits</span>
-      <div style="display:flex;align-items:center;gap:8px;">
+      <span style="display:flex;align-items:center;gap:8px;">
         <button ontouchend="if(_touchMoved)return;event.preventDefault();openDressMe();" onclick="openDressMe();"
           title="Dress Me"
           style="background:none;border:1.5px solid var(--border);border-radius:100px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;flex-shrink:0;">✨</button>
         <button class="nav-add" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
-      </div>
+      </span>
     </div>
     ${S.weatherPin ? `
     <div ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('plan')"
@@ -9116,12 +9117,10 @@ function viewCloset() {
     ${outfitCountHTML}
     ${filterHTML}${gridHTML}
     <div style="height:8px"></div>
-    ${dressMeModalHTML()}
   </div>`;
 }
 
-function dressMeModalHTML() {
-  if (!S._dressMeOpen) return '';
+function viewDressMe() {
   const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
   const norm = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
   const matchWardrobeItem = name => {
@@ -9132,19 +9131,14 @@ function dressMeModalHTML() {
     best = activeWardrobe.find(w => norm(w.name).includes(target) || target.includes(norm(w.name)));
     return best || null;
   };
-  return `
-    <!-- DRESS ME BOTTOM SHEET -->
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
-      ontouchend="if(event.target===this){closeDressMe();}"
-      onclick="if(event.target===this){closeDressMe();}">
-      <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;animation:slideUp .32s cubic-bezier(.22,.68,0,1.2);">
-        <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;">
-          <div style="font-size:16px;font-weight:800;color:var(--text);">✨ Dress Me</div>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();closeDressMe();" onclick="closeDressMe();"
-            style="background:none;border:none;font-size:20px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;line-height:1;touch-action:manipulation;">✕</button>
-        </div>
-        <div style="overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 20px 40px;">
-          ${S._dressMeStage === 'context' ? `
+  return `<div class="view view-notab">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();closeDressMe();" onclick="closeDressMe();">${iconBack()} Back</button>
+      <span class="nav-title">✨ Dress Me</span>
+      <span style="width:40px;flex-shrink:0;"></span>
+    </div>
+    <div style="padding:20px 20px 40px;">
+      ${S._dressMeStage === 'context' ? `
             <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">What are you up to today?</div>
             <input type="text" value="${esc(S._dressMeContext||'')}"
               placeholder="e.g. coffee with friends, big presentation, lazy Sunday…"
@@ -9194,9 +9188,8 @@ function dressMeModalHTML() {
               </div>
             </div>`;
           })() : ''}
-        </div>
-      </div>
-    </div>`;
+    </div>
+  </div>`;
 }
 
 function outfitCardHTML(e) {
