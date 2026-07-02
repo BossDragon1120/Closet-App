@@ -2977,6 +2977,8 @@ const S = {
   dressMeActive: null,          // { context, outfit, vibe } — set once user accepts a look, carried into the upload/analyze flow for credit
   savedDressMe: JSON.parse(localStorage.getItem('closet-dressme-saves') || '[]'), // [{id,vibe,hype,outfit,context,createdAt}]
   _openDressMeSaveId: null,     // which saved look is expanded on the Plan page
+  savedOutfitBuilds: JSON.parse(localStorage.getItem('closet-outfit-builds') || '[]'), // [{id,wardrobeId,wardrobeName,occasion,result,createdAt}]
+  _openOutfitBuildId: null,     // which saved outfit build is expanded on Plan page
   // Sell It — AI-drafted Poshmark/Depop listing, nudged when a piece scores 2★ or lower in Rate Mode
   sellDraft: null,        // { wardrobeId, loading, title, description, price, priceReasoning }
   _sellDraftOpen: false,  // bottom-sheet modal visible
@@ -6048,8 +6050,18 @@ function viewOutfitBuilder() {
         }).join('')}
       </div>` : ''}
 
-      <!-- Rebuild button -->
-      <div style="padding:16px 20px 0;">
+      <!-- Save + Rebuild buttons -->
+      <div style="padding:16px 20px 0;display:flex;flex-direction:column;gap:10px;">
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();saveOutfitBuild()"
+          onclick="saveOutfitBuild()"
+          style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
+            border:none;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);
+            color:#fff;font-size:14px;font-weight:800;
+            display:flex;align-items:center;justify-content:center;gap:8px;
+            box-shadow:0 3px 16px rgba(108,62,191,0.32);touch-action:manipulation;">
+          💜 Save to Plan
+        </button>
         <button
           ontouchend="if(_touchMoved)return;event.preventDefault();doOutfitBuild()"
           onclick="doOutfitBuild()"
@@ -6231,6 +6243,34 @@ Rules:
     render();
     toast('Couldn\'t build the outfit — check your API key and try again.');
   }
+}
+
+function saveOutfitBuild() {
+  const ob = S.outfitBuilder;
+  if (!ob?.result) return;
+  const w = S.wardrobe.find(i => i.id === ob.wardrobeId);
+  const entry = {
+    id: 'ob-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
+    wardrobeId: ob.wardrobeId,
+    wardrobeName: w?.name || '',
+    occasion: ob.occasion || '',
+    result: ob.result,
+    createdAt: new Date().toISOString(),
+  };
+  S.savedOutfitBuilds = [entry, ...S.savedOutfitBuilds];
+  localStorage.setItem('closet-outfit-builds', JSON.stringify(S.savedOutfitBuilds));
+  toast('💜 Saved to Plan!');
+  render();
+}
+function deleteOutfitBuild(id) {
+  S.savedOutfitBuilds = S.savedOutfitBuilds.filter(b => b.id !== id);
+  localStorage.setItem('closet-outfit-builds', JSON.stringify(S.savedOutfitBuilds));
+  if (S._openOutfitBuildId === id) S._openOutfitBuildId = null;
+  render();
+}
+function toggleOutfitBuild(id) {
+  S._openOutfitBuildId = S._openOutfitBuildId === id ? null : id;
+  render();
 }
 
 /* ================================================================
@@ -7467,14 +7507,13 @@ async function generateBookRec(entryId) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 350,
-        messages: [{ role: 'user', content: `You are a creative book curator with a passion for fashion. Given this outfit, recommend one real, specific book that perfectly matches the vibe of wearing it. Be imaginative and specific — the pairing should feel delightfully apt, like the book and outfit were made for each other.
-
-IMPORTANT: Only recommend books you are confident have a Goodreads rating above 4.0 based on your training data. Well-loved classics, award winners, and widely acclaimed contemporary novels are good sources. Include your best estimate of the Goodreads rating.${avoidList}
+        max_tokens: 1024,
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+        messages: [{ role: 'user', content: `You are a creative book curator with a passion for fashion. Search the web to find one real, specific book that perfectly matches the vibe of this outfit. Use search to find something with a Goodreads rating of 4+ stars. Be imaginative and specific — avoid obvious or overexposed picks (no Daisy Jones, no Colleen Hoover, nothing that has been a meme). Go for a deeper, surprising cut that still has real critical love.${avoidList}
 
 Outfit details: ${outfitDesc}
 
-Return ONLY valid JSON — no markdown:
+After searching, return ONLY valid JSON — no markdown:
 {
   "title": "exact book title",
   "author": "Author Name",
@@ -7488,7 +7527,9 @@ Return ONLY valid JSON — no markdown:
     });
     if (!res.ok) throw new Error(`API ${res.status}`);
     const data = await res.json();
-    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+    // Web search returns mixed content blocks; grab the last text block
+    const textBlock = (data.content || []).filter(b => b.type === 'text').pop();
+    const text = (textBlock?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('No JSON');
     const book = JSON.parse(m[0]);
@@ -9184,7 +9225,7 @@ function viewDressMe() {
               style="width:100%;box-sizing:border-box;padding:11px 13px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:inherit;color:var(--text);background:var(--bg);outline:none;">
             <div style="margin-top:6px;font-size:11px;color:var(--text-3);">Optional — leave blank for a solid everyday look.</div>
             <button ontouchend="if(_touchMoved)return;event.preventDefault();generateDressMe();" onclick="generateDressMe();"
-              style="width:100%;margin-top:16px;background:var(--gold);border:none;border-radius:100px;padding:12px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">✨ Get my outfit</button>
+              style="width:100%;margin-top:16px;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;border-radius:var(--r);padding:13px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;box-shadow:0 3px 16px rgba(108,62,191,0.28);">✨ Get my outfit</button>
           ` : S._dressMeLoading ? `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px 0;">
               <div class="spinner" style="width:28px;height:28px;border-width:3px;"></div>
@@ -9192,45 +9233,42 @@ function viewDressMe() {
             </div>
           ` : S.dressMeResult ? (() => {
             const r = S.dressMeResult;
-            return `<div style="background:linear-gradient(135deg,#1A1A1A 0%,#2A2010 100%);border-radius:16px;padding:20px;position:relative;overflow:hidden;">
-              <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 20%,rgba(184,125,42,0.18) 0%,transparent 60%);pointer-events:none;"></div>
-              <div style="position:relative;">
-                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--gold);margin-bottom:4px;">Today's Look</div>
-                <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px;">${esc(r.vibe||'')}</div>
-                <div style="font-size:14px;color:rgba(255,255,255,.65);margin-bottom:18px;font-style:italic;">${esc(r.hype||'')}</div>
-                <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
-                  ${(r.outfit||[]).map(p=>{
-                    const match = matchWardrobeItem(p.item);
-                    const thumbHTML = (match && match.photo)
-                      ? `<img src="${esc(photoBlobUrl(match.photo))}" alt="${esc(p.item||'')}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0;" loading="lazy">`
-                      : `<span style="font-size:24px;flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;">${esc(p.emoji||'👕')}</span>`;
-                    return `<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;">
+            return `
+              ${r.vibe ? `<div style="display:inline-block;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);color:#fff;border-radius:100px;padding:4px 14px;font-size:11px;font-weight:700;margin-bottom:10px;">${esc(r.vibe)}</div>` : ''}
+              ${r.hype ? `<p style="font-size:14px;color:var(--text-2);line-height:1.55;margin:0 0 18px;font-style:italic;">"${esc(r.hype)}"</p>` : ''}
+              <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Today's outfit</div>
+              <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+                ${(r.outfit||[]).map(p=>{
+                  const match = matchWardrobeItem(p.item);
+                  const thumbHTML = (match && match.photo)
+                    ? `<img src="${esc(photoBlobUrl(match.photo))}" alt="${esc(p.item||'')}" style="width:52px;height:68px;border-radius:8px;object-fit:cover;object-position:top;flex-shrink:0;" loading="lazy">`
+                    : `<div style="width:52px;height:68px;border-radius:8px;background:rgba(108,62,191,0.08);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">${esc(p.emoji||'👕')}</div>`;
+                  return `<div style="display:flex;align-items:center;gap:12px;padding:12px;background:linear-gradient(135deg,rgba(108,62,191,0.06),rgba(155,95,224,0.04));border:1.5px solid rgba(108,62,191,0.18);border-radius:var(--r);"
+                    ${match ? `ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${match.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${match.id}';navigate('wardrobe-item')"` : ''}>
                     ${thumbHTML}
                     <div style="flex:1;min-width:0;">
-                      <div style="font-size:14px;font-weight:700;color:#fff;line-height:1.25;">${esc(p.item||'')}</div>
-                      <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.35;margin-top:2px;">${esc(p.reason||'')}</div>
+                      <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;">${esc(p.item||'')}</div>
+                      <div style="font-size:11px;color:var(--text-3);line-height:1.35;margin-top:2px;">${esc(p.reason||'')}</div>
                     </div>
+                    ${match ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(108,62,191,0.4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>` : ''}
                   </div>`;
-                  }).join('')}
-                </div>
-                <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
-                  <button ontouchend="if(_touchMoved)return;event.preventDefault();acceptDressMe();" onclick="acceptDressMe();"
-                    style="width:100%;background:var(--gold);border:none;border-radius:100px;padding:13px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                    ✨ Putting it on!
-                  </button>
-                  <div style="display:flex;gap:8px;">
-                    <button ontouchend="if(_touchMoved)return;event.preventDefault();saveDressMe();" onclick="saveDressMe();"
-                      style="flex:1;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                      ❤️ Save it
-                    </button>
-                    <button ontouchend="if(_touchMoved)return;event.preventDefault();generateDressMe();" onclick="generateDressMe();"
-                      style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:rgba(255,255,255,.65);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                      🔄 Try another
-                    </button>
-                  </div>
-                </div>
+                }).join('')}
               </div>
-            </div>`;
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();acceptDressMe();" onclick="acceptDressMe();"
+                style="width:100%;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;border-radius:var(--r);padding:14px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;box-shadow:0 3px 16px rgba(108,62,191,0.32);margin-bottom:10px;display:block;">
+                ✨ Putting it on!
+              </button>
+              <div style="display:flex;gap:8px;">
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();saveDressMe();" onclick="saveDressMe();"
+                  style="flex:1;background:rgba(108,62,191,0.08);border:1.5px solid rgba(108,62,191,0.3);border-radius:var(--r);padding:11px;font-size:13px;font-weight:700;color:#6C3EBF;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                  💜 Save it
+                </button>
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();generateDressMe();" onclick="generateDressMe();"
+                  style="flex:1;background:var(--surface-2,var(--surface));border:1.5px solid var(--border);border-radius:var(--r);padding:11px;font-size:13px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                  🔄 Try another
+                </button>
+              </div>
+            `;
           })() : ''}
     </div>
   </div>`;
@@ -10074,6 +10112,67 @@ function viewPlan() {
         </div>
       ` : ''}
 
+      ${S.savedOutfitBuilds.length > 0 ? `
+        <!-- SAVED OUTFIT BUILDS -->
+        <div class="event-board-section">
+          <div class="event-board-header">
+            <span>💜 Saved Outfits</span>
+            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${S.savedOutfitBuilds.length} outfit${S.savedOutfitBuilds.length===1?'':'s'}</span>
+          </div>
+          ${S.savedOutfitBuilds.map(ob => {
+            const isOpen = S._openOutfitBuildId === ob.id;
+            const d = new Date(ob.createdAt);
+            const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+            const r = ob.result || {};
+            return `<div class="event-card">
+              <div class="event-card-header" style="cursor:pointer;touch-action:manipulation;"
+                ontouchend="if(_touchMoved)return;event.preventDefault();toggleOutfitBuild('${ob.id}');" onclick="toggleOutfitBuild('${ob.id}')">
+                <div class="event-card-desc">
+                  💜 ${esc(r.occasion || ob.wardrobeName || 'Saved Outfit')}
+                  <div style="font-size:11.5px;font-weight:600;color:var(--text-3);margin-top:2px;">${ob.wardrobeName ? esc(ob.wardrobeName) + ' · ' : ''}${dateLabel}</div>
+                </div>
+                <span style="font-size:12px;color:var(--text-3);transform:rotate(${isOpen?'180deg':'0deg'});transition:transform .15s;flex-shrink:0;">▾</span>
+                <button class="event-card-delete" title="Delete outfit"
+                  ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteOutfitBuild('${ob.id}');"
+                  onclick="event.stopPropagation();deleteOutfitBuild('${ob.id}')">✕</button>
+              </div>
+              ${isOpen ? `
+                <div class="event-card-body">
+                  ${r.stylistNote ? `<div style="font-size:13px;color:var(--text-2);font-style:italic;margin-bottom:12px;">"${esc(r.stylistNote)}"</div>` : ''}
+                  ${ob.wardrobeName ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(108,62,191,0.7);margin-bottom:8px;">Built around: ${esc(ob.wardrobeName)}</div>` : ''}
+                  ${(r.picks||[]).length ? `
+                    <div style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:6px;">PAIR WITH</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
+                      ${(r.picks||[]).map(p=>`
+                        <div style="display:flex;align-items:center;gap:10px;">
+                          <div style="width:8px;height:8px;border-radius:50%;background:rgba(108,62,191,0.5);flex-shrink:0;"></div>
+                          <div style="flex:1;min-width:0;">
+                            <span style="font-size:13px;font-weight:600;color:var(--text);">${esc(p.name||'')}</span>
+                            ${p.reason ? `<span style="font-size:11px;color:var(--text-3);"> — ${esc(p.reason)}</span>` : ''}
+                          </div>
+                        </div>`).join('')}
+                    </div>
+                  ` : ''}
+                  ${(r.gaps||[]).length ? `
+                    <div style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:6px;">COMPLETE THE LOOK</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;">
+                      ${(r.gaps||[]).map(g=>`
+                        <div style="display:flex;align-items:center;gap:10px;">
+                          <span style="font-size:14px;flex-shrink:0;">🛍</span>
+                          <div style="flex:1;min-width:0;">
+                            <span style="font-size:13px;font-weight:600;color:var(--text);">${esc(g.item||'')}</span>
+                            ${g.reason ? `<span style="font-size:11px;color:var(--text-3);"> — ${esc(g.reason)}</span>` : ''}
+                          </div>
+                        </div>`).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+              ` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+
       ${S.savedTripPlans.length > 0 ? `
         <!-- SAVED TRIP PLANS — condensed list, tap to expand/collapse -->
         <div class="event-board-section">
@@ -10753,16 +10852,24 @@ function viewProfile() {
   const btnStyle = `background:rgba(255,255,255,0.08);border:1px solid ${colors.accent}44;border-radius:100px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;color:${colors.accent};white-space:nowrap;touch-action:manipulation;`;
   const portraitHTML = persona ? `
     <div style="background:linear-gradient(135deg,${colors.bg1},${colors.bg2});border-radius:14px;padding:13px 14px 14px;border:1px solid ${colors.accent}33;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;">
         <div style="font-size:9px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:${colors.accent};padding-top:2px;">✦ Style Portrait</div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();heartPersona()" onclick="heartPersona()" style="${btnStyle}">${isSaved?'❤️':'♡'}</button>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();openShareCard()" onclick="openShareCard()" style="${btnStyle}">↗</button>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();generateStylePersona()" onclick="generateStylePersona()" style="${btnStyle}">⟳</button>
         </div>
       </div>
-      <div style="font-family:Georgia,serif;font-size:16px;font-weight:800;line-height:1.25;color:${colors.text};margin-bottom:8px;">${esc(persona.headline)}</div>
-      <div style="font-size:12px;line-height:1.65;color:${colors.text};opacity:.75;">${esc(persona.body)}</div>
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:Georgia,serif;font-size:16px;font-weight:800;line-height:1.25;color:${colors.text};margin-bottom:8px;">${esc(persona.headline)}</div>
+          <div style="font-size:12px;line-height:1.65;color:${colors.text};opacity:.75;">${esc(persona.body)}</div>
+        </div>
+        ${topLook?.photo ? `<div style="flex-shrink:0;">
+          <div style="width:66px;height:88px;border-radius:10px;overflow:hidden;border:1.5px solid ${colors.accent}44;box-shadow:0 2px 8px rgba(0,0,0,.15);">
+            <img src="${esc(topLook.photo)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">
+          </div>
+        </div>` : ''}
+      </div>
     </div>
     ${(() => { const jh = buildJourneyHTML(); return jh ? `<div style="margin-top:12px;">${jh}</div>` : ''; })()}` : `
     <div style="text-align:center;padding:18px 16px;background:var(--surface);border-radius:14px;border:1px dashed var(--border);">
@@ -11164,24 +11271,6 @@ function viewProfile() {
         ${expandBtn}
       </div>`;
     })() : ''}
-
-    <!-- ══ Divider ══ -->
-    <div style="height:1px;background:var(--border);margin:20px 16px;"></div>
-
-    <!-- ══ Fashion Stats ══ -->
-    <div style="margin:0 16px;display:flex;flex-direction:column;gap:10px;">
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('dashboard')"
-        onclick="navigate('dashboard')"
-        style="width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;box-sizing:border-box;">
-        <div style="width:40px;height:40px;border-radius:12px;background:var(--gold-bg);border:1px solid rgba(184,125,42,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">📊</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:1px;">Fashion Stats</div>
-          <div style="font-size:12px;color:var(--text-3);">Cost per wear, wardrobe breakdown, style score &amp; more</div>
-        </div>
-        <div style="font-size:18px;color:var(--text-3);">›</div>
-      </button>
-    </div>
 
     <!-- ══ Divider ══ -->
     <div style="height:1px;background:var(--border);margin:20px 16px;"></div>
@@ -12337,7 +12426,7 @@ function viewHome() {
   })() : '';
 
   // ── Style Goals + Visual Tab Cards ───────────────────────
-  const dTab = S.discoverTab || 'trends';
+  const dTab = S.discoverTab || 'tips';
   const GOAL_PRESETS = [
     { label:'Feminine',    emoji:'🌸' },
     { label:'Punk Rock',   emoji:'🤘' },
@@ -12390,9 +12479,8 @@ function viewHome() {
   const tipsCount = (() => { let n = 0; S.entries.forEach(e => { if (!e.recReactions) return; if (e.stylingTips?.length) { e.stylingTips.forEach((_,i) => { if (e.recReactions[String(i)] === 'liked') n++; }); } else { (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') n++; }); } }); return n; })();
 
   const tabCards = [
-    { key:'trends', icon:'🔥', label:'Trends',  sub: trendCount ? `${trendCount} trends loaded` : 'What\'s hot in fashion now' },
-    { key:'brands', icon:'✨', label:'Brands',  sub: brandCount ? `${brandCount} brand${brandCount===1?'':'s'} in your closet` : 'Discover your aesthetic' },
     { key:'tips',   icon:'✂️', label:'Tips',    sub: tipsCount  ? `${tipsCount} tip${tipsCount===1?'':'s'} saved` : 'Style tips from your fits' },
+    { key:'trends', icon:'🔥', label:'Trends',  sub: trendCount ? `${trendCount} trends loaded` : 'What\'s hot in fashion now' },
   ];
 
   const subTabPills = `
@@ -12790,38 +12878,6 @@ function viewDashboard() {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
         ${gridTiles.join('')}
       </div>
-
-      ${(() => {
-        // Collect every compliment across wardrobe, sorted newest first
-        const allC = [];
-        S.wardrobe.forEach(w => (w.compliments||[]).forEach(c => allC.push({w, date:c.date})));
-        if (!allC.length) return '';
-        allC.sort((a,b) => new Date(b.date)-new Date(a.date));
-        // Dedupe to one entry per item (most recent compliment date)
-        const seen = new Set(), recent = [];
-        for (const {w, date} of allC) {
-          if (!seen.has(w.id)) { seen.add(w.id); recent.push({w, lastDate:date, count:(w.compliments||[]).length}); }
-        }
-        const total = allC.length;
-        const relDate = iso => { const d=daysSince(iso); return d===0?'today':d===1?'yesterday':d<7?d+'d ago':fmtDate(iso); };
-        return `
-        <div style="margin-bottom:12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">💬 Recent Compliments</div>
-            <div style="font-size:11px;font-weight:700;color:var(--gold-dk);">${total} total</div>
-          </div>
-          <div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px;scrollbar-width:none;">
-            ${recent.slice(0,10).map(({w,lastDate,count}) => `
-              <div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
-                style="flex-shrink:0;width:110px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;touch-action:manipulation;text-align:center;">
-                ${w.photo ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;margin-bottom:6px;" loading="lazy">` : `<div style="font-size:30px;margin-bottom:6px;line-height:1;">${w.icon||'👕'}</div>`}
-                <div style="font-size:11.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.name)}</div>
-                <div style="font-size:11px;color:var(--gold-dk);margin-top:3px;font-weight:600;">${count} compliment${count===1?'':'s'}</div>
-                <div style="font-size:10px;color:var(--text-3);margin-top:2px;">${relDate(lastDate)}</div>
-              </div>`).join('')}
-          </div>
-        </div>`;
-      })()}
 
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${mostWorn ? wideTile('🏆', 'Most Worn Piece', esc(mostWorn.name), `${mostWorn.wears.length} wear${mostWorn.wears.length===1?'':'s'}${mostWorn.price ? ' · $'+(mostWorn.price/mostWorn.wears.length).toFixed(2)+'/wear' : ''}`) : ''}
@@ -13432,9 +13488,7 @@ function viewWardrobe() {
       <div class="filter-chip ${S.wardrobeSort==='recent-worn'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='recent-worn';render()"
         onclick="S.wardrobeSort='recent-worn';render()">🕐 Recently Worn</div>
-      <div class="filter-chip ${S.wardrobeSort==='best-val'?'active':''}"
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='best-val';render()"
-        onclick="S.wardrobeSort='best-val';render()">Best Value</div>
+
       <div class="filter-chip ${_colorSortActive?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort=(S.wardrobeSort==='color-asc')?'color-desc':'color-asc';render()"
         onclick="S.wardrobeSort=(S.wardrobeSort==='color-asc')?'color-desc':'color-asc';render()">${_colorSortLabel}</div>
@@ -17138,220 +17192,208 @@ function viewReview() {
    VIEW: MATCH REVIEW (post-save wardrobe sync)
    ================================================================ */
 function viewMatchReview() {
-  const mr = S.matchReview; if (!mr) { navigate('closet'); return ''; }
-  const confirmedMatches = mr.matches.filter(m => m.on);
-  const itemsToAdd = mr.unmatched.filter(u => u.addOn);
+  const mr = S.matchReview;
+  if (!mr) { navigate('closet'); return ''; }
 
-  const addCount = itemsToAdd.length;
-  const btnLabel = addCount > 0
-    ? `Add ${addCount} piece${addCount===1?'':'s'} to My Closet ✦`
-    : confirmedMatches.length > 0 ? 'Save & Log Wears' : 'Done';
+  // Unified step list: AI-matched items first, then unrecognised
+  const allSteps = [
+    ...mr.matches.map((_, i) => ({ type: 'match', dataIdx: i })),
+    ...mr.unmatched.map((_, i) => ({ type: 'unmatched', dataIdx: i })),
+  ];
 
-  return `<div class="view view-notab">
-    <div class="nav">
-      <span style="width:72px"></span>
-      <span class="nav-title">Add to My Closet</span>
-      <button class="nav-btn" onclick="skipMatchReview()" title="Skip">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
+  if (!allSteps.length) { doConfirmMatchReview(); return ''; }
 
-    <div class="match-header">
-      <h2>✨ Outfit Saved!</h2>
-      <p>Add these pieces to your closet to track what you wear, what it costs, and what it's worth over time.</p>
-    </div>
+  const step = mr.currentStep || 0;
+  const cur  = allSteps[step];
+  const isLast = step === allSteps.length - 1;
+  const entry = S.entries.find(e => e.id === mr.entryId);
+  const pct = Math.round((step / allSteps.length) * 100);
 
-    ${mr.matches.length ? `
-      <div class="match-section-label">Recognized from your wardrobe</div>
-      <p style="font-size:12px;color:var(--text-3);padding:0 16px;margin-bottom:10px;">Toggle off if Claude got it wrong — it'll move below so you can handle it.</p>
-      ${mr.matches.map((m, i) => {
-        const wItem = S.wardrobe.find(w => w.id === m.wardrobeId);
-        if (!wItem) return '';
-        // Also get the original outfit item to show what Claude detected
-        const entry = S.entries.find(e => e.id === mr.entryId);
-        const detectedName = entry?.items?.[m.newIdx]?.name || '';
-        const sameNameAsWardrobe = detectedName.toLowerCase().trim() === wItem.name.toLowerCase().trim();
-        const rescueBanner = m.on && wItem.inMaybePile ? `
-          <div style="margin-top:10px;background:#F0EFFE;border:1px solid #C5BAEE;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;">
-            <div style="font-size:20px;flex-shrink:0;">✨</div>
+  // ── Determine current item metadata ──────────────────────────────
+  let itemName, itemIcon, itemCat, decisionArea;
+
+  if (cur.type === 'match') {
+    const m   = mr.matches[cur.dataIdx];
+    const det = entry?.items?.[m.newIdx];
+    const wItem = S.wardrobe.find(w => w.id === m.wardrobeId);
+    itemName = det?.name || wItem?.name || 'Item';
+    itemIcon = det?.icon || wItem?.icon || '👕';
+    itemCat  = normalizeCat(det ? categoryFromIcon(det.icon, det.name) : (wItem?.category || 'Other'));
+
+    const pickerOpen  = mr._pickerOpen === step;
+    const pickerQuery = (mr._pickerQuery || '').trim().toLowerCase();
+
+    if (!pickerOpen) {
+      // ── Matched: show the candidate wardrobe item ──
+      const ph = wItem ? photoBlobUrl(wItem.photo) : null;
+      const purgBanner = wItem?.inMaybePile ? `
+        <div style="margin-bottom:12px;background:#F0EFFE;border:1px solid #C5BAEE;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <div style="font-size:18px;">✨</div>
+          <div style="flex:1;min-width:0;font-size:12px;color:#7B6AAF;line-height:1.4;">
+            <strong style="color:#5B3FBF;">You're wearing it!</strong> This is in Purgatory — keep it?
+          </div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();rescueFromMaybePile('${wItem.id}')" onclick="rescueFromMaybePile('${wItem.id}')"
+            style="flex-shrink:0;background:#9B7FE0;border:none;border-radius:100px;padding:6px 12px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">Keep ✓</button>
+        </div>` : '';
+
+      decisionArea = `
+        <div style="padding:0 16px 16px;">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Found in your closet</div>
+          ${purgBanner}
+          <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--gold);border-radius:var(--r);padding:12px;margin-bottom:14px;">
+            ${ph
+              ? `<img src="${esc(ph)}" style="width:54px;height:66px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
+              : `<div style="width:54px;height:66px;display:flex;align-items:center;justify-content:center;font-size:30px;background:var(--gold-bg);border-radius:8px;flex-shrink:0;">${wItem?.icon||'👕'}</div>`}
             <div style="flex:1;min-width:0;">
-              <div style="font-size:12px;font-weight:700;color:#5B3FBF;margin-bottom:2px;">You just wore it!</div>
-              <div style="font-size:12px;color:#7B6AAF;line-height:1.4;">This is in Purgatory — wearing it is a pretty good sign it belongs. Remove it?</div>
+              <div style="font-size:15px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(wItem?.name||'—')}</div>
+              <div style="font-size:12px;color:var(--text-3);margin-top:3px;">${[wItem?.category, wItem?.brand, (wItem?.wears?.length||0)+' wears'].filter(Boolean).join(' · ')}</div>
+              ${m.reason ? `<div style="font-size:11px;color:var(--text-3);margin-top:4px;line-height:1.35;font-style:italic;">"${esc(m.reason)}"</div>` : ''}
             </div>
-            <button
-              ontouchend="if(_touchMoved)return;event.preventDefault();rescueFromMaybePile('${wItem.id}')"
-              onclick="rescueFromMaybePile('${wItem.id}')"
-              style="flex-shrink:0;background:#9B7FE0;border:none;border-radius:100px;padding:7px 13px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">Keep it ✓</button>
-          </div>` : '';
-        return `<div class="match-card" style="${m.on?'':'opacity:0.5;'}">
-          <div style="flex:1;min-width:0;">
-            <div class="match-name">${esc(wItem.name)}</div>
-            ${!sameNameAsWardrobe && detectedName ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px;">Claude detected: "${esc(detectedName)}"</div>` : ''}
-            <div class="match-sub">${esc(m.reason)}</div>
           </div>
-          <button class="toggle ${m.on?'on':'off'}" onclick="toggleMatch(${i})"></button>
-        </div>
-        ${rescueBanner}`;
-      }).join('')}
-      <div style="height:16px"></div>` : ''}
-
-    ${mr.unmatched.length ? `
-      <div class="match-section-label">${mr.matches.length ? 'New pieces to add' : 'Add these to your closet'}</div>
-      <p style="font-size:12px;color:var(--text-3);padding:0 16px;margin-bottom:10px;">Toggle on to add a piece — a few details now unlock cost-per-wear tracking over time.</p>
-      ${mr.unmatched.map((u, i) => {
-        const itemCat = u.selectedCat || categoryFromIcon(u.item.icon, u.item.name);
-        // Tight similar-item detection: category match is a HARD requirement — a shoe should
-        // never be offered as a candidate match for a shirt, even if names share a word. Within
-        // the same category, rank by name/brand overlap so the closest matches surface first.
-        const outfitWords = new Set((u.item.name||'').toLowerCase().split(/\s+/).filter(w=>w.length>3));
-        const _wCat = w => normalizeCat(w.category || categoryFromIcon(w.icon, w.name));
-        const _closeness = w => {
-          let score = 0;
-          const wn = (w.name||'').toLowerCase();
-          if (wn.split(/\s+/).some(ww => ww.length > 3 && outfitWords.has(ww))) score += 2;
-          if (w.brand && u.item.name.toLowerCase().includes(w.brand.toLowerCase())) score += 2;
-          return score;
-        };
-        const similar = S.wardrobe
-          .filter(w => !mr.matches.find(m=>m.on&&m.wardrobeId===w.id) && _wCat(w) === itemCat)
-          .sort((a,b) => _closeness(b) - _closeness(a))
-          .slice(0, 5);
-        const recoveredNote = u._recovered ? `<div style="font-size:11px;color:#B87030;margin-top:2px;font-weight:600;">↩ Moved here — was matched incorrectly?</div>` : '';
-        return `<div class="match-card" style="flex-direction:column;align-items:stretch;gap:10px;${u._recovered?'border-color:#E8C060;background:#FFFDF5;':''}">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <div class="match-icon" style="font-size:22px;">${u.item.icon||'👕'}</div>
-            <div class="match-info" style="flex:1;min-width:0;">
-              <div class="match-name">${esc(u.item.name)}</div>
-              ${recoveredNote}
-            </div>
-            <button class="toggle ${u.addOn?'on':''}" onclick="toggleUnmatched(${i})" title="${u.addOn?'Don\'t add':'Add to wardrobe'}"></button>
-          </div>
-
-          ${(()=>{
-            const picker = S.wardrobePickerFor?.unmatchedIdx === i ? S.wardrobePickerFor : null;
-            const searchQuery = (picker?.query || '').trim().toLowerCase();
-            const browsingAll = !!picker && !searchQuery;
-            let itemsToShow;
-            if (searchQuery) {
-              // Free-text search spans the WHOLE wardrobe (any category) — the explicit escape
-              // hatch for when none of the close-match suggestions are the right piece.
-              itemsToShow = S.wardrobe.filter(w =>
-                (w.name||'').toLowerCase().includes(searchQuery) ||
-                (w.brand||'').toLowerCase().includes(searchQuery)
-              ).slice(0, 8);
-            } else if (browsingAll) {
-              itemsToShow = S.wardrobe.slice().sort((a,b)=>(a.name||'').localeCompare(b.name));
-            } else {
-              itemsToShow = similar;
-            }
-            if (u.addOn) return ''; // collapsed when adding as new piece
-            if (!itemsToShow.length && !picker && !u.linkToId && !similar.length) return '';
-            return `<div style="background:var(--surface-2);border-radius:var(--r-sm);padding:10px 12px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <div style="font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em;">Already in your wardrobe?</div>
-                <button onclick="${picker?`S.wardrobePickerFor=null;render()`:`S.wardrobePickerFor={unmatchedIdx:${i},query:''};render()`}"
-                  style="background:none;border:none;font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;padding:0;font-family:inherit;">
-                  ${picker?'Show suggestions ↑':'Browse all →'}
-                </button>
-              </div>
-              <input id="wardrobe-picker-search" class="form-input" type="text" placeholder="🔍 Search your closet…"
-                value="${esc(picker?.query || '')}"
-                oninput="S.wardrobePickerFor={unmatchedIdx:${i},query:this.value};clearTimeout(window._wpDebounce);window._wpDebounce=setTimeout(render,200);"
-                style="font-size:14px;padding:9px 12px;margin-bottom:8px;">
-              ${searchQuery && !itemsToShow.length ? `<p style="font-size:12px;color:var(--text-3);margin:4px 0 8px;">No matches for "${esc(searchQuery)}".</p>` : ''}
-              ${itemsToShow.map(sw => {
-                const isLinked = u.linkToId === sw.id;
-                return `<div onclick="linkUnmatchedToExisting(${i},'${sw.id}')"
-                  style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;margin-bottom:4px;
-                  background:${isLinked?'#EAFAF1':'var(--surface)'};border:1.5px solid ${isLinked?'#1E8449':'var(--border)'};
-                  transition:all .15s;">
-                  <span style="font-size:20px;">${sw.icon||'👕'}</span>
-                  <div style="flex:1;min-width:0;">
-                    <div style="font-size:13px;font-weight:600;color:${isLinked?'#1E8449':'var(--text)'};">${esc(sw.name)}</div>
-                    <div style="font-size:11px;color:var(--text-3);">${sw.brand?esc(sw.brand)+' · ':''}${sw.category||''} · ${sw.wears?.length||0} wear${(sw.wears?.length||0)===1?'':'s'}</div>
-                  </div>
-                  <span style="font-size:16px;">${isLinked?'✅':''}</span>
-                </div>`;
-              }).join('')}
-              ${!itemsToShow.length && !u.linkToId && !searchQuery ? `<p style="font-size:12px;color:var(--text-3);margin:4px 0;">No items in your wardrobe yet — add one below.</p>` : ''}
-              ${u.linkToId ? `<p style="font-size:11px;color:#1E8449;margin-top:4px;">✓ Wear logged on that item — no duplicate created.</p>` : ''}
-            </div>`;
-          })()}
-
-          ${u.addOn && !u.linkToId ? `
-            <div style="display:flex;flex-direction:column;gap:8px;">
-              <input class="form-input" type="text" placeholder="Edit name"
-                value="${esc(u.editedName !== undefined ? u.editedName : u.item.name)}"
-                oninput="S.matchReview.unmatched[${i}].editedName=this.value"
-                style="font-size:16px;padding:11px 14px;">
-              <input class="form-input" type="text" placeholder="Brand (optional — e.g. Zara, Madewell)"
-                value="${esc(u.brand||'')}" oninput="S.matchReview.unmatched[${i}].brand=this.value"
-                style="font-size:16px;padding:11px 14px;">
-              <select class="form-input" style="font-size:16px;padding:11px 14px;"
-                onchange="S.matchReview.unmatched[${i}].selectedCat=this.value;render()">
-                ${getAllCategories().filter(c=>c!=='All').map(c =>
-                  `<option value="${c}" ${itemCat===c?'selected':''}>${c==='Pants'?'Bottoms':c}</option>`
-                ).join('')}
-              </select>
-              <input class="form-input" type="text" placeholder="Description — color, cut, material (optional)"
-                value="${esc(u.description !== undefined ? u.description : (u.item.description||''))}"
-                oninput="S.matchReview.unmatched[${i}].description=this.value"
-                style="font-size:16px;padding:11px 14px;">
-
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:2px;">Did you just get this?</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-                <button onclick="S.matchReview.unmatched[${i}].isNew=true;render()"
-                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${u.isNew===true?'var(--gold)':'var(--border)'};background:${u.isNew===true?'var(--gold-bg)':'var(--surface)'};color:${u.isNew===true?'var(--gold-dk)':'var(--text-2)'};">✨ Just got it</button>
-                <button onclick="S.matchReview.unmatched[${i}].isNew=false;render()"
-                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${u.isNew!==true?'var(--gold)':'var(--border)'};background:${u.isNew!==true?'var(--gold-bg)':'var(--surface)'};color:${u.isNew!==true?'var(--gold-dk)':'var(--text-2)'};">📦 Had it awhile</button>
-              </div>
-
-              ${u.isNew===true ? `
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                  <div style="position:relative;">
-                    <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-3);pointer-events:none;">$</span>
-                    <input class="form-input" type="number" min="0" step="0.01"
-                      placeholder="Price paid"
-                      value="${esc(u.price||'')}" oninput="S.matchReview.unmatched[${i}].price=this.value"
-                      style="font-size:16px;padding:11px 14px 11px 26px;">
-                  </div>
-                  <input class="form-input" type="text" placeholder="Size (e.g. S, 28, 8)"
-                    value="${esc(u.size||'')}" oninput="S.matchReview.unmatched[${i}].size=this.value"
-                    style="font-size:16px;padding:11px 14px;">
-                </div>` : `
-                <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">About how many years ago?</div>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                  ${[1,2,3,4,5].map(y=>{const yr=(new Date().getFullYear()-y)+'-01';const act=u.purchasedDate===yr;return `<button ontouchend="if(_touchMoved)return;event.preventDefault();S.matchReview.unmatched[${i}].purchasedDate='${yr}';render();" onclick="S.matchReview.unmatched[${i}].purchasedDate='${yr}';render()" style="padding:7px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${act?'var(--gold)':'var(--border)'};background:${act?'var(--gold-bg)':'var(--surface)'};color:${act?'var(--gold-dk)':'var(--text-2)'};">${y===1?'1 yr':y===5?'5+ yrs':y+' yrs'}</button>`;}).join('')}
-                </div>`}
-
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-top:4px;">Was this a gift? 💝</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;">
-                <button onclick="S.matchReview.unmatched[${i}].gifted=true;render()"
-                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${u.gifted===true?'#9B35C8':'var(--border)'};background:${u.gifted===true?'#F5EEFF':'var(--surface)'};color:${u.gifted===true?'#7B35A8':'var(--text-2)'};">💝 Yes!</button>
-                <button onclick="S.matchReview.unmatched[${i}].gifted=false;render()"
-                  style="padding:9px 0;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${u.gifted===false?'var(--gold)':'var(--border)'};background:${u.gifted===false?'var(--gold-bg)':'var(--surface)'};color:${u.gifted===false?'var(--gold-dk)':'var(--text-2)'};">Nope</button>
-              </div>
-              ${u.gifted===true ? `<input class="form-input" type="text" placeholder="Who gave it to you? (optional)"
-                value="${esc(u.giftedBy||'')}" oninput="S.matchReview.unmatched[${i}].giftedBy=this.value"
-                style="font-size:16px;padding:11px 14px;margin-top:6px;">` : ''}
-            </div>` : ''}
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();advanceMatchStep(${step},'confirm')" onclick="advanceMatchStep(${step},'confirm')"
+            style="width:100%;padding:14px;border-radius:var(--r);border:none;background:var(--gold);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:8px;">
+            ✓ Yes — log the wear
+          </button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.matchReview._pickerOpen=${step};S.matchReview._pickerQuery='';render()" onclick="S.matchReview._pickerOpen=${step};S.matchReview._pickerQuery='';render()"
+            style="width:100%;padding:12px;border-radius:var(--r);border:1.5px solid var(--border);background:none;color:var(--text-2);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:8px;">
+            ✗ Wrong piece — pick another
+          </button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();advanceMatchStep(${step},'skip')" onclick="advanceMatchStep(${step},'skip')"
+            style="width:100%;padding:10px;border-radius:var(--r);border:none;background:none;color:var(--text-3);font-size:13px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            Skip this one
+          </button>
         </div>`;
-      }).join('')}
-      <div style="height:16px"></div>` : ''}
 
-    ${!mr.matches.length && !mr.unmatched.length ? `
-      <div style="text-align:center;padding:20px;color:var(--text-3);font-size:14px;">
-        No items to review. Your wardrobe is up to date!
-      </div>` : ''}
+    } else {
+      // ── Picker: find the correct wardrobe item ──
+      let grid;
+      if (pickerQuery) {
+        grid = S.wardrobe.filter(w =>
+          (w.name||'').toLowerCase().includes(pickerQuery) ||
+          (w.brand||'').toLowerCase().includes(pickerQuery)
+        ).slice(0, 20);
+      } else {
+        grid = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat);
+        if (!grid.length) grid = S.wardrobe.slice(0, 20);
+      }
 
-    <button class="btn btn-primary"
-      ontouchend="if(_touchMoved)return;event.preventDefault();doConfirmMatchReview()"
-      onclick="doConfirmMatchReview()">${btnLabel}</button>
-    <div style="height:10px"></div>
-    <button class="btn btn-secondary"
-      ontouchend="if(_touchMoved)return;event.preventDefault();skipMatchReview()"
-      onclick="skipMatchReview()">Skip for now</button>
-    <div style="height:36px"></div>
+      decisionArea = `
+        <div style="padding:0 16px 16px;">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">Which piece is this?</div>
+          <input id="match-picker-search" class="form-input" type="text" placeholder="🔍 Search your closet…"
+            value="${esc(mr._pickerQuery||'')}"
+            oninput="S.matchReview._pickerQuery=this.value;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
+            style="margin-bottom:10px;">
+          ${grid.length ? `
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:220px;overflow-y:auto;margin-bottom:10px;">
+            ${grid.map(sw => {
+              const sp = photoBlobUrl(sw.photo);
+              return `<div ontouchend="if(_touchMoved)return;event.preventDefault();advanceMatchStep(${step},'relink','${sw.id}')" onclick="advanceMatchStep(${step},'relink','${sw.id}')"
+                style="cursor:pointer;border-radius:10px;overflow:hidden;border:2px solid var(--border);touch-action:manipulation;">
+                ${sp
+                  ? `<img src="${esc(sp)}" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block;">`
+                  : `<div style="aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--surface-2);">${sw.icon||'👕'}</div>`}
+                <div style="padding:3px 5px;background:var(--surface);border-top:1px solid var(--border);">
+                  <div style="font-size:10px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(sw.name)}</div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>` : `<div style="text-align:center;padding:20px 0;color:var(--text-3);font-size:13px;">No items found</div>`}
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.matchReview._pickerOpen=false;render()" onclick="S.matchReview._pickerOpen=false;render()"
+            style="width:100%;padding:11px;border-radius:var(--r);border:1.5px solid var(--border);background:none;color:var(--text-3);font-size:13px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            ← Cancel
+          </button>
+        </div>`;
+    }
+
+  } else {
+    // ── Unmatched item ────────────────────────────────────────────
+    const u = mr.unmatched[cur.dataIdx];
+    itemName = u.item.name || 'Unknown item';
+    itemIcon = u.item.icon || '👕';
+    itemCat  = normalizeCat(u.selectedCat || categoryFromIcon(u.item.icon, u.item.name));
+
+    const pickerQuery = (mr._pickerQuery || '').trim().toLowerCase();
+    let grid;
+    if (pickerQuery) {
+      grid = S.wardrobe.filter(w =>
+        (w.name||'').toLowerCase().includes(pickerQuery) ||
+        (w.brand||'').toLowerCase().includes(pickerQuery)
+      ).slice(0, 20);
+    } else {
+      grid = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat).slice(0, 16);
+    }
+
+    decisionArea = `
+      <div style="padding:0 16px 16px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Already own this?</div>
+        <input id="match-picker-search" class="form-input" type="text" placeholder="🔍 Search your closet…"
+          value="${esc(mr._pickerQuery||'')}"
+          oninput="S.matchReview._pickerQuery=this.value;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
+          style="margin-bottom:10px;">
+        ${grid.length ? `
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:200px;overflow-y:auto;margin-bottom:12px;">
+          ${grid.map(sw => {
+            const sp = photoBlobUrl(sw.photo);
+            return `<div ontouchend="if(_touchMoved)return;event.preventDefault();advanceMatchStep(${step},'link','${sw.id}')" onclick="advanceMatchStep(${step},'link','${sw.id}')"
+              style="cursor:pointer;border-radius:10px;overflow:hidden;border:2px solid var(--border);touch-action:manipulation;">
+              ${sp
+                ? `<img src="${esc(sp)}" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block;">`
+                : `<div style="aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--surface-2);">${sw.icon||'👕'}</div>`}
+              <div style="padding:3px 5px;background:var(--surface);border-top:1px solid var(--border);">
+                <div style="font-size:10px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(sw.name)}</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>` : `
+        <div style="padding:14px;text-align:center;background:var(--surface);border-radius:var(--r-sm);border:1px dashed var(--border);margin-bottom:12px;color:var(--text-3);font-size:13px;">
+          No ${itemCat.toLowerCase()} items in your closet yet
+        </div>`}
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();advanceMatchStep(${step},'add')" onclick="advanceMatchStep(${step},'add')"
+          style="width:100%;padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#2C7A2C,#3DAA3D);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:8px;">
+          ➕ Add to My Closet
+        </button>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();advanceMatchStep(${step},'skip')" onclick="advanceMatchStep(${step},'skip')"
+          style="width:100%;padding:10px;border-radius:var(--r);border:none;background:none;color:var(--text-3);font-size:13px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          Skip this one
+        </button>
+      </div>`;
+  }
+
+  return `<div class="view view-notab" style="display:flex;flex-direction:column;">
+    <!-- Nav -->
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();skipMatchReview()" onclick="skipMatchReview()">Skip all</button>
+      <span class="nav-title" style="font-size:13px;font-weight:700;">Item ${step + 1} of ${allSteps.length}</span>
+      <span style="width:72px;"></span>
+    </div>
+
+    <!-- Outfit photo -->
+    ${entry?.photo ? `<div style="width:100%;height:200px;flex-shrink:0;overflow:hidden;position:relative;">
+      <img src="${esc(entry.photo)}" style="width:100%;height:100%;object-fit:cover;object-position:top;">
+      <div style="position:absolute;bottom:0;left:0;right:0;height:60px;background:linear-gradient(transparent,rgba(0,0,0,.5));"></div>
+    </div>` : ''}
+
+    <!-- Progress bar -->
+    <div style="height:4px;background:var(--border);flex-shrink:0;">
+      <div style="height:4px;background:var(--gold);border-radius:0 2px 2px 0;width:${Math.max(4, pct)}%;transition:width .3s;"></div>
+    </div>
+
+    <!-- Detected item chip -->
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div style="width:44px;height:44px;border-radius:12px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">
+        ${itemIcon}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;font-weight:800;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(itemName)}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px;">${itemCat} · detected in outfit</div>
+      </div>
+    </div>
+
+    <!-- Scrollable decision area -->
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:14px;">
+      ${decisionArea}
+    </div>
   </div>`;
 }
 
@@ -19520,6 +19562,9 @@ async function doSaveNew() {
     entryId: entry.id,
     matches: (matchResult.matches||[]).map(m => ({ ...m, on: true })),
     unmatched,
+    currentStep: 0,
+    _pickerOpen: false,
+    _pickerQuery: '',
   };
   Object.assign(S, { loading:false, view:'match-review' }); render();
 }
@@ -19628,6 +19673,41 @@ async function doConfirmMatchReview() {
 }
 
 function skipMatchReview() { S.matchReview = null; switchTab('closet'); checkStreakCelebration(); celebrateOutfitSave(); }
+
+// Handles a decision in the step-by-step match wizard and advances to the next item
+function advanceMatchStep(step, action, arg) {
+  const mr = S.matchReview;
+  if (!mr) return;
+
+  const allSteps = [
+    ...mr.matches.map((_, i) => ({ type: 'match', dataIdx: i })),
+    ...mr.unmatched.map((_, i) => ({ type: 'unmatched', dataIdx: i })),
+  ];
+  const cur = allSteps[step];
+  if (!cur) return;
+
+  if (cur.type === 'match') {
+    const m = mr.matches[cur.dataIdx];
+    if (action === 'confirm') { m.on = true; }
+    else if (action === 'skip')   { m.on = false; }
+    else if (action === 'relink') { m.wardrobeId = arg; m.on = true; }
+  } else {
+    const u = mr.unmatched[cur.dataIdx];
+    if (action === 'link')  { u.linkToId = arg; u.addOn = false; }
+    else if (action === 'add')  { u.addOn = true;  u.linkToId = null; }
+    else if (action === 'skip') { u.addOn = false; u.linkToId = null; }
+  }
+
+  mr._pickerOpen  = false;
+  mr._pickerQuery = '';
+
+  if (step >= allSteps.length - 1) {
+    doConfirmMatchReview();
+  } else {
+    mr.currentStep = step + 1;
+    render();
+  }
+}
 
 function toggleMatch(i) {
   if (!S.matchReview) return;
