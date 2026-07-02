@@ -3020,7 +3020,7 @@ const S = {
   // ui
   loading: false, loadingMsg: '', error: null,
   filter: 'all', wardrobeSort: 'smart', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeRatingFilter: null, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'wishlist', shopSelectedQuery: null, shopRateModeOnly: false, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false, _hiddenGemsDismissed: [],
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'wishlist', shopSelectedQuery: null, shopRateModeOnly: false, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false, _hiddenGemsDismissed: JSON.parse(localStorage.getItem('closet-gems-dismissed') || '[]'),
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
   // Style Persona
@@ -9225,7 +9225,7 @@ function viewDressMe() {
                     </button>
                     <button ontouchend="if(_touchMoved)return;event.preventDefault();generateDressMe();" onclick="generateDressMe();"
                       style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:rgba(255,255,255,.65);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                      👎 Try another
+                      🔄 Try another
                     </button>
                   </div>
                 </div>
@@ -9239,16 +9239,24 @@ function viewDressMe() {
 function outfitCardHTML(e) {
   const retired = isRetiredFit(e);
   const photoStyle = (e.doNotRepeat || retired) ? 'opacity:0.65;filter:saturate(0.25);' : '';
+  // Show latest rewear photo if one exists, otherwise original
+  const rewears = e.rewears || [];
+  const latestRewearPhoto = [...rewears].reverse().find(r => r.photo)?.photo || null;
+  const displayPhoto = latestRewearPhoto || e.photo;
+  const wearBadge = rewears.length > 0
+    ? `<div style="position:absolute;bottom:6px;right:6px;background:rgba(20,18,16,0.82);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.9);backdrop-filter:blur(4px);">×${rewears.length + 1} wears</div>`
+    : '';
   return `<div class="outfit-card${e.doNotRepeat?' dnr':''}"
     ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')"
     onclick="openEntry('${e.id}')" style="${retired?'opacity:0.82;':''}">
     <div class="outfit-card-photo-wrap">
-      <img class="outfit-card-photo" src="${e.photo}" alt="Outfit" loading="lazy"${(e.doNotRepeat||retired)?` style="${photoStyle}"`:''}>
+      <img class="outfit-card-photo" src="${displayPhoto}" alt="Outfit" loading="lazy"${(e.doNotRepeat||retired)?` style="${photoStyle}"`:''}>
       ${e.doNotRepeat ? `<div class="outfit-card-dnr-overlay"></div>` : ''}
       <button class="outfit-card-dnr-btn${e.doNotRepeat?' active':''}"
         ontouchend="if(_touchMoved)return;event.stopPropagation();event.preventDefault();toggleDoNotRepeat('${e.id}')"
         onclick="event.stopPropagation();toggleDoNotRepeat('${e.id}')"
         title="${e.doNotRepeat?'Remove flag':'Flag: won\'t wear again'}">✕</button>
+      ${wearBadge}
       ${retired ? `<div style="position:absolute;bottom:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);backdrop-filter:blur(4px);">📦 Retired</div>` : ''}
       ${e.claudeRecommended ? `<div style="position:absolute;top:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:var(--gold);backdrop-filter:blur(4px);">✨ Claude's Pick</div>` : ''}
     </div>
@@ -10170,12 +10178,14 @@ function viewPlan() {
 
   ${(S._rouletteOpen || S._funRouletteLoading) ? `
     <!-- STYLE ROULETTE BOTTOM SHEET -->
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
+    <div id="roulette-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
       ontouchmove="event.preventDefault()"
-      ontouchend="if(event.target===this){S._rouletteOpen=false;render();}"
+      ontouchstart="if(event.target===this)this._tapStartedOnBackdrop=true;"
+      ontouchend="if(this._tapStartedOnBackdrop&&event.target===this){this._tapStartedOnBackdrop=false;S._rouletteOpen=false;render();}else{this._tapStartedOnBackdrop=false;}"
       onclick="if(event.target===this){S._rouletteOpen=false;render();}">
       <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;"
-        ontouchmove="event.stopPropagation()">
+        ontouchmove="event.stopPropagation()"
+        ontouchstart="event.stopPropagation()">
         <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;">
           <div style="font-size:16px;font-weight:800;color:var(--text);">🎲 Style Roulette</div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();S._rouletteOpen=false;render();" onclick="S._rouletteOpen=false;render();"
@@ -11086,6 +11096,36 @@ function viewProfile() {
         ${bestOutfitsHTML}
         ${gemsCarouselHTML}
         ${paidOffHeroesHTML}
+      </div>`;
+    })()}
+
+    <!-- ══ Recent Compliments ══ -->
+    ${(()=>{
+      const allC = [];
+      S.wardrobe.forEach(w => (w.compliments||[]).forEach(c => allC.push({w, date:c.date})));
+      if (!allC.length) return '';
+      allC.sort((a,b) => new Date(b.date)-new Date(a.date));
+      const seen = new Set(), recent = [];
+      for (const {w, date} of allC) {
+        if (!seen.has(w.id)) { seen.add(w.id); recent.push({w, lastDate:date, count:(w.compliments||[]).length}); }
+      }
+      const total = allC.length;
+      const relDate = iso => { const d=daysSince(iso); return d===0?'today':d===1?'yesterday':d<7?d+'d ago':fmtDate(iso); };
+      return `<div style="margin:16px 16px 0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">💬 Recent Compliments</div>
+          <div style="font-size:11px;font-weight:700;color:var(--gold-dk);">${total} total</div>
+        </div>
+        <div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none;margin:0 -16px;padding:0 16px 4px;">
+          ${recent.slice(0,10).map(({w,lastDate,count}) => `
+            <div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+              style="flex-shrink:0;width:106px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 8px;cursor:pointer;touch-action:manipulation;text-align:center;">
+              ${w.photo ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:46px;height:46px;border-radius:8px;object-fit:cover;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;" loading="lazy">` : `<div style="font-size:28px;margin-bottom:6px;line-height:1;">${w.icon||'👕'}</div>`}
+              <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.name)}</div>
+              <div style="font-size:11px;color:var(--gold-dk);margin-top:2px;font-weight:600;">${count}×</div>
+              <div style="font-size:10px;color:var(--text-3);margin-top:1px;">${relDate(lastDate)}</div>
+            </div>`).join('')}
+        </div>
       </div>`;
     })()}
 
@@ -14968,8 +15008,8 @@ window.addEventListener('popstate', () => {
 });
 
 function startRateMode() {
-  const hasAny = S.wardrobe.some(w => !w.retiredFromCloset && !w.inMaybePile && !!w.wearPhoto);
-  if (!hasAny) { toast('No worn photos yet — add some to start rating! ✨'); return; }
+  const hasAny = S.wardrobe.some(w => !w.retiredFromCloset && !w.inMaybePile && (!!w.wearPhoto || !!w.photo));
+  if (!hasAny) { toast('Add photos to your wardrobe items to start rating! ✨'); return; }
   S.rateMode = null; // show setup/chooser screen first
   navigate('rate-mode');
   history.pushState({ rateMode: true }, '', location.href);
@@ -14984,10 +15024,12 @@ function setRateModePhotoMode(mode) {
 
 function confirmRateModeSetup() {
   const hasGoals = (S.styleGoals||[]).length > 0;
-  const items = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile && !!w.wearPhoto);
+  // Include any active item with any photo (product or worn) — worn-photo requirement
+  // was too strict and silently excluded newly-added unrated items from the queue.
+  const items = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile && (!!w.wearPhoto || !!w.photo));
   items.sort((a,b) => {
-    // Never-rated pieces (no star rating yet) always come first, regardless of goal-fit
-    // or re-evaluation timing below — getting a first rating on every item takes priority.
+    // Unrated items (no styleRating) always come first — getting a first impression on
+    // every piece is the priority before revisiting anything already scored.
     const unratedA = a.styleRating ? 1 : 0;
     const unratedB = b.styleRating ? 1 : 0;
     if (unratedA !== unratedB) return unratedA - unratedB;
@@ -15000,7 +15042,7 @@ function confirmRateModeSetup() {
     return (a.lastRatedAt||'').localeCompare(b.lastRatedAt||'');
   });
   const ids = items.map(w => w.id);
-  if (!ids.length) { toast('No worn photos yet — add some to start rating! ✨'); navigate('wardrobe'); return; }
+  if (!ids.length) { toast('Add photos to your wardrobe items to start rating! ✨'); navigate('wardrobe'); return; }
   S.rateMode = { ids, idx: 0, count: 0 };
   render();
 }
@@ -15549,7 +15591,7 @@ function viewWardrobeItem() {
   const outfits = (w.wears||[]).map(wr => S.entries.find(e => e.id === wr.outfitId)).filter(Boolean);
 
   // Similar items: computed but not rendered (reserved for future use)
-  const firstName = w.name.toLowerCase().split(/\s+/)[0];
+  const firstName = (w.name||'').toLowerCase().split(/\s+/)[0];
   const similar = S.wardrobe.filter(other =>
     other.id !== w.id && (
       (other.category && other.category === w.category) ||
@@ -15562,7 +15604,7 @@ function viewWardrobeItem() {
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')">${iconBack()} Wardrobe</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(S.activeTab&&S.activeTab!=='wardrobe'?S.activeTab:'wardrobe')" onclick="navigate(S.activeTab&&S.activeTab!=='wardrobe'?S.activeTab:'wardrobe')">${iconBack()} ${S.activeTab&&S.activeTab!=='wardrobe'?({profile:'Portfolio',plan:'Plan',shop:'Shop',closet:'Fits',home:'Home'}[S.activeTab]||'Back'):'Wardrobe'}</button>
       <span class="nav-title"></span>
       <div style="display:flex;align-items:center;gap:2px;">
         <button class="nav-btn" ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witem-edit-section')?.scrollIntoView({behavior:'smooth',block:'start'})" onclick="document.getElementById('witem-edit-section')?.scrollIntoView({behavior:'smooth',block:'start'})" title="Edit details" style="touch-action:manipulation;">
@@ -15608,7 +15650,7 @@ function viewWardrobeItem() {
           : `<div class="witem-emoji" style="${w.retiredFromCloset?'opacity:0.45;filter:saturate(0.3)':w.retiring?'opacity:0.72;filter:saturate(0.7)':''}">${w.icon||'👕'}</div>`;
         return toggle + imgEl;
       })()}
-      <div class="witem-name">${esc(w.name)}</div>
+      <div class="witem-name" style="${!w.name?'color:var(--text-3);font-style:italic;':''}">${w.name ? esc(w.name) : 'New piece'}</div>
       ${w.brand ? `<div style="font-size:14px;color:var(--text-3);margin-top:-6px;font-weight:500;">${esc(w.brand)}</div>` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px;">
         ${isGemPiece(w) ? `<div style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#FFFAED,#FFF5D0);color:#8B6010;border-radius:100px;padding:3px 10px;font-size:11px;font-weight:800;border:1px solid rgba(184,125,42,.35);letter-spacing:.03em;">💎 Gem Piece</div>` : ''}
@@ -15699,6 +15741,24 @@ function viewWardrobeItem() {
         </div>
       </div>
     </div>
+
+    <!-- ✨ AI Fill Banner (shown for new photo items) -->
+    ${(w._aiPending || (!w.name && w.photo && S.apiKey)) ? (() => {
+      const isLoading = S._aiItemFillLoading === w.id;
+      return `<div style="margin:0 16px 16px;padding:14px 16px;background:linear-gradient(135deg,rgba(108,62,191,0.15),rgba(155,95,224,0.1));border:1.5px solid rgba(108,62,191,0.35);border-radius:var(--r);display:flex;align-items:center;gap:12px;">
+        <div style="font-size:28px;flex-shrink:0;">${isLoading ? '⏳' : '✨'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${isLoading ? 'Analyzing your photo…' : 'Use AI to fill in details'}</div>
+          <div style="font-size:11.5px;color:var(--text-3);line-height:1.4;">${isLoading ? 'Claude is identifying the name, category, color, and description.' : 'Claude will identify the name, category, color, and description from your photo.'}</div>
+        </div>
+        ${!isLoading ? `<button
+          ontouchend="if(_touchMoved)return;event.preventDefault();fillItemDetailsWithAI('${w.id}')"
+          onclick="fillItemDetailsWithAI('${w.id}')"
+          style="flex-shrink:0;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;color:#fff;border-radius:100px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
+          Fill In
+        </button>` : ''}
+      </div>`;
+    })() : ''}
 
     <!-- ✨ Build an Outfit Around This -->
     <div style="padding:0 20px;margin-bottom:20px;">
@@ -17394,6 +17454,64 @@ function viewDetail() {
       </div>
       ${entry.ratingNote?`<p class="rating-note">"${esc(entry.ratingNote)}"</p>`:''}
 
+      ${(()=>{
+        const rewears = entry.rewears || [];
+        const todayIso = new Date().toISOString().slice(0,10);
+        const alreadyRewoToday = rewears.some(r => r.date?.slice(0,10) === todayIso);
+        const showPrompt = S._rewearPrompt === entry.id;
+        const rewearHistoryHTML = rewears.length > 0 ? `
+          <div style="margin:0 20px 16px;">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:10px;">Wear History</div>
+            <div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;">
+              <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="width:64px;height:64px;border-radius:10px;overflow:hidden;border:1.5px solid var(--gold);position:relative;">
+                  <img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;">
+                  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;"></div>
+                </div>
+                <div style="font-size:9px;color:var(--text-3);text-align:center;line-height:1.2;">Original<br>${fmtDate(entry.createdAt)}</div>
+              </div>
+              ${rewears.map((r,i) => `
+                <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                  <div style="width:64px;height:64px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);background:var(--surface-2);display:flex;align-items:center;justify-content:center;">
+                    ${r.photo
+                      ? `<img src="${r.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;">`
+                      : `<span style="font-size:22px;">👗</span>`}
+                  </div>
+                  <div style="font-size:9px;color:var(--text-3);text-align:center;line-height:1.2;">Rewear ${i+1}<br>${fmtDate(r.date)}</div>
+                </div>`).join('')}
+            </div>
+          </div>` : '';
+        return `
+          <div style="margin:16px 20px ${showPrompt?'0':'16px'};">
+            ${alreadyRewoToday
+              ? `<div style="font-size:13px;color:var(--text-3);text-align:center;padding:10px 0;">✓ Wear logged for today</div>`
+              : `<button
+                  ontouchend="if(_touchMoved)return;event.preventDefault();logRewear('${entry.id}')"
+                  onclick="logRewear('${entry.id}')"
+                  style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                  👗 Wore this again today
+                </button>`}
+          </div>
+          ${showPrompt ? `
+          <div style="margin:0 20px 16px;padding:16px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r-sm);">
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Want to capture today's look?</div>
+            <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;">Add a photo and it'll be stacked with this outfit.</div>
+            <div style="display:flex;gap:8px;">
+              <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;background:var(--gold);color:#fff;border-radius:var(--r-sm);font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation;">
+                📷 Add Photo
+                <input type="file" accept="image/*" style="display:none;" onchange="handleRewearPhoto(this,'${entry.id}')">
+              </label>
+              <button
+                ontouchend="if(_touchMoved)return;event.preventDefault();S._rewearPrompt=null;render()"
+                onclick="S._rewearPrompt=null;render()"
+                style="flex:1;padding:11px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                Skip
+              </button>
+            </div>
+          </div>` : ''}
+          ${rewearHistoryHTML}`;
+      })()}
+
       ${entry.weather ? `
       <div class="feel-bar">
         <div class="feel-bar-title">How did you feel in this outfit?</div>
@@ -18527,7 +18645,10 @@ function openEntry(id) {
 }
 function openWardrobeItem(id) { S.selectedWardrobeId = id; navigate('wardrobe-item'); }
 function dismissHiddenGem(id) {
-  if (!S._hiddenGemsDismissed.includes(id)) S._hiddenGemsDismissed = [...S._hiddenGemsDismissed, id];
+  if (!S._hiddenGemsDismissed.includes(id)) {
+    S._hiddenGemsDismissed = [...S._hiddenGemsDismissed, id];
+    localStorage.setItem('closet-gems-dismissed', JSON.stringify(S._hiddenGemsDismissed));
+  }
   render();
 }
 
@@ -18665,15 +18786,32 @@ function receiptImageSelected(input) {
   reader.readAsDataURL(file);
 }
 
-// Called when user picks a photo of a wardrobe item
+// Called when user picks a photo of a wardrobe item — creates item immediately and navigates to detail view
 function photoItemSelected(input) {
   const file = input.files?.[0];
   if (!file) return;
   compressImage(file).then(({ data, mime }) => {
-    const comma = data.indexOf(',');
-    S.receiptFlow.imageData = data.slice(comma + 1);
-    S.receiptFlow.imageMime = mime;
-    render();
+    const today = new Date();
+    const todayMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+    const newItem = {
+      id: uid(),
+      name: '',
+      brand: null, description: null, color: null,
+      price: null, size: null, icon: '👕',
+      category: 'Other', subCategory: null,
+      paidOff: false, retiring: false, gifted: false, giftedBy: null,
+      onSale: null, originalPrice: null,
+      addedAt: new Date().toISOString(),
+      wears: [], addedVia: 'photo',
+      isNew: true, purchasedDate: todayMonth,
+      photo: data, mime,
+      _aiPending: true,
+    };
+    S.wardrobe.push(newItem);
+    S.receiptFlow = null;
+    S.selectedWardrobeId = newItem.id;
+    navigate('wardrobe-item');
+    DB.wardrobe.put(newItem).catch(e => console.error('photo item save:', e));
   });
 }
 
@@ -18975,6 +19113,79 @@ async function analyzeItemPhoto() {
     S.receiptFlow.step = 'preview';
     render();
     toast('Couldn\'t auto-detect — fill in the details below.');
+  }
+}
+
+// Fill in wardrobe item details using AI — analyzes the item photo
+async function fillItemDetailsWithAI(id) {
+  const w = S.wardrobe.find(i => i.id === id);
+  if (!w) return;
+  if (!w.photo) { toast('No photo found to analyze.'); return; }
+  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+
+  S._aiItemFillLoading = id;
+  render();
+
+  try {
+    // Extract base64 data from data URL
+    const photoDataUrl = w.photo;
+    const commaIdx = photoDataUrl.indexOf(',');
+    const mimeMatch = photoDataUrl.match(/^data:([^;]+);/);
+    const mimeType = (mimeMatch ? mimeMatch[1] : null) || w.mime || 'image/jpeg';
+    const base64Data = commaIdx > -1 ? photoDataUrl.slice(commaIdx + 1) : photoDataUrl;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Data } },
+          { type: 'text', text: `You are a fashion expert. Look at this clothing item and return ONLY valid JSON — no markdown, no code fences, no commentary.
+
+{
+  "name": "Specific descriptive name, e.g. 'Navy Wool Blazer' or 'Ivory Linen Wide-Leg Trousers'",
+  "brand": "ONLY if the brand name is explicitly readable as text in this photo (on a label, tag, or logo). Use null if you cannot clearly read the brand name — do NOT guess from style",
+  "category": "exactly one of: Tops, Jackets, Pants, Dresses, Shoes, Bags, Jewelry, Accessories, Other",
+  "icon": "single most fitting clothing emoji",
+  "color": "primary color(s) of the item, e.g. 'navy', 'cream and black', 'burgundy'",
+  "description": "Color, material, fit, and notable details in 1–2 sentences"
+}` }
+        ]}]
+      }),
+    });
+
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('No JSON found');
+    const result = JSON.parse(m[0]);
+
+    w.name = result.name || w.name;
+    if (result.brand) w.brand = result.brand;
+    if (result.category) w.category = normalizeCat(result.category);
+    if (result.icon) w.icon = result.icon;
+    if (result.color) w.color = result.color;
+    if (result.description) w.description = result.description;
+    w._aiPending = false;
+
+    await DB.wardrobe.put(w);
+    S._aiItemFillLoading = null;
+    render();
+    toast('Details filled in! ✨ Review and adjust anything below.');
+  } catch(e) {
+    console.error('fillItemDetailsWithAI error:', e);
+    S._aiItemFillLoading = null;
+    w._aiPending = false;
+    render();
+    toast('Couldn\'t analyze photo — fill in the details manually.');
   }
 }
 
@@ -19494,6 +19705,40 @@ async function logWear(id) {
   // S.entries already contains mutated entry
   render();
   toast(`Logged! Worn ${entry.timesWorn}× total 👗`);
+}
+
+async function logRewear(id) {
+  const entry = S.entries.find(e=>e.id===id); if (!entry) return;
+  // Guard: only one re-wear per day
+  const todayIso = new Date().toISOString().slice(0,10);
+  if ((entry.rewears||[]).some(r => r.date?.slice(0,10) === todayIso)) {
+    toast('Already logged a wear today!'); return;
+  }
+  if (!entry.rewears) entry.rewears = [];
+  entry.rewears.push({ date: new Date().toISOString() });
+  entry.timesWorn = (entry.timesWorn||0)+1;
+  await DB.entries.put(entry);
+  S._rewearPrompt = id;
+  render();
+  toast('Wear logged! 👗');
+}
+
+async function handleRewearPhoto(input, id) {
+  const file = input.files?.[0]; if (!file) return;
+  const entry = S.entries.find(e=>e.id===id); if (!entry) return;
+  try {
+    const { data, mime } = await compressImage(file);
+    // Attach photo to the last rewear record
+    const last = entry.rewears?.[entry.rewears.length - 1];
+    if (last) { last.photo = data; last.mime = mime; }
+    await DB.entries.put(entry);
+    S._rewearPrompt = null;
+    render();
+    toast('Photo added! 📷');
+  } catch(err) {
+    console.error('Rewear photo error:', err);
+    toast('Could not add photo — try again');
+  }
 }
 
 async function logQuickWear(id) {
