@@ -113,6 +113,13 @@ body {
 }
 .tab-btn.active { color: var(--gold); }
 .tab-btn svg { width: 20px; height: 20px; }
+/* Per-tab accent colors */
+.tab-c-portfolio.active           { color: #C07A8A; }
+.tab-c-closet.active              { color: #5D9475; }
+.tab-c-fits.active                { color: #5A7EA5; }
+.tab-c-plan.active                { color: #7855BE; }
+.tab-c-evolve.active,
+.tab-c-evolve.bottom-btn-active   { color: #C07050 !important; }
 /* Hamburger and Profile buttons are icon-only, narrower */
 .tab-btn-icon {
   flex: 0 0 44px; display: flex; flex-direction: column; align-items: center;
@@ -2355,6 +2362,20 @@ function getAllCategories() {
 }
 
 // Migrate old category names to new ones (for items stored before the rename)
+function getCategoryColor(cat) {
+  const c = normalizeCat(cat || '');
+  const map = {
+    'Tops':     { color: '#C07A8A', bg: 'rgba(192,122,138,0.12)' }, // rose
+    'Pants':    { color: '#5A7EA5', bg: 'rgba(90,126,165,0.12)'  }, // steel blue
+    'Dresses':  { color: '#7855BE', bg: 'rgba(120,85,190,0.12)'  }, // purple
+    'Shoes':    { color: '#C07050', bg: 'rgba(192,112,80,0.12)'  }, // terracotta
+    'Jackets':  { color: '#5D9475', bg: 'rgba(93,148,117,0.12)'  }, // sage
+    'Bags':     { color: '#B87D2A', bg: 'rgba(184,125,42,0.12)'  }, // gold
+    'Other':    { color: '#888580', bg: 'rgba(136,133,128,0.12)' }, // neutral
+  };
+  return map[c] || map['Other'];
+}
+
 function normalizeCat(cat) {
   if (cat === 'Outerwear') return 'Jackets';
   if (cat === 'Bottoms')   return 'Pants';
@@ -6531,16 +6552,16 @@ function iconCompass() {
 function tabBarHTML() {
   const t = S.activeTab;
   return `<div class="tab-bar">
-    <button class="tab-btn ${t==='profile'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('profile')" onclick="switchTab('profile')" title="Portfolio">
+    <button class="tab-btn tab-c-portfolio ${t==='profile'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('profile')" onclick="switchTab('profile')" title="Portfolio">
       ${iconPerson()} <span>Portfolio</span>
     </button>
-    <button class="tab-btn ${t==='wardrobe'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('wardrobe')" onclick="switchTab('wardrobe')">
+    <button class="tab-btn tab-c-closet ${t==='wardrobe'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('wardrobe')" onclick="switchTab('wardrobe')">
       ${iconWardrobe()} <span>Closet</span>
     </button>
-    <button class="tab-btn ${t==='closet'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('closet')" onclick="switchTab('closet')">
+    <button class="tab-btn tab-c-fits ${t==='closet'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('closet')" onclick="switchTab('closet')">
       ${iconHanger()} <span>Fits</span>
     </button>
-    <button class="tab-btn ${t==='plan'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('plan')" onclick="switchTab('plan')">
+    <button class="tab-btn tab-c-plan ${t==='plan'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('plan')" onclick="switchTab('plan')">
       ${iconSparkle()} <span>Plan</span>
     </button>
     <button class="tab-btn ${t==='shop'?'active':''}" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('shop')" onclick="switchTab('shop')">
@@ -6562,7 +6583,7 @@ function bottomBarHTML() {
       onclick="S.featureMenuOpen=true;render()" title="Menu">
       ${iconBurger()} <span>Menu</span>
     </button>
-    <button class="bottom-btn ${S.view==='home'?'bottom-btn-active':''}"
+    <button class="bottom-btn tab-c-evolve ${S.view==='home'?'bottom-btn-active':''}"
       ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('home')"
       onclick="switchTab('home')" title="Evolve">
       ${iconCompass()} <span>Evolve</span>
@@ -13244,10 +13265,11 @@ function shelfSectionHTML(catItems, icon, label, countLabel, stateKey, fallbackI
     if (!batch.length) continue;
     shelves += `<div class="shoe-shelf">${batch.map(w => shelfCardHTML(w, fallbackIcon, catItems)).join('')}</div>`;
   }
+  const _catClr = getCategoryColor(label).color;
   return `<div class="shoe-rack-section" id="rack-section-${esc(String(stateKey))}"${bg ? ` style="background:${bg};"` : ''}>
     <div class="shoe-rack-header">
       <div class="shoe-rack-title">
-        <span class="shoe-rack-cat">${icon} ${label}</span>
+        <span class="shoe-rack-cat" style="color:${_catClr};">${icon} ${label}</span>
         <span class="shoe-rack-meta">${catItems.length} ${countLabel}${costStr?' · '+costStr:''}</span>
       </div>
       <div class="shoe-rack-controls">
