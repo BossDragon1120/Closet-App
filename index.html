@@ -9356,7 +9356,6 @@ function viewCloset() {
       const activeWardrobeCount = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile).length;
       const inviteHTML = activeWardrobeCount >= 3 ? `
         <div style="margin:10px 16px 0;display:flex;align-items:center;gap:10px;padding:12px 14px;background:linear-gradient(135deg,#1C1A18 0%,#2a2520 100%);border-radius:var(--r-sm);">
-          <span style="font-size:22px;flex-shrink:0;">✨</span>
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:700;color:#fff;">Want Claude to dress you today?</div>
             <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:1px;">Tell me what's on your plate and I'll pick the look.</div>
@@ -9454,60 +9453,90 @@ function viewDressMe() {
             `;
           })() : ''}
 
-      ${S.savedDressMe.length ? (()=>{
-        // ── SAVED LOOKS SECTION ───────────────────────────────────────────────
-        const vibes = [...new Set(S.savedDressMe.map(d=>d.vibe).filter(Boolean))];
-        const activeFilter = S._dressMeVibeFilter || 'all';
-        const filtered = activeFilter === 'all' ? S.savedDressMe : S.savedDressMe.filter(d => d.vibe === activeFilter);
+      ${(S.savedDressMe.length || S.savedOutfitBuilds.length || S.savedRouletteLooks.length) ? (()=>{
+        // ── SAVED LOOKS — Dress Me + Outfit Builds + Roulette, all together ───
+        const allSaved = [
+          ...S.savedDressMe.map(dm => {
+            const scored = (dm.outfit||[]).map((p,i)=>({p,i,s:heroScore(p.item,matchWardrobeItem(p.item)?.category)}));
+            scored.sort((a,b)=>b.s-a.s);
+            const ai = (dm.outfit||[])[scored[0]?.i??0]||null;
+            return { _type:'dressme', id:dm.id, vibe:dm.vibe||dm.context||'', context:dm.context||'',
+              items:dm.outfit||[], anchorItem:ai, _anchorWI:ai?matchWardrobeItem(ai.item):null,
+              createdAt:dm.createdAt, deleteFn:`deleteDressMeSave('${dm.id}')`,
+              extraBtn:{label:'✨ Wear',fn:`wearSavedDressMe('${dm.id}')`} };
+          }),
+          ...S.savedOutfitBuilds.map(ob => {
+            const wi = S.wardrobe.find(w=>w.id===ob.wardrobeId);
+            const picks = ob.result?.picks||[];
+            return { _type:'builder', id:ob.id, vibe:ob.result?.occasion||ob.wardrobeName||'',
+              context: wi?`Built around ${wi.name}`:'', items:picks.map(p=>({emoji:'👕',item:p.name,reason:p.reason})),
+              anchorItem: wi?{emoji:wi.icon||'👕',item:wi.name,reason:''}:(picks[0]||null), _anchorWI:wi||null,
+              createdAt:ob.createdAt, deleteFn:`deleteOutfitBuild('${ob.id}')`, extraBtn:null };
+          }),
+          ...S.savedRouletteLooks.map(rl => {
+            const scored = (rl.outfit||[]).map((p,i)=>({p,i,s:heroScore(p.item,matchWardrobeItem(p.item)?.category)}));
+            scored.sort((a,b)=>b.s-a.s);
+            const ai = (rl.outfit||[])[scored[0]?.i??0]||null;
+            return { _type:'roulette', id:rl.id, vibe:rl.vibe||'', context:'',
+              items:rl.outfit||[], anchorItem:ai, _anchorWI:ai?matchWardrobeItem(ai.item):null,
+              createdAt:rl.createdAt, deleteFn:`deleteRouletteLook('${rl.id}')`, extraBtn:null };
+          }),
+        ].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+
+        // Vibe chips — extracted from all three sources
+        const vibes = [...new Set(allSaved.map(s=>s.vibe).filter(Boolean))].sort();
+        const activeVibe = S._dressMeVibeFilter||'all';
+        const filtered = activeVibe==='all' ? allSaved : allSaved.filter(s=>s.vibe===activeVibe);
 
         return `
         <div style="margin-top:30px;padding-top:24px;border-top:1.5px solid var(--border);">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
             <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);">Saved Looks</div>
-            <div style="font-size:11px;color:var(--text-3);">${S.savedDressMe.length} saved</div>
+            <div style="font-size:11px;color:var(--text-3);">${allSaved.length} saved</div>
           </div>
 
           ${vibes.length > 1 ? `
           <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
             <button ontouchend="if(_touchMoved)return;event.preventDefault();S._dressMeVibeFilter='all';render();" onclick="S._dressMeVibeFilter='all';render()"
-              style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeFilter==='all'?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeFilter==='all'?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeFilter==='all'?'#fff':'#6C3EBF'};">All ${S.savedDressMe.length}</button>
+              style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeVibe==='all'?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeVibe==='all'?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeVibe==='all'?'#fff':'#6C3EBF'};">All ${allSaved.length}</button>
             ${vibes.map(v=>`<button ontouchend="if(_touchMoved)return;event.preventDefault();S._dressMeVibeFilter=${JSON.stringify(v)};render();" onclick="S._dressMeVibeFilter=${JSON.stringify(v)};render()"
-              style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeFilter===v?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeFilter===v?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeFilter===v?'#fff':'#6C3EBF'};">${esc(v)}</button>`).join('')}
+              style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeVibe===v?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeVibe===v?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeVibe===v?'#fff':'#6C3EBF'};">${esc(v)}</button>`).join('')}
           </div>` : ''}
 
           <div style="display:flex;flex-direction:column;gap:10px;">
-            ${filtered.map(dm=>{
-              const d = new Date(dm.createdAt);
+            ${filtered.map(look=>{
+              const d = new Date(look.createdAt);
               const dateLabel = isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-              const anchor = (dm.outfit||[])[0];
-              const anchorWI = anchor ? matchWardrobeItem(anchor.item||'') : null;
-              const navFn = `S._savedLookView={type:'dressme',id:'${dm.id}'};navigate('saved-look')`;
+              const ai = look.anchorItem;
+              const anchorWI = look._anchorWI;
+              const navFn = `S._savedLookView={type:'${look._type}',id:'${look.id}'};navigate('saved-look')`;
               return `
-              <div style="border:1.5px solid rgba(108,62,191,0.18);border-radius:var(--r);overflow:hidden;background:linear-gradient(135deg,rgba(108,62,191,0.04),rgba(155,95,224,0.02));">
+              <div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
                 <div style="display:flex;">
-                  ${(anchorWI?.photo||anchorWI?.photoThumb)
-                    ? `<div ontouchend="if(_touchMoved)return;event.preventDefault();${navFn};" onclick="${navFn}" style="width:76px;flex-shrink:0;cursor:pointer;">
-                        <img src="${esc(photoBlobUrl(anchorWI.photo||anchorWI.photoThumb))}" style="width:76px;height:100%;min-height:110px;object-fit:cover;object-position:top;display:block;">
-                       </div>`
-                    : `<div style="width:76px;flex-shrink:0;min-height:110px;background:rgba(108,62,191,0.08);display:flex;align-items:center;justify-content:center;font-size:30px;">${anchor?.emoji||'✨'}</div>`}
-                  <div style="flex:1;min-width:0;padding:12px 12px 10px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px;">
-                      ${dm.vibe?`<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#6C3EBF;background:rgba(108,62,191,0.12);border-radius:100px;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${esc(dm.vibe)}</span>`:'<span></span>'}
-                      <span style="font-size:10px;color:var(--text-3);flex-shrink:0;">${dateLabel}</span>
+                  <div ontouchend="if(_touchMoved)return;event.preventDefault();${navFn};" onclick="${navFn}" style="width:80px;flex-shrink:0;cursor:pointer;position:relative;">
+                    ${(anchorWI?.photo||anchorWI?.photoThumb)
+                      ? `<img src="${esc(photoBlobUrl(anchorWI.photo||anchorWI.photoThumb))}" style="width:80px;height:100%;min-height:120px;object-fit:cover;object-position:top;display:block;">`
+                      : `<div style="width:80px;min-height:120px;background:rgba(108,62,191,0.07);display:flex;align-items:center;justify-content:center;font-size:32px;">${ai?.emoji||'✨'}</div>`}
+                    <div style="position:absolute;bottom:0;left:0;right:0;padding:3px 4px;background:rgba(0,0,0,0.5);font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#fff;text-align:center;">Start with</div>
+                  </div>
+                  <div style="flex:1;min-width:0;padding:11px 12px 10px;">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:4px;">
+                      <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;flex:1;">${esc(look.vibe||ai?.item||'Saved Look')}</div>
+                      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                        <span style="font-size:10px;color:var(--text-3);">${dateLabel}</span>
+                        <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();${look.deleteFn};render();" onclick="event.stopPropagation();${look.deleteFn};render()"
+                          style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;padding:1px 2px;line-height:1;touch-action:manipulation;">✕</button>
+                      </div>
                     </div>
-                    ${dm.context?`<div style="font-size:11px;color:var(--text-3);margin-bottom:5px;">${esc(dm.context)}</div>`:''}
-                    <div style="font-size:12px;color:var(--text-2);line-height:1.55;">
-                      ${(dm.outfit||[]).slice(0,3).map(p=>`${esc(p.emoji||'✨')} ${esc(p.item||'')}`).join('<span style="color:var(--border);margin:0 4px;">·</span>')}${(dm.outfit||[]).length>3?`<span style="color:var(--text-3);"> +${(dm.outfit||[]).length-3}</span>`:''}
+                    ${look.context?`<div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">${esc(look.context)}</div>`:''}
+                    <div style="font-size:11px;color:var(--text-2);line-height:1.55;">
+                      ${look.items.slice(0,3).map(p=>`${esc(p.emoji||'👕')} ${esc(p.item||'')}`).join('<span style="color:var(--border);margin:0 3px;">·</span>')}${look.items.length>3?`<span style="color:var(--text-3);"> +${look.items.length-3}</span>`:''}
                     </div>
-                    <div style="display:flex;gap:7px;margin-top:10px;">
+                    <div style="display:flex;gap:7px;margin-top:9px;">
                       <button ontouchend="if(_touchMoved)return;event.preventDefault();${navFn};" onclick="${navFn}"
-                        style="flex:1;padding:8px 6px;background:transparent;border:1.5px solid rgba(108,62,191,0.28);border-radius:100px;font-size:11px;font-weight:700;color:#6C3EBF;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                        View →
-                      </button>
-                      <button ontouchend="if(_touchMoved)return;event.preventDefault();wearSavedDressMe('${dm.id}');" onclick="wearSavedDressMe('${dm.id}')"
-                        style="flex:1;padding:8px 6px;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;border-radius:100px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                        ✨ Wear
-                      </button>
+                        style="flex:1;padding:7px 6px;background:transparent;border:1.5px solid rgba(108,62,191,0.28);border-radius:100px;font-size:11px;font-weight:700;color:#6C3EBF;cursor:pointer;font-family:inherit;touch-action:manipulation;">View →</button>
+                      ${look.extraBtn?`<button ontouchend="if(_touchMoved)return;event.preventDefault();${look.extraBtn.fn};" onclick="${look.extraBtn.fn}"
+                        style="flex:1;padding:7px 6px;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;border-radius:100px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">${look.extraBtn.label}</button>`:''}
                     </div>
                   </div>
                 </div>
@@ -10232,125 +10261,75 @@ function viewPlan() {
         ` : ''}
       ` : ''}
 
-      ${(()=>{
-        // ── UNIFIED LOOKS CAROUSEL ────────────────────────────────────────────
-        // Merge saved looks (all 3 types) + unsaved suggestion log, sorted newest first
-        const savedIds = new Set([
-          ...S.savedDressMe.map(d=>d.id),
-          ...S.savedOutfitBuilds.map(o=>o.id),
-          ...S.savedRouletteLooks.map(r=>r.id),
-        ]);
-        const unsaved = S._suggestionLog.filter(l => !l.savedId);
 
-        const allLooks = [
-          ...S.savedDressMe.map(dm=>({
-            _type:'dressme', _saved:true, id:dm.id,
-            title:dm.vibe||'Saved Look', sub:dm.context||'', hype:dm.hype||'',
-            items:(dm.outfit||[]).map(p=>({emoji:p.emoji||'✨',name:p.item||'',reason:p.reason||''})),
-            createdAt:dm.createdAt, badge:'Dress Me', badgeColor:'#B87D2A',
-          })),
-          ...S.savedOutfitBuilds.map(ob=>({
-            _type:'builder', _saved:true, id:ob.id,
-            title:(ob.result&&ob.result.occasion)||ob.wardrobeName||'Outfit Build',
-            sub:ob.wardrobeName?`Around ${ob.wardrobeName}`:'',
-            hype:(ob.result&&ob.result.stylistNote)||'',
-            items:((ob.result&&ob.result.picks)||[]).map(p=>({emoji:'💜',name:p.name||'',reason:p.reason||''})),
-            createdAt:ob.createdAt, badge:'Outfit Builder', badgeColor:'#6C3EBF',
-          })),
-          ...S.savedRouletteLooks.map(rl=>({
-            _type:'roulette', _saved:true, id:rl.id,
-            title:rl.vibe||'Roulette Look', sub:'', hype:rl.hype||'',
-            items:(rl.outfit||[]).map(p=>({emoji:p.emoji||'🎲',name:p.item||'',reason:p.reason||''})),
-            createdAt:rl.createdAt, badge:'Style Roulette', badgeColor:'#2A6B4A',
-          })),
-          ...unsaved.map(l=>({
-            _type:l.source, _saved:false, id:l.id,
-            title:l.title||'Suggestion', sub:'', hype:l.hype||'',
-            items:l.items||[],
-            createdAt:l.createdAt,
-            badge:l.source==='dressme'?'Dress Me':l.source==='builder'?'Outfit Builder':'Style Roulette',
-            badgeColor:l.source==='dressme'?'#B87D2A':l.source==='builder'?'#6C3EBF':'#2A6B4A',
-          })),
+      ${S.savedTripPlans.length ? (()=>{
+        // ── TRIPS — universal list cards ──────────────────────────────────────
+        const aw = S.wardrobe.filter(w=>!w.retiredFromCloset&&!w.inMaybePile);
+        const normN = s=>(s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
+        const findWI = name=>{ const t=normN(name); return aw.find(w=>normN(w.name)===t)||aw.find(w=>normN(w.name).includes(t)||t.includes(normN(w.name)))||null; };
+
+        const rows = [
+          ...S.savedTripPlans.map(tp=>{
+            const day1 = (tp.suggestions||[])[0]?.outfit || (tp.suggestions||[])[0]?.items || [];
+            const items = day1.map((p,i)=>({...p,item:p.item||p.name||'',_i:i,_wi:findWI(p.item||p.name||'')}));
+            const scored = items.map(p=>({p,s:heroScore(p.item,p._wi?.category)}));
+            scored.sort((a,b)=>b.s-a.s);
+            const anchor = scored[0]?.p||items[0]||null;
+            const pairs = items.filter(p=>p._i!==(anchor?._i??-1));
+            const d = new Date(tp.createdAt);
+            return { _kind:'trip', id:tp.id, title:tp.destination||'Trip',
+              sub:`${tp.days} day${tp.days===1?'':'s'}`,
+              anchor, anchorWI:anchor?._wi||null, pairs, createdAt:tp.createdAt,
+              deleteFn:`deleteTripPlan('${tp.id}')`,
+              tapFn:`toggleTripPlan('${tp.id}')`,
+              tp };
+          }),
         ].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
 
-        if (!allLooks.length) return '';
-
-        return `<div style="margin-bottom:8px;">
-          <div class="event-board-header" style="padding:4px 16px 8px;">
-            <span>✨ Claude's Picks</span>
-            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${allLooks.length} look${allLooks.length===1?'':'s'}</span>
+        const total = rows.length;
+        return `<div style="padding:0 16px;margin-bottom:8px;">
+          <div class="event-board-header" style="padding:4px 0 10px;">
+            <span>✈️ Saved Trips</span>
+            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${total} saved</span>
           </div>
-          <div style="overflow-x:auto;scroll-snap-type:x mandatory;display:flex;gap:12px;padding:4px 16px 16px;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;">
-            ${allLooks.map(look=>{
-              const d = new Date(look.createdAt);
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${rows.map(row=>{
+              const d = new Date(row.createdAt);
               const dateLabel = isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-              const deleteFn = look._saved
-                ? (look._type==='dressme'?`deleteDressMeSave('${look.id}')`
-                  :look._type==='builder'?`deleteOutfitBuild('${look.id}')`
-                  :`deleteRouletteLook('${look.id}')`)
-                : `S._suggestionLog=S._suggestionLog.filter(l=>l.id!=='${look.id}');localStorage.setItem('closet-suggestion-log',JSON.stringify(S._suggestionLog));render()`;
-              const navFn = look._saved ? `S._savedLookView={type:'${look._type}',id:'${look.id}'};navigate('saved-look')` : '';
-              return `<div style="min-width:248px;max-width:248px;scroll-snap-align:start;flex-shrink:0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;${look._saved?'cursor:pointer;':''}"
-                ${look._saved ? `ontouchend="if(_touchMoved)return;event.preventDefault();${navFn};" onclick="${navFn}"` : ''}>
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                  <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${look.badgeColor};background:${look.badgeColor}1A;border-radius:100px;padding:3px 9px;white-space:nowrap;">${look.badge}${look._saved?'':' · unsaved'}</span>
-                  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                    <span style="font-size:11px;color:var(--text-3);">${dateLabel}</span>
-                    <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();${deleteFn};" onclick="event.stopPropagation();${deleteFn}"
-                      style="background:none;border:none;font-size:14px;color:var(--text-3);cursor:pointer;padding:2px 4px;line-height:1;touch-action:manipulation;">✕</button>
+              const isOpen = row._kind==='trip' && S._openTripPlanId===row.id;
+              return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
+                <!-- Card header -->
+                <div style="display:flex;" ontouchend="if(_touchMoved)return;event.preventDefault();${row.tapFn};" onclick="${row.tapFn}">
+                  <!-- Anchor photo -->
+                  <div style="width:80px;flex-shrink:0;position:relative;cursor:pointer;">
+                    ${(row.anchorWI?.photo||row.anchorWI?.photoThumb)
+                      ? `<img src="${esc(photoBlobUrl(row.anchorWI.photo||row.anchorWI.photoThumb))}" style="width:80px;height:100%;min-height:110px;object-fit:cover;object-position:top;display:block;">`
+                      : `<div style="width:80px;min-height:110px;background:rgba(184,125,42,0.08);display:flex;align-items:center;justify-content:center;font-size:30px;">✈️</div>`}
+                    <div style="position:absolute;bottom:0;left:0;right:0;padding:3px 4px;background:rgba(0,0,0,0.5);font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#fff;text-align:center;">Start with</div>
+                  </div>
+                  <!-- Details -->
+                  <div style="flex:1;min-width:0;padding:11px 12px 10px;cursor:pointer;">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:3px;">
+                      <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;flex:1;">${row._kind==='trip'?'✈️ ':''}${esc(row.title)}</div>
+                      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                        <span style="font-size:10px;color:var(--text-3);">${dateLabel}</span>
+                        <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();${row.deleteFn};render();" onclick="event.stopPropagation();${row.deleteFn};render()"
+                          style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;padding:1px 2px;line-height:1;touch-action:manipulation;">✕</button>
+                      </div>
+                    </div>
+                    ${row.sub?`<div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">${esc(row.sub)}</div>`:''}
+                    ${row.anchor?`<div style="font-size:11px;color:var(--text-2);margin-bottom:4px;">${esc(row.anchor.emoji||'👕')} <strong>${esc(row.anchor.item)}</strong></div>`:''}
+                    ${row.pairs.length?`<div style="font-size:11px;color:var(--text-3);line-height:1.5;">${row.pairs.slice(0,3).map(p=>`${esc(p.emoji||'👕')} ${esc(p.item)}`).join(' · ')}${row.pairs.length>3?` +${row.pairs.length-3}`:''}</div>`:''}
+                    <div style="font-size:11px;color:var(--gold-dk);font-weight:700;margin-top:8px;">${isOpen?'Hide plan ▴':'View full plan ▾'}</div>
                   </div>
                 </div>
-                <div>
-                  <div style="font-size:15px;font-weight:800;color:var(--text);line-height:1.25;">${esc(look.title)}</div>
-                  ${look.sub?`<div style="font-size:11px;color:var(--text-3);margin-top:2px;">${esc(look.sub)}</div>`:''}
-                  ${look.hype?`<div style="font-size:12px;color:var(--text-2);font-style:italic;margin-top:5px;">"${esc(look.hype)}"</div>`:''}
-                </div>
-                <div style="display:flex;flex-direction:column;gap:7px;flex:1;">
-                  ${look.items.slice(0,4).map(it=>`
-                    <div style="display:flex;align-items:flex-start;gap:8px;">
-                      <span style="font-size:16px;flex-shrink:0;line-height:1.35;">${esc(it.emoji)}</span>
-                      <div style="flex:1;min-width:0;">
-                        <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.3;">${esc(it.name)}</div>
-                        ${it.reason?`<div style="font-size:10.5px;color:var(--text-3);line-height:1.3;">${esc(it.reason)}</div>`:''}
-                      </div>
-                    </div>`).join('')}
-                  ${look.items.length>4?`<div style="font-size:11px;color:var(--text-3);padding-left:24px;">+${look.items.length-4} more</div>`:''}
-                </div>
-                ${look._saved?`<div style="font-size:11px;color:${look.badgeColor};font-weight:700;text-align:right;margin-top:auto;">View look →</div>`:''}
-              </div>`;
+                <!-- Trip expanded body -->
+                ${(row._kind==='trip'&&isOpen)?`<div style="border-top:1px solid var(--border);padding:0 12px 12px;">${tripPlanBodyHTML(row.tp.suggestions,row.tp.gaps,`${row.tp.days}-Day Wardrobe Plan`)}</div>`:''}`
+                + `</div>`;
             }).join('')}
           </div>
         </div>`;
-      })()}
-
-      ${S.savedTripPlans.length > 0 ? `
-        <!-- SAVED TRIP PLANS — condensed list, tap to expand/collapse -->
-        <div class="event-board-section">
-          <div class="event-board-header">
-            <span>✈️ Saved Trip Plans</span>
-            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${S.savedTripPlans.length} plan${S.savedTripPlans.length===1?'':'s'}</span>
-          </div>
-          ${S.savedTripPlans.map(tp => {
-            const isOpen = S._openTripPlanId === tp.id;
-            const d = new Date(tp.createdAt);
-            const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-            return `<div class="event-card">
-              <div class="event-card-header" style="cursor:pointer;touch-action:manipulation;"
-                ontouchend="if(_touchMoved)return;event.preventDefault();toggleTripPlan('${tp.id}');" onclick="toggleTripPlan('${tp.id}')">
-                <div class="event-card-desc">
-                  ✈️ ${esc(tp.destination)}
-                  <div style="font-size:11.5px;font-weight:600;color:var(--text-3);margin-top:2px;">${tp.days} day${tp.days===1?'':'s'} · ${dateLabel}</div>
-                </div>
-                <span style="font-size:12px;color:var(--text-3);transform:rotate(${isOpen?'180deg':'0deg'});transition:transform .15s;flex-shrink:0;">▾</span>
-                <button class="event-card-delete" title="Delete plan"
-                  ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteTripPlan('${tp.id}');"
-                  onclick="event.stopPropagation();deleteTripPlan('${tp.id}')">✕</button>
-              </div>
-              ${isOpen ? `<div class="event-card-body">${tripPlanBodyHTML(tp.suggestions, tp.gaps, `${tp.days}-Day Wardrobe Plan`)}</div>` : ''}
-            </div>`;
-          }).join('')}
-        </div>
-      ` : ''}
+      })() : ''}
 
       <!-- Post-trip-save success nudge -->
       ${p.savedSuccess && !p.suggestion ? `
@@ -10428,6 +10407,19 @@ function viewPlan() {
 `;
 }
 
+function heroScore(name, category) {
+  // Returns higher scores for visually interesting tops/bottoms/dresses; negative for accessories
+  const t = ((name||'') + ' ' + (category||'')).toLowerCase();
+  if (/dress|jumpsuit|romper|co.ord|suit/.test(t)) return 4;
+  if (/blazer|jacket|coat|puffer|trench|leather jacket/.test(t)) return 3;
+  if (/top|blouse|shirt|button.down|sweater|pullover|cardigan|hoodie|turtleneck|crop/.test(t)) return 2;
+  if (/pant|jean|trouser|skirt|short|legging|denim/.test(t)) return 2;
+  if (/shoe|boot|sneaker|heel|sandal|flat|loafer|slipper|mule/.test(t)) return -1;
+  if (/bag|purse|clutch|tote|backpack|wallet/.test(t)) return -1;
+  if (/earring|necklace|bracelet|ring|watch|jewelry|belt|sock|scarf|hat|cap|glove|sungl/.test(t)) return -1;
+  return 1;
+}
+
 function getSavedLookData(type, id) {
   const normStr = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
   const matchW = name => {
@@ -10453,11 +10445,16 @@ function getSavedLookData(type, id) {
   if (type === 'dressme') {
     const dm = S.savedDressMe.find(d => d.id === id); if (!dm) return null;
     const all = (dm.outfit||[]).map(p => ({ name: p.item||'', reason: p.reason||'', emoji: p.emoji||'✨', wardrobeItem: matchW(p.item) }));
+    const scored = all.map((p,i) => ({ p, i, score: heroScore(p.name, p.wardrobeItem?.category) }));
+    scored.sort((a,b) => b.score - a.score);
+    const anchorIdx = scored[0]?.i ?? 0;
+    const anchor = all[anchorIdx];
+    const pairs = all.filter((_,i) => i !== anchorIdx);
     return {
       badge: dm.vibe || dm.context || 'Saved Look', badgeColor: '#B87D2A',
       quote: dm.hype || '',
-      anchor: all[0] || null,
-      pairs: all.slice(1),
+      anchor: anchor || null,
+      pairs,
       gaps: [],
       deleteFn: `deleteDressMeSave('${id}')`,
       extraBtn: { label: '✨ Wear this look →', fn: `wearSavedDressMe('${id}')`, color: 'var(--gold)' },
@@ -10466,11 +10463,16 @@ function getSavedLookData(type, id) {
   if (type === 'roulette') {
     const rl = S.savedRouletteLooks.find(r => r.id === id); if (!rl) return null;
     const all = (rl.outfit||[]).map(p => ({ name: p.item||'', reason: p.reason||'', emoji: p.emoji||'🎲', wardrobeItem: matchW(p.item) }));
+    const scored = all.map((p,i) => ({ p, i, score: heroScore(p.name, p.wardrobeItem?.category) }));
+    scored.sort((a,b) => b.score - a.score);
+    const anchorIdx = scored[0]?.i ?? 0;
+    const anchor = all[anchorIdx];
+    const pairs = all.filter((_,i) => i !== anchorIdx);
     return {
-      badge: rl.vibe || 'Roulette Look', badgeColor: '#2A6B4A',
+      badge: rl.vibe || 'Event Look', badgeColor: '#2A6B4A',
       quote: rl.hype || '',
-      anchor: all[0] || null,
-      pairs: all.slice(1),
+      anchor: anchor || null,
+      pairs,
       gaps: [],
       deleteFn: `deleteRouletteLook('${id}')`,
       extraBtn: null,
