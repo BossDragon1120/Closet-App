@@ -3002,12 +3002,16 @@ const S = {
   _openOutfitBuildId: null,     // which saved outfit build is expanded on Plan page
   savedRouletteLooks: JSON.parse(localStorage.getItem('closet-roulette-looks') || '[]'), // [{id,vibe,hype,outfit,createdAt}]
   _openRouletteLookId: null,    // which saved roulette look is expanded on Plan page
+  _suggestionLog: JSON.parse(localStorage.getItem('closet-suggestion-log') || '[]'), // [{id,source,title,hype,items,createdAt,savedId}] auto-logged every generation
   // Sell It — AI-drafted Poshmark/Depop listing, nudged when a piece scores 2★ or lower in Rate Mode
   sellDraft: null,        // { wardrobeId, loading, title, description, price, priceReasoning }
   _sellDraftOpen: false,  // bottom-sheet modal visible
   _sellSuggestId: null,   // wardrobeId currently showing the inline "list it?" nudge in Rate Mode
   _sellDismissedIds: new Set(), // session-only — nudges dismissed this session, don't re-show for the same item
   _dismissedComplimentIds: new Set(JSON.parse(localStorage.getItem('closet-dismissed-compliments') || '[]')), // items hidden from the compliment carousel (tally unaffected)
+  _complimentModal: null,       // { wardrobeId } — "who complimented you?" popup open
+  _complimentFrom: '',          // input value in the compliment modal
+  _complimentLongPressId: null, // which carousel card is showing its ✕ dismiss button
   purchasedQueries: new Set(JSON.parse(localStorage.getItem('closet-purchased') || '[]')),
   shopBlocked: new Set(JSON.parse(localStorage.getItem('closet-shop-blocked') || '[]')),
   shopCache: JSON.parse(localStorage.getItem('closet-shop-cache') || '{}'), // key → {results,ts}
@@ -3070,6 +3074,7 @@ const S = {
   styleAvatar:        JSON.parse(localStorage.getItem('closet-style-avatar') || 'null'),
   _avatarLoading:     false,
   showShareCard:      false,
+  stylePortraitPhoto: localStorage.getItem('closet-portrait-photo') || null, // user-chosen photo for the style portrait
   // What's Hot trends
   hotTrends:          JSON.parse(localStorage.getItem('closet-hot-trends') || 'null'),
   _trendsLoading:     false,
@@ -4045,6 +4050,30 @@ function generateStyleAvatar(force) {
   toast(force ? 'Generating a new portrait — give it a few seconds ✨' : 'Generating your fashion portrait — give it a few seconds ✨');
 }
 
+function pickPortraitPhoto() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:0;left:0;';
+  document.body.appendChild(inp);
+  inp.addEventListener('change', async () => {
+    document.body.removeChild(inp);
+    const file = inp.files[0]; if (!file) return;
+    try {
+      const { data } = await compressImage(file);
+      S.stylePortraitPhoto = data;
+      localStorage.setItem('closet-portrait-photo', data);
+      render();
+      toast('Portrait photo updated ✨');
+    } catch(e) { console.error('pickPortraitPhoto:', e); toast('Could not load photo — try again.'); }
+  });
+  inp.click();
+}
+function clearPortraitPhoto() {
+  S.stylePortraitPhoto = null;
+  localStorage.removeItem('closet-portrait-photo');
+  render();
+}
 function openShareCard() { S.showShareCard = true; render(); }
 function closeShareCard() { S.showShareCard = false; render(); }
 
@@ -4162,12 +4191,16 @@ function aboutMeSheetHTML() {
 
   // ── Avatar block at top ────────────────────────────────────
   const bigAvatarHTML = (() => {
-    const wrap = `width:80px;height:108px;border-radius:12px;overflow:hidden;position:relative;flex-shrink:0;background:linear-gradient(160deg,${colors.accent}28,${colors.accent}10);border:2px solid ${colors.accent}44;display:flex;align-items:center;justify-content:center;`;
-    const placeholder = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;"><span style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--gold);opacity:.6;text-align:center;line-height:1.3;">No<br>Portrait</span></div>`;
-    if (avatar?.url)
-      return `<div style="${wrap}">${placeholder}<img src="${esc(avatar.url)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:2;" onerror="this.style.opacity='0'"></div>`;
-    const initial = S.profileName ? S.profileName[0].toUpperCase() : '✦';
-    return `<div style="${wrap}font-size:32px;font-weight:900;color:${colors.accent};">${initial}</div>`;
+    const wrap = `width:80px;height:108px;border-radius:12px;overflow:hidden;position:relative;flex-shrink:0;background:linear-gradient(160deg,${colors.accent}28,${colors.accent}10);border:2px solid ${colors.accent}44;display:flex;align-items:center;justify-content:center;cursor:pointer;`;
+    const portraitSrc = S.stylePortraitPhoto || (avatar?.url || null);
+    const placeholder = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;gap:4px;"><span style="font-size:18px;">📷</span><span style="font-size:9px;font-weight:700;color:var(--gold);opacity:.8;text-align:center;line-height:1.3;">Add<br>Photo</span></div>`;
+    const editBadge = `<div style="position:absolute;bottom:4px;right:4px;z-index:3;background:rgba(0,0,0,0.55);border-radius:100px;padding:2px 6px;font-size:8px;font-weight:700;color:#fff;letter-spacing:.04em;">edit</div>`;
+    if (portraitSrc)
+      return `<div style="${wrap}" ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto();" onclick="pickPortraitPhoto()">
+        <img src="${esc(photoBlobUrl(portraitSrc))}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:2;" onerror="this.style.opacity='0'">
+        ${editBadge}
+      </div>`;
+    return `<div style="${wrap}" ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto();" onclick="pickPortraitPhoto()">${placeholder}</div>`;
   })();
 
   // ── Profile chips ─────────────────────────────────────────
@@ -4199,6 +4232,12 @@ function aboutMeSheetHTML() {
       <button onclick="generateStylePersona()" style="flex:1;min-width:80px;background:none;border:1.5px solid var(--gold);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--gold-dk);">
         ⟳ Refresh
       </button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto();" onclick="pickPortraitPhoto()" style="flex:1;background:none;border:1.5px solid var(--border);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);touch-action:manipulation;">
+        📷 ${S.stylePortraitPhoto ? 'Change photo' : 'Add your photo'}
+      </button>
+      ${S.stylePortraitPhoto ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();clearPortraitPhoto();" onclick="clearPortraitPhoto()" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-3);touch-action:manipulation;">✕</button>` : ''}
     </div>` : `
     <div style="text-align:center;padding:18px;background:var(--surface);border-radius:14px;border:1px dashed var(--border);">
       <div style="font-size:24px;margin-bottom:8px;">✨</div>
@@ -4502,7 +4541,11 @@ function shareCardModalHTML() {
           <span style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:${colors.accent};">✦ CLOSET</span>
           <span style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:${colors.accent};opacity:.7;">STYLE PORTRAIT</span>
         </div>
-        <div style="padding:24px 24px 24px;text-align:center;">
+        ${S.stylePortraitPhoto ? `
+        <div style="width:100%;aspect-ratio:4/3;overflow:hidden;">
+          <img src="${esc(photoBlobUrl(S.stylePortraitPhoto))}" style="width:100%;height:100%;object-fit:cover;display:block;">
+        </div>` : ''}
+        <div style="padding:${S.stylePortraitPhoto?'16px':'24px'} 24px 24px;text-align:center;">
           <div style="font-size:10px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:${colors.accent};margin-bottom:10px;">✦ Style Portrait</div>
           <div style="font-family:Georgia,serif;font-size:19px;font-weight:800;line-height:1.25;margin-bottom:10px;color:${colors.text};">${esc(persona.headline)}</div>
           <div style="height:1px;background:${colors.accent};opacity:.25;margin:0 20px 12px;"></div>
@@ -6269,6 +6312,7 @@ Rules:
     const result = JSON.parse(text);
 
     S.outfitBuilder = { ...ob, loading: false, result };
+    logSuggestion('builder', result.occasion||'', result.stylistNote||'', (result.picks||[]).map(p=>({emoji:'💜',name:p.name||'',reason:p.reason||''})));
     render();
   } catch(e) {
     console.error('doOutfitBuild error', e);
@@ -6306,6 +6350,19 @@ function toggleOutfitBuild(id) {
   render();
 }
 
+function logSuggestion(source, title, hype, items) {
+  const MAX_LOG = 60;
+  const entry = {
+    id: 'sl-' + Date.now() + '-' + Math.random().toString(36).slice(2,5),
+    source, title: title||'', hype: hype||'',
+    items: (items||[]).map(it=>({emoji:it.emoji||'👕',name:it.name||it.item||'',reason:it.reason||''})),
+    createdAt: new Date().toISOString(),
+    savedId: null,
+  };
+  S._suggestionLog = [entry, ...S._suggestionLog].slice(0, MAX_LOG);
+  localStorage.setItem('closet-suggestion-log', JSON.stringify(S._suggestionLog));
+  return entry.id;
+}
 function saveRouletteLook() {
   if (!S.funRoulette) return;
   const entry = {
@@ -6531,6 +6588,7 @@ function render() {
   if (S.wordOfDay) html += wordOfDaySheetHTML();
   if (S._closetLightbox) html += closetLightboxHTML();
   if (S._sellDraftOpen) html += sellDraftModalHTML();
+  if (S._complimentModal) html += complimentModalHTML();
   if (S.toast) {
     // Rate Mode's star row sits low on screen — the default bottom toast would
     // cover it for ~2.6s and look like the stars are slow to load. Anchor near
@@ -7233,6 +7291,7 @@ Return ONLY valid JSON with no markdown or extra text:
     if (!Array.isArray(result.outfit)) throw new Error('Bad shape');
     S.funRoulette = result;
     S._rouletteOpen = true;
+    logSuggestion('roulette', result.vibe||'', result.hype||'', (result.outfit||[]).map(p=>({emoji:p.emoji||'🎲',name:p.item||'',reason:p.reason||''})));
     // Add used items to history, keep last 12 to avoid for next few spins
     const usedNames = (result.outfit || []).map(p => p.item).filter(Boolean);
     S._rouletteHistory = [...S._rouletteHistory, ...usedNames].slice(-12);
@@ -7321,6 +7380,7 @@ Return ONLY valid JSON with no markdown or extra text:
     if (!m) throw new Error('No JSON');
     const result = JSON.parse(m[0]);
     S.dressMeResult = result;
+    logSuggestion('dressme', result.vibe||'', result.hype||'', (result.outfit||[]).map(p=>({emoji:p.emoji||'✨',name:p.item||'',reason:p.reason||''})));
     const usedNames = (result.outfit || []).map(p => p.item).filter(Boolean);
     S._dressMeHistory = [...S._dressMeHistory, ...usedNames].slice(-12);
   } catch(e) {
@@ -7481,6 +7541,39 @@ function listOnMarketplace(platform) {
   } else {
     finish();
   }
+}
+
+function complimentModalHTML() {
+  const m = S._complimentModal; if (!m) return '';
+  const w = S.wardrobe.find(i => i.id === m.wardrobeId);
+  const itemName = w ? w.name : '';
+  return `<div onclick="closeComplimentModal()" ontouchend="if(_touchMoved)return;event.preventDefault();closeComplimentModal()"
+    style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
+    <div onclick="event.stopPropagation()" ontouchend="event.stopPropagation()"
+      style="width:100%;background:var(--surface);border-radius:24px 24px 0 0;padding:28px 20px calc(28px + env(safe-area-inset-bottom,0px));
+             box-shadow:0 -8px 40px rgba(0,0,0,0.2);animation:slideUp .28s cubic-bezier(.22,.68,0,1.2);">
+      <div style="width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 22px;"></div>
+      <div style="font-size:22px;text-align:center;margin-bottom:6px;">💬</div>
+      <div style="font-size:18px;font-weight:900;color:var(--text);text-align:center;margin-bottom:4px;">Got a compliment?</div>
+      ${itemName ? `<div style="font-size:13px;color:var(--text-3);text-align:center;margin-bottom:20px;">on your <strong style="color:var(--text-2);">${esc(itemName)}</strong></div>` : '<div style="margin-bottom:20px;"></div>'}
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);display:block;margin-bottom:8px;">Who complimented you? <span style="font-weight:500;text-transform:none;letter-spacing:0;">(optional)</span></label>
+        <input id="compliment-from-input" type="text" placeholder="e.g. Sarah, my coworker, a stranger…"
+          value="${esc(S._complimentFrom||'')}"
+          oninput="S._complimentFrom=this.value"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();submitCompliment();}"
+          style="width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg);font-size:15px;font-family:inherit;color:var(--text);box-sizing:border-box;outline:none;-webkit-appearance:none;">
+      </div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();submitCompliment();" onclick="submitCompliment()"
+        style="width:100%;padding:14px;background:var(--gold);border:none;border-radius:100px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:10px;">
+        ✨ Log it
+      </button>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();closeComplimentModal();" onclick="closeComplimentModal()"
+        style="width:100%;padding:12px;background:none;border:1.5px solid var(--border);border-radius:100px;font-size:14px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        Cancel
+      </button>
+    </div>
+  </div>`;
 }
 
 function sellDraftModalHTML() {
@@ -10135,156 +10228,98 @@ function viewPlan() {
         ` : ''}
       ` : ''}
 
-      ${S.savedDressMe.length > 0 ? `
-        <!-- SAVED DRESS ME LOOKS — condensed list, tap to expand -->
-        <div class="event-board-section">
-          <div class="event-board-header">
-            <span>✨ Saved Looks</span>
-            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${S.savedDressMe.length} look${S.savedDressMe.length===1?'':'s'}</span>
-          </div>
-          ${S.savedDressMe.map(dm => {
-            const isOpen = S._openDressMeSaveId === dm.id;
-            const d = new Date(dm.createdAt);
-            const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-            return `<div class="event-card">
-              <div class="event-card-header" style="cursor:pointer;touch-action:manipulation;"
-                ontouchend="if(_touchMoved)return;event.preventDefault();toggleDressMeSave('${dm.id}');" onclick="toggleDressMeSave('${dm.id}')">
-                <div class="event-card-desc">
-                  ✨ ${esc(dm.vibe||'Saved Look')}
-                  <div style="font-size:11.5px;font-weight:600;color:var(--text-3);margin-top:2px;">${dm.context ? esc(dm.context) + ' · ' : ''}${dateLabel}</div>
-                </div>
-                <span style="font-size:12px;color:var(--text-3);transform:rotate(${isOpen?'180deg':'0deg'});transition:transform .15s;flex-shrink:0;">▾</span>
-                <button class="event-card-delete" title="Delete look"
-                  ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteDressMeSave('${dm.id}');"
-                  onclick="event.stopPropagation();deleteDressMeSave('${dm.id}')">✕</button>
-              </div>
-              ${isOpen ? `
-                <div class="event-card-body">
-                  ${dm.hype ? `<div style="font-size:13px;color:var(--text-2);font-style:italic;margin-bottom:12px;">${esc(dm.hype)}</div>` : ''}
-                  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
-                    ${(dm.outfit||[]).map(p=>`
-                      <div style="display:flex;align-items:center;gap:10px;">
-                        <span style="font-size:20px;flex-shrink:0;">${esc(p.emoji||'👕')}</span>
-                        <div style="flex:1;min-width:0;">
-                          <div style="font-size:13px;font-weight:600;color:var(--text);">${esc(p.item||'')}</div>
-                          ${p.reason ? `<div style="font-size:11px;color:var(--text-3);">${esc(p.reason)}</div>` : ''}
-                        </div>
-                      </div>`).join('')}
-                  </div>
-                  <button ontouchend="if(_touchMoved)return;event.preventDefault();wearSavedDressMe('${dm.id}');" onclick="wearSavedDressMe('${dm.id}')"
-                    style="width:100%;padding:11px;background:var(--gold);border:none;border-radius:100px;font-size:13px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                    ✨ Wear this look →
-                  </button>
-                </div>
-              ` : ''}
-            </div>`;
-          }).join('')}
-        </div>
-      ` : ''}
+      ${(()=>{
+        // ── UNIFIED LOOKS CAROUSEL ────────────────────────────────────────────
+        // Merge saved looks (all 3 types) + unsaved suggestion log, sorted newest first
+        const savedIds = new Set([
+          ...S.savedDressMe.map(d=>d.id),
+          ...S.savedOutfitBuilds.map(o=>o.id),
+          ...S.savedRouletteLooks.map(r=>r.id),
+        ]);
+        const unsaved = S._suggestionLog.filter(l => !l.savedId);
 
-      ${S.savedOutfitBuilds.length > 0 ? `
-        <!-- SAVED OUTFIT BUILDS -->
-        <div class="event-board-section">
-          <div class="event-board-header">
-            <span>💜 Saved Outfits</span>
-            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${S.savedOutfitBuilds.length} outfit${S.savedOutfitBuilds.length===1?'':'s'}</span>
-          </div>
-          ${S.savedOutfitBuilds.map(ob => {
-            const isOpen = S._openOutfitBuildId === ob.id;
-            const d = new Date(ob.createdAt);
-            const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-            const r = ob.result || {};
-            return `<div class="event-card">
-              <div class="event-card-header" style="cursor:pointer;touch-action:manipulation;"
-                ontouchend="if(_touchMoved)return;event.preventDefault();toggleOutfitBuild('${ob.id}');" onclick="toggleOutfitBuild('${ob.id}')">
-                <div class="event-card-desc">
-                  💜 ${esc(r.occasion || ob.wardrobeName || 'Saved Outfit')}
-                  <div style="font-size:11.5px;font-weight:600;color:var(--text-3);margin-top:2px;">${ob.wardrobeName ? esc(ob.wardrobeName) + ' · ' : ''}${dateLabel}</div>
-                </div>
-                <span style="font-size:12px;color:var(--text-3);transform:rotate(${isOpen?'180deg':'0deg'});transition:transform .15s;flex-shrink:0;">▾</span>
-                <button class="event-card-delete" title="Delete outfit"
-                  ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteOutfitBuild('${ob.id}');"
-                  onclick="event.stopPropagation();deleteOutfitBuild('${ob.id}')">✕</button>
-              </div>
-              ${isOpen ? `
-                <div class="event-card-body">
-                  ${r.stylistNote ? `<div style="font-size:13px;color:var(--text-2);font-style:italic;margin-bottom:12px;">"${esc(r.stylistNote)}"</div>` : ''}
-                  ${ob.wardrobeName ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(108,62,191,0.7);margin-bottom:8px;">Built around: ${esc(ob.wardrobeName)}</div>` : ''}
-                  ${(r.picks||[]).length ? `
-                    <div style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:6px;">PAIR WITH</div>
-                    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
-                      ${(r.picks||[]).map(p=>`
-                        <div style="display:flex;align-items:center;gap:10px;">
-                          <div style="width:8px;height:8px;border-radius:50%;background:rgba(108,62,191,0.5);flex-shrink:0;"></div>
-                          <div style="flex:1;min-width:0;">
-                            <span style="font-size:13px;font-weight:600;color:var(--text);">${esc(p.name||'')}</span>
-                            ${p.reason ? `<span style="font-size:11px;color:var(--text-3);"> — ${esc(p.reason)}</span>` : ''}
-                          </div>
-                        </div>`).join('')}
-                    </div>
-                  ` : ''}
-                  ${(r.gaps||[]).length ? `
-                    <div style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:6px;">COMPLETE THE LOOK</div>
-                    <div style="display:flex;flex-direction:column;gap:6px;">
-                      ${(r.gaps||[]).map(g=>`
-                        <div style="display:flex;align-items:center;gap:10px;">
-                          <span style="font-size:14px;flex-shrink:0;">🛍</span>
-                          <div style="flex:1;min-width:0;">
-                            <span style="font-size:13px;font-weight:600;color:var(--text);">${esc(g.item||'')}</span>
-                            ${g.reason ? `<span style="font-size:11px;color:var(--text-3);"> — ${esc(g.reason)}</span>` : ''}
-                          </div>
-                        </div>`).join('')}
-                    </div>
-                  ` : ''}
-                </div>
-              ` : ''}
-            </div>`;
-          }).join('')}
-        </div>
-      ` : ''}
+        const allLooks = [
+          ...S.savedDressMe.map(dm=>({
+            _type:'dressme', _saved:true, id:dm.id,
+            title:dm.vibe||'Saved Look', sub:dm.context||'', hype:dm.hype||'',
+            items:(dm.outfit||[]).map(p=>({emoji:p.emoji||'✨',name:p.item||'',reason:p.reason||''})),
+            createdAt:dm.createdAt, badge:'Dress Me', badgeColor:'#B87D2A',
+          })),
+          ...S.savedOutfitBuilds.map(ob=>({
+            _type:'builder', _saved:true, id:ob.id,
+            title:(ob.result&&ob.result.occasion)||ob.wardrobeName||'Outfit Build',
+            sub:ob.wardrobeName?`Around ${ob.wardrobeName}`:'',
+            hype:(ob.result&&ob.result.stylistNote)||'',
+            items:((ob.result&&ob.result.picks)||[]).map(p=>({emoji:'💜',name:p.name||'',reason:p.reason||''})),
+            createdAt:ob.createdAt, badge:'Outfit Builder', badgeColor:'#6C3EBF',
+          })),
+          ...S.savedRouletteLooks.map(rl=>({
+            _type:'roulette', _saved:true, id:rl.id,
+            title:rl.vibe||'Roulette Look', sub:'', hype:rl.hype||'',
+            items:(rl.outfit||[]).map(p=>({emoji:p.emoji||'🎲',name:p.item||'',reason:p.reason||''})),
+            createdAt:rl.createdAt, badge:'Style Roulette', badgeColor:'#2A6B4A',
+          })),
+          ...unsaved.map(l=>({
+            _type:l.source, _saved:false, id:l.id,
+            title:l.title||'Suggestion', sub:'', hype:l.hype||'',
+            items:l.items||[],
+            createdAt:l.createdAt,
+            badge:l.source==='dressme'?'Dress Me':l.source==='builder'?'Outfit Builder':'Style Roulette',
+            badgeColor:l.source==='dressme'?'#B87D2A':l.source==='builder'?'#6C3EBF':'#2A6B4A',
+          })),
+        ].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
 
-      ${S.savedRouletteLooks.length > 0 ? `
-        <!-- SAVED ROULETTE LOOKS -->
-        <div class="event-board-section">
-          <div class="event-board-header">
-            <span>🎲 Roulette Looks</span>
-            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${S.savedRouletteLooks.length} look${S.savedRouletteLooks.length===1?'':'s'}</span>
+        if (!allLooks.length) return '';
+
+        return `<div style="margin-bottom:8px;">
+          <div class="event-board-header" style="padding:4px 16px 8px;">
+            <span>✨ Claude's Picks</span>
+            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${allLooks.length} look${allLooks.length===1?'':'s'}</span>
           </div>
-          ${S.savedRouletteLooks.map(rl => {
-            const isOpen = S._openRouletteLookId === rl.id;
-            const d = new Date(rl.createdAt);
-            const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-            return `<div class="event-card">
-              <div class="event-card-header" style="cursor:pointer;touch-action:manipulation;"
-                ontouchend="if(_touchMoved)return;event.preventDefault();toggleRouletteLook('${rl.id}');" onclick="toggleRouletteLook('${rl.id}')">
-                <div class="event-card-desc">
-                  🎲 ${esc(rl.vibe || 'Spun Look')}
-                  <div style="font-size:11.5px;font-weight:600;color:var(--text-3);margin-top:2px;">${dateLabel}</div>
-                </div>
-                <span style="font-size:12px;color:var(--text-3);transform:rotate(${isOpen?'180deg':'0deg'});transition:transform .15s;flex-shrink:0;">▾</span>
-                <button class="event-card-delete" title="Delete look"
-                  ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteRouletteLook('${rl.id}');"
-                  onclick="event.stopPropagation();deleteRouletteLook('${rl.id}')">✕</button>
-              </div>
-              ${isOpen ? `
-                <div class="event-card-body">
-                  ${rl.hype ? `<div style="font-size:13px;color:var(--text-2);font-style:italic;margin-bottom:12px;">"${esc(rl.hype)}"</div>` : ''}
-                  <div style="display:flex;flex-direction:column;gap:8px;">
-                    ${(rl.outfit||[]).map(p=>`
-                      <div style="display:flex;align-items:flex-start;gap:10px;">
-                        <span style="font-size:18px;flex-shrink:0;line-height:1.3;">${esc(p.emoji||'👕')}</span>
-                        <div style="flex:1;min-width:0;">
-                          <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(p.item||'')}</div>
-                          ${p.reason ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(p.reason)}</div>` : ''}
-                        </div>
-                      </div>`).join('')}
+          <div style="overflow-x:auto;scroll-snap-type:x mandatory;display:flex;gap:12px;padding:4px 16px 16px;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;">
+            ${allLooks.map(look=>{
+              const d = new Date(look.createdAt);
+              const dateLabel = isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+              const deleteFn = look._saved
+                ? (look._type==='dressme'?`deleteDressMeSave('${look.id}')`
+                  :look._type==='builder'?`deleteOutfitBuild('${look.id}')`
+                  :`deleteRouletteLook('${look.id}')`)
+                : `S._suggestionLog=S._suggestionLog.filter(l=>l.id!=='${look.id}');localStorage.setItem('closet-suggestion-log',JSON.stringify(S._suggestionLog));render()`;
+              return `<div style="min-width:248px;max-width:248px;scroll-snap-align:start;flex-shrink:0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                  <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${look.badgeColor};background:${look.badgeColor}1A;border-radius:100px;padding:3px 9px;white-space:nowrap;">${look.badge}${look._saved?'':' · unsaved'}</span>
+                  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                    <span style="font-size:11px;color:var(--text-3);">${dateLabel}</span>
+                    <button ontouchend="if(_touchMoved)return;event.preventDefault();${deleteFn};" onclick="${deleteFn}"
+                      style="background:none;border:none;font-size:14px;color:var(--text-3);cursor:pointer;padding:2px 4px;line-height:1;touch-action:manipulation;">✕</button>
                   </div>
                 </div>
-              ` : ''}
-            </div>`;
-          }).join('')}
-        </div>
-      ` : ''}
+                <div>
+                  <div style="font-size:15px;font-weight:800;color:var(--text);line-height:1.25;">${esc(look.title)}</div>
+                  ${look.sub?`<div style="font-size:11px;color:var(--text-3);margin-top:2px;">${esc(look.sub)}</div>`:''}
+                  ${look.hype?`<div style="font-size:12px;color:var(--text-2);font-style:italic;margin-top:5px;">"${esc(look.hype)}"</div>`:''}
+                </div>
+                <div style="display:flex;flex-direction:column;gap:7px;flex:1;">
+                  ${look.items.slice(0,4).map(it=>`
+                    <div style="display:flex;align-items:flex-start;gap:8px;">
+                      <span style="font-size:16px;flex-shrink:0;line-height:1.35;">${esc(it.emoji)}</span>
+                      <div style="flex:1;min-width:0;">
+                        <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.3;">${esc(it.name)}</div>
+                        ${it.reason?`<div style="font-size:10.5px;color:var(--text-3);line-height:1.3;">${esc(it.reason)}</div>`:''}
+                      </div>
+                    </div>`).join('')}
+                  ${look.items.length>4?`<div style="font-size:11px;color:var(--text-3);padding-left:24px;">+${look.items.length-4} more</div>`:''}
+                </div>
+                ${look._type==='dressme'&&look._saved?`
+                  <button ontouchend="if(_touchMoved)return;event.preventDefault();wearSavedDressMe('${look.id}');" onclick="wearSavedDressMe('${look.id}')"
+                    style="width:100%;padding:9px;background:var(--gold);border:none;border-radius:100px;font-size:12px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                    ✨ Wear this →
+                  </button>`:''}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      })()}
 
       ${S.savedTripPlans.length > 0 ? `
         <!-- SAVED TRIP PLANS — condensed list, tap to expand/collapse -->
@@ -11348,21 +11383,27 @@ function viewProfile() {
           <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">💬 Recent Compliments</div>
           <div style="font-size:11px;font-weight:700;color:var(--gold-dk);">${total} total</div>
         </div>
-        ${visible.length ? `<div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none;margin:0 -16px;padding:0 16px 4px;">
-          ${visible.slice(0,10).map(({w,lastDate,count}) => `
-            <div style="flex-shrink:0;width:106px;position:relative;">
-              <div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
-                style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 8px;cursor:pointer;touch-action:manipulation;text-align:center;">
+        ${visible.length ? `<div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -16px;padding:0 16px 4px;">
+          ${visible.slice(0,10).map(({w,lastDate,count}) => {
+            const isLongPress = S._complimentLongPressId === w.id;
+            const latestFrom = [...(w.compliments||[])].reverse().find(c=>c.from)?.from || null;
+            return `<div style="flex-shrink:0;width:106px;position:relative;"
+              ontouchstart="window._cpTimer=setTimeout(()=>{S._complimentLongPressId='${w.id}';render();setTimeout(()=>{if(S._complimentLongPressId==='${w.id}'){S._complimentLongPressId=null;render();}},3000);},500)"
+              ontouchmove="clearTimeout(window._cpTimer)"
+              ontouchend="clearTimeout(window._cpTimer)">
+              <div ontouchend="if(_touchMoved)return;event.preventDefault();if(S._complimentLongPressId==='${w.id}'){S._complimentLongPressId=null;render();return;}S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="if(S._complimentLongPressId==='${w.id}'){S._complimentLongPressId=null;render();return;}S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+                style="background:var(--surface);border:1.5px solid ${isLongPress?'var(--gold)':'var(--border)'};border-radius:12px;padding:10px 8px;cursor:pointer;touch-action:manipulation;text-align:center;transition:border-color .15s;">
                 ${w.photo ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:46px;height:46px;border-radius:8px;object-fit:cover;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;" loading="lazy">` : `<div style="font-size:28px;margin-bottom:6px;line-height:1;">${w.icon||'👕'}</div>`}
                 <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.name)}</div>
                 <div style="font-size:11px;color:var(--gold-dk);margin-top:2px;font-weight:600;">${count}×</div>
-                <div style="font-size:10px;color:var(--text-3);margin-top:1px;">${relDate(lastDate)}</div>
+                ${latestFrom ? `<div style="font-size:10px;color:var(--text-3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">from ${esc(latestFrom)}</div>` : `<div style="font-size:10px;color:var(--text-3);margin-top:1px;">${relDate(lastDate)}</div>`}
               </div>
-              <button
-                ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();dismissComplimentCard('${w.id}');"
-                onclick="event.stopPropagation();dismissComplimentCard('${w.id}');"
-                style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.45);border:none;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;">✕</button>
-            </div>`).join('')}
+              ${isLongPress ? `<button
+                ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();S._complimentLongPressId=null;dismissComplimentCard('${w.id}');"
+                onclick="event.stopPropagation();S._complimentLongPressId=null;dismissComplimentCard('${w.id}');"
+                style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:var(--gold);border:none;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;animation:fadeIn .15s;">✕</button>` : ''}
+            </div>`;
+          }).join('')}
         </div>` : `<div style="font-size:12px;color:var(--text-3);padding:8px 0;">All caught up — no items showing.</div>`}
       </div>`;
     })()}
@@ -20911,13 +20952,34 @@ async function thankGifter(wId) {
 // Keep old name as alias so any stale references still work
 const shareGiftWear = thankGifter;
 
-async function logCompliment(id) {
-  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
+function logCompliment(id) {
+  S._complimentModal = { wardrobeId: id };
+  S._complimentFrom = '';
+  render();
+  requestAnimationFrame(() => {
+    const inp = document.getElementById('compliment-from-input');
+    if (inp) inp.focus();
+  });
+}
+async function submitCompliment() {
+  const m = S._complimentModal; if (!m) return;
+  const w = S.wardrobe.find(i => i.id === m.wardrobeId); if (!w) return;
   if (!w.compliments) w.compliments = [];
-  w.compliments.push({ date: new Date().toISOString() });
-  await DB.wardrobe.put(w); render();
+  const entry = { date: new Date().toISOString() };
+  const from = (S._complimentFrom || '').trim();
+  if (from) entry.from = from;
+  w.compliments.push(entry);
+  S._complimentModal = null;
+  S._complimentFrom = '';
+  await DB.wardrobe.put(w);
+  render();
   launchConfetti();
-  toast("Compliment logged! You've got great taste. ✨");
+  toast(from ? `Logged! ${from} has great taste. ✨` : "Compliment logged! You've got great taste. ✨");
+}
+function closeComplimentModal() {
+  S._complimentModal = null;
+  S._complimentFrom = '';
+  render();
 }
 
 function setRating(n) {
