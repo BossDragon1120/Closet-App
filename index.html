@@ -5196,11 +5196,12 @@ function featuresMenuHTML() {
     {
       title: 'Portfolio',
       items: [
-        { icon: '✦', text: '<strong>AI Style Portrait</strong> — Claude writes a personal headline and style description based on your outfits, wardrobe, and vibe words. Regenerate anytime as your taste evolves.' },
-        { icon: '♥', text: '<strong>Style Journey</strong> — Heart any portrait to save it. Your saved portraits stack into a timeline so you can watch your style evolve over time.' },
+        { icon: '✦', text: '<strong>AI Style Portrait</strong> — Claude writes a personal headline and style description based on your outfits, wardrobe, and vibe words. Share or refresh anytime as your taste evolves.' },
         { icon: '📖', text: '<strong>Style Playbook</strong> — A living guide to your personal style: your aesthetic identity, what works, what to build next, and how to shop smarter.' },
         { icon: '✨', text: '<strong>Your Aura</strong> — Personal details (height, eye colour, scent, personality type, nail colour, hairstyle) that help Claude give you the most tailored advice possible.' },
         { icon: '⭐', text: '<strong>Best Outfits</strong> — All your 8+ rated looks in a swipeable carousel, alongside your 💎 Gem Pieces in a gold-accented showcase.' },
+        { icon: '📈', text: '<strong>Score &amp; Confidence History</strong> — Tap your Style Score or Confidence tile to see trend graphs of how your numbers have moved over time.' },
+        { icon: '🗓', text: '<strong>Streak Calendar</strong> — Tap your day streak tile to open a full calendar of your outfit logging history.' },
       ],
     },
     {
@@ -5209,7 +5210,10 @@ function featuresMenuHTML() {
         { icon: '📸', text: '<strong>AI Style Rating</strong> — Upload any outfit photo and get an instant 1–10 score with detailed, honest feedback from Claude.' },
         { icon: '🎯', text: '<strong>Occasion-Aware Scoring</strong> — Tell Claude the context before analysis. A gym look scores differently from a cocktail event.' },
         { icon: '💪', text: '<strong>Confidence Score</strong> — Log how confident you felt alongside your style rating.' },
+        { icon: '⚡', text: '<strong>Rate Mode</strong> — Rapid-fire swipe sessions to rate how every wardrobe piece makes you feel right now. Low scores trigger a Sell It prompt.' },
+        { icon: '👗', text: '<strong>Dress Me</strong> — Get a complete outfit for any occasion built from your actual closet, with a save option for looks you love.' },
         { icon: '📝', text: '<strong>Auto Occasion Tagging</strong> — Outfits are tagged by occasion from your notes automatically if you skip the picker.' },
+        { icon: '🔗', text: '<strong>Item Linking Wizard</strong> — After a fit check, Claude walks you through identifying each item in your photo and linking it to your wardrobe.' },
         { icon: '🪄', text: '<strong>Style it With…</strong> — Tap any outfit item and Claude suggests what to pair it with from your wardrobe.' },
         { icon: '💌', text: '<strong>Share Your Look</strong> — Share any outfit entry as a styled photo card with your rating and notes included.' },
       ],
@@ -5227,6 +5231,8 @@ function featuresMenuHTML() {
         { icon: '📦', text: '<strong>Retire & Memorial Garden</strong> — Log when pieces leave your closet. Beloved pieces can be memorialised with a photo and a eulogy.' },
         { icon: '🔍', text: '<strong>Wardrobe Search</strong> — Search across all your pieces by name, brand, or category instantly.' },
         { icon: '🎨', text: '<strong>Colour Stripes</strong> — Each wardrobe card picks up the piece\'s colour for fast visual scanning.' },
+        { icon: '🔮', text: '<strong>Hidden Gems</strong> — Claude surfaces owned-but-neglected pieces worth rediscovering and offers a restyle tip to bring them back.' },
+        { icon: '💰', text: '<strong>Sell It</strong> — When a piece rates consistently low, Claude writes a Poshmark-ready listing for it in seconds.' },
       ],
     },
     {
@@ -5234,8 +5240,10 @@ function featuresMenuHTML() {
       items: [
         { icon: '✨', text: '<strong>AI Outfit Ideas</strong> — Describe an event and get personalised outfit suggestions drawn from your actual wardrobe.' },
         { icon: '🌤', text: '<strong>Weather-Aware</strong> — Suggestions factor in today\'s forecast so you\'re never under- or over-dressed.' },
+        { icon: '🧩', text: '<strong>Outfit Builder</strong> — Pick any wardrobe piece and Claude builds a complete look around it.' },
         { icon: '🎲', text: '<strong>Style Roulette</strong> — Can\'t decide what to wear? Let Claude spin a surprise outfit from your wardrobe — a different pick every time.' },
         { icon: '🗓', text: '<strong>Trip Packing</strong> — Tell Claude where you\'re going and for how long. It builds a day-by-day packing list from what you already own.' },
+        { icon: '💾', text: '<strong>Save Everything</strong> — Save any AI-built outfit, Dress Me result, Roulette spin, or Trip Plan to your Plan page for later.' },
       ],
     },
     {
@@ -5272,10 +5280,11 @@ function featuresMenuHTML() {
     {
       title: 'Fashion Stats',
       items: [
-        { icon: '📊', text: '<strong>Style Score</strong> — Your overall average rating across all logged outfits, calculated fairly across occasion types.' },
+        { icon: '📊', text: '<strong>Style Score</strong> — Your overall average rating across all logged outfits. Tap the tile on Portfolio to see your full score history graph.' },
+        { icon: '💪', text: '<strong>Confidence Score</strong> — Your average confidence across logged outfits. Tap the tile to see your confidence trend over time.' },
         { icon: '🔄', text: '<strong>Wear Tracking</strong> — Total wears, average wears per piece, and cost-per-wear across your whole closet.' },
         { icon: '🏆', text: '<strong>Top Picks</strong> — Most-worn piece, top brand, and top activity surface automatically from your real data.' },
-        { icon: '🔥', text: '<strong>Streak & Logging</strong> — Track how many days in a row you\'ve been logging outfits.' },
+        { icon: '🔥', text: '<strong>Streak & Logging</strong> — Track how many days in a row you\'ve been logging outfits. Tap the tile to open your full logging calendar.' },
         { icon: '📤', text: '<strong>Shareable Stats Card</strong> — Generate a styled PNG of your fashion stats to share with friends.' },
       ],
     },
@@ -6503,6 +6512,7 @@ function render() {
     case 'therapy-session-edit': html = viewTherapySessionEdit(); break;
     case 'streak-calendar': html = viewStreakCalendar(); break;
     case 'dress-me':        html = viewDressMe();        break;
+    case 'style-roulette':  html = viewStyleRoulette();  break;
   }
   // Inject tab bar right after the .nav block on every tab view
   // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
@@ -9949,7 +9959,7 @@ function viewPlan() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">📅 Plan</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();S._rouletteOpen=true;generateRoulette();" onclick="S._rouletteOpen=true;generateRoulette();" style="font-size:12px;">
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();S.funRoulette=null;navigate('style-roulette');generateRoulette();" onclick="S.funRoulette=null;navigate('style-roulette');generateRoulette();" style="font-size:12px;">
         🎲 Style Roulette
       </button>
     </div>
@@ -10378,83 +10388,88 @@ function viewPlan() {
     <div style="height:30px"></div>
   </div>
 
-  ${(S._rouletteOpen || S._funRouletteLoading) ? `
-    <!-- STYLE ROULETTE BOTTOM SHEET -->
-    <div id="roulette-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;"
-      ontouchmove="event.preventDefault()"
-      ontouchstart="if(event.target===this)this._tapStartedOnBackdrop=true;"
-      ontouchend="if(this._tapStartedOnBackdrop&&event.target===this){this._tapStartedOnBackdrop=false;S._rouletteOpen=false;render();}else{this._tapStartedOnBackdrop=false;}"
-      onclick="if(event.target===this){S._rouletteOpen=false;render();}">
-      <div style="background:var(--surface);border-radius:20px;width:100%;max-width:440px;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;"
-        ontouchmove="event.stopPropagation()"
-        ontouchstart="event.stopPropagation()">
-        <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;">
-          <div style="font-size:16px;font-weight:800;color:var(--text);">🎲 Style Roulette</div>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._rouletteOpen=false;render();" onclick="S._rouletteOpen=false;render();"
-            style="background:none;border:none;font-size:20px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;line-height:1;touch-action:manipulation;">✕</button>
-        </div>
-        <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:20px 20px 40px;">
-          ${S._funRouletteLoading ? `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px 0;">
-              <div class="spinner" style="width:28px;height:28px;border-width:3px;"></div>
-              <div style="font-size:14px;color:var(--text-3);">Styling your look…</div>
-            </div>
-          ` : S.funRoulette ? (() => { try {
-            const r = S.funRoulette;
-            const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
-            const norm = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
-            const matchWardrobeItem = name => {
-              const target = norm(name);
-              if (!target) return null;
-              let best = activeWardrobe.find(w => norm(w.name) === target);
-              if (best) return best;
-              best = activeWardrobe.find(w => norm(w.name).includes(target) || target.includes(norm(w.name)));
-              return best || null;
-            };
-            return `<div style="background:linear-gradient(135deg,#1A1A1A 0%,#2A2010 100%);border-radius:16px;padding:20px;position:relative;overflow:hidden;">
-              <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 20%,rgba(184,125,42,0.18) 0%,transparent 60%);pointer-events:none;"></div>
-              <div style="position:relative;">
-                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--gold);margin-bottom:4px;">Today's Look</div>
-                <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:4px;">${esc(r.vibe||'')}</div>
-                <div style="font-size:14px;color:rgba(255,255,255,.65);margin-bottom:18px;font-style:italic;">${esc(r.hype||'')}</div>
-                <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
-                  ${(r.outfit||[]).map(p=>{
-                    const match = matchWardrobeItem(p.item);
-                    const thumbHTML = (match && match.photo)
-                      ? `<img src="${esc(photoBlobUrl(match.photo))}" alt="${esc(p.item||'')}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0;cursor:pointer;" loading="lazy">`
-                      : `<span style="font-size:24px;flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;">${esc(p.emoji||'👕')}</span>`;
-                    const openAttr = match ? `S.selectedWardrobeId='${match.id}';S._rouletteOpen=false;navigate('wardrobe-item')` : '';
-                    return `<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;${match?'cursor:pointer;':''}"
-                      ${match ? `ontouchend="if(_touchMoved)return;event.preventDefault();${openAttr}" onclick="${openAttr}"` : ''}>
-                    ${thumbHTML}
-                    <div style="flex:1;min-width:0;">
-                      <div style="font-size:14px;font-weight:700;color:#fff;line-height:1.25;">${esc(p.item||'')}</div>
-                      <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.35;margin-top:2px;">${esc(p.reason||'')}</div>
-                    </div>
-                    ${match ? `<span style="color:rgba(255,255,255,.35);font-size:13px;flex-shrink:0;">›</span>` : ''}
-                  </div>`;
-                  }).join('')}
-                </div>
-                <button
-                  ontouchend="if(_touchMoved)return;event.preventDefault();saveRouletteLook();"
-                  onclick="saveRouletteLook();"
-                  style="width:100%;background:linear-gradient(135deg,#B87D2A,#D4A43A);border:none;border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:8px;">
-                  🎲 Save this look
-                </button>
-                <button
-                  ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette();"
-                  onclick="generateRoulette();"
-                  style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:rgba(255,255,255,.8);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                  🔄 Spin again
-                </button>
-              </div>
-            </div>`;
-          } catch(e) { console.error('roulette render:', e); S.funRoulette=null; return ''; } })() : ''}
-        </div>
-      </div>
-    </div>
-  ` : ''}
 `;
+}
+
+function viewStyleRoulette() {
+  const r = S.funRoulette;
+  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+  const norm = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
+  const matchWardrobeItem = name => {
+    const target = norm(name);
+    if (!target) return null;
+    let best = activeWardrobe.find(w => norm(w.name) === target);
+    if (best) return best;
+    best = activeWardrobe.find(w => norm(w.name).includes(target) || target.includes(norm(w.name)));
+    return best || null;
+  };
+
+  let bodyHTML = '';
+  if (S._funRouletteLoading) {
+    bodyHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:60px 20px;">
+      <div class="spinner" style="width:32px;height:32px;border-width:3px;"></div>
+      <div style="font-size:15px;color:var(--text-3);">Styling your look…</div>
+    </div>`;
+  } else if (r) {
+    try {
+      bodyHTML = `
+        <div style="margin:20px 16px 0;background:linear-gradient(135deg,#1A1A1A 0%,#2A2010 100%);border-radius:20px;padding:24px;position:relative;overflow:hidden;">
+          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 70% 20%,rgba(184,125,42,0.18) 0%,transparent 60%);pointer-events:none;"></div>
+          <div style="position:relative;">
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--gold);margin-bottom:6px;">Today's Look</div>
+            <div style="font-size:26px;font-weight:900;color:#fff;margin-bottom:4px;line-height:1.2;">${esc(r.vibe||'')}</div>
+            <div style="font-size:14px;color:rgba(255,255,255,.6);margin-bottom:22px;font-style:italic;">${esc(r.hype||'')}</div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:22px;">
+              ${(r.outfit||[]).map(p => {
+                const match = matchWardrobeItem(p.item);
+                const thumbHTML = (match && match.photo)
+                  ? `<img src="${esc(photoBlobUrl(match.photo))}" alt="${esc(p.item||'')}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;flex-shrink:0;" loading="lazy">`
+                  : `<span style="font-size:26px;flex-shrink:0;width:48px;height:48px;display:flex;align-items:center;justify-content:center;">${esc(p.emoji||'👕')}</span>`;
+                const openAttr = match ? `S.selectedWardrobeId='${match.id}';navigate('wardrobe-item')` : '';
+                return `<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.07);border-radius:12px;padding:13px 15px;${match?'cursor:pointer;':''}"
+                  ${match ? `ontouchend="if(_touchMoved)return;event.preventDefault();${openAttr}" onclick="${openAttr}"` : ''}>
+                  ${thumbHTML}
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:14px;font-weight:700;color:#fff;line-height:1.25;">${esc(p.item||'')}</div>
+                    <div style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.4;margin-top:3px;">${esc(p.reason||'')}</div>
+                  </div>
+                  ${match ? `<span style="color:rgba(255,255,255,.35);font-size:15px;flex-shrink:0;">›</span>` : ''}
+                </div>`;
+              }).join('')}
+            </div>
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();saveRouletteLook();"
+              onclick="saveRouletteLook();"
+              style="width:100%;background:linear-gradient(135deg,#B87D2A,#D4A43A);border:none;border-radius:100px;padding:13px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:10px;">
+              🎲 Save this look
+            </button>
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette();"
+              onclick="generateRoulette();"
+              style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:13px;font-size:14px;font-weight:700;color:rgba(255,255,255,.8);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              🔄 Spin again
+            </button>
+          </div>
+        </div>`;
+    } catch(e) { console.error('viewStyleRoulette render:', e); S.funRoulette = null; }
+  } else {
+    bodyHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:60px 20px;text-align:center;">
+      <div style="font-size:48px;">🎲</div>
+      <div style="font-size:15px;color:var(--text-3);">Tap Spin to get a surprise outfit.</div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette();" onclick="generateRoulette();"
+        class="btn btn-primary" style="margin:0;">Spin</button>
+    </div>`;
+  }
+
+  return `<div class="view view-notab">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('plan')" onclick="navigate('plan')">${iconBack()} Plan</button>
+      <span class="nav-title">🎲 Style Roulette</span>
+      <span style="width:60px;"></span>
+    </div>
+    ${bodyHTML}
+    <div style="height:40px;"></div>
+  </div>`;
 }
 
 async function geocodeLocation(name) {
@@ -11894,9 +11909,10 @@ function viewSavedTips() {
       });
     } else {
       (e.recommendations||[]).forEach((r, i) => {
-        const key = String(i);
-        if (rx[key] === 'liked') tips.push({ text: r, entry: e });
-        else if (rx[key] === 'doing') doingTips.push({ text: r, entry: e });
+        const liked = rx[String(i)] === 'liked' || rx[r] === 'liked';
+        const doing = rx[String(i)] === 'doing' || rx[r] === 'doing';
+        if (liked) tips.push({ text: r, entry: e });
+        else if (doing) doingTips.push({ text: r, entry: e });
       });
     }
   });
@@ -12592,7 +12608,7 @@ function viewHome() {
   // Counts for tab card subtitles
   const trendCount = S.hotTrends?.trends?.length || 0;
   const brandCount = (() => { const bc = {}; S.wardrobe.forEach(w => { if (w.brand) bc[w.brand] = 1; }); return Object.keys(bc).length; })();
-  const tipsCount = (() => { let n = 0; S.entries.forEach(e => { const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{}); if (!Object.keys(rx).length) return; if (e.stylingTips?.length) { e.stylingTips.forEach((_,i) => { if (rx[String(i)] === 'liked') n++; }); } else { (e.recommendations||[]).forEach((_,i) => { if (rx[String(i)] === 'liked') n++; }); } }); return n; })();
+  const tipsCount = (() => { let n = 0; S.entries.forEach(e => { const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{}); if (!Object.keys(rx).length) return; if (e.stylingTips?.length) { e.stylingTips.forEach((_,i) => { if (rx[String(i)] === 'liked') n++; }); } else { (e.recommendations||[]).forEach((r,i) => { if (rx[String(i)] === 'liked' || rx[r] === 'liked') n++; }); } }); return n; })();
 
   const tabCards = [
     { key:'tips',   icon:'✂️', label:'Tips',    sub: tipsCount  ? `${tipsCount} tip${tipsCount===1?'':'s'} saved` : 'Style tips from your fits' },
@@ -12835,7 +12851,7 @@ function viewHome() {
       if (e.stylingTips?.length) {
         e.stylingTips.forEach((r, i) => { if (rx[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e }); });
       } else {
-        (e.recommendations||[]).forEach((r, i) => { if (rx[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e }); });
+        (e.recommendations||[]).forEach((r, i) => { if (rx[String(i)] === 'liked' || rx[r] === 'liked') likedRecs.push({ rec: r, entry: e }); });
       }
     });
     const count = likedRecs.length;
@@ -14220,7 +14236,7 @@ function viewOnboarding() {
     // 1 — Fits
     { label:'Fits', dark:true, img:'onboarding/fits.jpg',
       headline:'Your daily look,\nobjectively rated.',
-      sub:'Snap your outfit, get Claude\'s honest style feedback, and build a personal log of your best looks over time.',
+      sub:'Snap your outfit, get Claude\'s honest style feedback, and build a personal log of your best looks over time. Use Rate Mode to swipe through your whole wardrobe and rate how each piece makes you feel right now.',
       mock:`<div style="padding:0 24px;">
         <div style="background:linear-gradient(150deg,#2B2318,#1C1A18);border-radius:18px;padding:16px;">
           <div style="background:linear-gradient(160deg,#3B3020,#252018);border-radius:12px;height:136px;position:relative;margin-bottom:14px;display:flex;align-items:flex-end;padding:12px;overflow:hidden;">
@@ -14246,7 +14262,7 @@ function viewOnboarding() {
     // 2 — Closet
     { label:'Closet', dark:false, img:'onboarding/closet.jpg',
       headline:'Everything you own.\nFinally organised.',
-      sub:'Log your full wardrobe, track wears, flag Hero Pieces, crown your Signature style, and surface Hidden Gems you\'ve been sleeping on.',
+      sub:'Log your full wardrobe, track wears, flag Hero Pieces, and surface Hidden Gems you\'ve been sleeping on. Hit Dress Me and Claude builds a complete outfit from what you already own.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -14301,7 +14317,7 @@ function viewOnboarding() {
     // 4 — Plan
     { label:'Plan', dark:false, img:'onboarding/plan.jpg',
       headline:'Never scramble\nbefore an event again.',
-      sub:'Tell Claude your occasion and it builds an outfit from your actual wardrobe — weather-aware and personalised to what you own. Or spin Style Roulette for a surprise pick when you can\'t decide.',
+      sub:'Tell Claude your occasion and it builds an outfit from your actual wardrobe — weather-aware and personal to what you own. Use Outfit Builder to build a look around any piece, or spin Style Roulette when you can\'t decide. Save your favourites to Plan for later.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
           <div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:11px;padding:12px 14px;margin-bottom:12px;">
