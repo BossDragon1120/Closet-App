@@ -3849,7 +3849,6 @@ function aboutMeSheetHTML() {
 
       <!-- Header: portrait + name + chips -->
       <div style="padding:20px 20px 18px;display:flex;gap:16px;align-items:flex-start;">
-        ${bigAvatarHTML}
         <div style="flex:1;min-width:0;">
           <div style="font-size:20px;font-weight:900;letter-spacing:-.3px;margin-bottom:4px;">${S.profileName ? esc(S.profileName) : 'My Closet'}</div>
           ${S.profileStyleWords ? `<div style="font-size:12px;color:var(--text-2);line-height:1.5;margin-bottom:8px;">${esc(S.profileStyleWords.length>80?S.profileStyleWords.slice(0,80)+'…':S.profileStyleWords)}</div>` : ''}
@@ -3861,9 +3860,6 @@ function aboutMeSheetHTML() {
 
       <div style="height:1px;background:var(--border);margin:0 20px 20px;"></div>
 
-        ${portraitHTML}
-        ${(() => { const jh = buildJourneyHTML(); return jh ? `<div style="margin-top:20px;">${jh}</div>` : ''; })()}
-      </div>
 
       <div style="height:1px;background:var(--border);margin:0 20px 20px;"></div>
 
@@ -3883,166 +3879,6 @@ function aboutMeSheetHTML() {
       </div>
     </div>
   </div>`;
-}
-
-// ── Canvas text wrap helper ───────────────────────────────────────────────────
-function canvasWrapText(ctx, text, maxWidth) {
-  const words = text.split(' ');
-  const lines = []; let line = '';
-  for (const word of words) {
-    const test = line ? line + ' ' + word : word;
-    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; }
-    else line = test;
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
-// ── Export share card as PNG ──────────────────────────────────────────────────
-// Helper: load an image URL onto a canvas context robustly.
-// Strategy: fetch → blob URL (avoids canvas taint) → fallback to crossOrigin img.
-async function loadImageOntoCanvas(ctx, src, x, y, w, h) {
-  if (!src) return false;
-  // Strategy 1: fetch as blob so canvas stays untainted
-  try {
-    const resp = await fetch(src, { mode: 'cors' });
-    if (resp.ok) {
-      const blob = await resp.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const ok = await new Promise(res => {
-        const img = new Image();
-        img.onload  = () => { try { ctx.drawImage(img, x, y, w, h); } catch(e){} URL.revokeObjectURL(blobUrl); res(true); };
-        img.onerror = () => { URL.revokeObjectURL(blobUrl); res(false); };
-        img.src = blobUrl;
-        setTimeout(() => res(false), 8000);
-      });
-      if (ok) return true;
-    }
-  } catch(e) {}
-  // Strategy 2: crossOrigin img (requires CORS headers from server)
-  return await new Promise(res => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload  = () => { try { ctx.drawImage(img, x, y, w, h); res(true); } catch(e) { res(false); } };
-    img.onerror = () => res(false);
-    img.src = src;
-    setTimeout(() => res(false), 20000);
-  });
-}
-
-async function exportShareCard() {
-  const persona = S.stylePersona; if (!persona) return;
-  const colors = getPersonaColors(persona);
-  const sz = 1080;
-
-  toast('Building your share card… ✨');
-
-  const canvas = document.createElement('canvas');
-  canvas.width = sz; canvas.height = sz;
-  const ctx = canvas.getContext('2d');
-
-  // Background gradient
-  const grad = ctx.createLinearGradient(0, 0, sz*0.6, sz);
-  grad.addColorStop(0, colors.bg1);
-  grad.addColorStop(1, colors.bg2);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, sz, sz);
-
-  // Subtle diagonal texture lines
-  ctx.strokeStyle = colors.accent + '18';
-  ctx.lineWidth = 1;
-  for (let i = -sz; i < sz*2; i += 40) {
-    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + sz, sz); ctx.stroke();
-  }
-
-  // Top accent bar
-  ctx.fillStyle = colors.accent;
-  ctx.fillRect(0, 0, sz, 6);
-
-  // "✦ CLOSET" top-left logo
-  ctx.fillStyle = colors.accent;
-  ctx.font = 'bold 26px Georgia, serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('✦ CLOSET', 72, 68);
-
-  // "Style Portrait" label top-right
-  ctx.fillStyle = colors.textSub;
-  ctx.font = '500 20px Georgia, serif';
-  ctx.textAlign = 'right';
-  ctx.fillText('Style Portrait', sz - 72, 68);
-
-  // Persona label pill — starts higher since there's no avatar
-  const textTop = 160;
-  ctx.textAlign = 'center';
-  const labelTxt = '✦  S T Y L E  P O R T R A I T';
-  ctx.font = '600 18px Georgia, serif';
-  const lw = ctx.measureText(labelTxt).width;
-  ctx.fillStyle = colors.accent + '22';
-  const pillX = sz/2 - lw/2 - 16, pillY = textTop - 18, pillW = lw + 32, pillH = 30, pillR = 15;
-  ctx.beginPath();
-  ctx.moveTo(pillX + pillR, pillY);
-  ctx.lineTo(pillX + pillW - pillR, pillY); ctx.arcTo(pillX+pillW, pillY, pillX+pillW, pillY+pillR, pillR);
-  ctx.lineTo(pillX+pillW, pillY+pillH-pillR); ctx.arcTo(pillX+pillW, pillY+pillH, pillX+pillW-pillR, pillY+pillH, pillR);
-  ctx.lineTo(pillX+pillR, pillY+pillH); ctx.arcTo(pillX, pillY+pillH, pillX, pillY+pillH-pillR, pillR);
-  ctx.lineTo(pillX, pillY+pillR); ctx.arcTo(pillX, pillY, pillX+pillR, pillY, pillR);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = colors.accent;
-  ctx.fillText(labelTxt, sz/2, textTop);
-
-  // Headline (large, wrapped)
-  ctx.fillStyle = colors.text;
-  ctx.font = 'bold 52px Georgia, serif';
-  const headLines = canvasWrapText(ctx, persona.headline, sz - 180);
-  headLines.forEach((l, i) => ctx.fillText(l, sz/2, textTop + 66 + i * 62));
-
-  // Thin divider
-  const divY = textTop + 66 + headLines.length * 62 + 16;
-  ctx.strokeStyle = colors.accent + '55';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(sz/2 - 160, divY); ctx.lineTo(sz/2 + 160, divY); ctx.stroke();
-
-  // Body text (up to 3 lines)
-  ctx.fillStyle = colors.textSub;
-  ctx.font = '300 26px Georgia, serif';
-  const bodyLines = canvasWrapText(ctx, persona.body, sz - 220);
-  bodyLines.slice(0, 3).forEach((l, i) => ctx.fillText(l, sz/2, divY + 42 + i * 36));
-
-  // Bottom bar
-  const botY = sz - 70;
-  ctx.fillStyle = colors.accent + '18';
-  ctx.fillRect(0, botY, sz, sz - botY);
-  ctx.strokeStyle = colors.accent + '55';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, botY); ctx.lineTo(sz, botY); ctx.stroke();
-  ctx.fillStyle = colors.accent;
-  ctx.font = 'bold 22px Georgia, serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('closet.app  ·  Your AI-Powered Style Journal', sz/2, botY + 42);
-  ctx.textAlign = 'left';
-
-  // Export / share — toBlob wrapped in try/catch to handle tainted-canvas edge case
-  try {
-    const blob = await new Promise((res, rej) =>
-      canvas.toBlob(b => b ? res(b) : rej(new Error('empty blob')), 'image/png', 0.95));
-    const file = new File([blob], 'style-portrait.png', {type:'image/png'});
-    if (navigator.share && navigator.canShare?.({files:[file]})) {
-      try {
-        await navigator.share({ files:[file], title: persona.headline, text: `✦ ${persona.headline}\n\n${persona.body}\n\n— made with Closet` });
-        return;
-      } catch(e) { if (e.name === 'AbortError') return; }
-    }
-    // Fallback: download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'style-portrait.png';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
-    toast('Image saved to downloads ✓');
-  } catch(e) {
-    console.error('exportShareCard error:', e);
-    {
-      toast('Could not export — try again');
-    }
-  }
 }
 
 // ── Share card modal HTML ─────────────────────────────────────────────────────
@@ -8381,63 +8217,6 @@ function viewSetup() {
 /* ================================================================
    VIEW: CLOSET
    ================================================================ */
-/* ── Style Portrait card + Journey — shared across views ─ */
-function buildPersonaHTML() {
-  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
-  const persona = S.stylePersona;
-  const hasEnoughData = S.entries.length > 0 || activeWardrobe.length > 0;
-  const hasProfile = S.profileGeneration || S.profileMBTI || S.profileZodiac || S.profileStyleWords;
-
-  let personaInner;
-  if (S.personaLoading) {
-    personaInner = `
-      <div class="persona-tagline">✦ Style Portrait</div>
-      <div class="persona-body" style="display:flex;align-items:center;gap:10px;">
-        <div class="spinner" style="width:20px;height:20px;border-width:2px;border-top-color:var(--gold);"></div>
-        <span style="color:rgba(255,255,255,0.5);font-size:13px;">Claude is reading your style…</span>
-      </div>`;
-  } else if (persona) {
-    const ago = (() => {
-      if (!persona.ts) return '';
-      const mins = Math.round((Date.now()-persona.ts)/60000);
-      if (mins < 60) return `${mins}m ago`;
-      const hrs = Math.round(mins/60);
-      if (hrs < 24) return `${hrs}h ago`;
-      return `${Math.round(hrs/24)}d ago`;
-    })();
-    const isHearted = S.personaHistory.some(h => h.ts === persona.ts);
-    const pColors = getPersonaColors(persona);
-    personaInner = `
-      <div class="persona-tagline">✦ Style Portrait</div>
-      <div class="persona-headline" style="margin-bottom:6px;">${esc(persona.headline)}</div>
-      <div class="persona-body" style="margin-bottom:10px;">${esc(persona.body)}</div>
-      <div class="persona-actions">
-        <button class="persona-refresh-btn" onclick="generateStylePersona()">⟳ Refresh</button>
-        <div style="display:flex;align-items:center;gap:4px;">
-          <button class="persona-heart-btn${isHearted?' hearted':''}" onclick="heartPersona()" title="${isHearted?'Remove from journey':'Save to Style Journey'}">${isHearted?'♥':'♡'}</button>
-          <button onclick="sharePersona()" title="Share portrait" style="background:none;border:none;cursor:pointer;padding:8px 10px;line-height:1;color:rgba(255,255,255,0.45);transition:color .15s;" onmouseenter="this.style.color='rgba(255,255,255,0.85)'" onmouseleave="this.style.color='rgba(255,255,255,0.45)'">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          </button>
-          ${ago ? `<span class="persona-stamp">${ago}</span>` : ''}
-        </div>
-      </div>`;
-  } else {
-    const hint = !hasEnoughData
-      ? 'Log your first outfit or add wardrobe items, then tap below.'
-      : !hasProfile
-      ? 'Add a few profile details in Settings (MBTI, zodiac, style words) for a richer portrait.'
-      : 'Tap below — Claude will craft your personal style portrait.';
-    personaInner = `
-      <div class="persona-tagline">✦ Style Portrait</div>
-      <div class="persona-empty">${esc(hint)}</div>
-      <button class="persona-gen-btn" onclick="generateStylePersona()"${!hasEnoughData&&!hasProfile?' disabled':''}>
-        ✦ Generate My Style Portrait
-      </button>`;
-  }
-
-  return `<div class="persona-card">${personaInner}</div>`;
-}
-
 
 function viewCloset() {
   const entries = filteredEntries();
@@ -9712,7 +9491,6 @@ function viewStylistReport() {
     ...S.savedRouletteLooks.map(r => ({ type: 'roulette', id: r.id, at: r.createdAt })),
   ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 6);
 
-  const persona = S.stylePersona;
   const goals = S.styleGoals || [];
   const name = S.profileName || 'Your';
 
@@ -9740,9 +9518,7 @@ function viewStylistReport() {
       <div style="background:linear-gradient(160deg,#1C1A18,#2a2318);padding:28px 20px 24px;position:relative;overflow:hidden;">
         <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#B8860B,#D4A820);"></div>
         <div style="display:flex;align-items:center;gap:16px;">
-          ${(S.stylePortraitPhoto)
-            ? `<div style="width:72px;height:72px;border-radius:50%;overflow:hidden;border:2.5px solid rgba(212,168,32,0.6);flex-shrink:0;"><img src="${esc(S.stylePortraitPhoto)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
-            : `<div style="width:72px;height:72px;border-radius:50%;background:rgba(184,134,11,0.15);border:2.5px solid rgba(212,168,32,0.4);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:32px;">🪞</div>`}
+          <div style="width:72px;height:72px;border-radius:50%;background:rgba(184,134,11,0.15);border:2.5px solid rgba(212,168,32,0.4);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:32px;">🪞</div>
           <div>
             <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(212,168,32,0.7);margin-bottom:4px;">Style Profile</div>
             <div style="font-size:22px;font-weight:900;color:#fff;line-height:1.1;">${esc(name)}</div>
@@ -9925,17 +9701,12 @@ function openStylistPDF() {
   <!-- HEADER -->
   <div style="background:linear-gradient(160deg,#1C1A18,#2a2318);border-radius:16px;padding:28px 24px;margin-bottom:8px;color:#fff;position:relative;overflow:hidden;">
     <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#B8860B,#D4A820);"></div>
-    <div style="display:flex;align-items:center;gap:18px;margin-bottom:${persona?'18':'0'}px;">
-      ${S.stylePortraitPhoto ? `<div style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:2.5px solid rgba(212,168,32,0.6);flex-shrink:0;"><img src="${S.stylePortraitPhoto}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>` : ''}
+    <div style="display:flex;align-items:center;gap:18px;margin-bottom:0;">
       <div>
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(212,168,32,0.7);margin-bottom:6px;">Style Profile · ${dateStr}</div>
         <div style="font-size:28px;font-weight:900;">${name}</div>
       </div>
     </div>
-    ${persona ? `<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:16px;">
-      <div style="font-size:17px;font-weight:800;color:#D4A820;line-height:1.3;margin-bottom:8px;">${persona.headline}</div>
-      <div style="font-size:13px;color:rgba(255,255,255,0.72);line-height:1.65;">${persona.body}</div>
-    </div>` : ''}
   </div>
 
   ${goals.length ? `<h2>Style Goals</h2>
@@ -10515,8 +10286,7 @@ const CYCLE_PHASES = {
    ================================================================ */
 function viewProfile() {
   const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
-  const avatar  = S.styleAvatar;
-  const colors  = persona ? getPersonaColors(persona) : { accent: 'var(--gold)', bg1: '#f7f4f0', bg2: '#ede8e1', text: 'var(--text)' };
+  const colors  = { accent: 'var(--gold)', bg1: '#f7f4f0', bg2: '#ede8e1', text: 'var(--text)' };
 
   // ── Streak ────────────────────────────────────────────────
   const today = new Date(); today.setHours(0,0,0,0);
@@ -10586,43 +10356,6 @@ function viewProfile() {
     .filter(e => e.photo && !e.doNotRepeat && e.rating != null)
     .sort((a,b) => (b.rating||0) - (a.rating||0))[0] || null;
 
-  // ── Portrait card ─────────────────────────────────────────
-  const isSaved = !!S.personaHistory.find(h=>h.ts===persona?.ts);
-  const btnStyle = `background:rgba(255,255,255,0.08);border:1px solid ${colors.accent}44;border-radius:100px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;color:${colors.accent};white-space:nowrap;touch-action:manipulation;`;
-  const portraitPhotoSrc = S.stylePortraitPhoto ? photoBlobUrl(S.stylePortraitPhoto) : (topLook?.photo || null);
-  const portraitHTML = persona ? `
-    <div style="background:linear-gradient(135deg,${colors.bg1},${colors.bg2});border-radius:14px;padding:13px 14px 14px;border:1px solid ${colors.accent}33;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;">
-        <div style="font-size:9px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:${colors.accent};padding-top:2px;">✦ Style Portrait</div>
-        <div style="display:flex;gap:6px;flex-shrink:0;">
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto()" onclick="pickPortraitPhoto()" style="${btnStyle}" title="Add your photo">📷</button>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();openShareCard()" onclick="openShareCard()" style="${btnStyle}">↗</button>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();generateStylePersona()" onclick="generateStylePersona()" style="${btnStyle}">⟳</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:12px;align-items:flex-start;">
-        <div style="flex:1;min-width:0;">
-          <div style="font-family:Georgia,serif;font-size:16px;font-weight:800;line-height:1.25;color:${colors.text};margin-bottom:8px;">${esc(persona.headline)}</div>
-          <div style="font-size:12px;line-height:1.65;color:${colors.text};opacity:.75;">${esc(persona.body)}</div>
-        </div>
-        <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;">
-          <div ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto()" onclick="pickPortraitPhoto()"
-            style="width:66px;height:88px;border-radius:10px;overflow:hidden;border:1.5px solid ${colors.accent}44;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer;position:relative;background:${colors.accent}18;display:flex;align-items:center;justify-content:center;">
-            ${portraitPhotoSrc
-              ? `<img src="${esc(portraitPhotoSrc)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">
-                 <div style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,.5);border-radius:100px;padding:1px 4px;font-size:8px;color:#fff;font-weight:700;">edit</div>`
-              : `<div style="text-align:center;"><div style="font-size:18px;">📷</div><div style="font-size:8px;font-weight:700;color:${colors.accent};margin-top:2px;line-height:1.3;">Add<br>photo</div></div>`}
-          </div>
-          ${S.stylePortraitPhoto ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();clearPortraitPhoto()" onclick="clearPortraitPhoto()" style="background:none;border:none;font-size:9px;color:${colors.accent};opacity:.6;cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">remove</button>` : ''}
-        </div>
-      </div>
-    </div>
-    ${(() => { const jh = buildJourneyHTML(); return jh ? `<div style="margin-top:12px;">${jh}</div>` : ''; })()}` : `
-    <div style="text-align:center;padding:18px 16px;background:var(--surface);border-radius:14px;border:1px dashed var(--border);">
-      <div style="font-size:24px;margin-bottom:8px;">✨</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:12px;">Generate your Style Portrait to see yourself through the lens of your wardrobe.</div>
-      <button onclick="generateStylePersona()" style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">✦ Generate Now</button>
-    </div>`;
 
   // ── Top brands ────────────────────────────────────────────
   const brandCounts = {};
