@@ -6570,6 +6570,7 @@ function render() {
     case 'streak-calendar': html = viewStreakCalendar(); break;
     case 'dress-me':        html = viewDressMe();        break;
     case 'style-roulette':  html = viewStyleRoulette();  break;
+    case 'wish-share':      html = viewWishShare();      break;
   }
   // Inject tab bar right after the .nav block on every tab view
   // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
@@ -8983,7 +8984,7 @@ async function _downloadOrShareCanvas(canvas, filename) {
 function openWishShareSheet() {
   const wishItems = [];
   const wishNames = new Set();
-  // Saved (hearted) purchase recs only
+  // Saved (hearted) purchase recs only — same logic as before
   S.entries.forEach(e => {
     if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
     e.purchaseRecs.forEach((r, i) => {
@@ -9001,14 +9002,24 @@ function openWishShareSheet() {
     return;
   }
   S._wishShareItems = wishItems;
-  S.shopWishShareOpen = true;
-  render();
+  navigate('wish-share');
 }
 
 function toggleWishShareItem(idx) {
   if (!S._wishShareItems || !S._wishShareItems[idx]) return;
   S._wishShareItems[idx].selected = !S._wishShareItems[idx].selected;
-  render();
+  // Update just the count and button — no full render so scroll never jumps
+  const count = S._wishShareItems.filter(x => x.selected).length;
+  const countEl = document.getElementById('wish-share-count');
+  if (countEl) countEl.textContent = `${count} of ${S._wishShareItems.length} selected`;
+  const btn = document.getElementById('wish-share-btn');
+  if (btn) {
+    btn.disabled = count === 0;
+    btn.textContent = count ? `Create Card (${count}) →` : 'Select items above';
+    btn.style.background = count ? 'var(--gold)' : 'var(--border)';
+    btn.style.color = count ? '#fff' : 'var(--text-3)';
+    btn.style.cursor = count ? 'pointer' : 'default';
+  }
 }
 
 async function shareWishListCard() {
@@ -9123,10 +9134,10 @@ async function shareWishListCard() {
   ctx.fillText('Made with Closet', W / 2, footerY + 26);
   ctx.textAlign = 'left';
 
-  // Close modal and share
-  S.shopWishShareOpen = false;
+  // Navigate back and share
+  S._wishShareItems = null;
   S.shopWishOccasion = '';
-  render();
+  navigate('shop');
   await _downloadOrShareCanvas(canvas, 'wish-list.png');
 }
 
@@ -9945,86 +9956,7 @@ function viewShop() {
       </div>`;
     })() : ''}
 
-    <!-- Share Wish List bottom sheet -->
-    ${S.shopWishShareOpen && S._wishShareItems ? (() => {
-      const wishItems = S._wishShareItems;
-      const selectedCount = wishItems.filter(x => x.selected).length;
-      const QUICK = ['🎂 Birthday','🎄 Holiday','💍 Registry'];
-      return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishShareOpen=false;S._wishShareItems=null;render();" onclick="S.shopWishShareOpen=false;S._wishShareItems=null;render()">
-        <div style="background:var(--surface);border-radius:24px;width:100%;max-width:420px;max-height:min(80dvh,640px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.25);"
-          ontouchend="event.stopPropagation();" onclick="event.stopPropagation()">
-
-          <!-- Fixed header -->
-          <div style="padding:10px 20px 10px;flex-shrink:0;">
-            <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 10px;"></div>
-            <div style="display:flex;align-items:baseline;justify-content:space-between;">
-              <div style="font-size:18px;font-weight:900;">🎁 Share Wish List</div>
-              <div style="font-size:12px;color:var(--text-3);">${selectedCount} of ${wishItems.length} selected</div>
-            </div>
-          </div>
-
-          <!-- Scrollable content -->
-          <div style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;padding:0 20px;">
-
-            <!-- Item picker -->
-            <div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;">
-              ${wishItems.map((item, idx) => {
-                const sel = item.selected;
-                const detail = item.spotted
-                  ? [item.brand, item.price].filter(Boolean).join(' · ')
-                  : (item.reason || '');
-                return `<button
-                  ontouchend="if(_touchMoved)return;event.preventDefault();toggleWishShareItem(${idx});"
-                  onclick="toggleWishShareItem(${idx});"
-                  style="width:100%;display:flex;align-items:center;gap:10px;padding:10px 14px;background:${sel?'var(--gold-bg)':'var(--surface)'};border:none;border-bottom:1px solid var(--border);cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;${idx===wishItems.length-1?'border-bottom:none;':''}" >
-                  <div style="width:22px;height:22px;border-radius:50%;background:${sel?'var(--gold)':'transparent'};border:2px solid ${sel?'var(--gold)':'var(--border)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s,border-color .12s;">
-                    ${sel?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}
-                  </div>
-                  ${item.photo ? `<img src="${item.photo}" style="width:32px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : ''}
-                  <div style="flex:1;min-width:0;">
-                    <div style="font-size:13px;font-weight:${sel?'700':'500'};color:var(--text);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(item.name)}</div>
-                    ${detail ? `<div style="font-size:10px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(detail)}</div>` : ''}
-                  </div>
-                  ${item.spotted ? `<span style="font-size:9px;font-weight:700;background:#EEF3FA;color:#3B5E8C;padding:2px 5px;border-radius:100px;flex-shrink:0;">📌</span>` : ''}
-                </button>`;
-              }).join('')}
-            </div>
-
-            <!-- Occasion -->
-            <div style="margin-bottom:6px;">
-              <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">Occasion <span style="font-weight:400;color:var(--text-3)">(optional)</span></div>
-              <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;">
-                ${QUICK.map(label => {
-                  const active = S.shopWishOccasion === label;
-                  return `<button
-                    ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render();"
-                    onclick="S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render()"
-                    style="border-radius:100px;border:1.5px solid ${active?'var(--gold)':'var(--border)'};background:${active?'var(--gold-bg)':'none'};color:${active?'var(--gold-dk)':'var(--text-2)'};font-size:12px;font-weight:600;padding:6px 13px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                  ${label}</button>`;
-                }).join('')}
-              </div>
-              <input type="text" placeholder="Or type your own… e.g. Christmas Ideas"
-                value="${esc(S.shopWishOccasion)}"
-                oninput="S.shopWishOccasion=this.value"
-                style="width:100%;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text);box-sizing:border-box;outline:none;">
-            </div>
-            <div style="height:4px;"></div>
-          </div>
-
-          <!-- Sticky action button — never scrolls away -->
-          <div style="flex-shrink:0;padding:14px 20px 18px;border-top:1px solid var(--border);background:var(--surface);">
-            <button
-              ontouchend="if(_touchMoved)return;event.preventDefault();shareWishListCard();"
-              onclick="shareWishListCard()"
-              ${selectedCount===0?'disabled':''}
-              style="width:100%;background:${selectedCount?'var(--gold)':'var(--border)'};color:${selectedCount?'#fff':'var(--text-3)'};border:none;border-radius:var(--r-sm);padding:14px;font-size:15px;font-weight:800;cursor:${selectedCount?'pointer':'default'};font-family:inherit;touch-action:manipulation;transition:background .15s,color .15s;">
-              ${selectedCount ? `Create Card (${selectedCount}) →` : 'Select items above'}
-            </button>
-          </div>
-        </div>
-      </div>`;
-    })() : ''}
+    <!-- Share Wish List: now a dedicated page (wish-share view) -->
 
   ${/* Returns entry point — subtle utility row at bottom of Shop */ ''}
   ${src !== 'spotted' && src !== 'wishlist' ? `
@@ -10424,6 +10356,90 @@ function viewPlan() {
   </div>
 
 `;
+}
+
+function viewWishShare() {
+  const wishItems = S._wishShareItems || [];
+  const selectedCount = wishItems.filter(x => x.selected).length;
+  const QUICK = ['🎂 Birthday','🎄 Holiday','💍 Registry'];
+
+  return `<div class="view view-notab" style="display:flex;flex-direction:column;height:100dvh;box-sizing:border-box;">
+    <div class="nav" style="flex-shrink:0;">
+      <button class="nav-back"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S._wishShareItems=null;navigate('shop');"
+        onclick="S._wishShareItems=null;navigate('shop');">
+        ${iconBack()} Saved
+      </button>
+      <span class="nav-title">🎁 Share Wish List</span>
+      <span id="wish-share-count" style="font-size:12px;color:var(--text-3);font-weight:600;padding-right:4px;">${selectedCount} of ${wishItems.length} selected</span>
+    </div>
+
+    <!-- Scrollable body -->
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px 0;">
+
+      ${wishItems.length === 0 ? `
+        <div style="text-align:center;padding:60px 20px;color:var(--text-3);">
+          <div style="font-size:40px;margin-bottom:12px;">🎁</div>
+          <div style="font-size:14px;font-weight:600;">No items on your wish list yet.</div>
+          <div style="font-size:12px;margin-top:6px;">Heart picks in Claude's Recs to add them here.</div>
+        </div>` : `
+
+      <!-- Item picker — native checkboxes, no re-render on tap -->
+      <div style="border:1.5px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:20px;">
+        ${wishItems.map((item, idx) => {
+          const sel = item.selected;
+          const detail = item.spotted
+            ? [item.brand, item.price].filter(Boolean).join(' · ')
+            : (item.reason || '');
+          return `<label style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:${sel?'var(--gold-bg)':'var(--surface)'};border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;${idx===wishItems.length-1?'border-bottom:none;':''}">
+            <input type="checkbox" ${sel?'checked':''} style="display:none;" onchange="toggleWishShareItem(${idx})">
+            <div id="wish-check-${idx}" style="width:22px;height:22px;border-radius:50%;background:${sel?'var(--gold)':'transparent'};border:2px solid ${sel?'var(--gold)':'var(--border)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s,border-color .12s;">
+              ${sel?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}
+            </div>
+            ${item.photo ? `<img src="${esc(item.photo)}" style="width:36px;height:46px;object-fit:cover;border-radius:7px;flex-shrink:0;">` : ''}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:${sel?'700':'500'};color:var(--text);line-height:1.35;">${esc(item.name)}</div>
+              ${detail ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px;">${esc(detail)}</div>` : ''}
+            </div>
+            ${item.spotted ? `<span style="font-size:9px;font-weight:700;background:#EEF3FA;color:#3B5E8C;padding:2px 6px;border-radius:100px;flex-shrink:0;">📌</span>` : ''}
+          </label>`;
+        }).join('')}
+      </div>
+
+      <!-- Occasion -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">Occasion <span style="font-weight:400;color:var(--text-3)">(optional)</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+          ${QUICK.map(label => {
+            const active = S.shopWishOccasion === label;
+            return `<button
+              ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render();"
+              onclick="S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render()"
+              style="border-radius:100px;border:1.5px solid ${active?'var(--gold)':'var(--border)'};background:${active?'var(--gold-bg)':'none'};color:${active?'var(--gold-dk)':'var(--text-2)'};font-size:13px;font-weight:600;padding:7px 14px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              ${label}
+            </button>`;
+          }).join('')}
+        </div>
+        <input type="text" placeholder="Or type your own… e.g. Christmas Ideas"
+          value="${esc(S.shopWishOccasion||'')}"
+          oninput="S.shopWishOccasion=this.value"
+          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text);box-sizing:border-box;outline:none;-webkit-appearance:none;">
+      </div>`}
+
+      <div style="height:env(safe-area-inset-bottom,20px);"></div>
+    </div>
+
+    <!-- Sticky bottom action -->
+    <div style="flex-shrink:0;padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--border);background:var(--surface);">
+      <button id="wish-share-btn"
+        ontouchend="if(_touchMoved)return;event.preventDefault();shareWishListCard();"
+        onclick="shareWishListCard()"
+        ${selectedCount===0?'disabled':''}
+        style="width:100%;background:${selectedCount?'var(--gold)':'var(--border)'};color:${selectedCount?'#fff':'var(--text-3)'};border:none;border-radius:100px;padding:15px;font-size:15px;font-weight:800;cursor:${selectedCount?'pointer':'default'};font-family:inherit;touch-action:manipulation;transition:background .15s,color .15s;">
+        ${selectedCount ? `Create Card (${selectedCount}) →` : 'Select items above'}
+      </button>
+    </div>
+  </div>`;
 }
 
 function viewStyleRoulette() {
@@ -11009,11 +11025,13 @@ function viewProfile() {
   // ── Portrait card ─────────────────────────────────────────
   const isSaved = !!S.personaHistory.find(h=>h.ts===persona?.ts);
   const btnStyle = `background:rgba(255,255,255,0.08);border:1px solid ${colors.accent}44;border-radius:100px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;color:${colors.accent};white-space:nowrap;touch-action:manipulation;`;
+  const portraitPhotoSrc = S.stylePortraitPhoto ? photoBlobUrl(S.stylePortraitPhoto) : (topLook?.photo || null);
   const portraitHTML = persona ? `
     <div style="background:linear-gradient(135deg,${colors.bg1},${colors.bg2});border-radius:14px;padding:13px 14px 14px;border:1px solid ${colors.accent}33;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;">
         <div style="font-size:9px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:${colors.accent};padding-top:2px;">✦ Style Portrait</div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto()" onclick="pickPortraitPhoto()" style="${btnStyle}" title="Add your photo">📷</button>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();openShareCard()" onclick="openShareCard()" style="${btnStyle}">↗</button>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();generateStylePersona()" onclick="generateStylePersona()" style="${btnStyle}">⟳</button>
         </div>
@@ -11023,11 +11041,16 @@ function viewProfile() {
           <div style="font-family:Georgia,serif;font-size:16px;font-weight:800;line-height:1.25;color:${colors.text};margin-bottom:8px;">${esc(persona.headline)}</div>
           <div style="font-size:12px;line-height:1.65;color:${colors.text};opacity:.75;">${esc(persona.body)}</div>
         </div>
-        ${topLook?.photo ? `<div style="flex-shrink:0;">
-          <div style="width:66px;height:88px;border-radius:10px;overflow:hidden;border:1.5px solid ${colors.accent}44;box-shadow:0 2px 8px rgba(0,0,0,.15);">
-            <img src="${esc(topLook.photo)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">
+        <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto()" onclick="pickPortraitPhoto()"
+            style="width:66px;height:88px;border-radius:10px;overflow:hidden;border:1.5px solid ${colors.accent}44;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer;position:relative;background:${colors.accent}18;display:flex;align-items:center;justify-content:center;">
+            ${portraitPhotoSrc
+              ? `<img src="${esc(portraitPhotoSrc)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">
+                 <div style="position:absolute;bottom:3px;right:3px;background:rgba(0,0,0,.5);border-radius:100px;padding:1px 4px;font-size:8px;color:#fff;font-weight:700;">edit</div>`
+              : `<div style="text-align:center;"><div style="font-size:18px;">📷</div><div style="font-size:8px;font-weight:700;color:${colors.accent};margin-top:2px;line-height:1.3;">Add<br>photo</div></div>`}
           </div>
-        </div>` : ''}
+          ${S.stylePortraitPhoto ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();clearPortraitPhoto()" onclick="clearPortraitPhoto()" style="background:none;border:none;font-size:9px;color:${colors.accent};opacity:.6;cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">remove</button>` : ''}
+        </div>
       </div>
     </div>
     ${(() => { const jh = buildJourneyHTML(); return jh ? `<div style="margin-top:12px;">${jh}</div>` : ''; })()}` : `
