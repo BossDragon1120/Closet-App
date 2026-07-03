@@ -4018,7 +4018,13 @@ function viewWishShare() {
         onclick="navigate('shop')">
         ${iconBack()} Back
       </button>
-      <span class="nav-title">Share Wish List</span>
+      <button class="nav-add"
+        ontouchend="if(_touchMoved)return;event.preventDefault();shareWishListCard();"
+        onclick="shareWishListCard()"
+        style="border:none;background:${S._wishShareItems.length?'var(--gold)':'var(--border)'};color:${S._wishShareItems.length?'#fff':'var(--text-3)'};"
+        ${S._wishShareItems.length?'':'disabled'}>
+        ↗ Share Wish List
+      </button>
     </div>
 
     <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 16px;padding-bottom:calc(100px + env(safe-area-inset-bottom,0px));">
@@ -4086,7 +4092,7 @@ function viewWishShare() {
     </div>
 
     <!-- Sticky share button -->
-    <div style="position:fixed;bottom:0;left:0;right:0;padding:14px 16px;padding-bottom:max(14px,env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--border);">
+    <div style="position:sticky;bottom:0;flex-shrink:0;padding:14px 16px;padding-bottom:max(14px,env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--border);">
       <button
         ontouchend="if(_touchMoved)return;event.preventDefault();shareWishListCard();"
         onclick="shareWishListCard()"
