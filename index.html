@@ -3035,7 +3035,7 @@ const S = {
   // ui
   loading: false, loadingMsg: '', error: null,
   filter: 'all', wardrobeSort: 'smart', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeRatingFilter: null, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopSource: 'wishlist', shopSelectedQuery: null, shopRateModeOnly: false, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false, _hiddenGemsDismissed: JSON.parse(localStorage.getItem('closet-gems-dismissed') || '[]'),
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopSource: 'wishlist', shopSelectedQuery: null, shopRateModeOnly: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: [], shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false, _hiddenGemsDismissed: JSON.parse(localStorage.getItem('closet-gems-dismissed') || '[]'),
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
   // Extended profile (for persona generation)
@@ -3890,6 +3890,135 @@ function shareTrend() {
   if (nf.source) parts.push(``, `via ${nf.source}${nf.url ? ' — ' + nf.url : ''}`);
   parts.push('', '— spotted with Closet, my personal style journal');
   shareText(`Trend Alert: ${nf.headline}`, parts.join('\n'));
+}
+
+// ── Share: Wish List ─────────────────────────────────────────────────────────
+function _buildWishItems() {
+  const items = []; const seen = new Set();
+  S.entries.forEach(e => {
+    if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
+    e.purchaseRecs.forEach((r, i) => {
+      if (e.purchaseReactions[String(i)] === 'liked') {
+        const label = r.item || r;
+        const key = label.toLowerCase().trim();
+        if (!seen.has(key)) { seen.add(key); items.push({ label, query: r.query || label, reason: r.reason || '' }); }
+      }
+    });
+  });
+  return items;
+}
+function openWishShareSheet() {
+  const items = _buildWishItems();
+  S.shopWishShareOpen = false; // not used for sheet anymore
+  S._wishShareItems = items.map(i => i.query); // all selected by default
+  S.shopWishOccasion = '';
+  navigate('wish-share');
+}
+function toggleWishShareItem(query) {
+  const idx = S._wishShareItems.indexOf(query);
+  if (idx >= 0) S._wishShareItems.splice(idx, 1);
+  else S._wishShareItems.push(query);
+  render();
+}
+function shareWishListCard() {
+  const items = _buildWishItems().filter(i => S._wishShareItems.includes(i.query));
+  if (!items.length) { toast('Select at least one item'); return; }
+  const name = S.profileName || 'My';
+  const occ  = S.shopWishOccasion ? ` — ${S.shopWishOccasion}` : '';
+  let text = `✨ ${name}'s Wish List${occ}\n\n`;
+  items.forEach((it, n) => {
+    text += `${n + 1}. ${it.label}`;
+    if (it.reason) text += `\n   ${it.reason}`;
+    text += '\n';
+  });
+  text += '\n(curated with my Closet App 💛)';
+  if (navigator.share) {
+    navigator.share({ title: `${name}'s Wish List`, text }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(text)
+      .then(() => toast('Copied to clipboard! 📋'))
+      .catch(() => toast('Sharing not available — try copying manually'));
+  }
+  navigate('shop');
+}
+
+function viewWishShare() {
+  const allItems = _buildWishItems();
+  const OCCASIONS = ['🎁 Gift Ideas', '🎂 Birthday', '🎄 Holiday', '💝 Valentine\'s', '👰 Wedding', '🌸 Spring Refresh'];
+
+  return `<div class="view" style="display:flex;flex-direction:column;height:100%;background:var(--bg);">
+    <div class="nav" style="flex-shrink:0;">
+      <button class="nav-back"
+        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('shop');"
+        onclick="navigate('shop')">
+        ${iconBack()} Back
+      </button>
+      <span class="nav-title">Share Wish List</span>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 16px;padding-bottom:calc(100px + env(safe-area-inset-bottom,0px));">
+
+      <!-- Occasion chips -->
+      <div style="margin-bottom:24px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:10px;">Occasion (optional)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${OCCASIONS.map(occ => {
+            const active = S.shopWishOccasion === occ;
+            const occEsc = occ.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            return `<button
+              ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishOccasion=S.shopWishOccasion==='${occEsc}'?'':'${occEsc}';render();"
+              onclick="S.shopWishOccasion=S.shopWishOccasion==='${occEsc}'?'':'${occEsc}';render();"
+              style="padding:7px 14px;border-radius:100px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${active?'none':'1.5px solid var(--border)'};background:${active?'var(--gold)':'var(--surface)'};color:${active?'#fff':'var(--text-2)'};"
+            >${esc(occ)}</button>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Items -->
+      <div style="margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);">Items — ${S._wishShareItems.length} of ${allItems.length} selected</div>
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();S._wishShareItems=S._wishShareItems.length===allItems.length?[]:allItems.map(i=>i.query);render();"
+            onclick="S._wishShareItems=S._wishShareItems.length===allItems.length?[]:allItems.map(i=>i.query);render();"
+            style="font-size:12px;font-weight:700;color:var(--gold-dk);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0;touch-action:manipulation;">
+            ${S._wishShareItems.length === allItems.length ? 'Deselect all' : 'Select all'}
+          </button>
+        </div>
+        ${allItems.length === 0
+          ? `<div style="text-align:center;padding:32px 16px;color:var(--text-3);font-size:13px;">♥ Heart items in your outfit recs to build your Wish List.</div>`
+          : allItems.map(item => {
+            const checked = S._wishShareItems.includes(item.query);
+            const qEsc = item.query.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            return `<div
+              ontouchend="if(_touchMoved)return;event.preventDefault();toggleWishShareItem('${qEsc}');"
+              onclick="toggleWishShareItem('${qEsc}');"
+              style="display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">
+              <!-- Checkbox -->
+              <div style="flex-shrink:0;margin-top:1px;width:24px;height:24px;border-radius:7px;border:2px solid ${checked?'var(--gold)':'var(--border)'};background:${checked?'var(--gold)':'transparent'};display:flex;align-items:center;justify-content:center;transition:all .12s;pointer-events:none;">
+                ${checked?`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`:''}
+              </div>
+              <!-- Text -->
+              <div style="flex:1;min-width:0;pointer-events:none;">
+                <div style="font-size:15px;font-weight:700;color:var(--text);line-height:1.3;">${esc(item.label)}</div>
+                ${item.reason?`<div style="font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.45;">${esc(item.reason)}</div>`:''}
+              </div>
+            </div>`;
+          }).join('')}
+      </div>
+    </div>
+
+    <!-- Sticky share button -->
+    <div style="position:fixed;bottom:0;left:0;right:0;padding:14px 16px;padding-bottom:max(14px,env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--border);">
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();shareWishListCard();"
+        onclick="shareWishListCard()"
+        style="width:100%;padding:15px;background:${S._wishShareItems.length?'var(--gold)':'var(--border)'};color:${S._wishShareItems.length?'#fff':'var(--text-3)'};border:none;border-radius:100px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:all .15s;"
+        ${S._wishShareItems.length?'':'disabled'}>
+        ↗ Share${S._wishShareItems.length && S._wishShareItems.length < allItems.length ? ` (${S._wishShareItems.length} items)` : ' Wish List'}
+      </button>
+    </div>
+  </div>`;
 }
 
 // ── Share: Wardrobe Item ──────────────────────────────────────────────────────
@@ -5825,6 +5954,7 @@ function render() {
     case 'closet':       html = viewCloset();       break;
     case 'wardrobe':     html = viewWardrobe();     break;
     case 'shop':         html = viewShop();         break;
+    case 'wish-share':   html = viewWishShare();    break;
     case 'plan':         html = viewPlan();         break;
     case 'home':         html = viewHome();         break;
     case 'profile':      html = viewProfile();      break;
@@ -8426,9 +8556,9 @@ function viewDressMe() {
 
           ${vibes.length > 1 ? `
           <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
-            <button ontouchstart="event.stopPropagation();S._dressMeVibeFilter='all';render();"
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();S._dressMeVibeFilter='all';render();" onclick="S._dressMeVibeFilter='all';render();"
               style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeVibe==='all'?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeVibe==='all'?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeVibe==='all'?'#fff':'#6C3EBF'};">All ${allSaved.length}</button>
-            ${vibes.map(v=>`<button ontouchstart="event.stopPropagation();S._dressMeVibeFilter=${JSON.stringify(v)};render();"
+            ${vibes.map(v=>`<button ontouchend="if(_touchMoved)return;event.preventDefault();S._dressMeVibeFilter='${v.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}';render();" onclick="S._dressMeVibeFilter='${v.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}';render();"
               style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeVibe===v?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeVibe===v?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeVibe===v?'#fff':'#6C3EBF'};">${esc(v)}</button>`).join('')}
           </div>` : ''}
 
@@ -8774,8 +8904,8 @@ function viewShop() {
       <span class="nav-logo">🛍️ Shop</span>
       ${src === 'spotted'
         ? `<button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openSpottedCapture();" onclick="openSpottedCapture()">＋ Capture</button>`
-        : src === 'wishlist'
-        ? ``
+        : src === 'wishlist' && wishItems.length > 0
+        ? `<button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openWishShareSheet();" onclick="openWishShareSheet()" style="background:var(--gold);color:#fff;border:none;">Share List</button>`
         : ``
       }
     </div>
