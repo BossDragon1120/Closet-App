@@ -2998,11 +2998,13 @@ const S = {
   dressMeActive: null,          // { context, outfit, vibe } — set once user accepts a look, carried into the upload/analyze flow for credit
   savedDressMe: JSON.parse(localStorage.getItem('closet-dressme-saves') || '[]'), // [{id,vibe,hype,outfit,context,createdAt}]
   _openDressMeSaveId: null,     // which saved look is expanded on the Plan page
+  _dressMeVibeFilter: 'all',    // vibe chip filter for saved looks on the Dress Me page
   savedOutfitBuilds: JSON.parse(localStorage.getItem('closet-outfit-builds') || '[]'), // [{id,wardrobeId,wardrobeName,occasion,result,createdAt}]
   _openOutfitBuildId: null,     // which saved outfit build is expanded on Plan page
   savedRouletteLooks: JSON.parse(localStorage.getItem('closet-roulette-looks') || '[]'), // [{id,vibe,hype,outfit,createdAt}]
   _openRouletteLookId: null,    // which saved roulette look is expanded on Plan page
   _suggestionLog: JSON.parse(localStorage.getItem('closet-suggestion-log') || '[]'), // [{id,source,title,hype,items,createdAt,savedId}] auto-logged every generation
+  _savedLookView: null, // {type:'dressme'|'builder'|'roulette', id} — which saved look is open in viewSavedLook()
   // Sell It — AI-drafted Poshmark/Depop listing, nudged when a piece scores 2★ or lower in Rate Mode
   sellDraft: null,        // { wardrobeId, loading, title, description, price, priceReasoning }
   _sellDraftOpen: false,  // bottom-sheet modal visible
@@ -6571,6 +6573,7 @@ function render() {
     case 'dress-me':        html = viewDressMe();        break;
     case 'style-roulette':  html = viewStyleRoulette();  break;
     case 'wish-share':      html = viewWishShare();      break;
+    case 'saved-look':      html = viewSavedLook();      break;
   }
   // Inject tab bar right after the .nav block on every tab view
   // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
@@ -9008,7 +9011,18 @@ function openWishShareSheet() {
 function toggleWishShareItem(idx) {
   if (!S._wishShareItems || !S._wishShareItems[idx]) return;
   S._wishShareItems[idx].selected = !S._wishShareItems[idx].selected;
-  // Update just the count and button — no full render so scroll never jumps
+  const sel = S._wishShareItems[idx].selected;
+  // Update the visual circle checkbox
+  const checkEl = document.getElementById('wish-check-' + idx);
+  if (checkEl) {
+    checkEl.style.background = sel ? 'var(--gold)' : 'transparent';
+    checkEl.style.borderColor = sel ? 'var(--gold)' : 'var(--border)';
+    checkEl.innerHTML = sel ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : '';
+  }
+  // Update row background
+  const rowEl = document.getElementById('wish-row-' + idx);
+  if (rowEl) rowEl.style.background = sel ? 'var(--gold-bg)' : 'var(--surface)';
+  // Update count label and button
   const count = S._wishShareItems.filter(x => x.selected).length;
   const countEl = document.getElementById('wish-share-count');
   if (countEl) countEl.textContent = `${count} of ${S._wishShareItems.length} selected`;
@@ -9321,12 +9335,7 @@ function viewCloset() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">📸 Fits</span>
-      <span style="display:flex;align-items:center;gap:8px;">
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();openDressMe();" onclick="openDressMe();"
-          title="Dress Me"
-          style="background:none;border:1.5px solid var(--border);border-radius:100px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;flex-shrink:0;">✨</button>
-        <button class="nav-add" onclick="navigate('upload')">${iconPlus()} Log Outfit</button>
-      </span>
+      <button class="nav-add" onclick="navigate('upload')">${iconPlus()} Log Outfit</button>
     </div>
     ${S.weatherPin ? `
     <div ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('plan')"
@@ -9444,6 +9453,69 @@ function viewDressMe() {
               </div>
             `;
           })() : ''}
+
+      ${S.savedDressMe.length ? (()=>{
+        // ── SAVED LOOKS SECTION ───────────────────────────────────────────────
+        const vibes = [...new Set(S.savedDressMe.map(d=>d.vibe).filter(Boolean))];
+        const activeFilter = S._dressMeVibeFilter || 'all';
+        const filtered = activeFilter === 'all' ? S.savedDressMe : S.savedDressMe.filter(d => d.vibe === activeFilter);
+
+        return `
+        <div style="margin-top:30px;padding-top:24px;border-top:1.5px solid var(--border);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);">Saved Looks</div>
+            <div style="font-size:11px;color:var(--text-3);">${S.savedDressMe.length} saved</div>
+          </div>
+
+          ${vibes.length > 1 ? `
+          <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();S._dressMeVibeFilter='all';render();" onclick="S._dressMeVibeFilter='all';render()"
+              style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeFilter==='all'?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeFilter==='all'?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeFilter==='all'?'#fff':'#6C3EBF'};">All ${S.savedDressMe.length}</button>
+            ${vibes.map(v=>`<button ontouchend="if(_touchMoved)return;event.preventDefault();S._dressMeVibeFilter=${JSON.stringify(v)};render();" onclick="S._dressMeVibeFilter=${JSON.stringify(v)};render()"
+              style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeFilter===v?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeFilter===v?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeFilter===v?'#fff':'#6C3EBF'};">${esc(v)}</button>`).join('')}
+          </div>` : ''}
+
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${filtered.map(dm=>{
+              const d = new Date(dm.createdAt);
+              const dateLabel = isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+              const anchor = (dm.outfit||[])[0];
+              const anchorWI = anchor ? matchWardrobeItem(anchor.item||'') : null;
+              const navFn = `S._savedLookView={type:'dressme',id:'${dm.id}'};navigate('saved-look')`;
+              return `
+              <div style="border:1.5px solid rgba(108,62,191,0.18);border-radius:var(--r);overflow:hidden;background:linear-gradient(135deg,rgba(108,62,191,0.04),rgba(155,95,224,0.02));">
+                <div style="display:flex;">
+                  ${(anchorWI?.photo||anchorWI?.photoThumb)
+                    ? `<div ontouchend="if(_touchMoved)return;event.preventDefault();${navFn};" onclick="${navFn}" style="width:76px;flex-shrink:0;cursor:pointer;">
+                        <img src="${esc(photoBlobUrl(anchorWI.photo||anchorWI.photoThumb))}" style="width:76px;height:100%;min-height:110px;object-fit:cover;object-position:top;display:block;">
+                       </div>`
+                    : `<div style="width:76px;flex-shrink:0;min-height:110px;background:rgba(108,62,191,0.08);display:flex;align-items:center;justify-content:center;font-size:30px;">${anchor?.emoji||'✨'}</div>`}
+                  <div style="flex:1;min-width:0;padding:12px 12px 10px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px;">
+                      ${dm.vibe?`<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#6C3EBF;background:rgba(108,62,191,0.12);border-radius:100px;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${esc(dm.vibe)}</span>`:'<span></span>'}
+                      <span style="font-size:10px;color:var(--text-3);flex-shrink:0;">${dateLabel}</span>
+                    </div>
+                    ${dm.context?`<div style="font-size:11px;color:var(--text-3);margin-bottom:5px;">${esc(dm.context)}</div>`:''}
+                    <div style="font-size:12px;color:var(--text-2);line-height:1.55;">
+                      ${(dm.outfit||[]).slice(0,3).map(p=>`${esc(p.emoji||'✨')} ${esc(p.item||'')}`).join('<span style="color:var(--border);margin:0 4px;">·</span>')}${(dm.outfit||[]).length>3?`<span style="color:var(--text-3);"> +${(dm.outfit||[]).length-3}</span>`:''}
+                    </div>
+                    <div style="display:flex;gap:7px;margin-top:10px;">
+                      <button ontouchend="if(_touchMoved)return;event.preventDefault();${navFn};" onclick="${navFn}"
+                        style="flex:1;padding:8px 6px;background:transparent;border:1.5px solid rgba(108,62,191,0.28);border-radius:100px;font-size:11px;font-weight:700;color:#6C3EBF;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                        View →
+                      </button>
+                      <button ontouchend="if(_touchMoved)return;event.preventDefault();wearSavedDressMe('${dm.id}');" onclick="wearSavedDressMe('${dm.id}')"
+                        style="flex:1;padding:8px 6px;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;border-radius:100px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                        ✨ Wear
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      })() : ''}
     </div>
   </div>`;
 }
@@ -10217,12 +10289,14 @@ function viewPlan() {
                   :look._type==='builder'?`deleteOutfitBuild('${look.id}')`
                   :`deleteRouletteLook('${look.id}')`)
                 : `S._suggestionLog=S._suggestionLog.filter(l=>l.id!=='${look.id}');localStorage.setItem('closet-suggestion-log',JSON.stringify(S._suggestionLog));render()`;
-              return `<div style="min-width:248px;max-width:248px;scroll-snap-align:start;flex-shrink:0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+              const navFn = look._saved ? `S._savedLookView={type:'${look._type}',id:'${look.id}'};navigate('saved-look')` : '';
+              return `<div style="min-width:248px;max-width:248px;scroll-snap-align:start;flex-shrink:0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;${look._saved?'cursor:pointer;':''}"
+                ${look._saved ? `ontouchend="if(_touchMoved)return;event.preventDefault();${navFn};" onclick="${navFn}"` : ''}>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
                   <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${look.badgeColor};background:${look.badgeColor}1A;border-radius:100px;padding:3px 9px;white-space:nowrap;">${look.badge}${look._saved?'':' · unsaved'}</span>
                   <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
                     <span style="font-size:11px;color:var(--text-3);">${dateLabel}</span>
-                    <button ontouchend="if(_touchMoved)return;event.preventDefault();${deleteFn};" onclick="${deleteFn}"
+                    <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();${deleteFn};" onclick="event.stopPropagation();${deleteFn}"
                       style="background:none;border:none;font-size:14px;color:var(--text-3);cursor:pointer;padding:2px 4px;line-height:1;touch-action:manipulation;">✕</button>
                   </div>
                 </div>
@@ -10242,11 +10316,7 @@ function viewPlan() {
                     </div>`).join('')}
                   ${look.items.length>4?`<div style="font-size:11px;color:var(--text-3);padding-left:24px;">+${look.items.length-4} more</div>`:''}
                 </div>
-                ${look._type==='dressme'&&look._saved?`
-                  <button ontouchend="if(_touchMoved)return;event.preventDefault();wearSavedDressMe('${look.id}');" onclick="wearSavedDressMe('${look.id}')"
-                    style="width:100%;padding:9px;background:var(--gold);border:none;border-radius:100px;font-size:12px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                    ✨ Wear this →
-                  </button>`:''}
+                ${look._saved?`<div style="font-size:11px;color:${look.badgeColor};font-weight:700;text-align:right;margin-top:auto;">View look →</div>`:''}
               </div>`;
             }).join('')}
           </div>
@@ -10358,6 +10428,148 @@ function viewPlan() {
 `;
 }
 
+function getSavedLookData(type, id) {
+  const normStr = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
+  const matchW = name => {
+    const t = normStr(name); if (!t) return null;
+    const active = S.wardrobe.filter(w => !w.retiredFromCloset);
+    return active.find(w => normStr(w.name) === t) ||
+           active.find(w => normStr(w.name).includes(t) || t.includes(normStr(w.name))) || null;
+  };
+  if (type === 'builder') {
+    const ob = S.savedOutfitBuilds.find(o => o.id === id); if (!ob) return null;
+    const anchor = S.wardrobe.find(w => w.id === ob.wardrobeId);
+    const r = ob.result || {};
+    return {
+      badge: r.occasion || ob.wardrobeName || 'Outfit', badgeColor: '#6C3EBF',
+      quote: r.stylistNote || '',
+      anchor: anchor ? { wardrobeItem: anchor, name: anchor.name, reason: '', emoji: anchor.icon||'👕' } : null,
+      pairs: (r.picks||[]).map(p => ({ name: p.name, reason: p.reason||'', emoji: '👕', wardrobeItem: matchW(p.name) })),
+      gaps: (r.gaps||[]).map(g => ({ item: g.item, reason: g.reason||'', searchQuery: g.searchQuery||g.item })),
+      deleteFn: `deleteOutfitBuild('${id}')`,
+      extraBtn: null,
+    };
+  }
+  if (type === 'dressme') {
+    const dm = S.savedDressMe.find(d => d.id === id); if (!dm) return null;
+    const all = (dm.outfit||[]).map(p => ({ name: p.item||'', reason: p.reason||'', emoji: p.emoji||'✨', wardrobeItem: matchW(p.item) }));
+    return {
+      badge: dm.vibe || dm.context || 'Saved Look', badgeColor: '#B87D2A',
+      quote: dm.hype || '',
+      anchor: all[0] || null,
+      pairs: all.slice(1),
+      gaps: [],
+      deleteFn: `deleteDressMeSave('${id}')`,
+      extraBtn: { label: '✨ Wear this look →', fn: `wearSavedDressMe('${id}')`, color: 'var(--gold)' },
+    };
+  }
+  if (type === 'roulette') {
+    const rl = S.savedRouletteLooks.find(r => r.id === id); if (!rl) return null;
+    const all = (rl.outfit||[]).map(p => ({ name: p.item||'', reason: p.reason||'', emoji: p.emoji||'🎲', wardrobeItem: matchW(p.item) }));
+    return {
+      badge: rl.vibe || 'Roulette Look', badgeColor: '#2A6B4A',
+      quote: rl.hype || '',
+      anchor: all[0] || null,
+      pairs: all.slice(1),
+      gaps: [],
+      deleteFn: `deleteRouletteLook('${id}')`,
+      extraBtn: null,
+    };
+  }
+  return null;
+}
+
+function viewSavedLook() {
+  const sl = S._savedLookView;
+  if (!sl) { navigate('plan'); return ''; }
+  const data = getSavedLookData(sl.type, sl.id);
+  if (!data) { navigate('plan'); return ''; }
+  const { badge, badgeColor, quote, anchor, pairs, gaps, deleteFn, extraBtn } = data;
+  const anchorWI = anchor?.wardrobeItem;
+
+  return `<div class="view view-notab">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('plan')" onclick="navigate('plan')">${iconBack()} Plan</button>
+      <span class="nav-title">Your Outfit</span>
+      <button class="nav-btn" ontouchend="if(_touchMoved)return;event.preventDefault();${deleteFn};navigate('plan');" onclick="${deleteFn};navigate('plan');" style="font-size:18px;touch-action:manipulation;background:none;border:none;color:var(--text-3);cursor:pointer;padding:8px;">✕</button>
+    </div>
+
+    <!-- Occasion pill + stylist note -->
+    <div style="padding:16px 20px 10px;">
+      ${badge ? `<div style="display:inline-block;background:${badgeColor};color:#fff;border-radius:100px;padding:4px 14px;font-size:11px;font-weight:700;margin-bottom:10px;">${esc(badge)}</div>` : ''}
+      ${quote ? `<p style="font-size:14px;color:var(--text-2);line-height:1.55;margin:0;font-style:italic;">"${esc(quote)}"</p>` : ''}
+    </div>
+
+    <!-- Start with -->
+    ${anchor ? `
+    <div style="padding:0 20px 6px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:8px;">Start with</div>
+      <div style="display:flex;align-items:center;gap:12px;padding:12px;background:${badgeColor}0D;border:1.5px solid ${badgeColor}40;border-radius:var(--r);${anchorWI?'cursor:pointer;':''}"
+        ${anchorWI ? `ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${anchorWI.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${anchorWI.id}';navigate('wardrobe-item')"` : ''}>
+        ${anchorWI?.photo
+          ? `<img src="${esc(photoBlobUrl(anchorWI.photo))}" style="width:56px;height:74px;object-fit:cover;object-position:top;border-radius:8px;flex-shrink:0;">`
+          : `<div style="width:56px;height:74px;border-radius:8px;background:${badgeColor}18;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">${anchor.emoji||anchorWI?.icon||'👕'}</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:800;color:${badgeColor};">${esc(anchorWI?.name || anchor.name)}</div>
+          ${anchorWI?.brand ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(anchorWI.brand)}</div>` : ''}
+          ${anchorWI?.category ? `<div style="font-size:11px;color:var(--text-3);">${esc(anchorWI.category)}</div>` : ''}
+          ${!anchorWI && anchor.reason ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(anchor.reason)}</div>` : ''}
+        </div>
+        ${anchorWI ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${badgeColor}80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>` : ''}
+      </div>
+    </div>` : ''}
+
+    <!-- Pair with -->
+    ${pairs.length ? `
+    <div style="padding:16px 20px 6px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Pair with from your closet</div>
+      <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+        ${pairs.map(p => {
+          const wi = p.wardrobeItem;
+          return `<div style="flex-shrink:0;width:110px;${wi?'cursor:pointer;':''}"
+            ${wi ? `ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${wi.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${wi.id}';navigate('wardrobe-item')"` : ''}>
+            <div style="width:110px;height:147px;border-radius:10px;overflow:hidden;background:var(--surface-2);border:${wi ? `1.5px solid ${badgeColor}4D` : '1.5px dashed var(--border)'};position:relative;">
+              ${(wi?.photo || wi?.photoThumb)
+                ? `<img src="${esc(photoBlobUrl(wi.photo||wi.photoThumb))}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${p.emoji||wi?.icon||'👕'}</div>`}
+              ${wi ? `<div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,rgba(0,0,0,.5) 100%);pointer-events:none;"></div>` : ''}
+            </div>
+            <div style="font-size:11px;font-weight:700;color:${wi?'var(--text)':'var(--text-3)'};margin-top:5px;line-height:1.3;">${esc(wi?.name||p.name)}</div>
+            <div style="font-size:10px;color:var(--text-3);margin-top:2px;line-height:1.35;">${esc(p.reason)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- Complete the look -->
+    ${gaps.length ? `
+    <div style="padding:16px 20px 6px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Complete the look</div>
+      ${gaps.map(g => {
+        const q = encodeURIComponent(g.searchQuery||g.item);
+        return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--gold-bg);border:1.5px solid rgba(184,125,42,0.3);border-radius:var(--r-sm);margin-bottom:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(g.item)}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.4;">${esc(g.reason)}</div>
+          </div>
+          <a href="https://www.google.com/search?tbm=shop&q=${q}" target="_blank" rel="noopener"
+            style="flex-shrink:0;padding:7px 13px;background:var(--gold);color:#fff;border-radius:100px;font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;touch-action:manipulation;"
+            ontouchend="event.stopPropagation()">🛍 Shop</a>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
+
+    ${extraBtn ? `
+    <div style="padding:16px 20px 0;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();${extraBtn.fn};" onclick="${extraBtn.fn}"
+        style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;border:none;background:${extraBtn.color};color:#fff;font-size:14px;font-weight:800;touch-action:manipulation;">
+        ${extraBtn.label}
+      </button>
+    </div>` : ''}
+    <div style="height:40px;"></div>
+  </div>`;
+}
+
 function viewWishShare() {
   const wishItems = S._wishShareItems || [];
   const selectedCount = wishItems.filter(x => x.selected).length;
@@ -10391,18 +10603,20 @@ function viewWishShare() {
           const detail = item.spotted
             ? [item.brand, item.price].filter(Boolean).join(' · ')
             : (item.reason || '');
-          return `<label style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:${sel?'var(--gold-bg)':'var(--surface)'};border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;${idx===wishItems.length-1?'border-bottom:none;':''}">
-            <input type="checkbox" ${sel?'checked':''} style="display:none;" onchange="toggleWishShareItem(${idx})">
-            <div id="wish-check-${idx}" style="width:22px;height:22px;border-radius:50%;background:${sel?'var(--gold)':'transparent'};border:2px solid ${sel?'var(--gold)':'var(--border)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s,border-color .12s;">
+          return `<div id="wish-row-${idx}"
+            ontouchend="if(_touchMoved)return;event.preventDefault();toggleWishShareItem(${idx});"
+            onclick="toggleWishShareItem(${idx})"
+            style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:${sel?'var(--gold-bg)':'var(--surface)'};border-bottom:${idx===wishItems.length-1?'none':'1px solid var(--border)'};cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;">
+            <div id="wish-check-${idx}" style="width:22px;height:22px;border-radius:50%;background:${sel?'var(--gold)':'transparent'};border:2px solid ${sel?'var(--gold)':'var(--border)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;pointer-events:none;">
               ${sel?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}
             </div>
-            ${item.photo ? `<img src="${esc(item.photo)}" style="width:36px;height:46px;object-fit:cover;border-radius:7px;flex-shrink:0;">` : ''}
-            <div style="flex:1;min-width:0;">
+            ${item.photo ? `<img src="${esc(item.photo)}" style="width:36px;height:46px;object-fit:cover;border-radius:7px;flex-shrink:0;pointer-events:none;">` : ''}
+            <div style="flex:1;min-width:0;pointer-events:none;">
               <div style="font-size:14px;font-weight:${sel?'700':'500'};color:var(--text);line-height:1.35;">${esc(item.name)}</div>
               ${detail ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px;">${esc(detail)}</div>` : ''}
             </div>
-            ${item.spotted ? `<span style="font-size:9px;font-weight:700;background:#EEF3FA;color:#3B5E8C;padding:2px 6px;border-radius:100px;flex-shrink:0;">📌</span>` : ''}
-          </label>`;
+            ${item.spotted ? `<span style="font-size:9px;font-weight:700;background:#EEF3FA;color:#3B5E8C;padding:2px 6px;border-radius:100px;flex-shrink:0;pointer-events:none;">📌</span>` : ''}
+          </div>`;
         }).join('')}
       </div>
 
@@ -13889,7 +14103,7 @@ function viewWardrobe() {
     ${activeWardrobe.length > 0 ? `<div style="padding:10px 16px 0;display:flex;align-items:baseline;justify-content:space-between;gap:6px;">
       <div style="display:flex;align-items:baseline;gap:6px;">
         <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${activeWardrobe.length}</span>
-        <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">piece${activeWardrobe.length===1?'':'s'} in your closet</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">piece${activeWardrobe.length===1?'':'s'}</span>
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0;">
         <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('rating-summary');" onclick="navigate('rating-summary')" title="Ratings summary"
