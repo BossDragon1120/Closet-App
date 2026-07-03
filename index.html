@@ -3912,7 +3912,15 @@ function openWishShareSheet() {
   S.shopWishShareOpen = false; // not used for sheet anymore
   S._wishShareItems = items.map(i => i.query); // all selected by default
   S.shopWishOccasion = '';
+  S._wishOccCustom = false;
+  S._wishShareSheetOpen = false;
   navigate('wish-share');
+}
+function toggleWishOccCustom() {
+  S._wishOccCustom = !S._wishOccCustom;
+  S.shopWishOccasion = '';
+  render();
+  if (S._wishOccCustom) requestAnimationFrame(() => document.getElementById('wish-occ-input')?.focus());
 }
 function toggleWishShareItem(query) {
   const idx = S._wishShareItems.indexOf(query);
@@ -3920,11 +3928,10 @@ function toggleWishShareItem(query) {
   else S._wishShareItems.push(query);
   render();
 }
-function shareWishListCard() {
+function _buildWishShareText() {
   const items = _buildWishItems().filter(i => S._wishShareItems.includes(i.query));
-  if (!items.length) { toast('Select at least one item'); return; }
   const name = S.profileName || 'My';
-  const occ  = S.shopWishOccasion ? ` — ${S.shopWishOccasion}` : '';
+  const occ  = (S.shopWishOccasion || '').trim() ? ` — ${S.shopWishOccasion.trim()}` : '';
   let text = `✨ ${name}'s Wish List${occ}\n\n`;
   items.forEach((it, n) => {
     text += `${n + 1}. ${it.label}`;
@@ -3932,14 +3939,72 @@ function shareWishListCard() {
     text += '\n';
   });
   text += '\n(curated with my Closet App 💛)';
-  if (navigator.share) {
-    navigator.share({ title: `${name}'s Wish List`, text }).catch(() => {});
-  } else {
-    navigator.clipboard?.writeText(text)
-      .then(() => toast('Copied to clipboard! 📋'))
-      .catch(() => toast('Sharing not available — try copying manually'));
+  return text;
+}
+function shareWishListCard() {
+  const items = _buildWishItems().filter(i => S._wishShareItems.includes(i.query));
+  if (!items.length) { toast('Select at least one item'); return; }
+  S._wishShareSheetOpen = true;
+  render();
+}
+function closeWishShareSheet() { S._wishShareSheetOpen = false; render(); }
+function _wishShareCopyFallback(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  ta.remove();
+}
+function wishShareVia(method) {
+  const text  = _buildWishShareText();
+  const title = `${S.profileName || 'My'}'s Wish List`;
+  S._wishShareSheetOpen = false;
+  render();
+  if (method === 'native') {
+    navigator.share({ title, text }).then(() => navigate('shop')).catch(() => {});
+  } else if (method === 'sms') {
+    location.href = 'sms:?&body=' + encodeURIComponent(text);
+  } else if (method === 'email') {
+    location.href = 'mailto:?subject=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(text);
+  } else if (method === 'copy') {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(() => toast('Copied to clipboard! 📋'))
+        .catch(() => { _wishShareCopyFallback(text); toast('Copied to clipboard! 📋'); });
+    } else {
+      _wishShareCopyFallback(text);
+      toast('Copied to clipboard! 📋');
+    }
   }
-  navigate('shop');
+}
+function wishShareSheetHTML() {
+  const canNative = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const row = (method, icon, label, sub) => `<button
+    ontouchend="if(_touchMoved)return;event.preventDefault();wishShareVia('${method}');"
+    onclick="wishShareVia('${method}')"
+    style="width:100%;display:flex;align-items:center;gap:14px;padding:15px 16px;background:var(--bg);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;margin-bottom:10px;">
+    <span style="font-size:22px;flex-shrink:0;">${icon}</span>
+    <span style="flex:1;min-width:0;">
+      <span style="display:block;font-size:15px;font-weight:800;color:var(--text);">${label}</span>
+      <span style="display:block;font-size:12px;color:var(--text-3);margin-top:1px;">${sub}</span>
+    </span>
+  </button>`;
+  return `<div onclick="closeWishShareSheet()" ontouchend="if(_touchMoved)return;event.preventDefault();closeWishShareSheet()"
+    style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
+    <div onclick="event.stopPropagation()" ontouchend="event.stopPropagation()"
+      style="width:100%;background:var(--surface);border-radius:24px 24px 0 0;padding:14px 20px calc(20px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 40px rgba(0,0,0,0.2);animation:slideUp .28s cubic-bezier(.22,.68,0,1.2);">
+      <div style="width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 18px;"></div>
+      <div style="font-size:17px;font-weight:900;color:var(--text);text-align:center;margin-bottom:16px;">Share your Wish List</div>
+      ${canNative ? row('native', '↗️', 'Share…', 'AirDrop, Messages, and more') : ''}
+      ${row('sms', '💬', 'Text Message', 'Send it in a text')}
+      ${row('email', '✉️', 'Email', 'Send it by email')}
+      ${row('copy', '📋', 'Copy to Clipboard', 'Paste it anywhere')}
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();closeWishShareSheet();" onclick="closeWishShareSheet()"
+        style="width:100%;padding:13px;background:none;border:none;font-size:14px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:2px;">
+        Cancel
+      </button>
+    </div>
+  </div>`;
 }
 
 function viewWishShare() {
@@ -3963,15 +4028,27 @@ function viewWishShare() {
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:10px;">Occasion (optional)</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;">
           ${OCCASIONS.map(occ => {
-            const active = S.shopWishOccasion === occ;
+            const active = !S._wishOccCustom && S.shopWishOccasion === occ;
             const occEsc = occ.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
             return `<button
-              ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishOccasion=S.shopWishOccasion==='${occEsc}'?'':'${occEsc}';render();"
-              onclick="S.shopWishOccasion=S.shopWishOccasion==='${occEsc}'?'':'${occEsc}';render();"
+              ontouchend="if(_touchMoved)return;event.preventDefault();S._wishOccCustom=false;S.shopWishOccasion=S.shopWishOccasion==='${occEsc}'?'':'${occEsc}';render();"
+              onclick="S._wishOccCustom=false;S.shopWishOccasion=S.shopWishOccasion==='${occEsc}'?'':'${occEsc}';render();"
               style="padding:7px 14px;border-radius:100px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${active?'none':'1.5px solid var(--border)'};background:${active?'var(--gold)':'var(--surface)'};color:${active?'#fff':'var(--text-2)'};"
             >${esc(occ)}</button>`;
           }).join('')}
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();toggleWishOccCustom();"
+            onclick="toggleWishOccCustom()"
+            style="padding:7px 14px;border-radius:100px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${S._wishOccCustom?'none':'1.5px dashed var(--border)'};background:${S._wishOccCustom?'var(--gold)':'var(--surface)'};color:${S._wishOccCustom?'#fff':'var(--text-2)'};"
+          >✏️ Custom</button>
         </div>
+        ${S._wishOccCustom ? `
+        <input id="wish-occ-input" type="text" maxlength="40"
+          placeholder="e.g. Graduation, Baby Shower, Just Because…"
+          value="${esc(S.shopWishOccasion || '')}"
+          oninput="S.shopWishOccasion=this.value"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+          style="width:100%;margin-top:12px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--gold);background:var(--surface);font-size:15px;font-family:inherit;color:var(--text);box-sizing:border-box;outline:none;-webkit-appearance:none;">` : ''}
       </div>
 
       <!-- Items -->
@@ -4018,6 +4095,8 @@ function viewWishShare() {
         ↗ Share${S._wishShareItems.length && S._wishShareItems.length < allItems.length ? ` (${S._wishShareItems.length} items)` : ' Wish List'}
       </button>
     </div>
+
+    ${S._wishShareSheetOpen ? wishShareSheetHTML() : ''}
   </div>`;
 }
 
@@ -5801,8 +5880,8 @@ function saveRouletteLook() {
   };
   S.savedDressMe = [entry, ...S.savedDressMe];
   localStorage.setItem('closet-dressme-saves', JSON.stringify(S.savedDressMe));
-  toast('Saved!');
-  render();
+  toast('Saved to your Dress Me looks 💜');
+  navigate('home');
 }
 function deleteRouletteLook(id) {
   S.savedRouletteLooks = S.savedRouletteLooks.filter(r => r.id !== id);
@@ -8709,10 +8788,7 @@ function filteredEntries() {
 /* ================================================================
    VIEW: SHOP
    ================================================================ */
-function viewShop() {
-  const list = buildShoppingList();
-
-  function shopItemEmoji(query) {
+function shopItemEmoji(query) {
     const q = (query||'').toLowerCase();
     if (/boot|ankle boot|chelsea|combat boot/.test(q))      return '👢';
     if (/sneaker|trainer|athletic shoe|running shoe/.test(q)) return '👟';
@@ -8742,8 +8818,12 @@ function viewShop() {
     if (/suit|blazer|sport coat/.test(q))                   return '🤵';
     if (/swimsuit|bikini|swimwear/.test(q))                 return '👙';
     if (/sock/.test(q))                                     return '🧦';
+    if (/cami|camisole|bodysuit/.test(q))                   return '👚';
     return '🛍️';
-  }
+}
+
+function viewShop() {
+  const list = buildShoppingList();
 
   function shopItemBg(query) {
     // Deterministic warm pastel based on query string
@@ -9215,7 +9295,7 @@ function viewPlan() {
                           ${g.items.map((itemName, idx) => {
                             const wItem = _findWardrobeForPlanItem(itemName);
                             const photoSrc = wItem ? photoBlobUrl(wItem.wearPhoto || wItem.photo || null) : null;
-                            const icon = wItem ? (wItem.icon || '👕') : '👕';
+                            const icon = wItem ? (wItem.icon || shopItemEmoji(itemName)) : shopItemEmoji(itemName);
                             const tile = `<div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:0;max-width:110px;">
                               ${photoSrc
                                 ? `<div style="width:72px;height:88px;border-radius:10px;overflow:hidden;border:2px solid ${isAlternate?'var(--gold)':'var(--border)'};flex-shrink:0;"><img src="${esc(photoSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;" onerror="this.parentElement.innerHTML='<div style=\\'width:72px;height:88px;display:flex;align-items:center;justify-content:center;font-size:32px;\\'>${icon}</div>'"></div>`
@@ -9331,7 +9411,7 @@ function viewPlan() {
               const d = new Date(tp.createdAt);
               const dateLabel = isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
               // Collect all unique emojis across all days
-              const allEmojis = [...new Set((tp.suggestions||[]).flatMap(day=>(day.outfit||day.items||[]).map(p=>p.emoji||'👕')))].slice(0,8);
+              const allEmojis = [...new Set((tp.suggestions||[]).flatMap(day=>(day.outfit||day.items||[]).map(p=>p.emoji||shopItemEmoji(p.item||p.name||''))))].slice(0,8);
               return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
                 <div style="padding:10px 14px;cursor:pointer;touch-action:manipulation;"
                   ontouchend="if(_touchMoved)return;event.preventDefault();toggleTripPlan('${tp.id}');" onclick="toggleTripPlan('${tp.id}')">
@@ -10199,10 +10279,10 @@ function eventCardHTML(ev, extraStyle) {
   const sg = ev.suggestion;
   const allItems = sg
     ? (sg.groups?.length
-        ? sg.groups.flatMap(g => g.items.map(n => ({ name: n, emoji: '👕' })))
+        ? sg.groups.flatMap(g => g.items.map(n => ({ name: n, emoji: shopItemEmoji(n) })))
         : (sg.items || []).map(it => {
             const m = it.match(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u);
-            return { name: m ? it.slice(m[0].length).trim() : it, emoji: m ? m[1] : '👕' };
+            return { name: m ? it.slice(m[0].length).trim() : it, emoji: m ? m[1] : shopItemEmoji(it) };
           })
       )
     : [];
@@ -10837,19 +10917,24 @@ function viewProfile() {
             const isLongPress = S._complimentLongPressId === w.id;
             const latestFrom = [...(w.compliments||[])].reverse().find(c=>c.from)?.from || null;
             return `<div style="flex-shrink:0;width:106px;position:relative;"
-              ontouchstart="window._cpTimer=setTimeout(()=>{S._complimentLongPressId='${w.id}';render();setTimeout(()=>{if(S._complimentLongPressId==='${w.id}'){S._complimentLongPressId=null;render();}},3000);},500)"
-              ontouchmove="clearTimeout(window._cpTimer)"
-              ontouchend="clearTimeout(window._cpTimer)">
-              <div ontouchend="if(_touchMoved)return;event.preventDefault();if(S._complimentLongPressId==='${w.id}'){S._complimentLongPressId=null;render();return;}S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="if(S._complimentLongPressId==='${w.id}'){S._complimentLongPressId=null;render();return;}S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
-                style="background:var(--surface);border:1.5px solid ${isLongPress?'var(--gold)':'var(--border)'};border-radius:12px;padding:10px 8px;cursor:pointer;touch-action:manipulation;text-align:center;transition:border-color .15s;">
+              ontouchstart="complimentPressStart('${w.id}')"
+              ontouchmove="complimentPressCancel()"
+              ontouchend="complimentPressCancel()"
+              ontouchcancel="complimentPressCancel()"
+              onmousedown="complimentPressStart('${w.id}')"
+              onmouseup="complimentPressCancel()"
+              onmouseleave="complimentPressCancel()"
+              oncontextmenu="event.preventDefault()">
+              <div ontouchend="if(_touchMoved)return;event.preventDefault();complimentCardTap('${w.id}')" onclick="complimentCardTap('${w.id}')"
+                style="background:var(--surface);border:1.5px solid ${isLongPress?'var(--gold)':'var(--border)'};border-radius:12px;padding:10px 8px;cursor:pointer;touch-action:manipulation;text-align:center;transition:border-color .15s;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;">
                 ${w.photo ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:46px;height:46px;border-radius:8px;object-fit:cover;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;" loading="lazy">` : `<div style="font-size:28px;margin-bottom:6px;line-height:1;">${w.icon||'👕'}</div>`}
                 <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.name)}</div>
                 <div style="font-size:11px;color:var(--gold-dk);margin-top:2px;font-weight:600;">${count}×</div>
                 ${latestFrom ? `<div style="font-size:10px;color:var(--text-3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">from ${esc(latestFrom)}</div>` : `<div style="font-size:10px;color:var(--text-3);margin-top:1px;">${relDate(lastDate)}</div>`}
               </div>
               ${isLongPress ? `<button
-                ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();S._complimentLongPressId=null;dismissComplimentCard('${w.id}');"
-                onclick="event.stopPropagation();S._complimentLongPressId=null;dismissComplimentCard('${w.id}');"
+                ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();complimentPressCancel();S._complimentLongPressId=null;dismissComplimentCard('${w.id}');"
+                onclick="event.stopPropagation();complimentPressCancel();S._complimentLongPressId=null;dismissComplimentCard('${w.id}');"
                 style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:var(--gold);border:none;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;animation:fadeIn .15s;">✕</button>` : ''}
             </div>`;
           }).join('')}
@@ -18308,6 +18393,33 @@ function dismissComplimentCard(wardrobeId) {
   S._dismissedComplimentIds.add(wardrobeId);
   localStorage.setItem('closet-dismissed-compliments', JSON.stringify([...S._dismissedComplimentIds]));
   render();
+}
+// ── Compliment carousel long-press (press & hold to reveal ✕) ────────────────
+function complimentPressStart(id) {
+  window._cpFired = false;
+  clearTimeout(window._cpTimer);
+  window._cpTimer = setTimeout(() => {
+    window._cpFired = true; // consumed by the touchend/click of this same gesture
+    S._complimentLongPressId = id;
+    if (navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
+    render();
+    clearTimeout(window._cpHide);
+    window._cpHide = setTimeout(() => {
+      if (S._complimentLongPressId === id) { S._complimentLongPressId = null; render(); }
+    }, 4000);
+  }, 450);
+}
+function complimentPressCancel() {
+  clearTimeout(window._cpTimer);
+}
+function complimentCardTap(id) {
+  // The finger-lift that ends the long-press itself lands here — swallow it
+  // so the ✕ that just appeared isn't instantly cleared.
+  if (window._cpFired) { window._cpFired = false; return; }
+  // A ✕ is showing (this card or another): a plain tap dismisses it.
+  if (S._complimentLongPressId) { S._complimentLongPressId = null; render(); return; }
+  S.selectedWardrobeId = id;
+  navigate('wardrobe-item');
 }
 function dismissHiddenGem(id) {
   if (!S._hiddenGemsDismissed.includes(id)) {
