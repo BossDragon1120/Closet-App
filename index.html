@@ -2120,17 +2120,6 @@ body {
   background: linear-gradient(135deg,#FFFAED,#FFF5D0);
   border-color: var(--gold);
 }
-.hero-share-btn {
-  width: 100%; padding: 14px; border-radius: var(--r);
-  cursor: pointer; font-family: inherit;
-  background: linear-gradient(135deg,#1C1A18,#2a2318);
-  border: 1.5px solid var(--gold);
-  color: var(--gold); font-size: 14px; font-weight: 800;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  transition: opacity .15s; touch-action: manipulation;
-  letter-spacing: .02em;
-}
-.hero-share-btn:active { opacity: .8; }
 
 /* ── SIGNATURE PIECES ───────────────────────────────────── */
 :root {
@@ -2732,9 +2721,6 @@ async function saveProfileToFirestore() {
       nonNegPhysical: S.nonNegPhysical, nonNegAesthetic: S.nonNegAesthetic,
       cycleEnabled: S.cycleEnabled, cycleStartDay: S.cycleStartDay,
       cycleLength: S.cycleLength, cyclePeriodDays: S.cyclePeriodDays,
-      stylePersona: S.stylePersona || null,
-      personaHistory: S.personaHistory,
-      styleAvatar: S.styleAvatar || null,
       signatureScent: S.signatureScent, scentHistory: S.scentHistory,
       hairstyle: S.hairstyle, hairstyleHistory: S.hairstyleHistory,
       signatureNailColor: S.signatureNailColor, braSize: S.braSize, braStyle: S.braStyle, braFitNotes: S.braFitNotes, eyeColor: S.eyeColor,
@@ -2787,9 +2773,6 @@ async function loadProfileFromFirestore() {
     if (p.cycleLength   != null) { S.cycleLength     = p.cycleLength;                       localStorage.setItem('closet-cycle-len',  p.cycleLength); }
     if (p.cyclePeriodDays!=null) { S.cyclePeriodDays = p.cyclePeriodDays;                   localStorage.setItem('closet-cycle-pdur', p.cyclePeriodDays); }
     if (p.shopBudget    != null) { S.shopBudget      = p.shopBudget;                        localStorage.setItem('closet-shop-budget', p.shopBudget); }
-    if (p.stylePersona  != null) { S.stylePersona    = p.stylePersona;                      localStorage.setItem('closet-persona',         JSON.stringify(p.stylePersona)); }
-    if (p.personaHistory!= null) { S.personaHistory  = p.personaHistory;                    localStorage.setItem('closet-persona-history', JSON.stringify(p.personaHistory)); }
-    if (p.styleAvatar   != null) { S.styleAvatar     = p.styleAvatar;                       localStorage.setItem('closet-style-avatar',    JSON.stringify(p.styleAvatar)); }
     if (p.scentHistory  != null) { S.scentHistory    = p.scentHistory;                      localStorage.setItem('closet-scent-history',   JSON.stringify(p.scentHistory)); }
     if (p.hairstyleHistory!=null){ S.hairstyleHistory= p.hairstyleHistory;                  localStorage.setItem('closet-hairstyle-history',JSON.stringify(p.hairstyleHistory)); }
     if (p.weatherPin    != null) { S.weatherPin      = p.weatherPin;                        localStorage.setItem('closet-weather-pin',     JSON.stringify(p.weatherPin)); }
@@ -3052,13 +3035,9 @@ const S = {
   // ui
   loading: false, loadingMsg: '', error: null,
   filter: 'all', wardrobeSort: 'smart', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeRatingFilter: null, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
-  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: null, shopSource: 'wishlist', shopSelectedQuery: null, shopRateModeOnly: false, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false, _hiddenGemsDismissed: JSON.parse(localStorage.getItem('closet-gems-dismissed') || '[]'),
+  closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopSource: 'wishlist', shopSelectedQuery: null, shopRateModeOnly: false, shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false, _hiddenGemsDismissed: JSON.parse(localStorage.getItem('closet-gems-dismissed') || '[]'),
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
-  // Style Persona
-  stylePersona:       JSON.parse(localStorage.getItem('closet-persona') || 'null'),
-  personaHistory:     JSON.parse(localStorage.getItem('closet-persona-history') || '[]'),
-  personaLoading:     false,
   // Extended profile (for persona generation)
   profileGeneration:  localStorage.getItem('closet-profile-gen')         || '',
   profileMBTI:        localStorage.getItem('closet-profile-mbti')        || '',
@@ -3072,11 +3051,6 @@ const S = {
   eulogyPolishing:    false,  // true while Claude is rewriting the eulogy
   weatherPin:         JSON.parse(localStorage.getItem('closet-weather-pin') || 'null'),
   _weatherPinLoading: false,
-  // Style Avatar
-  styleAvatar:        JSON.parse(localStorage.getItem('closet-style-avatar') || 'null'),
-  _avatarLoading:     false,
-  showShareCard:      false,
-  stylePortraitPhoto: localStorage.getItem('closet-portrait-photo') || null, // user-chosen photo for the style portrait
   // What's Hot trends
   hotTrends:          JSON.parse(localStorage.getItem('closet-hot-trends') || 'null'),
   _trendsLoading:     false,
@@ -3685,399 +3659,6 @@ Note: "${notes.slice(0,300)}"`
   } catch { return null; }
 }
 
-/* ================================================================
-   CLAUDE API — STYLE PERSONA GENERATION
-   ================================================================ */
-async function generateStylePersona() {
-  const key = S.apiKey.trim();
-  if (!key) { toast('Add your Anthropic API key in Settings first.'); return; }
-
-  S.personaLoading = true; render();
-
-  try {
-    const profile = [
-      S.profileName        ? `Name: ${S.profileName}` : '',
-      S.profileGeneration  ? `Generation: ${S.profileGeneration}` : '',
-      S.profileMBTI        ? `MBTI personality type: ${S.profileMBTI}` : '',
-      S.profileZodiac      ? `Zodiac sign: ${S.profileZodiac}` : '',
-      S.profileLocation    ? `Location/Climate: ${S.profileLocation}` : '',
-      S.profileStyleWords  ? `Self-described style: "${S.profileStyleWords}"` : '',
-      S.profileAge         ? `Age: ${S.profileAge}` : '',
-      S.nonNegPhysical     ? `Physical/practical non-negotiables (never suggest items that conflict with these): ${S.nonNegPhysical}` : '',
-      S.nonNegAesthetic    ? `Aesthetic non-negotiables (styles this person consistently avoids): ${S.nonNegAesthetic}` : '',
-    ].filter(Boolean).join('\n');
-
-    const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
-    const topWorn = [...activeWardrobe]
-      .sort((a,b)=>(b.wears?.length||0)-(a.wears?.length||0)).slice(0,10);
-    const wardrobeSummary = topWorn.length
-      ? topWorn.map(w=>`• ${w.icon||'👕'} ${w.name}${w.brand?' ('+w.brand+')':''}${w.category?' ['+w.category+']':''} — worn ${w.wears?.length||0}×`).join('\n')
-      : '(no wardrobe data yet)';
-
-    const avgRating = styleScore(S.entries);
-
-    const tagCounts = {};
-    S.entries.forEach(e=>{ if(e.occasionTag) tagCounts[e.occasionTag]=(tagCounts[e.occasionTag]||0)+1; });
-    const topOccasions = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([t])=>t);
-
-    const brandCounts = {};
-    activeWardrobe.forEach(w=>{ if(w.brand) brandCounts[w.brand]=(brandCounts[w.brand]||0)+(w.wears?.length||1); });
-    const topBrands = Object.entries(brandCounts).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([b])=>b);
-
-    const prompt = `You are a warm, perceptive personal stylist writing an uplifting style portrait for someone. Study everything below and craft a characterization that feels personal, specific, and celebratory — never generic.
-
-PROFILE:
-${profile || '(minimal profile info provided)'}
-
-MOST-WORN WARDROBE ITEMS:
-${wardrobeSummary}
-
-OUTFIT STATS:
-- Total outfits logged: ${S.entries.length}
-${avgRating ? `- Average style rating: ${avgRating}/10` : ''}
-${topOccasions.length ? `- Top occasions: ${topOccasions.join(', ')}` : ''}
-${topBrands.length ? `- Favourite brands: ${topBrands.join(', ')}` : ''}
-- Wardrobe items: ${activeWardrobe.length}
-
-Respond with ONLY a JSON object — no markdown, no preamble:
-{
-  "headline": "A punchy 5-9 word fashion archetype title, e.g. 'The Effortless Athlete Who Always Looks Put-Together'",
-  "body": "Two sentences (≤60 words total). First sentence: describe their core aesthetic with a specific, flattering observation drawn from their data. Second sentence: celebrate a distinctive quality or strength in how they dress. Always positive, always grounded in their actual details."
-}`;
-
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-    // If haiku-4-5 isn't available, retry with the known-stable haiku-3-5
-    let resp2 = resp;
-    if (resp.status === 400 || resp.status === 404) {
-      const errBody = await resp.json().catch(() => ({}));
-      if (/model/i.test(errBody?.error?.message || '')) {
-        resp2 = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': key,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: 'claude-haiku-3-5-20241022', max_tokens: 300,
-            messages: [{ role: 'user', content: prompt }],
-          }),
-        });
-      } else {
-        throw new Error(errBody?.error?.message || `API error ${resp.status}`);
-      }
-    }
-    if (!resp2.ok) {
-      const errBody = await resp2.json().catch(() => ({}));
-      const msg = errBody?.error?.message || `API error ${resp2.status}`;
-      throw new Error(msg);
-    }
-    const data = await resp2.json();
-    let text = (data.content?.[0]?.text || '').trim()
-      .replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/i,'').trim();
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('Bad response format');
-    const parsed = JSON.parse(m[0]);
-    if (!parsed.headline || !parsed.body) throw new Error('Missing fields in response');
-
-    S.stylePersona = { headline: parsed.headline, body: parsed.body, ts: Date.now() };
-    localStorage.setItem('closet-persona', JSON.stringify(S.stylePersona));
-    toast('Style portrait updated ✨');
-  } catch(e) {
-    console.error('generateStylePersona error:', e);
-    toast('Portrait failed: ' + (e.message || 'Unknown error'));
-  }
-  S.personaLoading = false;
-  render();
-}
-
-// ── Generic share helper ──────────────────────────────────────────────────────
-async function shareText(title, text, url) {
-  const fullText = url ? `${text}\n\n${url}` : text;
-  if (navigator.share) {
-    try { await navigator.share(url ? { title, text, url } : { title, text }); return; }
-    catch(e) { if (e.name === 'AbortError') return; }
-  }
-  // Fallback: copy to clipboard
-  try {
-    await navigator.clipboard.writeText(fullText);
-    toast('Copied to clipboard ✓');
-  } catch(e) { toast('Could not share — try copying manually'); }
-}
-
-// ── Share: Style Portrait ─────────────────────────────────────────────────────
-function sharePersona() {
-  const p = S.stylePersona; if (!p) return;
-  const name = S.profileName ? `${S.profileName}'s Style Portrait` : 'My Style Portrait';
-  const text = `✦ ${p.headline}\n\n${p.body}\n\n— via Closet, my personal style journal`;
-  shareText(name, text);
-}
-
-// ── Persona color palette ─────────────────────────────────────────────────────
-function getPersonaColors(persona) {
-  if (!persona) return { bg1:'#1A1428', bg2:'#251E35', accent:'#C5A028', text:'#F0E6D3', textSub:'rgba(240,230,211,0.7)' };
-  const txt = (persona.headline + ' ' + persona.body).toLowerCase();
-  if (/minimal|clean|simple|neutral|mono|understated/.test(txt))
-    return { bg1:'#111214', bg2:'#1E2022', accent:'#B0B0B0', text:'#F5F5F5', textSub:'rgba(245,245,245,0.65)' };
-  if (/boho|earthy|natural|organic|warm|desert|terracotta|rattan/.test(txt))
-    return { bg1:'#271608', bg2:'#3D2310', accent:'#C4956A', text:'#F5EAD7', textSub:'rgba(245,234,215,0.7)' };
-  if (/bold|vibrant|colorful|bright|pop|eclectic|statement/.test(txt))
-    return { bg1:'#180832', bg2:'#2A0848', accent:'#FF6B9D', text:'#FFE8F5', textSub:'rgba(255,232,245,0.7)' };
-  if (/romantic|feminine|soft|floral|dreamy|whimsi/.test(txt))
-    return { bg1:'#22071A', bg2:'#380E28', accent:'#E8A5B8', text:'#FDF0F5', textSub:'rgba(253,240,245,0.7)' };
-  if (/dark|edge|goth|rock|leather|moody|noir/.test(txt))
-    return { bg1:'#060606', bg2:'#100808', accent:'#CC3333', text:'#D4C4B0', textSub:'rgba(212,196,176,0.7)' };
-  if (/preppy|classic|timeless|nautical|ivy|heritage|tailored/.test(txt))
-    return { bg1:'#0A1628', bg2:'#152240', accent:'#C5A028', text:'#EEF2FF', textSub:'rgba(238,242,255,0.7)' };
-  if (/athletic|sport|active|casual|weekend|athleisure/.test(txt))
-    return { bg1:'#060F1E', bg2:'#0A1A2E', accent:'#00C07F', text:'#E8F8F2', textSub:'rgba(232,248,242,0.7)' };
-  if (/street|urban|hype|oversized|skate/.test(txt))
-    return { bg1:'#0A0A0A', bg2:'#181818', accent:'#FF4500', text:'#FFFFFF', textSub:'rgba(255,255,255,0.65)' };
-  return { bg1:'#1A1428', bg2:'#251E35', accent:'#C5A028', text:'#F0E6D3', textSub:'rgba(240,230,211,0.7)' };
-}
-
-// ── Fashion sketch SVG builder ────────────────────────────────────────────────
-function buildFashionSketchSVG(persona) {
-  const colors = getPersonaColors(persona);
-  const txt = ((persona?.headline||'') + ' ' + (persona?.body||'')).toLowerCase();
-  const ink = '#1C1C1E';
-  const skin = '#F2D9B8';
-  const blush = colors.accent + '30';
-  const ac = colors.accent;
-
-  // Deterministic hair style from persona headline
-  let h = 0;
-  for (const c of (persona?.headline || 'x')) h = (h * 31 + c.charCodeAt(0)) & 0x7fffffff;
-  const hairIdx = h % 5;
-
-  // Outfit type from persona keywords
-  let outfit = 'classic';
-  if (/minimal|clean|simple|understated|mono/.test(txt))    outfit = 'minimal';
-  else if (/boho|earthy|flowy|flowing|natural|organic/.test(txt)) outfit = 'boho';
-  else if (/romantic|feminine|soft|floral|dreamy|whimsi/.test(txt)) outfit = 'romantic';
-  else if (/bold|vibrant|colorful|pop|statement|eclectic/.test(txt)) outfit = 'bold';
-  else if (/athletic|sport|active|athleisure|casual/.test(txt)) outfit = 'athletic';
-  else if (/dark|edge|goth|leather|noir|moody/.test(txt))   outfit = 'edge';
-  else if (/street|urban|hype|oversized|skate/.test(txt))   outfit = 'street';
-
-  // ── Hair definitions (drawn in two passes: behind & front of face) ───────────
-  const hairBack = [
-    /* 0 sleek bob */    `<path d="M80,65 Q78,44 100,34 Q122,24 120,65" fill="${ac}99" stroke="none"/>`,
-    /* 1 long waves */   `<path d="M80,65 Q68,50 74,100 Q70,130 68,165 Q78,168 82,140 Q90,100 100,95 Q110,100 118,140 Q122,168 132,165 Q130,130 126,100 Q132,50 120,65 Q110,24 100,28 Q88,24 80,65Z" fill="${ac}77" stroke="none"/>`,
-    /* 2 updo/bun */     `<path d="M82,65 Q80,46 100,36 Q120,26 118,65" fill="${ac}99" stroke="none"/>`,
-    /* 3 shoulder wav */ `<path d="M80,65 Q72,48 78,100 Q80,115 78,130 Q88,125 92,105 Q100,100 108,105 Q112,125 122,130 Q120,115 122,100 Q128,48 120,65 Q110,26 100,30 Q88,26 80,65Z" fill="${ac}77" stroke="none"/>`,
-    /* 4 straight long */'<path d="M80,65 Q70,50 68,120 Q66,155 70,180 Q80,175 82,140 Q92,100 100,98 Q108,100 118,140 Q120,175 130,180 Q134,155 132,120 Q130,50 120,65 Q110,24 100,28 Q88,24 80,65Z" fill="${ac}66" stroke="none"/>',
-  ][hairIdx];
-
-  const hairFront = [
-    /* 0 sleek bob */    `<path d="M80,65 Q78,44 100,34 Q122,24 120,65 Q110,56 100,58 Q90,56 80,65Z" fill="${ac}CC" stroke="${ink}" stroke-width="1.2" stroke-linejoin="round"/>`,
-    /* 1 long waves */   `<path d="M80,65 Q78,44 100,28 Q122,24 120,65 Q110,56 100,58 Q90,56 80,65Z" fill="${ac}CC" stroke="${ink}" stroke-width="1.2"/>`,
-    /* 2 updo/bun */     `<path d="M82,65 Q80,46 100,36 Q120,26 118,65 Q110,58 100,60 Q90,58 82,65Z" fill="${ac}CC" stroke="${ink}" stroke-width="1.2"/>
-     <circle cx="100" cy="30" r="11" fill="${ac}EE" stroke="${ink}" stroke-width="1.2"/>
-     <path d="M92,34 Q100,28 108,34" fill="none" stroke="${ink}" stroke-width="1"/>`,
-    /* 3 shoulder wav */ `<path d="M80,65 Q76,44 100,30 Q124,24 120,65 Q110,56 100,58 Q90,56 80,65Z" fill="${ac}CC" stroke="${ink}" stroke-width="1.2"/>
-     <path d="M80,65 Q75,90 78,115" fill="none" stroke="${ac}CC" stroke-width="8" stroke-linecap="round"/>
-     <path d="M120,65 Q125,90 122,115" fill="none" stroke="${ac}CC" stroke-width="8" stroke-linecap="round"/>`,
-    /* 4 straight long */`<path d="M80,65 Q78,44 100,28 Q122,24 120,65 Q110,55 100,58 Q90,55 80,65Z" fill="${ac}CC" stroke="${ink}" stroke-width="1.2"/>
-     <path d="M80,65 Q70,100 72,160" fill="none" stroke="${ac}BB" stroke-width="9" stroke-linecap="round"/>
-     <path d="M120,65 Q130,100 128,160" fill="none" stroke="${ac}BB" stroke-width="9" stroke-linecap="round"/>`,
-  ][hairIdx];
-
-  // ── Outfit silhouettes ────────────────────────────────────────────────────────
-  const outfits = {
-    minimal: /* tailored trench/coat */ `
-      <path d="M78,112 L62,175 L66,305 L134,305 L138,175 L122,112 Q100,122 78,112Z" fill="white" stroke="${ink}" stroke-width="1.4" stroke-linejoin="round"/>
-      <path d="M78,112 L62,175 L80,178 L90,115Z" fill="${ac}22" stroke="${ink}" stroke-width="1" stroke-linejoin="round"/>
-      <path d="M122,112 L138,175 L120,178 L110,115Z" fill="${ac}22" stroke="${ink}" stroke-width="1" stroke-linejoin="round"/>
-      <path d="M100,122 L100,260" stroke="${ink}" stroke-width="0.8" stroke-dasharray="3,4"/>
-      <line x1="88" y1="148" x2="112" y2="148" stroke="${ink}" stroke-width="0.8"/>`,
-    boho: /* flowing maxi */ `
-      <path d="M80,112 Q68,145 58,200 Q50,245 48,305 L152,305 Q150,245 142,200 Q132,145 120,112 Q100,122 80,112Z" fill="${ac}22" stroke="${ink}" stroke-width="1.4" stroke-linejoin="round"/>
-      <path d="M68,165 Q84,174 100,170 Q116,174 132,165" fill="none" stroke="${ac}88" stroke-width="1.2" stroke-dasharray="4,3"/>
-      <path d="M58,215 Q78,226 100,222 Q122,226 142,215" fill="none" stroke="${ac}88" stroke-width="1.2" stroke-dasharray="4,3"/>
-      <path d="M50,265 Q74,274 100,270 Q126,274 150,265" fill="none" stroke="${ac}88" stroke-width="1.2" stroke-dasharray="4,3"/>`,
-    romantic: /* a-line dress */ `
-      <path d="M80,112 Q76,140 78,165 Q68,185 62,225 Q58,260 60,305 L140,305 Q142,260 138,225 Q132,185 122,165 Q124,140 120,112 Q100,122 80,112Z" fill="${ac}18" stroke="${ink}" stroke-width="1.4"/>
-      <path d="M80,112 Q100,120 120,112 L122,138 Q100,148 78,138Z" fill="${ac}33" stroke="${ink}" stroke-width="1"/>
-      <path d="M76,170 Q100,182 124,170" fill="none" stroke="${ink}" stroke-width="1.2"/>
-      <path d="M64,228 Q100,240 136,228" fill="none" stroke="${ac}66" stroke-width="1"/>`,
-    bold: /* crop top + wide-leg */ `
-      <path d="M82,112 L82,155 Q100,162 118,155 L118,112 Q100,122 82,112Z" fill="${ac}" stroke="${ink}" stroke-width="1.4"/>
-      <path d="M82,158 Q68,180 52,305 L100,305 Q100,230 100,200 Q100,230 100,305 L148,305 Q132,180 118,158 Z" fill="${ac}33" stroke="${ink}" stroke-width="1.4" stroke-linejoin="round"/>`,
-    athletic: /* tracksuit */ `
-      <path d="M80,112 Q66,140 64,180 L72,305 L128,305 L136,180 Q134,140 120,112 Q100,122 80,112Z" fill="${ac}44" stroke="${ink}" stroke-width="1.4"/>
-      <path d="M80,112 L64,180 L80,184 L90,116Z" fill="${ac}88" stroke="${ink}" stroke-width="1"/>
-      <path d="M120,112 L136,180 L120,184 L110,116Z" fill="${ac}88" stroke="${ink}" stroke-width="1"/>
-      <line x1="90" y1="116" x2="110" y2="116" stroke="${ink}" stroke-width="1"/>
-      <path d="M70,245 Q100,252 130,245" fill="none" stroke="${ac}" stroke-width="2"/>`,
-    edge: /* long structured coat */ `
-      <path d="M74,112 L56,185 L60,305 L140,305 L144,185 L126,112 Q100,124 74,112Z" fill="${ink}0A" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
-      <path d="M74,112 L56,185 L76,190 L88,118Z" fill="${ink}18" stroke="${ink}" stroke-width="1"/>
-      <path d="M126,112 L144,185 L124,190 L112,118Z" fill="${ink}18" stroke="${ink}" stroke-width="1"/>
-      <line x1="100" y1="124" x2="100" y2="305" stroke="${ink}" stroke-width="1.5"/>
-      <path d="M88,162 Q100,158 112,162" fill="none" stroke="${ink}" stroke-width="1"/>`,
-    street: /* oversized hoodie */ `
-      <path d="M76,112 L56,172 L64,305 L136,305 L144,172 L124,112 Q100,128 76,112Z" fill="${ac}44" stroke="${ink}" stroke-width="1.4" stroke-linejoin="round"/>
-      <path d="M76,112 L56,172 L76,176 L88,120Z" fill="${ac}77" stroke="${ink}" stroke-width="1"/>
-      <path d="M124,112 L144,172 L124,176 L112,120Z" fill="${ac}77" stroke="${ink}" stroke-width="1"/>
-      <path d="M88,200 Q100,208 112,200" fill="none" stroke="${ink}" stroke-width="1.5"/>
-      <circle cx="100" cy="133" r="5" fill="${ink}22" stroke="${ink}" stroke-width="1"/>`,
-    classic: /* tailored suit/dress */ `
-      <path d="M80,112 L72,175 L70,305 L130,305 L128,175 L120,112 Q100,122 80,112Z" fill="${ac}22" stroke="${ink}" stroke-width="1.4"/>
-      <path d="M80,112 L72,175 L84,178 L90,116Z" fill="${ac}44" stroke="${ink}" stroke-width="1"/>
-      <path d="M120,112 L128,175 L116,178 L110,116Z" fill="${ac}44" stroke="${ink}" stroke-width="1"/>
-      <line x1="100" y1="122" x2="100" y2="240" stroke="${ink}" stroke-width="0.8"/>`,
-  };
-
-  return `<svg viewBox="0 0 200 320" xmlns="http://www.w3.org/2000/svg">
-  ${hairBack}
-  <!-- Arms -->
-  <path d="M78,114 Q56,155 50,205" fill="none" stroke="${skin}" stroke-width="12" stroke-linecap="round"/>
-  <path d="M78,114 Q56,155 50,205" fill="none" stroke="${ink}" stroke-width="1.3" stroke-linecap="round"/>
-  <path d="M122,114 Q144,155 150,205" fill="none" stroke="${skin}" stroke-width="12" stroke-linecap="round"/>
-  <path d="M122,114 Q144,155 150,205" fill="none" stroke="${ink}" stroke-width="1.3" stroke-linecap="round"/>
-  <!-- Torso/shoulders base -->
-  <path d="M78,112 Q68,125 72,145 Q86,152 100,150 Q114,152 128,145 Q132,125 122,112 Q100,122 78,112Z" fill="${skin}" stroke="${ink}" stroke-width="1.3"/>
-  <!-- Neck -->
-  <path d="M94,78 Q92,96 94,112 Q100,116 106,112 Q108,96 106,78 Q100,75 94,78Z" fill="${skin}" stroke="${ink}" stroke-width="1.2"/>
-  <!-- Collarbone -->
-  <path d="M78,112 Q88,108 100,110 Q112,108 122,112" fill="none" stroke="${ink}" stroke-width="1" opacity="0.5"/>
-  <!-- Outfit -->
-  ${outfits[outfit] || outfits.classic}
-  <!-- Head -->
-  <ellipse cx="100" cy="58" rx="21" ry="24" fill="${skin}" stroke="${ink}" stroke-width="1.4"/>
-  ${hairFront}
-  <!-- Brows -->
-  <path d="M87,47 Q91,44 95,46" fill="none" stroke="${ink}" stroke-width="1.6" stroke-linecap="round"/>
-  <path d="M105,46 Q109,44 113,47" fill="none" stroke="${ink}" stroke-width="1.6" stroke-linecap="round"/>
-  <!-- Eyes -->
-  <path d="M87,53 Q91,50 95,53 Q91,57 87,53Z" fill="${ink}"/>
-  <path d="M105,53 Q109,50 113,53 Q109,57 105,53Z" fill="${ink}"/>
-  <circle cx="92" cy="52" r="1.2" fill="white"/>
-  <circle cx="110" cy="52" r="1.2" fill="white"/>
-  <!-- Lashes upper -->
-  <path d="M87,52 Q86,49 85,47" fill="none" stroke="${ink}" stroke-width="1" stroke-linecap="round"/>
-  <path d="M95,52 Q95,49 96,47" fill="none" stroke="${ink}" stroke-width="1" stroke-linecap="round"/>
-  <path d="M105,52 Q104,49 103,47" fill="none" stroke="${ink}" stroke-width="1" stroke-linecap="round"/>
-  <path d="M113,52 Q114,49 115,47" fill="none" stroke="${ink}" stroke-width="1" stroke-linecap="round"/>
-  <!-- Nose -->
-  <path d="M99,60 Q97,66 99,68 Q101,69 103,68 Q105,66 101,60" fill="none" stroke="${ink}" stroke-width="1.1" stroke-linecap="round"/>
-  <!-- Lips -->
-  <path d="M93,74 Q97,71 100,72 Q103,71 107,74" fill="none" stroke="${ink}" stroke-width="1.4" stroke-linecap="round"/>
-  <path d="M93,74 Q100,79 107,74" fill="${ac}55" stroke="${ink}" stroke-width="1.1" stroke-linecap="round"/>
-  <!-- Cupid's bow -->
-  <path d="M95,73 Q100,70 105,73" fill="none" stroke="${ink}" stroke-width="0.9" stroke-linecap="round"/>
-  <!-- Blush -->
-  <ellipse cx="84" cy="66" rx="7" ry="4" fill="${blush}"/>
-  <ellipse cx="116" cy="66" rx="7" ry="4" fill="${blush}"/>
-</svg>`;
-}
-
-// ── Generate avatar (now uses sketch template — no API call) ──────────────────
-// ── Pollinations.ai — free AI image generation, no API key needed ────────────
-function hashStr(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
-  return Math.abs(h) % 99991;
-}
-
-function pollinationsLocationBannerUrl(location) {
-  const prompt = `Cinematic wide-angle landscape photograph of ${location}, golden hour warm light, beautiful city architecture and skyline, travel photography style, ultra detailed, vibrant colors, no people, no text`;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=320&model=flux&nologo=true&seed=${hashStr(location)}`;
-}
-
-function reloadLocationBanner() {
-  const img = document.getElementById('locBannerImg');
-  const err = document.getElementById('locBannerError');
-  const shimmer = document.getElementById('locBannerShimmer');
-  const loading = document.getElementById('locBannerLoading');
-  if (!img || !S.profileLocation) return;
-  // Reset to loading state
-  if (err) err.style.display = 'none';
-  if (shimmer) shimmer.style.display = '';
-  if (loading) loading.style.display = 'flex';
-  img.style.display = 'block';
-  img.style.opacity = '0';
-  // Force reload by appending a cache-bust param
-  img.src = pollinationsLocationBannerUrl(S.profileLocation) + '&_t=' + Date.now();
-}
-
-function pollinationsFashionPortraitUrl(persona, seed) {
-  // Use persona text directly so the portrait reflects the actual style description
-  const headline = (persona.headline || '').trim();
-  // Extract up to 5 descriptive phrases from the body (split on commas/periods)
-  const bodyPhrases = (persona.body || '')
-    .split(/[,.]+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 4)
-    .slice(0, 5)
-    .join(', ');
-  const prompt = `fashion editorial portrait illustration, "${headline}" personal style, ${bodyPhrases}, full figure elegant pose, high fashion magazine aesthetic, stylized artistic, soft gradient background, professional fashion illustration`;
-  const useSeed = seed !== undefined ? seed : hashStr(headline);
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=400&height=600&model=flux&nologo=true&seed=${useSeed}`;
-}
-
-function pollinationsWardrobeSketchUrl(name, category) {
-  const prompt = `fashion flat sketch illustration, ${name}, ${category||'clothing'}, clean minimalist line art, white background, fashion design technical drawing, professional apparel sketch, editorial style`;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&model=flux&nologo=true&seed=${hashStr((name||'')+(category||''))}`;
-}
-
-function generateStyleAvatar(force) {
-  const persona = S.stylePersona;
-  if (!persona) { toast('Generate your style portrait first'); return; }
-  // Without force, show existing portrait if it already matches this persona
-  if (!force && S.styleAvatar?.personaTs === persona.ts && (S.styleAvatar.url || S.styleAvatar.svg)) {
-    S.showShareCard = true; render(); return;
-  }
-  // Force (regenerate) uses a random seed for a fresh image; first-time uses deterministic seed
-  const seed = force ? (Date.now() % 99991) : undefined;
-  const url = pollinationsFashionPortraitUrl(persona, seed);
-  S.styleAvatar = { url, personaTs: persona.ts, ts: Date.now() };
-  localStorage.setItem('closet-style-avatar', JSON.stringify(S.styleAvatar)); fsSet('styleAvatar', S.styleAvatar);
-  S.showShareCard = true;
-  render();
-  toast(force ? 'Generating a new portrait — give it a few seconds ✨' : 'Generating your fashion portrait — give it a few seconds ✨');
-}
-
-function pickPortraitPhoto() {
-  const inp = document.createElement('input');
-  inp.type = 'file';
-  inp.accept = 'image/*';
-  inp.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:0;left:0;';
-  document.body.appendChild(inp);
-  inp.addEventListener('change', async () => {
-    document.body.removeChild(inp);
-    const file = inp.files[0]; if (!file) return;
-    try {
-      const { data } = await compressImage(file);
-      S.stylePortraitPhoto = data;
-      localStorage.setItem('closet-portrait-photo', data);
-      render();
-      toast('Portrait photo updated ✨');
-    } catch(e) { console.error('pickPortraitPhoto:', e); toast('Could not load photo — try again.'); }
-  });
-  inp.click();
-}
-function clearPortraitPhoto() {
-  S.stylePortraitPhoto = null;
-  localStorage.removeItem('closet-portrait-photo');
-  render();
-}
-function openShareCard() { S.showShareCard = true; render(); }
-function closeShareCard() { S.showShareCard = false; render(); }
 
 /* ================================================================
    ABOUT ME PANEL
@@ -4187,66 +3768,6 @@ function confirmRetireHair() {
 }
 
 function aboutMeSheetHTML() {
-  const persona = S.stylePersona;
-  const avatar  = S.styleAvatar;
-  const colors  = persona ? getPersonaColors(persona) : { accent: 'var(--gold)', bg1: '#f7f4f0', bg2: '#ede8e1', text: 'var(--text)' };
-
-  // ── Avatar block at top ────────────────────────────────────
-  const bigAvatarHTML = (() => {
-    const wrap = `width:80px;height:108px;border-radius:12px;overflow:hidden;position:relative;flex-shrink:0;background:linear-gradient(160deg,${colors.accent}28,${colors.accent}10);border:2px solid ${colors.accent}44;display:flex;align-items:center;justify-content:center;cursor:pointer;`;
-    const portraitSrc = S.stylePortraitPhoto || (avatar?.url || null);
-    const placeholder = `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;gap:4px;"><span style="font-size:18px;">📷</span><span style="font-size:9px;font-weight:700;color:var(--gold);opacity:.8;text-align:center;line-height:1.3;">Add<br>Photo</span></div>`;
-    const editBadge = `<div style="position:absolute;bottom:4px;right:4px;z-index:3;background:rgba(0,0,0,0.55);border-radius:100px;padding:2px 6px;font-size:8px;font-weight:700;color:#fff;letter-spacing:.04em;">edit</div>`;
-    if (portraitSrc)
-      return `<div style="${wrap}" ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto();" onclick="pickPortraitPhoto()">
-        <img src="${esc(photoBlobUrl(portraitSrc))}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:2;" onerror="this.style.opacity='0'">
-        ${editBadge}
-      </div>`;
-    return `<div style="${wrap}" ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto();" onclick="pickPortraitPhoto()">${placeholder}</div>`;
-  })();
-
-  // ── Profile chips ─────────────────────────────────────────
-  const chips = [
-    S.profileLocation    ? { icon:'📍', label: S.profileLocation }    : null,
-    S.profileGeneration  ? { icon:'🎂', label: S.profileGeneration.split(' ')[0] + ' ' + S.profileGeneration.split(' ')[1] } : null,
-    S.profileZodiac      ? { icon:'⭐', label: S.profileZodiac }         : null,
-    S.profileMBTI        ? { icon:'🧠', label: S.profileMBTI }         : null,
-  ].filter(Boolean);
-
-  const chipsHTML = chips.length ? chips.map(c =>
-    `<div class="about-me-chip">${c.icon} ${esc(c.label)}</div>`
-  ).join('') : '';
-
-  // ── Style Portrait mini-card ──────────────────────────────
-  const portraitHTML = persona ? `
-    <div style="background:linear-gradient(135deg,${colors.bg1},${colors.bg2});border-radius:14px;padding:14px 16px;border:1px solid ${colors.accent}33;margin-bottom:8px;">
-      <div style="font-size:9px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:${colors.accent};margin-bottom:6px;">✦ Style Portrait</div>
-      <div style="font-family:Georgia,serif;font-size:16px;font-weight:800;line-height:1.25;color:${colors.text};margin-bottom:8px;">${esc(persona.headline)}</div>
-      <div style="font-size:12px;line-height:1.65;color:${colors.text};opacity:.75;">${esc(persona.body)}</div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button onclick="heartPersona()" style="flex:1;min-width:80px;background:none;border:1.5px solid var(--border);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);">
-        ${S.personaHistory.find(h=>h.ts===persona.ts) ? '❤️ Saved' : '♡ Save'}
-      </button>
-      <button onclick="openShareCard()" style="flex:1;min-width:80px;background:none;border:1.5px solid var(--border);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);">
-        📤 Share
-      </button>
-      <button onclick="generateStylePersona()" style="flex:1;min-width:80px;background:none;border:1.5px solid var(--gold);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--gold-dk);">
-        ⟳ Refresh
-      </button>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:8px;">
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();pickPortraitPhoto();" onclick="pickPortraitPhoto()" style="flex:1;background:none;border:1.5px solid var(--border);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-2);touch-action:manipulation;">
-        📷 ${S.stylePortraitPhoto ? 'Change photo' : 'Add your photo'}
-      </button>
-      ${S.stylePortraitPhoto ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();clearPortraitPhoto();" onclick="clearPortraitPhoto()" style="background:none;border:1.5px solid var(--border);border-radius:100px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text-3);touch-action:manipulation;">✕</button>` : ''}
-    </div>` : `
-    <div style="text-align:center;padding:18px;background:var(--surface);border-radius:14px;border:1px dashed var(--border);">
-      <div style="font-size:24px;margin-bottom:8px;">✨</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:12px;">Your Style Portrait hasn't been generated yet</div>
-      <button onclick="closeAboutMe();generateStylePersona();" style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">✦ Generate Now</button>
-    </div>`;
-
   // ── Signature Scent section ───────────────────────────────
   const isRetiringScent = S._aboutMeRetiring === 'scent';
   const scentSection = `
@@ -4340,9 +3861,6 @@ function aboutMeSheetHTML() {
 
       <div style="height:1px;background:var(--border);margin:0 20px 20px;"></div>
 
-      <!-- Style Portrait -->
-      <div class="about-me-section">
-        <div class="about-me-section-title">✦ Style Portrait</div>
         ${portraitHTML}
         ${(() => { const jh = buildJourneyHTML(); return jh ? `<div style="margin-top:20px;">${jh}</div>` : ''; })()}
       </div>
@@ -4528,42 +4046,6 @@ async function exportShareCard() {
 }
 
 // ── Share card modal HTML ─────────────────────────────────────────────────────
-function shareCardModalHTML() {
-  const persona = S.stylePersona; if (!persona) return '';
-  const colors = getPersonaColors(persona);
-
-  return `
-  <div id="share-card-overlay" onclick="if(event.target.id==='share-card-overlay')closeShareCard()" style="position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);">
-    <div style="width:100%;max-width:360px;">
-
-      <!-- Card Preview -->
-      <div style="border-radius:20px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.6);background:linear-gradient(135deg,${colors.bg1},${colors.bg2});color:${colors.text};">
-        <div style="height:5px;background:${colors.accent};"></div>
-        <div style="padding:20px 20px 4px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-family:Georgia,serif;font-size:14px;font-weight:700;color:${colors.accent};">✦ CLOSET</span>
-          <span style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:${colors.accent};opacity:.7;">STYLE PORTRAIT</span>
-        </div>
-        ${S.stylePortraitPhoto ? `
-        <div style="width:100%;aspect-ratio:4/3;overflow:hidden;">
-          <img src="${esc(photoBlobUrl(S.stylePortraitPhoto))}" style="width:100%;height:100%;object-fit:cover;display:block;">
-        </div>` : ''}
-        <div style="padding:${S.stylePortraitPhoto?'16px':'24px'} 24px 24px;text-align:center;">
-          <div style="font-size:10px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:${colors.accent};margin-bottom:10px;">✦ Style Portrait</div>
-          <div style="font-family:Georgia,serif;font-size:19px;font-weight:800;line-height:1.25;margin-bottom:10px;color:${colors.text};">${esc(persona.headline)}</div>
-          <div style="height:1px;background:${colors.accent};opacity:.25;margin:0 20px 12px;"></div>
-          <div style="font-size:12px;line-height:1.6;color:${colors.text};opacity:.75;">${esc(persona.body)}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${colors.accent};opacity:.5;margin-top:14px;">closet.app · Your AI-Powered Style Journal</div>
-        </div>
-      </div>
-
-      <!-- Buttons -->
-      <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">
-        <button onclick="exportShareCard()" style="width:100%;padding:13px;border-radius:100px;border:2px solid ${colors.accent};background:transparent;color:${colors.accent};font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">📤 Save &amp; Share Image</button>
-        <button onclick="closeShareCard()" style="width:100%;padding:11px;border-radius:100px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.55);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Close</button>
-      </div>
-    </div>
-  </div>`;
-}
 
 // ── Share: Trend Alert ────────────────────────────────────────────────────────
 function shareTrend() {
@@ -4587,29 +4069,6 @@ function shareWardrobeItem(id) {
   shareText(w.name, lines.join('\n'));
 }
 
-function heartPersona() {
-  if (!S.stylePersona) return;
-  const p = S.stylePersona;
-  const idx = S.personaHistory.findIndex(h => h.ts === p.ts);
-  if (idx >= 0) {
-    // Already saved — toggle off
-    S.personaHistory.splice(idx, 1);
-    toast('Removed from Style Journey');
-  } else {
-    // Save a snapshot (headline + body + timestamp)
-    S.personaHistory.push({ headline: p.headline, body: p.body, ts: p.ts });
-    toast('Saved to your Style Journey ♥');
-  }
-  localStorage.setItem('closet-persona-history', JSON.stringify(S.personaHistory)); fsSet('personaHistory', S.personaHistory);
-  render();
-}
-
-function removeFromJourney(ts) {
-  S.personaHistory = S.personaHistory.filter(h => h.ts !== ts);
-  localStorage.setItem('closet-persona-history', JSON.stringify(S.personaHistory)); fsSet('personaHistory', S.personaHistory);
-  render();
-  toast('Removed');
-}
 
 /* ================================================================
    WEATHER (Open-Meteo — no API key required)
@@ -5436,6 +4895,7 @@ function featuresMenuHTML() {
       </div>
       <div class="feat-body" style="padding:0;">
         ${menuRow('🌿', 'Book Closet Therapy', 'Seasonal in-person visit — photograph, organise & digitise your wardrobe', "S.menuSection='services';render()")}
+        ${menuRow('📋', 'Share with Stylist', 'A creative PDF summary of your best looks & pieces', "closeMenu();navigate('stylist-report')")}
         ${menuRow('📊', 'Your Fashion Stats', 'Tiles of your style data — shareable at a tap', "closeMenu();navigate('dashboard')")}
         ${menuRow('✦', "Closet's Features", 'Everything built into your style journal', "S.menuSection='about';render()")}
         ${menuRow('✨', 'Onboarding Flow', 'Take the feature tour or set up your style', "closeMenu();S.onboardStep=0;navigate('onboarding')")}
@@ -6374,9 +5834,9 @@ function saveRouletteLook() {
     outfit: (S.funRoulette.outfit || []).map(p => ({ item: p.item||'', emoji: p.emoji||'👕', reason: p.reason||'' })),
     createdAt: new Date().toISOString(),
   };
-  S.savedRouletteLooks = [entry, ...S.savedRouletteLooks];
-  localStorage.setItem('closet-roulette-looks', JSON.stringify(S.savedRouletteLooks));
-  toast('🎲 Saved to Plan!');
+  S.savedDressMe = [entry, ...S.savedDressMe];
+  localStorage.setItem('closet-dressme-saves', JSON.stringify(S.savedDressMe));
+  toast('Saved!');
   render();
 }
 function deleteRouletteLook(id) {
@@ -6572,8 +6032,8 @@ function render() {
     case 'streak-calendar': html = viewStreakCalendar(); break;
     case 'dress-me':        html = viewDressMe();        break;
     case 'style-roulette':  html = viewStyleRoulette();  break;
-    case 'wish-share':      html = viewWishShare();      break;
     case 'saved-look':      html = viewSavedLook();      break;
+    case 'stylist-report':  html = viewStylistReport();  break;
   }
   // Inject tab bar right after the .nav block on every tab view
   // Skip if the view returned a notab form (e.g. sell form inside the sell tab)
@@ -6588,7 +6048,6 @@ function render() {
   if (S.featureMenuOpen) html += featuresMenuHTML();
   // About Me flyout retired — Profile is now its own tab. Kept for safety but never shown.
   // if (S.showAboutMe) html += aboutMeSheetHTML();
-  if (S.showShareCard) html += shareCardModalHTML();
   if (S.wordOfDay) html += wordOfDaySheetHTML();
   if (S._closetLightbox) html += closetLightboxHTML();
   if (S._sellDraftOpen) html += sellDraftModalHTML();
@@ -7409,7 +6868,7 @@ function saveDressMe() {
   };
   S.savedDressMe = [entry, ...S.savedDressMe];
   localStorage.setItem('closet-dressme-saves', JSON.stringify(S.savedDressMe));
-  toast('❤️ Saved to Plan → Saved Looks!');
+  toast('Saved!');
 }
 function deleteDressMeSave(id) {
   S.savedDressMe = S.savedDressMe.filter(d => d.id !== id);
@@ -8128,14 +7587,8 @@ function viewFun() {
             <button
               ontouchend="if(_touchMoved)return;event.preventDefault();S.battleMode=true;S.friendRatingMode=false;navigate('upload')"
               onclick="S.battleMode=true;S.friendRatingMode=false;navigate('upload')"
-              style="width:100%;background:rgba(220,50,50,0.85);border:none;border-radius:100px;padding:12px 20px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:10px;">
+              style="width:100%;background:rgba(220,50,50,0.85);border:none;border-radius:100px;padding:12px 20px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
               ⚔️ Start a Battle
-            </button>
-            <button
-              ontouchend="if(_touchMoved)return;event.preventDefault();S.friendRatingMode=true;S.battleMode=false;navigate('upload')"
-              onclick="S.friendRatingMode=true;S.battleMode=false;navigate('upload')"
-              style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:100px;padding:10px 20px;font-size:13px;font-weight:700;color:rgba(255,255,255,.75);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-              👯 Friend's Fit Check
             </button>
 
             ${(()=>{
@@ -8175,6 +7628,28 @@ function viewFun() {
                 </div>` : ''}
               </div>`;
             })()}
+          </div>
+        </div>
+      </div>
+
+      <!-- Style Roulette -->
+      <div style="margin:10px 16px 0;">
+        <div style="border-radius:20px;overflow:hidden;background:linear-gradient(135deg,#0D1A2A 0%,#1A2D3A 50%,#0D1A2A 100%);padding:22px 20px;position:relative;">
+          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 80% 30%,rgba(50,140,220,0.2) 0%,transparent 60%);pointer-events:none;"></div>
+          <div style="position:relative;">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+              <div style="font-size:40px;line-height:1;flex-shrink:0;">🎲</div>
+              <div style="flex:1;">
+                <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:4px;">Style Roulette</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;">Can't decide what to wear? Let Claude spin a surprise outfit from your wardrobe — a different pick every time.</div>
+              </div>
+            </div>
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();S.funRoulette=null;navigate('style-roulette');generateRoulette();"
+              onclick="S.funRoulette=null;navigate('style-roulette');generateRoulette()"
+              style="width:100%;background:rgba(50,140,220,0.85);border:none;border-radius:100px;padding:12px 20px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+              🎲 Spin an Outfit
+            </button>
           </div>
         </div>
       </div>
@@ -8678,115 +8153,6 @@ async function toggleGem(id) {
   await DB.wardrobe.put(w);
 }
 
-/* ================================================================
-   HERO PIECES — SHARE CARD (used from wardrobe item view)
-   ================================================================ */
-// ── Share a single hero piece as a visual card ────────────────────
-function shareHeroPiece(id) {
-  const w = S.wardrobe.find(i => i.id === id);
-  if (!w) return;
-  const canvas = document.createElement('canvas');
-  const W = 750, H = 980;
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-
-  // Background
-  ctx.fillStyle = '#1C1A18';
-  ctx.fillRect(0, 0, W, H);
-
-  // Subtle grid texture
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
-  // Gold top bar
-  const grd = ctx.createLinearGradient(0, 0, W, 0);
-  grd.addColorStop(0, '#B8860B'); grd.addColorStop(1, '#D4A820');
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, W, 6);
-
-  // Crown + "Hero Piece" label
-  ctx.font = '800 13px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(212,168,32,0.9)';
-  ctx.letterSpacing = '2px';
-  ctx.fillText('✦ HERO PIECE', 40, 58);
-
-  // Big emoji
-  ctx.font = '120px serif';
-  ctx.fillText(w.icon || '👕', W/2 - 68, 230);
-
-  // Item name
-  ctx.font = '800 46px -apple-system,sans-serif';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.textAlign = 'center';
-  const nameLine = w.name.length > 24 ? w.name.slice(0, 24) + '…' : w.name;
-  ctx.fillText(nameLine, W/2, 305);
-
-  // Brand + category
-  const sub = [w.brand, w.category].filter(Boolean).join('  ·  ');
-  if (sub) {
-    ctx.font = '500 20px -apple-system,sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText(sub, W/2, 340);
-  }
-
-  // Divider
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(60, 375); ctx.lineTo(W-60, 375); ctx.stroke();
-
-  // Description
-  if (w.description) {
-    ctx.font = '400 21px -apple-system,sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.72)';
-    const words = w.description.split(' ');
-    let line = '', y = 420, maxW = W - 120;
-    for (const word of words) {
-      const test = line + (line ? ' ' : '') + word;
-      if (ctx.measureText(test).width > maxW && line) {
-        ctx.fillText(line, W/2, y); line = word; y += 34;
-        if (y > 600) { ctx.fillText(line + '…', W/2, y); line = null; break; }
-      } else { line = test; }
-    }
-    if (line) ctx.fillText(line, W/2, y);
-  }
-
-  // Stats row
-  const statY = 660;
-  const stats = [];
-  const wears = w.wears?.length || 0;
-  if (wears > 0) stats.push({ val: String(wears), lbl: 'Wears' });
-  if (w.brand)   stats.push({ val: w.brand, lbl: 'Brand' });
-  if (w.size)    stats.push({ val: w.size, lbl: 'Size' });
-  if (stats.length) {
-    const colW = W / stats.length;
-    stats.forEach((s, i) => {
-      const cx = colW * i + colW / 2;
-      ctx.font = '700 26px -apple-system,sans-serif';
-      ctx.fillStyle = '#D4A820';
-      ctx.fillText(s.val, cx, statY);
-      ctx.font = '500 14px -apple-system,sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillText(s.lbl.toUpperCase(), cx, statY + 22);
-    });
-  }
-
-  // "Looking for styling help" note
-  ctx.font = 'italic 400 19px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.38)';
-  ctx.fillText('Looking for styling help with this piece ✦', W/2, 750);
-
-  // Bottom branding
-  ctx.font = '600 15px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(184,125,42,0.7)';
-  ctx.fillText('✦ Closet', W/2, H - 36);
-  ctx.font = '400 13px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  ctx.fillText(new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}), W/2, H - 16);
-
-  _downloadOrShareCanvas(canvas, `hero-${w.name.replace(/\s+/g,'-').toLowerCase()}.png`);
-}
 
 // ── Share a single wardrobe item as a product card ───────────────
 async function shareWardrobeItem(id) {
@@ -8981,179 +8347,6 @@ async function _downloadOrShareCanvas(canvas, filename) {
   }, 'image/png');
 }
 
-/* ================================================================
-   SHARE: WISH LIST CARD
-   ================================================================ */
-function openWishShareSheet() {
-  const wishItems = [];
-  const wishNames = new Set();
-  // Saved (hearted) purchase recs only — same logic as before
-  S.entries.forEach(e => {
-    if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
-    e.purchaseRecs.forEach((r, i) => {
-      if (e.purchaseReactions[String(i)] === 'liked') {
-        const name = r.item || r;
-        if (!wishNames.has(name.toLowerCase())) {
-          wishNames.add(name.toLowerCase());
-          wishItems.push({ name, reason: r.reason || '', selected: true });
-        }
-      }
-    });
-  });
-  if (!wishItems.length) {
-    toast('Nothing on your list yet — heart picks in Claude\'s Recs or add items to Spotted!');
-    return;
-  }
-  S._wishShareItems = wishItems;
-  navigate('wish-share');
-}
-
-function toggleWishShareItem(idx) {
-  if (!S._wishShareItems || !S._wishShareItems[idx]) return;
-  S._wishShareItems[idx].selected = !S._wishShareItems[idx].selected;
-  const sel = S._wishShareItems[idx].selected;
-  // Update the visual circle checkbox
-  const checkEl = document.getElementById('wish-check-' + idx);
-  if (checkEl) {
-    checkEl.style.background = sel ? 'var(--gold)' : 'transparent';
-    checkEl.style.borderColor = sel ? 'var(--gold)' : 'var(--border)';
-    checkEl.innerHTML = sel ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : '';
-  }
-  // Update row background
-  const rowEl = document.getElementById('wish-row-' + idx);
-  if (rowEl) rowEl.style.background = sel ? 'var(--gold-bg)' : 'var(--surface)';
-  // Update count label and button
-  const count = S._wishShareItems.filter(x => x.selected).length;
-  const countEl = document.getElementById('wish-share-count');
-  if (countEl) countEl.textContent = `${count} of ${S._wishShareItems.length} selected`;
-  const btn = document.getElementById('wish-share-btn');
-  if (btn) {
-    btn.disabled = count === 0;
-    btn.textContent = count ? `Create Card (${count}) →` : 'Select items above';
-    btn.style.background = count ? 'var(--gold)' : 'var(--border)';
-    btn.style.color = count ? '#fff' : 'var(--text-3)';
-    btn.style.cursor = count ? 'pointer' : 'default';
-  }
-}
-
-async function shareWishListCard() {
-  // Use the selected items from the picker
-  const items = (S._wishShareItems || []).filter(x => x.selected);
-  if (!items.length) {
-    toast('Select at least one item first!');
-    return;
-  }
-  const occasion = S.shopWishOccasion.trim();
-  const userName = S.profileName || 'My';
-
-  // Canvas setup
-  const W = 420;
-  const ROW_H = 56;
-  const HEADER_H = 116;
-  const FOOTER_H = 50;
-  const PAD = 24;
-  const H = HEADER_H + items.length * ROW_H + 16 + FOOTER_H;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = W * 2; canvas.height = H * 2;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(2, 2);
-
-  // Background
-  ctx.fillStyle = '#F7F4F0';
-  ctx.fillRect(0, 0, W, H);
-
-  // Header gradient bar
-  const grd = ctx.createLinearGradient(0, 0, W, 0);
-  grd.addColorStop(0, '#B87D2A');
-  grd.addColorStop(1, '#8B5E1A');
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, W, HEADER_H);
-
-  // "✦ CLOSET" small label
-  ctx.font = '700 10px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,.6)';
-  ctx.fillText('✦ CLOSET', PAD, 26);
-
-  // Main title
-  ctx.font = '900 23px -apple-system,sans-serif';
-  ctx.fillStyle = '#FFFFFF';
-  const titleLine = occasion || `${userName}'s Wish List`;
-  ctx.fillText(titleLine, PAD, 60);
-
-  // Subtitle
-  ctx.font = '500 13px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,.72)';
-  const subLine = occasion ? `${userName}'s Wish List · ${items.length} pick${items.length===1?'':'s'}` : `${items.length} pick${items.length===1?'':'s'}`;
-  ctx.fillText(subLine, PAD, 82);
-
-  // Date
-  ctx.font = '400 11px -apple-system,sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,.45)';
-  ctx.fillText(new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}), PAD, 102);
-
-  // Items
-  items.forEach((item, idx) => {
-    const y = HEADER_H + idx * ROW_H;
-    // Alternating row tint
-    if (idx % 2 === 0) {
-      ctx.fillStyle = 'rgba(0,0,0,.03)';
-      ctx.fillRect(0, y, W, ROW_H);
-    }
-    // Separator line
-    ctx.strokeStyle = '#E3DAD0';
-    ctx.lineWidth = .5;
-    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
-
-    // Number circle
-    ctx.fillStyle = '#B87D2A';
-    ctx.beginPath(); ctx.arc(PAD + 11, y + ROW_H / 2, 11, 0, Math.PI * 2); ctx.fill();
-    ctx.font = '700 11px -apple-system,sans-serif';
-    ctx.fillStyle = '#fff';
-    ctx.textAlign = 'center';
-    ctx.fillText(String(idx + 1), PAD + 11, y + ROW_H / 2 + 4);
-    ctx.textAlign = 'left';
-
-    // Item name — truncate to fit
-    ctx.font = '600 14px -apple-system,sans-serif';
-    ctx.fillStyle = '#1C1A18';
-    const maxW = W - PAD * 2 - 32;
-    let name = item.name;
-    while (ctx.measureText(name).width > maxW && name.length > 1) name = name.slice(0, -1);
-    if (name !== item.name) name += '…';
-    const _detail = item.reason || (item.spotted ? [item.brand, item.price].filter(Boolean).join(' · ') : '');
-    ctx.fillText(name, PAD + 30, _detail ? y + ROW_H / 2 - 5 : y + ROW_H / 2 + 5);
-
-    // Reason / brand+price line
-    const detail = item.reason || (item.spotted ? [item.brand, item.price].filter(Boolean).join(' · ') : '');
-    if (detail) {
-      ctx.font = '400 11px -apple-system,sans-serif';
-      ctx.fillStyle = '#6B6563';
-      let reason = detail;
-      while (ctx.measureText(reason).width > maxW && reason.length > 1) reason = reason.slice(0, -1);
-      if (reason !== detail) reason += '…';
-      ctx.fillText(reason, PAD + 30, y + ROW_H / 2 + 12);
-    }
-  });
-
-  // Footer separator
-  const footerY = HEADER_H + items.length * ROW_H + 12;
-  ctx.strokeStyle = '#E3DAD0'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(PAD, footerY); ctx.lineTo(W - PAD, footerY); ctx.stroke();
-
-  // Footer text
-  ctx.font = '500 11px -apple-system,sans-serif';
-  ctx.fillStyle = '#B0A9A4';
-  ctx.textAlign = 'center';
-  ctx.fillText('Made with Closet', W / 2, footerY + 26);
-  ctx.textAlign = 'left';
-
-  // Navigate back and share
-  S._wishShareItems = null;
-  S.shopWishOccasion = '';
-  navigate('shop');
-  await _downloadOrShareCanvas(canvas, 'wish-list.png');
-}
 
 /* ================================================================
    VIEW: SETUP
@@ -9245,49 +8438,6 @@ function buildPersonaHTML() {
   return `<div class="persona-card">${personaInner}</div>`;
 }
 
-function buildJourneyHTML() {
-  const persona = S.stylePersona;
-  const currentTs = persona ? persona.ts : null;
-  const journeyPast = S.personaHistory.filter(h => h.ts !== currentTs);
-  if (!journeyPast.length) return '';
-  const sorted = [...journeyPast].sort((a, b) => b.ts - a.ts);
-  const fmtTs = ts => {
-    if (!ts) return '';
-    const d = new Date(ts);
-    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  };
-  // Top card: fully open. Older cards: just the header strip peeking out below.
-  const cardsHTML = sorted.map((h, i) => {
-    const isTop = i === 0;
-    const zIndex = sorted.length - i + 1;
-    if (isTop) {
-      return `
-        <div class="journey-top" style="z-index:${zIndex};">
-          <div class="journey-stack-date">♥ ${fmtTs(h.ts)}</div>
-          <div class="journey-stack-headline">${esc(h.headline)}</div>
-          <div class="journey-stack-body">${esc(h.body)}</div>
-          <button class="journey-stack-del" onclick="removeFromJourney(${h.ts})" title="Remove">✕</button>
-        </div>`;
-    }
-    return `
-      <div class="journey-peek" style="z-index:${zIndex};">
-        <div class="journey-stack-date">♥ ${fmtTs(h.ts)}</div>
-        <div class="journey-stack-headline">${esc(h.headline)}</div>
-        <button class="journey-stack-del" onclick="removeFromJourney(${h.ts})" title="Remove">✕</button>
-      </div>`;
-  }).join('');
-
-  return `
-    <div style="margin-top:4px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);">Style Journey</div>
-        <span style="font-size:11px;color:var(--text-3);">${sorted.length} saved</span>
-      </div>
-      <div style="position:relative;">
-        ${cardsHTML}
-      </div>
-    </div>`;
-}
 
 function viewCloset() {
   const entries = filteredEntries();
@@ -9446,7 +8596,7 @@ function viewDressMe() {
                   💜 Save it
                 </button>
                 <button ontouchend="if(_touchMoved)return;event.preventDefault();generateDressMe();" onclick="generateDressMe();"
-                  style="flex:1;background:var(--surface-2,var(--surface));border:1.5px solid var(--border);border-radius:var(--r);padding:11px;font-size:13px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                  style="flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:11px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;font-family:inherit;touch-action:manipulation;">
                   🔄 Try another
                 </button>
               </div>
@@ -9497,9 +8647,9 @@ function viewDressMe() {
 
           ${vibes.length > 1 ? `
           <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:14px;scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();S._dressMeVibeFilter='all';render();" onclick="S._dressMeVibeFilter='all';render()"
+            <button ontouchstart="event.stopPropagation();S._dressMeVibeFilter='all';render();"
               style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeVibe==='all'?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeVibe==='all'?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeVibe==='all'?'#fff':'#6C3EBF'};">All ${allSaved.length}</button>
-            ${vibes.map(v=>`<button ontouchend="if(_touchMoved)return;event.preventDefault();S._dressMeVibeFilter=${JSON.stringify(v)};render();" onclick="S._dressMeVibeFilter=${JSON.stringify(v)};render()"
+            ${vibes.map(v=>`<button ontouchstart="event.stopPropagation();S._dressMeVibeFilter=${JSON.stringify(v)};render();"
               style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${activeVibe===v?'none':'1.5px solid rgba(108,62,191,0.3)'};background:${activeVibe===v?'linear-gradient(135deg,#6C3EBF,#9B5FE0)':'transparent'};color:${activeVibe===v?'#fff':'#6C3EBF'};">${esc(v)}</button>`).join('')}
           </div>` : ''}
 
@@ -9846,7 +8996,7 @@ function viewShop() {
       ${src === 'spotted'
         ? `<button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openSpottedCapture();" onclick="openSpottedCapture()">＋ Capture</button>`
         : src === 'wishlist'
-        ? `<button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openWishShareSheet();" onclick="openWishShareSheet()">🎁 Share List</button>`
+        ? ``
         : ``
       }
     </div>
@@ -10057,7 +9207,6 @@ function viewShop() {
       </div>`;
     })() : ''}
 
-    <!-- Share Wish List: now a dedicated page (wish-share view) -->
 
   ${/* Returns entry point — subtle utility row at bottom of Shop */ ''}
   ${src !== 'spotted' && src !== 'wishlist' ? `
@@ -10085,9 +9234,6 @@ function viewPlan() {
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">📅 Plan</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();S.funRoulette=null;navigate('style-roulette');generateRoulette();" onclick="S.funRoulette=null;navigate('style-roulette');generateRoulette();" style="font-size:12px;">
-        🎲 Style Roulette
-      </button>
     </div>
 
     <div class="plan-hero">
@@ -10263,69 +9409,36 @@ function viewPlan() {
 
 
       ${S.savedTripPlans.length ? (()=>{
-        // ── TRIPS — universal list cards ──────────────────────────────────────
-        const aw = S.wardrobe.filter(w=>!w.retiredFromCloset&&!w.inMaybePile);
-        const normN = s=>(s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
-        const findWI = name=>{ const t=normN(name); return aw.find(w=>normN(w.name)===t)||aw.find(w=>normN(w.name).includes(t)||t.includes(normN(w.name)))||null; };
-
-        const rows = [
-          ...S.savedTripPlans.map(tp=>{
-            const day1 = (tp.suggestions||[])[0]?.outfit || (tp.suggestions||[])[0]?.items || [];
-            const items = day1.map((p,i)=>({...p,item:p.item||p.name||'',_i:i,_wi:findWI(p.item||p.name||'')}));
-            const scored = items.map(p=>({p,s:heroScore(p.item,p._wi?.category)}));
-            scored.sort((a,b)=>b.s-a.s);
-            const anchor = scored[0]?.p||items[0]||null;
-            const pairs = items.filter(p=>p._i!==(anchor?._i??-1));
-            const d = new Date(tp.createdAt);
-            return { _kind:'trip', id:tp.id, title:tp.destination||'Trip',
-              sub:`${tp.days} day${tp.days===1?'':'s'}`,
-              anchor, anchorWI:anchor?._wi||null, pairs, createdAt:tp.createdAt,
-              deleteFn:`deleteTripPlan('${tp.id}')`,
-              tapFn:`toggleTripPlan('${tp.id}')`,
-              tp };
-          }),
-        ].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-
-        const total = rows.length;
+        // ── SAVED TRIPS — compact rows, expand to full plan ───────────────────
+        const sorted = [...S.savedTripPlans].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
         return `<div style="padding:0 16px;margin-bottom:8px;">
           <div class="event-board-header" style="padding:4px 0 10px;">
             <span>✈️ Saved Trips</span>
-            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${total} saved</span>
+            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${sorted.length} saved</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            ${rows.map(row=>{
-              const d = new Date(row.createdAt);
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${sorted.map(tp=>{
+              const isOpen = S._openTripPlanId === tp.id;
+              const d = new Date(tp.createdAt);
               const dateLabel = isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-              const isOpen = row._kind==='trip' && S._openTripPlanId===row.id;
+              // Collect all unique emojis across all days
+              const allEmojis = [...new Set((tp.suggestions||[]).flatMap(day=>(day.outfit||day.items||[]).map(p=>p.emoji||'👕')))].slice(0,8);
               return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
-                <!-- Card header -->
-                <div style="display:flex;" ontouchend="if(_touchMoved)return;event.preventDefault();${row.tapFn};" onclick="${row.tapFn}">
-                  <!-- Anchor photo -->
-                  <div style="width:80px;flex-shrink:0;position:relative;cursor:pointer;">
-                    ${(row.anchorWI?.photo||row.anchorWI?.photoThumb)
-                      ? `<img src="${esc(photoBlobUrl(row.anchorWI.photo||row.anchorWI.photoThumb))}" style="width:80px;height:100%;min-height:110px;object-fit:cover;object-position:top;display:block;">`
-                      : `<div style="width:80px;min-height:110px;background:rgba(184,125,42,0.08);display:flex;align-items:center;justify-content:center;font-size:30px;">✈️</div>`}
-                    <div style="position:absolute;bottom:0;left:0;right:0;padding:3px 4px;background:rgba(0,0,0,0.5);font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#fff;text-align:center;">Start with</div>
-                  </div>
-                  <!-- Details -->
-                  <div style="flex:1;min-width:0;padding:11px 12px 10px;cursor:pointer;">
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:3px;">
-                      <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;flex:1;">${row._kind==='trip'?'✈️ ':''}${esc(row.title)}</div>
-                      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
-                        <span style="font-size:10px;color:var(--text-3);">${dateLabel}</span>
-                        <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();${row.deleteFn};render();" onclick="event.stopPropagation();${row.deleteFn};render()"
-                          style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;padding:1px 2px;line-height:1;touch-action:manipulation;">✕</button>
-                      </div>
+                <div style="padding:10px 14px;cursor:pointer;touch-action:manipulation;"
+                  ontouchend="if(_touchMoved)return;event.preventDefault();toggleTripPlan('${tp.id}');" onclick="toggleTripPlan('${tp.id}')">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">✈️ ${esc(tp.destination||'Trip')}</div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                      <span style="font-size:10px;color:var(--text-3);">${tp.days}d · ${dateLabel}</span>
+                      <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteTripPlan('${tp.id}');render();" onclick="event.stopPropagation();deleteTripPlan('${tp.id}');render()"
+                        style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;padding:2px 3px;line-height:1;touch-action:manipulation;">✕</button>
+                      <span style="font-size:11px;color:var(--text-3);transition:transform .15s;display:inline-block;transform:rotate(${isOpen?'180deg':'0'});">▾</span>
                     </div>
-                    ${row.sub?`<div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">${esc(row.sub)}</div>`:''}
-                    ${row.anchor?`<div style="font-size:11px;color:var(--text-2);margin-bottom:4px;">${esc(row.anchor.emoji||'👕')} <strong>${esc(row.anchor.item)}</strong></div>`:''}
-                    ${row.pairs.length?`<div style="font-size:11px;color:var(--text-3);line-height:1.5;">${row.pairs.slice(0,3).map(p=>`${esc(p.emoji||'👕')} ${esc(p.item)}`).join(' · ')}${row.pairs.length>3?` +${row.pairs.length-3}`:''}</div>`:''}
-                    <div style="font-size:11px;color:var(--gold-dk);font-weight:700;margin-top:8px;">${isOpen?'Hide plan ▴':'View full plan ▾'}</div>
                   </div>
+                  <div style="font-size:18px;margin-top:6px;letter-spacing:2px;">${allEmojis.join(' ')}</div>
                 </div>
-                <!-- Trip expanded body -->
-                ${(row._kind==='trip'&&isOpen)?`<div style="border-top:1px solid var(--border);padding:0 12px 12px;">${tripPlanBodyHTML(row.tp.suggestions,row.tp.gaps,`${row.tp.days}-Day Wardrobe Plan`)}</div>`:''}`
-                + `</div>`;
+                ${isOpen?`<div style="border-top:1px solid var(--border);padding:0 12px 12px;">${tripPlanBodyHTML(tp.suggestions,tp.gaps,`${tp.days}-Day Wardrobe Plan`)}</div>`:''}
+              </div>`;
             }).join('')}
           </div>
         </div>`;
@@ -10483,17 +9596,18 @@ function getSavedLookData(type, id) {
 
 function viewSavedLook() {
   const sl = S._savedLookView;
-  if (!sl) { navigate('plan'); return ''; }
+  const backTo = sl?.from || 'dress-me';
+  if (!sl) { navigate(backTo); return ''; }
   const data = getSavedLookData(sl.type, sl.id);
-  if (!data) { navigate('plan'); return ''; }
+  if (!data) { navigate(backTo); return ''; }
   const { badge, badgeColor, quote, anchor, pairs, gaps, deleteFn, extraBtn } = data;
   const anchorWI = anchor?.wardrobeItem;
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('plan')" onclick="navigate('plan')">${iconBack()} Plan</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${backTo}')" onclick="navigate('${backTo}')">${iconBack()} Back</button>
       <span class="nav-title">Your Outfit</span>
-      <button class="nav-btn" ontouchend="if(_touchMoved)return;event.preventDefault();${deleteFn};navigate('plan');" onclick="${deleteFn};navigate('plan');" style="font-size:18px;touch-action:manipulation;background:none;border:none;color:var(--text-3);cursor:pointer;padding:8px;">✕</button>
+      <button class="nav-btn" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${backTo}');" onclick="navigate('${backTo}');" style="font-size:18px;touch-action:manipulation;background:none;border:none;color:var(--text-3);cursor:pointer;padding:8px;">✕</button>
     </div>
 
     <!-- Occasion pill + stylist note -->
@@ -10568,94 +9682,285 @@ function viewSavedLook() {
         ${extraBtn.label}
       </button>
     </div>` : ''}
-    <div style="height:40px;"></div>
+    <div style="padding:20px 20px 8px;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();${deleteFn};navigate('${backTo}');" onclick="${deleteFn};navigate('${backTo}');"
+        style="width:100%;padding:13px;border-radius:var(--r);cursor:pointer;font-family:inherit;border:1.5px solid var(--border);background:none;color:var(--text-3);font-size:13px;font-weight:700;touch-action:manipulation;">
+        Delete
+      </button>
+    </div>
+    <div style="height:24px;"></div>
   </div>`;
 }
 
-function viewWishShare() {
-  const wishItems = S._wishShareItems || [];
-  const selectedCount = wishItems.filter(x => x.selected).length;
-  const QUICK = ['🎂 Birthday','🎄 Holiday','💍 Registry'];
+/* ================================================================
+   STYLIST REPORT — hamburger entry, opens a print-ready PDF window
+   ================================================================ */
+function viewStylistReport() {
+  const aw = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
 
-  return `<div class="view view-notab" style="display:flex;flex-direction:column;height:100dvh;box-sizing:border-box;">
+  // Top pieces: score by (wears * 2) + (rating * 3), take top 8 with photos first
+  const scored = aw.map(w => ({
+    w,
+    score: (w.wears?.length || 0) * 2 + (w.rating || 0) * 3
+  })).sort((a, b) => b.score - a.score);
+  const topPieces = scored.filter(x => x.w.photo || x.w.photoThumb).slice(0, 8).map(x => x.w);
+
+  // Best saved looks (most recent 6, across all three types)
+  const allSaved = [
+    ...S.savedDressMe.map(d => ({ type: 'dressme', id: d.id, at: d.createdAt })),
+    ...S.savedOutfitBuilds.map(o => ({ type: 'builder', id: o.id, at: o.createdAt })),
+    ...S.savedRouletteLooks.map(r => ({ type: 'roulette', id: r.id, at: r.createdAt })),
+  ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 6);
+
+  const persona = S.stylePersona;
+  const goals = S.styleGoals || [];
+  const name = S.profileName || 'Your';
+
+  return `
+  <div style="display:flex;flex-direction:column;height:100%;background:var(--bg);overflow:hidden;">
+    <!-- Nav -->
     <div class="nav" style="flex-shrink:0;">
       <button class="nav-back"
-        ontouchend="if(_touchMoved)return;event.preventDefault();S._wishShareItems=null;navigate('shop');"
-        onclick="S._wishShareItems=null;navigate('shop');">
-        ${iconBack()} Saved
+        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('closet');"
+        onclick="navigate('closet')">
+        ${iconBack()} Back
       </button>
-      <span class="nav-title">🎁 Share Wish List</span>
-      <span id="wish-share-count" style="font-size:12px;color:var(--text-3);font-weight:600;padding-right:4px;">${selectedCount} of ${wishItems.length} selected</span>
+      <span class="nav-title">📋 Stylist Report</span>
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();openStylistPDF();"
+        onclick="openStylistPDF()"
+        style="background:linear-gradient(135deg,#B8860B,#D4A820);border:none;border-radius:100px;padding:7px 14px;font-size:12px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
+        ↗ Open PDF
+      </button>
     </div>
 
-    <!-- Scrollable body -->
-    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px 0;">
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));">
 
-      ${wishItems.length === 0 ? `
-        <div style="text-align:center;padding:60px 20px;color:var(--text-3);">
-          <div style="font-size:40px;margin-bottom:12px;">🎁</div>
-          <div style="font-size:14px;font-weight:600;">No items on your wish list yet.</div>
-          <div style="font-size:12px;margin-top:6px;">Heart picks in Claude's Recs to add them here.</div>
-        </div>` : `
-
-      <!-- Item picker — native checkboxes, no re-render on tap -->
-      <div style="border:1.5px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:20px;">
-        ${wishItems.map((item, idx) => {
-          const sel = item.selected;
-          const detail = item.spotted
-            ? [item.brand, item.price].filter(Boolean).join(' · ')
-            : (item.reason || '');
-          return `<div id="wish-row-${idx}"
-            ontouchend="if(_touchMoved)return;event.preventDefault();toggleWishShareItem(${idx});"
-            onclick="toggleWishShareItem(${idx})"
-            style="display:flex;align-items:center;gap:12px;padding:13px 16px;background:${sel?'var(--gold-bg)':'var(--surface)'};border-bottom:${idx===wishItems.length-1?'none':'1px solid var(--border)'};cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;">
-            <div id="wish-check-${idx}" style="width:22px;height:22px;border-radius:50%;background:${sel?'var(--gold)':'transparent'};border:2px solid ${sel?'var(--gold)':'var(--border)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;pointer-events:none;">
-              ${sel?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}
-            </div>
-            ${item.photo ? `<img src="${esc(item.photo)}" style="width:36px;height:46px;object-fit:cover;border-radius:7px;flex-shrink:0;pointer-events:none;">` : ''}
-            <div style="flex:1;min-width:0;pointer-events:none;">
-              <div style="font-size:14px;font-weight:${sel?'700':'500'};color:var(--text);line-height:1.35;">${esc(item.name)}</div>
-              ${detail ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px;">${esc(detail)}</div>` : ''}
-            </div>
-            ${item.spotted ? `<span style="font-size:9px;font-weight:700;background:#EEF3FA;color:#3B5E8C;padding:2px 6px;border-radius:100px;flex-shrink:0;pointer-events:none;">📌</span>` : ''}
-          </div>`;
-        }).join('')}
+      <!-- ── HEADER ─────────────────────────────────── -->
+      <div style="background:linear-gradient(160deg,#1C1A18,#2a2318);padding:28px 20px 24px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#B8860B,#D4A820);"></div>
+        <div style="display:flex;align-items:center;gap:16px;">
+          ${(S.stylePortraitPhoto)
+            ? `<div style="width:72px;height:72px;border-radius:50%;overflow:hidden;border:2.5px solid rgba(212,168,32,0.6);flex-shrink:0;"><img src="${esc(S.stylePortraitPhoto)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
+            : `<div style="width:72px;height:72px;border-radius:50%;background:rgba(184,134,11,0.15);border:2.5px solid rgba(212,168,32,0.4);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:32px;">🪞</div>`}
+          <div>
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(212,168,32,0.7);margin-bottom:4px;">Style Profile</div>
+            <div style="font-size:22px;font-weight:900;color:#fff;line-height:1.1;">${esc(name)}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px;">${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+          </div>
+        </div>
       </div>
 
-      <!-- Occasion -->
-      <div style="margin-bottom:20px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">Occasion <span style="font-weight:400;color:var(--text-3)">(optional)</span></div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-          ${QUICK.map(label => {
-            const active = S.shopWishOccasion === label;
-            return `<button
-              ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render();"
-              onclick="S.shopWishOccasion=S.shopWishOccasion==='${label}'?'':'${label}';render()"
-              style="border-radius:100px;border:1.5px solid ${active?'var(--gold)':'var(--border)'};background:${active?'var(--gold-bg)':'none'};color:${active?'var(--gold-dk)':'var(--text-2)'};font-size:13px;font-weight:600;padding:7px 14px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-              ${label}
-            </button>`;
+      <!-- ── STYLE GOALS ──────────────────────────────── -->
+      ${goals.length ? `
+      <div style="padding:20px 20px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Style Goals</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${goals.map(g => `<div style="background:var(--gold-bg);border:1px solid var(--gold);border-radius:100px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--gold-dk);">${esc(g)}</div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      <!-- ── TOP PIECES ───────────────────────────────── -->
+      ${topPieces.length ? `
+      <div style="padding:20px 20px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Signature Pieces</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          ${topPieces.map(w => {
+            const src = w.photo || w.photoThumb || '';
+            const wears = w.wears?.length || 0;
+            return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
+              <div style="height:140px;overflow:hidden;background:var(--surface-2);">
+                ${src ? `<img src="${esc(src)}" style="width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;">${esc(w.icon||'👕')}</div>`}
+              </div>
+              <div style="padding:10px;">
+                <div style="font-size:12px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:3px;">${esc(w.name)}</div>
+                ${w.brand ? `<div style="font-size:10px;color:var(--text-3);">${esc(w.brand)}</div>` : ''}
+                ${wears ? `<div style="font-size:10px;color:var(--gold-dk);font-weight:700;margin-top:4px;">Worn ${wears}×</div>` : ''}
+              </div>
+            </div>`;
           }).join('')}
         </div>
-        <input type="text" placeholder="Or type your own… e.g. Christmas Ideas"
-          value="${esc(S.shopWishOccasion||'')}"
-          oninput="S.shopWishOccasion=this.value"
-          style="width:100%;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text);box-sizing:border-box;outline:none;-webkit-appearance:none;">
-      </div>`}
+      </div>` : ''}
 
-      <div style="height:env(safe-area-inset-bottom,20px);"></div>
-    </div>
+      <!-- ── BEST LOOKS ───────────────────────────────── -->
+      ${allSaved.length ? `
+      <div style="padding:20px 20px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Best Looks</div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          ${allSaved.map(sl => {
+            const data = getSavedLookData(sl.type, sl.id);
+            if (!data) return '';
+            const { badge, quote, anchor, pairs } = data;
+            const anchorWI = anchor?.wardrobeItem || null;
+            const anchorSrc = anchorWI ? (anchorWI.photo || anchorWI.photoThumb || '') : '';
+            return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
+              <div style="padding:10px 12px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+                <div style="font-size:10px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">${esc(badge)}</div>
+                ${quote ? `<div style="font-size:10px;color:var(--text-3);font-style:italic;flex:1;min-width:0;margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(quote)}</div>` : ''}
+              </div>
+              <div style="padding:12px;">
+                <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">Start with</div>
+                ${anchor ? `<div style="display:inline-block;text-align:center;margin-bottom:12px;">
+                  ${anchorSrc
+                    ? `<div style="width:80px;height:100px;border-radius:10px;overflow:hidden;border:2px solid var(--gold);"><img src="${esc(anchorSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
+                    : `<div style="width:80px;height:100px;border-radius:10px;background:var(--surface-2);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:34px;">${esc(anchor.emoji||'👕')}</div>`}
+                  <div style="font-size:10px;font-weight:700;color:var(--text);margin-top:5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(anchor.name)}</div>
+                </div>` : ''}
+                ${pairs.length ? `
+                  <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">Pair with</div>
+                  <div style="display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;">
+                    ${pairs.map(p => {
+                      const pwi = p.wardrobeItem;
+                      const psrc = pwi ? (pwi.photo || pwi.photoThumb || '') : '';
+                      return `<div style="flex-shrink:0;text-align:center;width:58px;">
+                        ${psrc
+                          ? `<div style="width:58px;height:72px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);"><img src="${esc(psrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
+                          : `<div style="width:58px;height:72px;border-radius:8px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:24px;">${esc(p.emoji||'👕')}</div>`}
+                        <div style="font-size:9px;color:var(--text-2);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</div>
+                      </div>`;
+                    }).join('')}
+                  </div>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : ''}
 
-    <!-- Sticky bottom action -->
-    <div style="flex-shrink:0;padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--border);background:var(--surface);">
-      <button id="wish-share-btn"
-        ontouchend="if(_touchMoved)return;event.preventDefault();shareWishListCard();"
-        onclick="shareWishListCard()"
-        ${selectedCount===0?'disabled':''}
-        style="width:100%;background:${selectedCount?'var(--gold)':'var(--border)'};color:${selectedCount?'#fff':'var(--text-3)'};border:none;border-radius:100px;padding:15px;font-size:15px;font-weight:800;cursor:${selectedCount?'pointer':'default'};font-family:inherit;touch-action:manipulation;transition:background .15s,color .15s;">
-        ${selectedCount ? `Create Card (${selectedCount}) →` : 'Select items above'}
-      </button>
+      <!-- ── STATS ────────────────────────────────────── -->
+      <div style="padding:20px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Wardrobe at a Glance</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          ${[
+            ['👗', aw.length, 'pieces'],
+            ['📓', S.entries.length, 'outfits logged'],
+            ['💜', allSaved.length, 'saved looks'],
+          ].map(([ic, n, lbl]) => `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 10px;text-align:center;">
+            <div style="font-size:20px;">${ic}</div>
+            <div style="font-size:20px;font-weight:900;color:var(--text);margin:4px 0 2px;">${n}</div>
+            <div style="font-size:9px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;">${lbl}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+
     </div>
   </div>`;
+}
+
+function openStylistPDF() {
+  const aw = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+  const goals = S.styleGoals || [];
+  const name = S.profileName || 'Your Closet';
+
+  const scored = aw.map(w => ({ w, score: (w.wears?.length||0)*2 + (w.rating||0)*3 }))
+    .sort((a,b) => b.score - a.score);
+  const topPieces = scored.filter(x => x.w.photo || x.w.photoThumb).slice(0, 8).map(x => x.w);
+
+  const allSaved = [
+    ...S.savedDressMe.map(d=>({type:'dressme',id:d.id,at:d.createdAt})),
+    ...S.savedOutfitBuilds.map(o=>({type:'builder',id:o.id,at:o.createdAt})),
+    ...S.savedRouletteLooks.map(r=>({type:'roulette',id:r.id,at:r.createdAt})),
+  ].sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6);
+
+  const dateStr = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+  const pieceCards = topPieces.map(w => {
+    const src = w.photo || w.photoThumb || '';
+    const wears = w.wears?.length || 0;
+    return `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;break-inside:avoid;">
+      <div style="height:160px;overflow:hidden;background:#f5f0e8;">
+        ${src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:56px;">${w.icon||'👕'}</div>`}
+      </div>
+      <div style="padding:10px 12px;">
+        <div style="font-size:13px;font-weight:800;color:#1C1A18;line-height:1.3;">${w.name}</div>
+        ${w.brand ? `<div style="font-size:11px;color:#888;margin-top:2px;">${w.brand}</div>` : ''}
+        ${wears ? `<div style="font-size:11px;color:#B8860B;font-weight:700;margin-top:4px;">Worn ${wears}×</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const lookCards = allSaved.map(sl => {
+    const data = getSavedLookData(sl.type, sl.id);
+    if (!data) return '';
+    const { badge, quote, anchor, pairs } = data;
+    const awi = anchor?.wardrobeItem;
+    const asrc = awi ? (awi.photo || awi.photoThumb || '') : '';
+    return `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;padding:14px;break-inside:avoid;margin-bottom:16px;">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:4px;">${badge}${quote ? ' · ' + quote : ''}</div>
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#888;margin:10px 0 6px;">Start with</div>
+      ${anchor ? `<div style="display:inline-block;text-align:center;vertical-align:top;margin-right:16px;">
+        ${asrc ? `<div style="width:80px;height:100px;border-radius:10px;overflow:hidden;border:2px solid #B8860B;display:inline-block;"><img src="${asrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>` : `<div style="width:80px;height:100px;border-radius:10px;background:#f5f0e8;border:2px solid #B8860B;display:inline-flex;align-items:center;justify-content:center;font-size:34px;">${anchor.emoji||'👕'}</div>`}
+        <div style="font-size:10px;font-weight:700;color:#1C1A18;margin-top:5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${anchor.name}</div>
+      </div>` : ''}
+      ${pairs.length ? `<div style="margin-top:10px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px;">Pair with</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          ${pairs.map(p => {
+            const pwi = p.wardrobeItem;
+            const psrc = pwi ? (pwi.photo || pwi.photoThumb || '') : '';
+            return `<div style="text-align:center;width:58px;">
+              ${psrc ? `<div style="width:58px;height:72px;border-radius:8px;overflow:hidden;border:1.5px solid #e0d5c0;"><img src="${psrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>` : `<div style="width:58px;height:72px;border-radius:8px;background:#f5f0e8;border:1.5px solid #e0d5c0;display:flex;align-items:center;justify-content:center;font-size:22px;">${p.emoji||'👕'}</div>`}
+              <div style="font-size:9px;color:#555;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+  <title>${name} — Style Report</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;color:#1C1A18;max-width:780px;margin:0 auto;padding:32px 24px;}
+    @media print{body{padding:16px;}.no-print{display:none!important;}@page{margin:20mm;}}
+    h2{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#888;margin:32px 0 14px;}
+    .print-btn{background:linear-gradient(135deg,#B8860B,#D4A820);color:#fff;border:none;border-radius:100px;padding:10px 22px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:24px;}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    @media(min-width:600px){.grid-2{grid-template-columns:1fr 1fr 1fr 1fr;}}
+  </style></head><body>
+  <div class="no-print" style="text-align:right;margin-bottom:24px;">
+    <button class="print-btn" onclick="window.print()">🖨 Save as PDF</button>
+  </div>
+
+  <!-- HEADER -->
+  <div style="background:linear-gradient(160deg,#1C1A18,#2a2318);border-radius:16px;padding:28px 24px;margin-bottom:8px;color:#fff;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#B8860B,#D4A820);"></div>
+    <div style="display:flex;align-items:center;gap:18px;margin-bottom:${persona?'18':'0'}px;">
+      ${S.stylePortraitPhoto ? `<div style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:2.5px solid rgba(212,168,32,0.6);flex-shrink:0;"><img src="${S.stylePortraitPhoto}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>` : ''}
+      <div>
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(212,168,32,0.7);margin-bottom:6px;">Style Profile · ${dateStr}</div>
+        <div style="font-size:28px;font-weight:900;">${name}</div>
+      </div>
+    </div>
+    ${persona ? `<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:16px;">
+      <div style="font-size:17px;font-weight:800;color:#D4A820;line-height:1.3;margin-bottom:8px;">${persona.headline}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.72);line-height:1.65;">${persona.body}</div>
+    </div>` : ''}
+  </div>
+
+  ${goals.length ? `<h2>Style Goals</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+    ${goals.map(g=>`<div style="background:#fffaed;border:1px solid #B8860B;border-radius:100px;padding:5px 14px;font-size:12px;font-weight:700;color:#8a5f00;">${g}</div>`).join('')}
+  </div>` : ''}
+
+  ${topPieces.length ? `<h2>Signature Pieces</h2>
+  <div class="grid-2">${pieceCards}</div>` : ''}
+
+  ${allSaved.length ? `<h2>Best Looks</h2>${lookCards}` : ''}
+
+  <h2>Wardrobe at a Glance</h2>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;">
+    ${[['👗',aw.length,'Pieces'],['📓',S.entries.length,'Outfits Logged'],['💜',allSaved.length,'Saved Looks']].map(([ic,n,lb])=>`<div style="border:1.5px solid #e0d5c0;border-radius:12px;padding:14px 18px;text-align:center;min-width:90px;"><div style="font-size:22px;">${ic}</div><div style="font-size:22px;font-weight:900;margin:4px 0 2px;">${n}</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">${lb}</div></div>`).join('')}
+  </div>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  } else {
+    toast('Allow pop-ups to open the PDF report');
+  }
 }
 
 function viewStyleRoulette() {
@@ -10985,33 +10290,77 @@ function eventEmojiFor(text) {
 
 function eventCardHTML(ev, extraStyle) {
   const expanded = !!S._expandedEvents[ev.id];
-  const emoji = eventEmojiFor((ev.desc || '') + ' ' + (ev.title || ''));
+  const evEmoji = eventEmojiFor((ev.desc || '') + ' ' + (ev.title || ''));
   const title = esc(ev.title || autoTitle(ev.desc || ''));
   const toggleAct = `S._expandedEvents['${ev.id}']=!S._expandedEvents['${ev.id}'];render()`;
-  const deleteAct = `deleteEventBoardItem('${ev.id}')`;
-  const borderBottom = expanded ? 'border-bottom:1px solid var(--border);' : '';
-  const chevronRot   = expanded ? 'rotate(90deg)' : 'rotate(0deg)';
 
-  return '<div class="event-card"' + (extraStyle ? ' style="' + extraStyle + '"' : '') + '>' +
-    '<div class="event-card-header" style="' + borderBottom + '">' +
-      '<div ontouchend="if(_touchMoved)return;event.preventDefault();' + toggleAct + '" onclick="' + toggleAct + '" ' +
-           'style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;touch-action:manipulation;">' +
-        '<div style="font-size:20px;flex-shrink:0;line-height:1;">' + emoji + '</div>' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:13px;font-weight:800;color:var(--text);' + (expanded ? 'margin-bottom:2px;' : '') + '">' + title + '</div>' +
-          (expanded && ev.desc ? '<div style="font-size:11px;color:var(--text-3);line-height:1.4;">' + esc(ev.desc) + '</div>' : '') +
-        '</div>' +
-        '<div style="font-size:16px;color:var(--text-3);flex-shrink:0;transform:' + chevronRot + ';transition:transform .2s;">›</div>' +
-      '</div>' +
-      '<button class="event-card-delete" ontouchend="if(_touchMoved)return;event.preventDefault();' + deleteAct + '" onclick="' + deleteAct + '" title="Remove">✕</button>' +
-    '</div>' +
-    (expanded ?
-      '<div class="event-card-body">' +
-        '<div class="event-card-items">' + (ev.suggestion?.items || []).map(it => '<span class="event-card-chip">' + esc(it) + '</span>').join('') + '</div>' +
-        (ev.suggestion?.reasoning ? '<div class="event-card-reasoning">' + esc(ev.suggestion.reasoning) + '</div>' : '') +
-      '</div>'
-    : '') +
-  '</div>';
+  // Flatten items from both suggestion formats
+  const sg = ev.suggestion;
+  const allItems = sg
+    ? (sg.groups?.length
+        ? sg.groups.flatMap(g => g.items.map(n => ({ name: n, emoji: '👕' })))
+        : (sg.items || []).map(it => {
+            const m = it.match(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u);
+            return { name: m ? it.slice(m[0].length).trim() : it, emoji: m ? m[1] : '👕' };
+          })
+      )
+    : [];
+
+  // Match to wardrobe + heroScore for anchor
+  const withWI = allItems.map(p => ({ ...p, wi: _findWardrobeForPlanItem(p.name) }));
+  const scored = [...withWI].sort((a, b) => heroScore(b.name, b.wi?.category) - heroScore(a.name, a.wi?.category));
+  const anchor = scored[0] || null;
+  const pairs = anchor ? withWI.filter(p => p !== anchor) : withWI.slice(1);
+
+  // Emoji row for collapsed state
+  const emojiRow = allItems.slice(0, 7).map(p => p.emoji).join(' ');
+
+  const expandedBody = anchor ? `
+    <div style="border-top:1px solid var(--border);padding:12px 14px 14px;">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">Start with</div>
+      <div style="margin-bottom:14px;">
+        ${(()=>{
+          const photoSrc = anchor.wi ? photoBlobUrl(anchor.wi.photo || anchor.wi.wearPhoto || null) : null;
+          return `<div style="display:inline-block;text-align:center;">
+            ${photoSrc
+              ? `<div style="width:88px;height:110px;border-radius:10px;overflow:hidden;border:2px solid var(--gold);"><img src="${esc(photoSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
+              : `<div style="width:88px;height:110px;border-radius:10px;background:var(--surface-2);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:36px;">${anchor.emoji}</div>`}
+            <div style="font-size:10px;font-weight:700;color:var(--text);margin-top:5px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(anchor.name)}</div>
+          </div>`;
+        })()}
+      </div>
+      ${pairs.length ? `
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">Pair with</div>
+        <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;">
+          ${pairs.map(p => {
+            const photoSrc = p.wi ? photoBlobUrl(p.wi.photo || p.wi.wearPhoto || null) : null;
+            return `<div style="flex-shrink:0;text-align:center;width:64px;">
+              ${photoSrc
+                ? `<div style="width:64px;height:80px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);"><img src="${esc(photoSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
+                : `<div style="width:64px;height:80px;border-radius:8px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;">${p.emoji}</div>`}
+              <div style="font-size:9px;color:var(--text-2);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+      ${sg?.reasoning ? `<div style="font-size:11px;color:var(--text-3);line-height:1.4;margin-top:10px;font-style:italic;">${esc(sg.reasoning)}</div>` : ''}
+    </div>` : (sg?.reasoning ? `<div style="border-top:1px solid var(--border);padding:12px 14px;font-size:12px;color:var(--text-2);line-height:1.5;">${esc(sg.reasoning)}</div>` : '');
+
+  return `<div class="event-card"${extraStyle ? ` style="${extraStyle}"` : ''}>
+    <div style="padding:10px 14px;cursor:pointer;touch-action:manipulation;"
+      ontouchend="if(_touchMoved)return;event.preventDefault();${toggleAct}" onclick="${toggleAct}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${evEmoji} ${title}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteEventBoardItem('${ev.id}')" onclick="event.stopPropagation();deleteEventBoardItem('${ev.id}')"
+            style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;padding:2px 3px;line-height:1;touch-action:manipulation;">✕</button>
+          <span style="font-size:11px;color:var(--text-3);display:inline-block;transform:rotate(${expanded?'180deg':'0'});">▾</span>
+        </div>
+      </div>
+      ${!expanded && emojiRow ? `<div style="font-size:18px;margin-top:6px;letter-spacing:2px;">${emojiRow}</div>` : ''}
+    </div>
+    ${expanded ? expandedBody : ''}
+  </div>`;
 }
 
 function isRetiredFit(entry) {
@@ -11166,7 +10515,6 @@ const CYCLE_PHASES = {
    ================================================================ */
 function viewProfile() {
   const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
-  const persona = S.stylePersona;
   const avatar  = S.styleAvatar;
   const colors  = persona ? getPersonaColors(persona) : { accent: 'var(--gold)', bg1: '#f7f4f0', bg2: '#ede8e1', text: 'var(--text)' };
 
@@ -11689,7 +11037,6 @@ function viewProfile() {
     <!-- ══ ZONE 3: Your Identity — Style Portrait + Aura grouped ══ -->
     <div style="margin:0 16px 16px;background:rgba(100,74,138,0.05);border:1.5px solid rgba(100,74,138,0.15);border-radius:16px;padding:14px 14px 14px;">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(100,74,138,0.45);margin-bottom:12px;">✨ Your Identity</div>
-      ${portraitHTML}
       <div style="margin-top:12px;">
         <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('aura')" onclick="navigate('aura')"
           style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
@@ -16262,12 +15609,7 @@ function viewWardrobeItem() {
             ontouchend="if(_touchMoved)return;event.preventDefault();toggleGem('${w.id}')"
             onclick="toggleGem('${w.id}')"></button>
         </div>
-        ${isGemPiece(w) ? `
-        <div style="margin-top:10px;">
-          <button class="hero-share-btn" style="width:100%;padding:10px;"
-            ontouchend="if(_touchMoved)return;event.preventDefault();shareHeroPiece('${w.id}')"
-            onclick="shareHeroPiece('${w.id}')">📤 Share with Stylist</button>
-        </div>` : ''}
+        ${isGemPiece(w) ? `` : ''}
       </div>
     </div>
 
