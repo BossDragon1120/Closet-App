@@ -3000,11 +3000,14 @@ const S = {
   _openDressMeSaveId: null,     // which saved look is expanded on the Plan page
   savedOutfitBuilds: JSON.parse(localStorage.getItem('closet-outfit-builds') || '[]'), // [{id,wardrobeId,wardrobeName,occasion,result,createdAt}]
   _openOutfitBuildId: null,     // which saved outfit build is expanded on Plan page
+  savedRouletteLooks: JSON.parse(localStorage.getItem('closet-roulette-looks') || '[]'), // [{id,vibe,hype,outfit,createdAt}]
+  _openRouletteLookId: null,    // which saved roulette look is expanded on Plan page
   // Sell It — AI-drafted Poshmark/Depop listing, nudged when a piece scores 2★ or lower in Rate Mode
   sellDraft: null,        // { wardrobeId, loading, title, description, price, priceReasoning }
   _sellDraftOpen: false,  // bottom-sheet modal visible
   _sellSuggestId: null,   // wardrobeId currently showing the inline "list it?" nudge in Rate Mode
   _sellDismissedIds: new Set(), // session-only — nudges dismissed this session, don't re-show for the same item
+  _dismissedComplimentIds: new Set(JSON.parse(localStorage.getItem('closet-dismissed-compliments') || '[]')), // items hidden from the compliment carousel (tally unaffected)
   purchasedQueries: new Set(JSON.parse(localStorage.getItem('closet-purchased') || '[]')),
   shopBlocked: new Set(JSON.parse(localStorage.getItem('closet-shop-blocked') || '[]')),
   shopCache: JSON.parse(localStorage.getItem('closet-shop-cache') || '{}'), // key → {results,ts}
@@ -5172,7 +5175,7 @@ function toast(msg) {
   S.toast = msg; render();
   _toastTimer = setTimeout(() => { S.toast = null; render(); }, 2600);
 }
-function navigate(view) { S.view = view; S.error = null; render(); window.scrollTo(0,0); }
+function navigate(view) { if (view !== S.view) S._prevView = S.view; S.view = view; S.error = null; render(); window.scrollTo(0,0); }
 function switchTab(tab)  {
   S.activeTab = tab;
   S.view = tab;
@@ -6294,6 +6297,31 @@ function toggleOutfitBuild(id) {
   render();
 }
 
+function saveRouletteLook() {
+  if (!S.funRoulette) return;
+  const entry = {
+    id: 'rl-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
+    vibe: S.funRoulette.vibe || '',
+    hype: S.funRoulette.hype || '',
+    outfit: (S.funRoulette.outfit || []).map(p => ({ item: p.item||'', emoji: p.emoji||'👕', reason: p.reason||'' })),
+    createdAt: new Date().toISOString(),
+  };
+  S.savedRouletteLooks = [entry, ...S.savedRouletteLooks];
+  localStorage.setItem('closet-roulette-looks', JSON.stringify(S.savedRouletteLooks));
+  toast('🎲 Saved to Plan!');
+  render();
+}
+function deleteRouletteLook(id) {
+  S.savedRouletteLooks = S.savedRouletteLooks.filter(r => r.id !== id);
+  localStorage.setItem('closet-roulette-looks', JSON.stringify(S.savedRouletteLooks));
+  if (S._openRouletteLookId === id) S._openRouletteLookId = null;
+  render();
+}
+function toggleRouletteLook(id) {
+  S._openRouletteLookId = S._openRouletteLookId === id ? null : id;
+  render();
+}
+
 /* ================================================================
    VIEW: MY BRANDS
    ================================================================ */
@@ -6529,6 +6557,14 @@ function render() {
   if (S.outfitLinker && document.activeElement?.id === 'outfit-linker-search') {
     requestAnimationFrame(() => {
       const inp = document.getElementById('outfit-linker-search');
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    });
+  }
+  // Post-render: re-focus match-picker search in match-review flow
+  if (window._matchPickerFocused) {
+    window._matchPickerFocused = false;
+    requestAnimationFrame(() => {
+      const inp = document.getElementById('match-picker-search');
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
     });
   }
@@ -7184,6 +7220,7 @@ Return ONLY valid JSON with no markdown or extra text:
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('No JSON');
     const result = JSON.parse(m[0]);
+    if (!Array.isArray(result.outfit)) throw new Error('Bad shape');
     S.funRoulette = result;
     S._rouletteOpen = true;
     // Add used items to history, keep last 12 to avoid for next few spins
@@ -7191,10 +7228,12 @@ Return ONLY valid JSON with no markdown or extra text:
     S._rouletteHistory = [...S._rouletteHistory, ...usedNames].slice(-12);
   } catch(e) {
     console.error('generateRoulette:', e);
+    S._rouletteOpen = false;
     toast('Couldn\'t generate — try again.');
+  } finally {
+    S._funRouletteLoading = false;
+    render();
   }
-  S._funRouletteLoading = false;
-  render();
 }
 
 // ── Dress Me — daily AI outfit recommendation ───────────────────────────────
@@ -10194,6 +10233,49 @@ function viewPlan() {
         </div>
       ` : ''}
 
+      ${S.savedRouletteLooks.length > 0 ? `
+        <!-- SAVED ROULETTE LOOKS -->
+        <div class="event-board-section">
+          <div class="event-board-header">
+            <span>🎲 Roulette Looks</span>
+            <span style="font-size:12px;font-weight:500;color:var(--text-3);">${S.savedRouletteLooks.length} look${S.savedRouletteLooks.length===1?'':'s'}</span>
+          </div>
+          ${S.savedRouletteLooks.map(rl => {
+            const isOpen = S._openRouletteLookId === rl.id;
+            const d = new Date(rl.createdAt);
+            const dateLabel = isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+            return `<div class="event-card">
+              <div class="event-card-header" style="cursor:pointer;touch-action:manipulation;"
+                ontouchend="if(_touchMoved)return;event.preventDefault();toggleRouletteLook('${rl.id}');" onclick="toggleRouletteLook('${rl.id}')">
+                <div class="event-card-desc">
+                  🎲 ${esc(rl.vibe || 'Spun Look')}
+                  <div style="font-size:11.5px;font-weight:600;color:var(--text-3);margin-top:2px;">${dateLabel}</div>
+                </div>
+                <span style="font-size:12px;color:var(--text-3);transform:rotate(${isOpen?'180deg':'0deg'});transition:transform .15s;flex-shrink:0;">▾</span>
+                <button class="event-card-delete" title="Delete look"
+                  ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteRouletteLook('${rl.id}');"
+                  onclick="event.stopPropagation();deleteRouletteLook('${rl.id}')">✕</button>
+              </div>
+              ${isOpen ? `
+                <div class="event-card-body">
+                  ${rl.hype ? `<div style="font-size:13px;color:var(--text-2);font-style:italic;margin-bottom:12px;">"${esc(rl.hype)}"</div>` : ''}
+                  <div style="display:flex;flex-direction:column;gap:8px;">
+                    ${(rl.outfit||[]).map(p=>`
+                      <div style="display:flex;align-items:flex-start;gap:10px;">
+                        <span style="font-size:18px;flex-shrink:0;line-height:1.3;">${esc(p.emoji||'👕')}</span>
+                        <div style="flex:1;min-width:0;">
+                          <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(p.item||'')}</div>
+                          ${p.reason ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(p.reason)}</div>` : ''}
+                        </div>
+                      </div>`).join('')}
+                  </div>
+                </div>
+              ` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+
       ${S.savedTripPlans.length > 0 ? `
         <!-- SAVED TRIP PLANS — condensed list, tap to expand/collapse -->
         <div class="event-board-section">
@@ -10298,12 +10380,12 @@ function viewPlan() {
 
   ${(S._rouletteOpen || S._funRouletteLoading) ? `
     <!-- STYLE ROULETTE BOTTOM SHEET -->
-    <div id="roulette-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;"
+    <div id="roulette-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;"
       ontouchmove="event.preventDefault()"
       ontouchstart="if(event.target===this)this._tapStartedOnBackdrop=true;"
       ontouchend="if(this._tapStartedOnBackdrop&&event.target===this){this._tapStartedOnBackdrop=false;S._rouletteOpen=false;render();}else{this._tapStartedOnBackdrop=false;}"
       onclick="if(event.target===this){S._rouletteOpen=false;render();}">
-      <div style="background:var(--surface);border-radius:20px 20px 0 0;width:100%;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;"
+      <div style="background:var(--surface);border-radius:20px;width:100%;max-width:440px;box-sizing:border-box;max-height:min(88dvh,85vh);display:flex;flex-direction:column;"
         ontouchmove="event.stopPropagation()"
         ontouchstart="event.stopPropagation()">
         <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;">
@@ -10317,7 +10399,7 @@ function viewPlan() {
               <div class="spinner" style="width:28px;height:28px;border-width:3px;"></div>
               <div style="font-size:14px;color:var(--text-3);">Styling your look…</div>
             </div>
-          ` : S.funRoulette ? (() => {
+          ` : S.funRoulette ? (() => { try {
             const r = S.funRoulette;
             const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
             const norm = s => (s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').trim();
@@ -10354,6 +10436,12 @@ function viewPlan() {
                   }).join('')}
                 </div>
                 <button
+                  ontouchend="if(_touchMoved)return;event.preventDefault();saveRouletteLook();"
+                  onclick="saveRouletteLook();"
+                  style="width:100%;background:linear-gradient(135deg,#B87D2A,#D4A43A);border:none;border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:8px;">
+                  🎲 Save this look
+                </button>
+                <button
                   ontouchend="if(_touchMoved)return;event.preventDefault();generateRoulette();"
                   onclick="generateRoulette();"
                   style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:11px;font-size:13px;font-weight:700;color:rgba(255,255,255,.8);cursor:pointer;font-family:inherit;touch-action:manipulation;">
@@ -10361,7 +10449,7 @@ function viewPlan() {
                 </button>
               </div>
             </div>`;
-          })() : ''}
+          } catch(e) { console.error('roulette render:', e); S.funRoulette=null; return ''; } })() : ''}
         </div>
       </div>
     </div>
@@ -11237,23 +11325,30 @@ function viewProfile() {
       for (const {w, date} of allC) {
         if (!seen.has(w.id)) { seen.add(w.id); recent.push({w, lastDate:date, count:(w.compliments||[]).length}); }
       }
-      const total = allC.length;
+      const total = allC.length; // tally always uses full count, unaffected by dismissals
+      const visible = recent.filter(({w}) => !S._dismissedComplimentIds.has(w.id));
       const relDate = iso => { const d=daysSince(iso); return d===0?'today':d===1?'yesterday':d<7?d+'d ago':fmtDate(iso); };
       return `<div style="margin:16px 16px 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">💬 Recent Compliments</div>
           <div style="font-size:11px;font-weight:700;color:var(--gold-dk);">${total} total</div>
         </div>
-        <div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none;margin:0 -16px;padding:0 16px 4px;">
-          ${recent.slice(0,10).map(({w,lastDate,count}) => `
-            <div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
-              style="flex-shrink:0;width:106px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 8px;cursor:pointer;touch-action:manipulation;text-align:center;">
-              ${w.photo ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:46px;height:46px;border-radius:8px;object-fit:cover;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;" loading="lazy">` : `<div style="font-size:28px;margin-bottom:6px;line-height:1;">${w.icon||'👕'}</div>`}
-              <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.name)}</div>
-              <div style="font-size:11px;color:var(--gold-dk);margin-top:2px;font-weight:600;">${count}×</div>
-              <div style="font-size:10px;color:var(--text-3);margin-top:1px;">${relDate(lastDate)}</div>
+        ${visible.length ? `<div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none;margin:0 -16px;padding:0 16px 4px;">
+          ${visible.slice(0,10).map(({w,lastDate,count}) => `
+            <div style="flex-shrink:0;width:106px;position:relative;">
+              <div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
+                style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 8px;cursor:pointer;touch-action:manipulation;text-align:center;">
+                ${w.photo ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:46px;height:46px;border-radius:8px;object-fit:cover;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;" loading="lazy">` : `<div style="font-size:28px;margin-bottom:6px;line-height:1;">${w.icon||'👕'}</div>`}
+                <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.name)}</div>
+                <div style="font-size:11px;color:var(--gold-dk);margin-top:2px;font-weight:600;">${count}×</div>
+                <div style="font-size:10px;color:var(--text-3);margin-top:1px;">${relDate(lastDate)}</div>
+              </div>
+              <button
+                ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();dismissComplimentCard('${w.id}');"
+                onclick="event.stopPropagation();dismissComplimentCard('${w.id}');"
+                style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.45);border:none;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;">✕</button>
             </div>`).join('')}
-        </div>
+        </div>` : `<div style="font-size:12px;color:var(--text-3);padding:8px 0;">All caught up — no items showing.</div>`}
       </div>`;
     })()}
 
@@ -12497,7 +12592,7 @@ function viewHome() {
   // Counts for tab card subtitles
   const trendCount = S.hotTrends?.trends?.length || 0;
   const brandCount = (() => { const bc = {}; S.wardrobe.forEach(w => { if (w.brand) bc[w.brand] = 1; }); return Object.keys(bc).length; })();
-  const tipsCount = (() => { let n = 0; S.entries.forEach(e => { if (!e.recReactions) return; if (e.stylingTips?.length) { e.stylingTips.forEach((_,i) => { if (e.recReactions[String(i)] === 'liked') n++; }); } else { (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') n++; }); } }); return n; })();
+  const tipsCount = (() => { let n = 0; S.entries.forEach(e => { const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{}); if (!Object.keys(rx).length) return; if (e.stylingTips?.length) { e.stylingTips.forEach((_,i) => { if (rx[String(i)] === 'liked') n++; }); } else { (e.recommendations||[]).forEach((_,i) => { if (rx[String(i)] === 'liked') n++; }); } }); return n; })();
 
   const tabCards = [
     { key:'tips',   icon:'✂️', label:'Tips',    sub: tipsCount  ? `${tipsCount} tip${tipsCount===1?'':'s'} saved` : 'Style tips from your fits' },
@@ -12735,11 +12830,12 @@ function viewHome() {
   const tipsContent = (()=>{
     const likedRecs = [];
     S.entries.forEach(e => {
-      if (!e.recReactions) return;
+      const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{});
+      if (!Object.keys(rx).length) return;
       if (e.stylingTips?.length) {
-        e.stylingTips.forEach((r, i) => { if (e.recReactions[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e }); });
+        e.stylingTips.forEach((r, i) => { if (rx[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e }); });
       } else {
-        (e.recommendations||[]).forEach(r => { if (e.recReactions[r] === 'liked') likedRecs.push({ rec: r, entry: e }); });
+        (e.recommendations||[]).forEach((r, i) => { if (rx[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e }); });
       }
     });
     const count = likedRecs.length;
@@ -13289,7 +13385,7 @@ function viewWardrobe() {
     S._wardrobeSearchOpen?1:0,
     S._wardrobeHeroFilter?1:0, S._wardrobeMaybePileFilter?1:0, S._wardrobeRatingFilter ?? 'none',
     S.wardrobeTailoringFilter?1:0,
-    S.wardrobeExpanded?1:0, S.wardrobeRetiredExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0, S._hiddenGemsExpanded?1:0,
+    S.wardrobeExpanded?1:0, S.wardrobeRetiredExpanded?1:0, S._wardrobeReorderMode?1:0, S._wardrobeSelectMode?1:0, S._hiddenGemsExpanded?1:0, (S._hiddenGemsDismissed||[]).join(','),
     S._addingShelf?1:0, S._newlyPaidOff||'', S.shoeRackLevels, S.bagRackLevels, S.accessoryRackLevels,
     S.weatherPin ? S.weatherPin.city+S.weatherPin.tempF : '',
     (S._wardrobeSelected||[]).join(','),
@@ -15680,7 +15776,7 @@ function viewWardrobeItem() {
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(S.activeTab&&S.activeTab!=='wardrobe'?S.activeTab:'wardrobe')" onclick="navigate(S.activeTab&&S.activeTab!=='wardrobe'?S.activeTab:'wardrobe')">${iconBack()} ${S.activeTab&&S.activeTab!=='wardrobe'?({profile:'Portfolio',plan:'Plan',shop:'Shop',closet:'Fits',home:'Home'}[S.activeTab]||'Back'):'Wardrobe'}</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(S._prevView&&S._prevView!=='wardrobe-item'?S._prevView:(S.activeTab||'wardrobe'))" onclick="navigate(S._prevView&&S._prevView!=='wardrobe-item'?S._prevView:(S.activeTab||'wardrobe'))">${iconBack()} ${(()=>{const _bv=S._prevView&&S._prevView!=='wardrobe-item'?S._prevView:(S.activeTab||'wardrobe');return {profile:'Portfolio',plan:'Plan',shop:'Shop',closet:'Fits',home:'Home',wardrobe:'Wardrobe'}[_bv]||'Back';})()}</button>
       <span class="nav-title"></span>
       <div style="display:flex;align-items:center;gap:2px;">
         <button class="nav-btn" ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witem-edit-section')?.scrollIntoView({behavior:'smooth',block:'start'})" onclick="document.getElementById('witem-edit-section')?.scrollIntoView({behavior:'smooth',block:'start'})" title="Edit details" style="touch-action:manipulation;">
@@ -17304,7 +17400,7 @@ function viewMatchReview() {
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">Which piece is this?</div>
           <input id="match-picker-search" class="form-input" type="text" placeholder="🔍 Search your closet…"
             value="${esc(mr._pickerQuery||'')}"
-            oninput="S.matchReview._pickerQuery=this.value;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
+            oninput="S.matchReview._pickerQuery=this.value;window._matchPickerFocused=true;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
             style="margin-bottom:10px;">
           ${grid.length ? `
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:220px;overflow-y:auto;margin-bottom:10px;">
@@ -17351,7 +17447,7 @@ function viewMatchReview() {
         <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Already own this?</div>
         <input id="match-picker-search" class="form-input" type="text" placeholder="🔍 Search your closet…"
           value="${esc(mr._pickerQuery||'')}"
-          oninput="S.matchReview._pickerQuery=this.value;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
+          oninput="S.matchReview._pickerQuery=this.value;window._matchPickerFocused=true;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
           style="margin-bottom:10px;">
         ${grid.length ? `
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:200px;overflow-y:auto;margin-bottom:12px;">
@@ -18708,6 +18804,11 @@ function openEntry(id) {
   if (entry?.rating === 10) setTimeout(launchConfetti, 200);
 }
 function openWardrobeItem(id) { S.selectedWardrobeId = id; navigate('wardrobe-item'); }
+function dismissComplimentCard(wardrobeId) {
+  S._dismissedComplimentIds.add(wardrobeId);
+  localStorage.setItem('closet-dismissed-compliments', JSON.stringify([...S._dismissedComplimentIds]));
+  render();
+}
 function dismissHiddenGem(id) {
   if (!S._hiddenGemsDismissed.includes(id)) {
     S._hiddenGemsDismissed = [...S._hiddenGemsDismissed, id];
