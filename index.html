@@ -5147,9 +5147,111 @@ const FASHION_WORDS = [
   { word: 'Dart', phonetic: '/dart/', type: 'noun',
     def: 'A folded and sewn tuck of fabric that removes excess material to shape a flat piece of cloth around curves.',
     example: 'Two well-placed bust darts are the difference between a blouse that fits and one that just covers.' },
-  { word: 'Grosgrain', phonetic: '/GROH-grayn/', type: 'noun',
-    def: 'A closely woven ribbed ribbon or fabric — the horizontal cords give it its distinctive texture and crisp body.',
-    example: 'A grosgrain bow at the collar elevated an otherwise ordinary shirt into something considered.' },
+  { word: 'Sprezzatura', phonetic: '/spret-tsah-TOO-rah/', type: 'noun',
+    def: 'Italian for studied nonchalance — the art of making great style look entirely accidental.',
+    example: 'One sleeve half-rolled, collar slightly askew, nothing overthought: pure sprezzatura.' },
+  { word: 'Sartorial', phonetic: '/sar-TOR-ee-uhl/', type: 'adjective',
+    def: 'Relating to tailoring, clothing, or the way a person dresses — the adjective for taking clothes seriously.',
+    example: 'Her sartorial instincts said swap the sneakers for loafers, and she was right.' },
+  { word: 'Déshabillé', phonetic: '/day-zah-bee-YAY/', type: 'noun',
+    def: 'The state of being artfully, deliberately undone — elegance that looks like it just woke up beautifully.',
+    example: 'Silk robe, bare feet, yesterday\'s earrings — déshabillé, but make it intentional.' },
+  { word: 'Gorge', phonetic: '/gorj/', type: 'noun',
+    def: 'The seam where a jacket\'s collar meets its lapel. Its height quietly dates every suit ever made.',
+    example: 'Vintage or new? Check the gorge — high reads 2010s, low whispers 1970s.' },
+  { word: 'Break', phonetic: '/brayk/', type: 'noun',
+    def: 'The fold that forms where a trouser hem meets the shoe — none, half, or full, and each says something different.',
+    example: 'No break reads modern and Italian; a full break reads borrowed from your dad. Choose deliberately.' },
+  { word: 'Ease', phonetic: '/eez/', type: 'noun',
+    def: 'The built-in difference between your measurements and a garment\'s — the breathing room that makes clothes wearable.',
+    example: 'The blazer fit in the shoulders but had zero ease through the back — one reach and a seam would go.' },
+  { word: 'Vent', phonetic: '/vent/', type: 'noun',
+    def: 'The slit at the back or sides of a jacket, coat, or skirt that allows movement and keeps the drape clean.',
+    example: 'The tacking stitch holding the vent closed is temporary — snip it before you wear it out the door.' },
+  { word: 'Boning', phonetic: '/BOH-ning/', type: 'noun',
+    def: 'Rigid strips sewn into a bodice or corset to hold structure — once whalebone, now steel or plastic.',
+    example: 'Good boning is why a strapless gown stays up all night without a single tug.' },
+  { word: 'French Seam', phonetic: '/french SEEM/', type: 'noun',
+    def: 'A seam sewn twice to fully enclose the raw edges — as clean inside the garment as outside.',
+    example: 'Flip a blouse inside out before buying — French seams are the quiet signature of quality.' },
+  { word: 'Bar Tack', phonetic: '/BAR tak/', type: 'noun',
+    def: 'A dense block of reinforcing stitches at stress points — pocket corners, belt loops, zipper ends.',
+    example: 'Jeans worth buying have crisp bar tacks at every pocket corner. Check before the fitting room.' },
+  { word: 'Bouclé', phonetic: '/boo-KLAY/', type: 'noun',
+    def: 'Yarn — and the fabric woven from it — with a looped, nubby surface; the texture Chanel built an empire on.',
+    example: 'A bouclé jacket does texture work that a flat blazer never could.' },
+  { word: 'Moiré', phonetic: '/mwah-RAY/', type: 'noun',
+    def: 'A rippled, watermarked effect pressed into ribbed silk — the fabric appears to move like light on water.',
+    example: 'The moiré skirt shimmered with every step, no sequins required.' },
+  { word: 'Gabardine', phonetic: '/GAB-er-deen/', type: 'noun',
+    def: 'A tightly woven, water-shedding twill patented by Thomas Burberry in 1888.',
+    example: 'The trench coat\'s entire reputation rests on gabardine\'s weatherproof shoulders.' },
+  { word: 'Chambray', phonetic: '/SHAM-bray/', type: 'noun',
+    def: 'A plain-weave cotton with a colored warp and white weft — denim\'s softer, lighter cousin.',
+    example: 'A chambray shirt gives you the denim look without the denim-on-denim risk.' },
+  { word: 'Ottoman', phonetic: '/OT-uh-muhn/', type: 'noun',
+    def: 'Not the footstool — a heavy fabric with pronounced horizontal ribs, beloved for structured jackets and skirts.',
+    example: 'The ottoman sheath held its shape from the first meeting to the last train home.' },
+  { word: 'Slub', phonetic: '/slub/', type: 'noun',
+    def: 'A thickened, irregular spot in a yarn — once considered a flaw, now prized for organic texture.',
+    example: 'The slubs in the linen tee are the point — perfection is for polyester.' },
+  { word: 'Nap', phonetic: '/nap/', type: 'noun',
+    def: 'The raised, directional pile of fabrics like velvet and suede — stroke it one way, it\'s smooth; the other, it resists.',
+    example: 'Cut velvet against the nap and the color turns deeper and moodier. Tailors plan for it.' },
+  { word: 'Hand', phonetic: '/hand/', type: 'noun',
+    def: 'How a fabric feels — its weight, drape, and touch, judged by insiders before they ever look at the label.',
+    example: 'Shop with your fingers first: a beautiful hand never lies about quality.' },
+  { word: 'Marled', phonetic: '/MAR-uhld/', type: 'adjective',
+    def: 'Made from two differently colored yarns twisted together, giving knitwear a flecked, heathered depth.',
+    example: 'A marled grey sweater has dimension that flat-dyed knits can\'t fake.' },
+  { word: 'Intarsia', phonetic: '/in-TAR-see-uh/', type: 'noun',
+    def: 'A knitting technique where blocks of color are worked in like inlaid wood — pictures built into the knit itself.',
+    example: 'The intarsia rose on the cardigan wasn\'t printed or stitched on — it was knitted in, loop by loop.' },
+  { word: 'Shibori', phonetic: '/shih-BOR-ee/', type: 'noun',
+    def: 'The centuries-old Japanese art of shaping fabric — twisting, binding, folding — before dyeing it, so the cloth remembers.',
+    example: 'That indigo scarf isn\'t tie-dye — it\'s shibori, and the difference is a few hundred years of craft.' },
+  { word: 'Sashiko', phonetic: '/SAH-shee-koh/', type: 'noun',
+    def: 'Japanese running-stitch embroidery, originally for reinforcing workwear — repair elevated to decoration.',
+    example: 'White sashiko stitching across an indigo jacket: mending so beautiful it becomes the design.' },
+  { word: 'Boro', phonetic: '/BOR-oh/', type: 'noun',
+    def: 'Japanese textiles patched and mended across generations — the philosophy that repair adds beauty rather than hiding it.',
+    example: 'The boro-inspired denim wore its patches proudly — every fix a chapter, not a flaw.' },
+  { word: 'Ikat', phonetic: '/EE-kaht/', type: 'noun',
+    def: 'A technique where yarns are resist-dyed before weaving, giving patterns their signature soft, blurred edges.',
+    example: 'You can spot true ikat by the gentle haze at the pattern\'s edges — printed versions are too crisp.' },
+  { word: 'Paillette', phonetic: '/pah-YET/', type: 'noun',
+    def: 'An oversized sequin, usually hanging from a single point so it moves and catches light independently.',
+    example: 'Sequins sparkle; paillettes ripple. The dress sounded like rain when she walked.' },
+  { word: 'Soutache', phonetic: '/soo-TASH/', type: 'noun',
+    def: 'A narrow, flat decorative braid sewn in scrolling patterns — the signature of hussar uniforms and couture alike.',
+    example: 'Black soutache swirled across the jacket like calligraphy.' },
+  { word: 'Épaulette', phonetic: '/EP-uh-let/', type: 'noun',
+    def: 'An ornamental shoulder piece, born on military uniforms and permanently absorbed into fashion\'s vocabulary.',
+    example: 'The épaulettes on the khaki jacket added just enough authority to the weekend look.' },
+  { word: 'Dolman', phonetic: '/DOHL-muhn/', type: 'adjective',
+    def: 'A sleeve cut deep and wide from the garment\'s body, narrowing at the wrist — dramatic at the shoulder, easy everywhere.',
+    example: 'Dolman sleeves make the simplest knit top feel like a considered silhouette choice.' },
+  { word: 'Empire Waist', phonetic: '/AHM-peer wayst/', type: 'noun',
+    def: 'A waistline raised to just under the bust, elongating the body below — named for Napoleon-era France.',
+    example: 'Two centuries later, the empire waist is still the most forgiving line in the book.' },
+  { word: 'Redingote', phonetic: '/RED-ing-goht/', type: 'noun',
+    def: 'A long, fitted coat cut open or buttoned-back at the front to reveal what\'s underneath — outerwear as frame.',
+    example: 'Worn open over a slip dress, the redingote turned the whole outfit into architecture.' },
+  { word: 'Balmacaan', phonetic: '/bal-muh-KAHN/', type: 'noun',
+    def: 'A loose, single-breasted overcoat with raglan sleeves — the relaxed, unstuffy answer to the tailored topcoat.',
+    example: 'The oversized balmacaan over a hoodie is the easiest coat move going.' },
+  { word: 'Obi', phonetic: '/OH-bee/', type: 'noun',
+    def: 'The wide sash worn with a kimono — and the inspiration behind every broad wrap belt in modern fashion.',
+    example: 'An obi-style belt over the shirt dress redrew her whole silhouette in five seconds.' },
+  { word: 'Deadstock', phonetic: '/DED-stok/', type: 'noun',
+    def: 'Fabric or goods produced but never sold or used — vintage material in untouched condition, now hunted like treasure.',
+    example: 'The jeans were cut from deadstock 90s denim — fabric that waited thirty years for its moment.' },
+  { word: 'Haberdashery', phonetic: '/HAB-er-dash-uh-ree/', type: 'noun',
+    def: 'In Britain, a shop of sewing notions — buttons, ribbons, thread. In America, a dealer in men\'s furnishings.',
+    example: 'She left the haberdashery with horn buttons that cost more than the coat they were destined for.' },
+  { word: 'Cordwainer', phonetic: '/KORD-way-ner/', type: 'noun',
+    def: 'A maker of new shoes from fine leather — not to be confused with a cobbler, who only repairs them.',
+    example: 'London\'s cordwainers have their own livery company — shoemaking as high craft since 1272.' },
   { word: 'Crewelwork', phonetic: '/KROO-el-work/', type: 'noun',
     def: 'Embroidery using wool thread worked in a variety of stitches to create bold, textured, often nature-inspired designs.',
     example: 'The vintage coat\'s crewelwork cuffs were worth the dry-cleaning bill a hundred times over.' },
@@ -5180,9 +5282,17 @@ function checkWordOfTheDay() {
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const last  = localStorage.getItem('closet-wotd-date');
   if (last === today) return; // already seen today
-  // Deterministic pick: same word all day for all users
-  const idx = Math.abs(today.replace(/-/g,'').split('').reduce((a,c)=>a+c.charCodeAt(0),0)) % FASHION_WORDS.length;
-  S.wordOfDay = FASHION_WORDS[idx];
+  // Deterministic pick: same word all day for all users.
+  // Days-since-epoch × a stride coprime to the list length walks the entire
+  // list exactly once before any word repeats, and consecutive days land far
+  // apart in the list. (The old digit-sum approach crawled through the same
+  // handful of neighboring words and collided on digit-swapped dates.)
+  const N = FASHION_WORDS.length;
+  const dayNum = Math.floor(Date.parse(today) / 86400000);
+  let stride = 37;
+  const gcd = (a, b) => b ? gcd(b, a % b) : a;
+  while (gcd(stride, N) !== 1) stride++;
+  S.wordOfDay = FASHION_WORDS[(dayNum * stride) % N];
 }
 
 function dismissWordOfDay() {
@@ -8462,11 +8572,21 @@ function viewCloset() {
     ? `<button class="show-more-btn" onclick="S.closetExpanded=true;render()">Show ${moreCount} more outfit${moreCount===1?'':'s'} ↓</button>`
     : '';
 
+  const selMode = !!S._fitsSelectMode;
+  const selCount = (S._fitsSelected || []).length;
   const outfitCountHTML = S.entries.length > 0 ? `
-    <div style="padding:10px 16px 0;display:flex;align-items:baseline;gap:6px;">
+    <div style="padding:10px 16px 0;display:flex;align-items:center;gap:6px;">
       <span style="font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.5px;">${S.entries.length}</span>
       <span style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">outfit${S.entries.length===1?'':'s'} logged</span>
-    </div>` : '';
+      <div style="flex:1;"></div>
+      ${S.entries.length > 1 ? `<button
+        ontouchend="if(_touchMoved)return;event.preventDefault();toggleFitsSelectMode();"
+        onclick="toggleFitsSelectMode()"
+        style="flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation;border:${selMode?'none':'1.5px solid #6C3EBF'};background:${selMode?'#6C3EBF':'transparent'};color:${selMode?'#fff':'#6C3EBF'};">
+        ${selMode ? 'Done' : '☑ Select'}
+      </button>` : ''}
+    </div>
+    ${selMode ? `<div style="padding:6px 16px 0;font-size:12px;color:var(--text-3);">Tap the fits you want to share — numbers show the order they'll appear.</div>` : ''}` : '';
 
   const gridHTML = entries.length
     ? `<div class="outfit-grid">${displayEntries.map(outfitCardHTML).join('')}</div>${showMoreBtn}`
@@ -8522,6 +8642,21 @@ function viewCloset() {
     ${outfitCountHTML}
     ${filterHTML}${gridHTML}
     <div style="height:8px"></div>
+
+    ${selMode ? `
+    <!-- Select-mode action bar -->
+    <div style="position:sticky;bottom:calc(var(--tab-h) + var(--safe-b));z-index:150;padding:10px 16px;background:var(--bg);border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+      <span style="font-size:13px;font-weight:800;color:var(--text-2);flex-shrink:0;">${selCount} selected</span>
+      <div style="flex:1;"></div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleFitsSelectMode();" onclick="toggleFitsSelectMode()"
+        style="padding:10px 16px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">Cancel</button>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();openFitsShareSheet();" onclick="openFitsShareSheet()"
+        style="padding:10px 20px;border-radius:100px;border:none;background:${selCount?'var(--gold)':'var(--border)'};color:${selCount?'#fff':'var(--text-3)'};font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;" ${selCount?'':'disabled'}>
+        ↗ Share${selCount?` (${selCount})`:''}
+      </button>
+    </div>` : ''}
+
+    ${S._fitsShareSheetOpen ? fitsShareSheetHTML() : ''}
   </div>`;
 }
 
@@ -8703,16 +8838,23 @@ function outfitCardHTML(e) {
   const wearBadge = rewears.length > 0
     ? `<div style="position:absolute;bottom:6px;right:6px;background:rgba(20,18,16,0.82);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.9);backdrop-filter:blur(4px);">×${rewears.length + 1} wears</div>`
     : '';
+  const selMode = !!S._fitsSelectMode;
+  const selIdx  = selMode ? (S._fitsSelected || []).indexOf(e.id) : -1;
+  const selected = selIdx >= 0;
+  const tapAct = selMode ? `toggleFitSelected('${e.id}')` : `openEntry('${e.id}')`;
   return `<div class="outfit-card${e.doNotRepeat?' dnr':''}"
-    ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')"
-    onclick="openEntry('${e.id}')" style="${retired?'opacity:0.82;':''}">
+    ontouchend="if(_touchMoved)return;event.preventDefault();${tapAct}"
+    onclick="${tapAct}" style="${retired?'opacity:0.82;':''}${selected?'outline:3px solid #6C3EBF;outline-offset:-3px;border-radius:var(--r);':''}">
     <div class="outfit-card-photo-wrap">
       <img class="outfit-card-photo" src="${displayPhoto}" alt="Outfit" loading="lazy"${(e.doNotRepeat||retired)?` style="${photoStyle}"`:''}>
       ${e.doNotRepeat ? `<div class="outfit-card-dnr-overlay"></div>` : ''}
-      <button class="outfit-card-dnr-btn${e.doNotRepeat?' active':''}"
+      ${selected ? `<div style="position:absolute;inset:0;background:rgba(108,62,191,0.22);pointer-events:none;"></div>
+      <div style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:#6C3EBF;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;box-shadow:0 1px 6px rgba(0,0,0,0.35);">${selIdx + 1}</div>` : ''}
+      ${selMode && !selected ? `<div style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,0.9);background:rgba(20,18,16,0.3);box-shadow:0 1px 4px rgba(0,0,0,0.25);"></div>` : ''}
+      ${selMode ? '' : `<button class="outfit-card-dnr-btn${e.doNotRepeat?' active':''}"
         ontouchend="if(_touchMoved)return;event.stopPropagation();event.preventDefault();toggleDoNotRepeat('${e.id}')"
         onclick="event.stopPropagation();toggleDoNotRepeat('${e.id}')"
-        title="${e.doNotRepeat?'Remove flag':'Flag: won\'t wear again'}">✕</button>
+        title="${e.doNotRepeat?'Remove flag':'Flag: won\'t wear again'}">✕</button>`}
       ${wearBadge}
       ${retired ? `<div style="position:absolute;bottom:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);backdrop-filter:blur(4px);">📦 Retired</div>` : ''}
       ${e.claudeRecommended ? `<div style="position:absolute;top:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:var(--gold);backdrop-filter:blur(4px);">✨ Claude's Pick</div>` : ''}
@@ -8727,6 +8869,140 @@ function outfitCardHTML(e) {
 }
 
 function setFilter(f) { S.filter = f; S.closetExpanded = false; render(); }
+
+// ── Fits multi-select & share ─────────────────────────────────────────────────
+function toggleFitsSelectMode() {
+  S._fitsSelectMode = !S._fitsSelectMode;
+  S._fitsSelected = [];          // array of entry ids, in tap order
+  S._fitsShareSheetOpen = false;
+  render();
+}
+function toggleFitSelected(id) {
+  S._fitsSelected = S._fitsSelected || [];
+  const i = S._fitsSelected.indexOf(id);
+  if (i >= 0) S._fitsSelected.splice(i, 1);
+  else S._fitsSelected.push(id);
+  render();
+}
+function _selectedFitEntries() {
+  return (S._fitsSelected || []).map(id => S.entries.find(e => e.id === id)).filter(Boolean);
+}
+function _fitDisplayPhoto(e) {
+  return [...(e.rewears || [])].reverse().find(r => r.photo)?.photo || e.photo;
+}
+function _buildFitsShareText() {
+  const sel = _selectedFitEntries();
+  const msg = (S._fitsShareMsg || '').trim() || 'Which one should I wear today?';
+  let text = `${msg}\n\n`;
+  sel.forEach((e, i) => {
+    const bits = [`Look ${i + 1}`];
+    if (e.occasionTag) bits.push(e.occasionTag);
+    bits.push(`⭐ ${e.rating}/10`);
+    text += `${i + 1}. ${bits.join(' — ')}\n`;
+  });
+  text += '\n(sent from my Closet app 💛)';
+  return text;
+}
+function openFitsShareSheet() {
+  if (!(S._fitsSelected || []).length) { toast('Tap a fit or two first!'); return; }
+  if (S._fitsShareMsg === undefined) S._fitsShareMsg = '';
+  S._fitsShareSheetOpen = true;
+  render();
+}
+function closeFitsShareSheet() { S._fitsShareSheetOpen = false; render(); }
+function setFitsShareMsgChip(msg) {
+  S._fitsShareMsg = msg;
+  const inp = document.getElementById('fits-share-msg');
+  if (inp) inp.value = msg;
+}
+function _exitFitsShare() {
+  S._fitsShareSheetOpen = false;
+  S._fitsSelectMode = false;
+  S._fitsSelected = [];
+  render();
+}
+async function _fitsShareFiles() {
+  const sel = _selectedFitEntries();
+  const files = [];
+  for (let i = 0; i < sel.length; i++) {
+    const src = _fitDisplayPhoto(sel[i]);
+    if (!src) continue;
+    try {
+      let blob;
+      if (src.startsWith('data:')) {
+        // Decode data URLs directly — no fetch dependency
+        const [meta, b64] = src.split(',');
+        const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+        blob = new Blob([bytes], { type: mime });
+      } else {
+        blob = await (await fetch(src)).blob();
+      }
+      files.push(new File([blob], `look-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' }));
+    } catch (e) {}
+  }
+  return files;
+}
+async function shareFitsVia(method) {
+  const text = _buildFitsShareText();
+  if (method === 'native') {
+    const files = await _fitsShareFiles();
+    const payload = (files.length && navigator.canShare && navigator.canShare({ files })) ? { files, text } : { text };
+    navigator.share(payload).then(() => { toast('Sent! 💛'); _exitFitsShare(); }).catch(() => {});
+    return;
+  }
+  if (method === 'sms')   { _exitFitsShare(); location.href = 'sms:?&body=' + encodeURIComponent(text); return; }
+  if (method === 'email') { _exitFitsShare(); location.href = 'mailto:?subject=' + encodeURIComponent('Help me pick a fit 👀') + '&body=' + encodeURIComponent(text); return; }
+  if (method === 'copy') {
+    const done = () => { toast('Copied! 📋'); _exitFitsShare(); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(() => { _wishShareCopyFallback(text); done(); });
+    else { _wishShareCopyFallback(text); done(); }
+  }
+}
+function fitsShareSheetHTML() {
+  const n = (S._fitsSelected || []).length;
+  const canNative = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const chips = ['Which one should I wear today?', 'Rate these looks 👀', 'Help me pick for tonight ✨'];
+  const row = (method, icon, label, sub) => `<button
+    ontouchend="if(_touchMoved)return;event.preventDefault();shareFitsVia('${method}');"
+    onclick="shareFitsVia('${method}')"
+    style="width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;margin-bottom:10px;">
+    <span style="font-size:22px;flex-shrink:0;">${icon}</span>
+    <span style="flex:1;min-width:0;">
+      <span style="display:block;font-size:15px;font-weight:800;color:var(--text);">${label}</span>
+      <span style="display:block;font-size:12px;color:var(--text-3);margin-top:1px;">${sub}</span>
+    </span>
+  </button>`;
+  return `<div onclick="closeFitsShareSheet()" ontouchend="if(_touchMoved)return;event.preventDefault();closeFitsShareSheet()"
+    style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
+    <div onclick="event.stopPropagation()" ontouchend="event.stopPropagation()"
+      style="width:100%;background:var(--surface);border-radius:24px 24px 0 0;padding:14px 20px calc(20px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 40px rgba(0,0,0,0.2);animation:slideUp .28s cubic-bezier(.22,.68,0,1.2);max-height:85vh;overflow-y:auto;">
+      <div style="width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 16px;"></div>
+      <div style="font-size:17px;font-weight:900;color:var(--text);text-align:center;margin-bottom:14px;">Share ${n} fit${n === 1 ? '' : 's'}</div>
+      <input id="fits-share-msg" type="text" maxlength="120"
+        placeholder="Which one should I wear today?"
+        value="${esc(S._fitsShareMsg || '')}"
+        oninput="S._fitsShareMsg=this.value"
+        style="width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg);font-size:15px;font-family:inherit;color:var(--text);box-sizing:border-box;outline:none;-webkit-appearance:none;margin-bottom:10px;">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+        ${chips.map(c => `<button
+          ontouchend="if(_touchMoved)return;event.preventDefault();setFitsShareMsgChip('${c.replace(/'/g, "\\'")}');"
+          onclick="setFitsShareMsgChip('${c.replace(/'/g, "\\'")}')"
+          style="padding:6px 12px;border-radius:100px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;touch-action:manipulation;border:1.5px solid var(--border);background:var(--surface);color:var(--text-2);">${esc(c)}</button>`).join('')}
+      </div>
+      ${canNative ? row('native', '↗️', 'Share with photos', 'AirDrop, Messages & more — pics included') : ''}
+      ${row('sms', '💬', 'Text Message', 'Message only — photos won’t attach')}
+      ${row('email', '✉️', 'Email', 'Message only — photos won’t attach')}
+      ${row('copy', '📋', 'Copy Message', 'Paste it anywhere')}
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();closeFitsShareSheet();" onclick="closeFitsShareSheet()"
+        style="width:100%;padding:12px;background:none;border:none;font-size:14px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:2px;">
+        Cancel
+      </button>
+    </div>
+  </div>`;
+}
 
 async function setRecReaction(entryId, recIdx, reaction) {
   const e = S.entries.find(e => e.id === entryId); if (!e) return;
