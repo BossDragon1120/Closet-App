@@ -3012,7 +3012,7 @@ const S = {
   // Rate Mode — dating-app-style swipe/rate/purgatory flow over the wardrobe
   restockQueries: new Set(JSON.parse(localStorage.getItem('closet-restock') || '[]')), // queries flagged for "find similar" agent search
   rateModeSeenHelp: localStorage.getItem('closet-ratemode-help-seen') === 'true',
-  rateModePhotoMode: localStorage.getItem('closet-ratemode-photo') || 'worn', // 'worn' | 'product' — chosen each session
+  rateModePhotoMode: 'product', // 'worn' | 'product' — defaults to Product (left box) each session
   rateMode: null, // { ids: [wardrobeId,...], idx, count } — active session state
   rateModeCelebrate: null, // milestone count (e.g. 20) currently being celebrated, or null
   // new outfit flow
@@ -3956,6 +3956,98 @@ function shareWishListCard() {
   render();
 }
 function closeWishShareSheet() { S._wishShareSheetOpen = false; render(); }
+/* ================================================================
+   SUGGESTION FEEDBACK → developer
+   Writes to the top-level Firestore `feedback` collection (create-only
+   for signed-in users — see rules note in DEPLOY.md).
+   ================================================================ */
+const FEEDBACK_SOURCES = {
+  'dress-me':       '✨ Dress Me',
+  'style-roulette': '🎲 Style Roulette',
+  'outfit-builder': '✨ Build an Outfit',
+};
+function openSuggestionFeedback(source) {
+  let payload = null;
+  if (source === 'dress-me' && S.dressMeResult) {
+    payload = { vibe: S.dressMeResult.vibe || '', context: (S._dressMeContext || '').trim(),
+      items: (S.dressMeResult.outfit || []).map(p => p.item || '') };
+  } else if (source === 'style-roulette' && S.funRoulette) {
+    payload = { vibe: S.funRoulette.vibe || '', items: (S.funRoulette.outfit || []).map(p => p.item || '') };
+  } else if (source === 'outfit-builder' && S.outfitBuilder?.result) {
+    const w = S.wardrobe.find(x => x.id === S.outfitBuilder.wardrobeId);
+    payload = { anchor: w?.name || '', occasion: S.outfitBuilder.occasion || '',
+      items: (S.outfitBuilder.result.picks || []).map(p => p.name || '') };
+  }
+  S._fbSheet = { source, payload, rating: null };
+  S._fbText = '';
+  S._fbSending = false;
+  render();
+}
+function closeSuggestionFeedback() { S._fbSheet = null; render(); }
+function setFeedbackRating(r) { if (S._fbSheet) { S._fbSheet.rating = S._fbSheet.rating === r ? null : r; render(); } }
+async function submitSuggestionFeedback() {
+  const fb = S._fbSheet;
+  if (!fb || S._fbSending) return;
+  if (!fb.rating && !(S._fbText || '').trim()) { toast('Pick a rating or write a note first'); return; }
+  S._fbSending = true; render();
+  try {
+    await firestore.collection('feedback').add({
+      source: fb.source,
+      rating: fb.rating || null,
+      note: (S._fbText || '').trim() || null,
+      suggestion: fb.payload || null,
+      styleGoals: S.styleGoals || [],
+      build: APP_BUILD,
+      uid: currentUser?.uid || 'anon',
+      createdAt: new Date().toISOString(),
+    });
+    S._fbSheet = null; S._fbSending = false;
+    toast('Feedback sent — thank you! 💛');
+    render();
+  } catch (e) {
+    console.warn('feedback:', e);
+    S._fbSending = false;
+    toast("Couldn't send — check your connection and try again");
+    render();
+  }
+}
+function feedbackSheetHTML() {
+  const fb = S._fbSheet;
+  if (!fb) return '';
+  const srcLabel = FEEDBACK_SOURCES[fb.source] || fb.source;
+  const items = fb.payload?.items?.length ? fb.payload.items.join(' · ') : '';
+  const ratingBtn = (val, emoji, label) => `<button
+    ontouchend="if(_touchMoved)return;event.preventDefault();setFeedbackRating('${val}');" onclick="setFeedbackRating('${val}')"
+    style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 6px;background:${fb.rating===val?'var(--gold-bg)':'var(--bg)'};border:1.5px solid ${fb.rating===val?'var(--gold)':'var(--border)'};border-radius:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+    <span style="font-size:24px;">${emoji}</span>
+    <span style="font-size:11px;font-weight:700;color:${fb.rating===val?'var(--gold-dk)':'var(--text-2)'};">${label}</span>
+  </button>`;
+  return `<div onclick="closeSuggestionFeedback()" ontouchend="if(_touchMoved)return;event.preventDefault();closeSuggestionFeedback()"
+    style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
+    <div onclick="event.stopPropagation()" ontouchend="event.stopPropagation()"
+      style="width:100%;background:var(--surface);border-radius:24px 24px 0 0;padding:14px 20px calc(20px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 40px rgba(0,0,0,0.2);animation:slideUp .28s cubic-bezier(.22,.68,0,1.2);">
+      <div style="width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 16px;"></div>
+      <div style="font-size:17px;font-weight:900;color:var(--text);text-align:center;margin-bottom:4px;">How was this suggestion?</div>
+      <div style="font-size:12px;color:var(--text-3);text-align:center;margin-bottom:14px;">${esc(srcLabel)}${items ? ` — ${esc(items.length > 70 ? items.slice(0,70) + '…' : items)}` : ''}</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        ${ratingBtn('love', '😍', 'Loved it')}
+        ${ratingBtn('meh',  '😐', 'It was OK')}
+        ${ratingBtn('off',  '🙅', 'Way off')}
+      </div>
+      <textarea id="fb-note" rows="3" maxlength="500"
+        placeholder="What worked or didn't? (optional — goes straight to the developer)"
+        oninput="S._fbText=this.value"
+        style="width:100%;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);resize:none;font-family:inherit;line-height:1.5;outline:none;margin-bottom:12px;">${esc(S._fbText||'')}</textarea>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();submitSuggestionFeedback();" onclick="submitSuggestionFeedback()"
+        style="width:100%;padding:14px;background:${S._fbSending?'var(--border)':'var(--gold)'};color:#fff;border:none;border-radius:100px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;" ${S._fbSending?'disabled':''}>
+        ${S._fbSending ? 'Sending…' : '📨 Send to the Developer'}
+      </button>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();closeSuggestionFeedback();" onclick="closeSuggestionFeedback()"
+        style="width:100%;padding:12px;background:none;border:none;font-size:14px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:2px;">Cancel</button>
+    </div>
+  </div>`;
+}
+
 // Generic share helper — native share sheet with clipboard fallback.
 // (Referenced by several buttons but lost in a refactor; restored 2026-07.)
 function shareText(title, text, url) {
@@ -4374,173 +4466,7 @@ async function refreshNewsFlash() {
   }
 }
 
-function newsFlashHTML() {
-  const nf = S.newsFlash;
-  if (!nf) {
-    // Show a small prompt to fetch one (only if api key is available)
-    if (!S.apiKey) return '';
-    return `<div style="padding:8px 16px 0;display:flex;justify-content:flex-end;">
-      <button onclick="refreshNewsFlash()" style="background:none;border:1px solid var(--border);border-radius:100px;padding:5px 13px;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;">
-        ✦ Get Trend Alert
-      </button>
-    </div>`;
-  }
-  const thumbHTML = nf.thumbnail
-    ? `<img src="${esc(nf.thumbnail)}" alt="" style="width:100%;aspect-ratio:21/9;object-fit:cover;display:block;border-radius:var(--r-sm);margin-bottom:8px;"
-        onerror="this.style.display='none'">`
-    : '';
-  return `<div class="newsflash" id="newsflash">
-    <div class="newsflash-inner">
-      <div class="newsflash-top">
-        <div class="newsflash-label">
-          ✦ Trend Alert
-          <button class="newsflash-refresh" onclick="refreshNewsFlash()" title="Get new trend">↻</button>
-        </div>
-        <button class="newsflash-close" onclick="dismissNewsFlash()" aria-label="Dismiss">✕</button>
-      </div>
-      ${thumbHTML}
-      <div class="newsflash-headline">${esc(nf.headline)}</div>
-      <div class="newsflash-summary">${esc(nf.summary)}</div>
-      <div class="newsflash-footer">
-        <span class="newsflash-source">${esc(nf.source)}</span>
-        <div style="display:flex;align-items:center;gap:10px;">
-          ${nf.url ? `<a class="newsflash-read" href="${esc(nf.url)}" target="_blank" rel="noopener">Read →</a>` : ''}
-          <button onclick="shareTrend()" title="Share this trend" style="background:none;border:none;cursor:pointer;padding:2px;line-height:1;color:var(--text-3);display:flex;align-items:center;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-    <div class="newsflash-swipe-hint">← swipe to dismiss</div>
-  </div>`;
-}
-
-/* ================================================================
-   OUTFIT SUGGESTIONS (claude-haiku)
-   ================================================================ */
-async function suggestOutfits(eventDesc, forecast) {
-  const key = S.apiKey.trim(); if (!key) return null;
-  // Build a concise snapshot of past outfits with weather feel data
-  const outfitSnap = S.entries.slice(0, 30).map(e => {
-    const items = (e.items||[]).map(i=>`${i.icon||''}${i.name}`).join(', ');
-    const parts = [`styleRating:${e.rating}`, `items:[${items}]`];
-    if (e.confidence != null) parts.push(`confidenceScore:${e.confidence}`);
-    if (e.occasionTag)  parts.push(`occasion:${e.occasionTag}`);
-    if (e.weather)      parts.push(`temp:${e.weather.tempF}°F`);
-    if (e.weatherFeel)  parts.push(`felt:${e.weatherFeel}`);
-    return `{id:${e.id}, ${parts.join(', ')}}`;
-  }).join('\n');
-  // Wardrobe snapshot (exclude retiring items) — shuffled to prevent Claude always picking the same pieces
-  const wardSnap = S.wardrobe.filter(w=>!w.retiring)
-    .slice().sort(() => Math.random() - 0.5)
-    .map(w => `{name:"${w.icon||''}${w.name}", cat:${w.category||'?'}, wears:${w.wears?.length||0}${w.brand?`, brand:${w.brand}`:''}}`
-  ).join('\n');
-
-  const weatherLine = forecast
-    ? `Forecasted weather: ${forecast.icon} ${forecast.condition}, high ${forecast.hi}°F / low ${forecast.lo}°F`
-    : 'No weather forecast available.';
-
-  const profileParts = [
-    S.profileName   ? `Name: ${S.profileName}`     : '',
-    S.profileAge    ? `Age: ${S.profileAge}`        : '',
-  ].filter(Boolean).join(', ');
-  // Rolling history of recently suggested items — avoid repeating the same picks
-  if (!S._planSuggestHistory) S._planSuggestHistory = [];
-  const avoidPlanLine = S._planSuggestHistory.length
-    ? `\nAVOID these items from recent suggestions — make this feel fresh:\n${S._planSuggestHistory.map(n=>`• ${n}`).join('\n')}\n`
-    : '';
-
-  // Random creative nudge to push variety
-  const planDirectives = [
-    'Look for an underused or rarely-worn piece to build around — give it a moment.',
-    'Consider a slightly bolder or more unexpected combination than the obvious choice.',
-    'Prioritise items the person hasn\'t worn together before.',
-    'Think about texture contrast — mix a structured piece with something relaxed.',
-    'Look for a colour or pattern in the wardrobe that hasn\'t featured much recently.',
-    'Push the formality slightly — either dress it up more or dress it down more than expected.',
-  ];
-  const planDirective = planDirectives[Math.floor(Math.random() * planDirectives.length)];
-
-  const prompt = `You are a creative personal stylist with access to a client's full wardrobe and outfit history. Suggest the single best outfit for an upcoming event.
-${profileParts ? `\nCLIENT PROFILE: ${profileParts}` : ''}
-EVENT: "${eventDesc}"
-${weatherLine}
-CREATIVE DIRECTIVE: ${planDirective}
-${avoidPlanLine}
-OUTFIT HISTORY (most recent 30):
-${outfitSnap || '(none yet)'}
-
-WARDROBE ITEMS:
-${wardSnap || '(none yet)'}
-
-Rules:
-- Base suggestions on real items from the outfit history and wardrobe above. Reference item names specifically.
-- Factor in the event description — location, vibe, season, and formality all matter.
-- Factor in the weather: if it's cold, suggest layers; if hot, suggest breathable fabrics.
-- If weatherFeel data shows the person ran hot/cold at similar temps, adjust accordingly.
-- Prioritize outfits and items with high confidenceScore (8–10) — these are outfits the person felt best in.
-- Each suggestion should reference specific item names from their history/wardrobe when possible.
-
-Return a JSON object (not an array):
-{
-  "outfitId": "<id from outfit history, or null if remix>",
-  "groups": [
-    { "role": "Top", "items": ["item name"] },
-    { "role": "Bottom", "items": ["primary option", "alternate option if applicable"] },
-    { "role": "Shoes", "items": ["item name"] },
-    { "role": "Bag", "items": ["item name"] },
-    { "role": "Layer", "items": ["item name"] }
-  ],
-  "reasoning": "2 sentences explaining why this works for the event",
-  "weatherNote": "1 sentence on temperature suitability, or omit if no forecast"
-}
-Rules for groups:
-- Only include roles that have an actual item to suggest (skip empty roles).
-- If two items are genuine alternates for the same role (e.g. a dress OR pants+top), put both in that group's "items" array. Do NOT put alternates in separate groups.
-- A dress replaces both Top and Bottom — use role "Dress" with a single item.
-- Keep item names exactly as they appear in the wardrobe list above.
-- Maximum 2 items per group (primary + one alternate).
-Do not include emojis in item names. Return only the JSON object, no other text.`;
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 400,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const text = (data.content?.[0]?.text || '').trim();
-    const jsonStr = text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
-    const parsed = JSON.parse(jsonStr);
-    // Accept either a single object or the first item of an array
-    const result = Array.isArray(parsed) ? parsed[0] : parsed;
-    // Derive flat items[] from groups for backward compat (event board chips)
-    if (result && result.groups && !result.items) {
-      result.items = result.groups.map(g => g.items[0]).filter(Boolean);
-    }
-    // Track suggested items so next call avoids the same picks
-    if (result?.items?.length) {
-      if (!S._planSuggestHistory) S._planSuggestHistory = [];
-      S._planSuggestHistory = [...S._planSuggestHistory, ...result.items].slice(-12);
-    }
-    return result;
-  } catch(e) { console.error('suggestOutfits error', e); return null; }
-}
-
-/* ================================================================
-   SHOPPING LIST HELPERS
-   ================================================================ */
-// Safe index-based tap handler — avoids inline string escaping entirely
-window._shopQ = []; // populated by viewShop() each render
+// Trend Alert now appears in the daily login briefing sheet (wordOfDaySheetHTML).
 function _shopTap(idx) {
   const q = window._shopQ[idx];
   if (q === undefined) return;
@@ -4754,6 +4680,10 @@ function toast(msg) {
   S.toast = msg; render();
   _toastTimer = setTimeout(() => { S.toast = null; render(); }, 2600);
 }
+// Visible build stamp (Settings footer) — update on deploy to verify which
+// version a device is actually running.
+const APP_BUILD = '2026-07-06';
+
 function navigate(view) { if (view !== S.view) S._prevView = S.view; S.view = view; S.error = null; render(); window.scrollTo(0,0); }
 function switchTab(tab)  {
   S.activeTab = tab;
@@ -5329,42 +5259,55 @@ function dismissWordOfDay() {
 function wordOfDaySheetHTML() {
   const w = S.wordOfDay;
   if (!w) return '';
+  // Daily briefing sheet: Word of the Day + Trend Alert, two cards of similar
+  // visual weight. The trend card fills in from S.newsFlash (initNewsFlash
+  // runs at login and re-renders when the story arrives).
+  const nf = S.newsFlash;
+  const trendCard = nf ? `
+      <div style="margin:12px 20px 0;background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">✦ Trend Alert</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);line-height:1.3;margin-bottom:5px;">${esc(nf.headline)}</div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${esc(nf.summary)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:9px;">
+          <span style="font-size:11px;color:var(--text-3);">${esc(nf.source||'')}</span>
+          ${nf.url ? `<a href="${esc(nf.url)}" target="_blank" rel="noopener" style="font-size:12px;font-weight:700;color:var(--gold-dk);text-decoration:none;">Read →</a>` : ''}
+        </div>
+      </div>` : (S.apiKey ? `
+      <div style="margin:12px 20px 0;background:var(--bg);border:1.5px dashed var(--border);border-radius:14px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">✦ Trend Alert</div>
+        <div style="font-size:12px;color:var(--text-3);">Fetching today's fashion news…</div>
+      </div>` : '');
   return `
   <div onclick="dismissWordOfDay()" ontouchend="if(_touchMoved)return;event.preventDefault();dismissWordOfDay()"
     style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;display:flex;align-items:flex-end;">
     <div onclick="event.stopPropagation()" ontouchend="event.stopPropagation()"
       style="width:100%;background:var(--surface);border-radius:24px 24px 0 0;padding:0 0 env(safe-area-inset-bottom,20px);
-             box-shadow:0 -8px 40px rgba(0,0,0,0.18);animation:slideUp .32s cubic-bezier(.22,.68,0,1.2);">
+             box-shadow:0 -8px 40px rgba(0,0,0,0.18);animation:slideUp .32s cubic-bezier(.22,.68,0,1.2);max-height:88vh;overflow-y:auto;">
       <!-- pill handle -->
       <div style="display:flex;justify-content:center;padding:14px 0 0;">
         <div style="width:36px;height:4px;border-radius:2px;background:var(--border);"></div>
       </div>
       <!-- header -->
-      <div style="text-align:center;padding:16px 24px 0;">
-        <div style="font-size:22px;margin-bottom:6px;">📖</div>
-        <div style="font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--gold);">Fashion Word of the Day</div>
-        <div style="font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.45;">A new term every day to help you talk — and think — like a style expert.</div>
+      <div style="text-align:center;padding:12px 24px 2px;">
+        <div style="font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--gold);">☀️ Today's Style Briefing</div>
       </div>
-      <!-- divider -->
-      <div style="margin:14px 24px 0;height:1px;background:var(--border);"></div>
-      <!-- word -->
-      <div style="text-align:center;padding:14px 24px 0;">
-        <div style="font-size:32px;font-weight:800;color:var(--text-1);letter-spacing:-.02em;line-height:1.1;">${esc(w.word)}</div>
-        <div style="font-size:13px;color:var(--text-3);font-style:italic;margin-top:4px;">${esc(w.phonetic)} &nbsp;·&nbsp; <span style="font-style:normal;font-weight:600;color:var(--text-2);">${esc(w.type)}</span></div>
+      <!-- Word of the Day card -->
+      <div style="margin:12px 20px 0;background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">📖 Word of the Day</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:5px;">
+          <span style="font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.02em;line-height:1.1;">${esc(w.word)}</span>
+          <span style="font-size:12px;color:var(--text-3);font-style:italic;">${esc(w.phonetic)} · <span style="font-style:normal;font-weight:600;color:var(--text-2);">${esc(w.type)}</span></span>
+        </div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.55;">${esc(w.def)}</div>
+        <div style="margin-top:9px;padding:9px 12px;background:var(--surface);border-radius:10px;border-left:3px solid var(--gold);">
+          <div style="font-size:12.5px;font-style:italic;color:var(--text-2);line-height:1.5;">"${esc(w.example)}"</div>
+        </div>
       </div>
-      <!-- divider -->
-      <div style="margin:16px 24px;height:1px;background:var(--border);"></div>
-      <!-- definition -->
-      <div style="padding:0 24px;font-size:15px;line-height:1.6;color:var(--text-1);">${esc(w.def)}</div>
-      <!-- example -->
-      <div style="margin:14px 24px 0;padding:12px 14px;background:var(--bg);border-radius:12px;border-left:3px solid var(--gold);">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin-bottom:4px;">In context</div>
-        <div style="font-size:14px;font-style:italic;color:var(--text-2);line-height:1.55;">"${esc(w.example)}"</div>
-      </div>
+      ${trendCard}
       <!-- dismiss -->
-      <div style="padding:20px 24px 8px;">
+      <div style="padding:16px 20px 8px;">
         <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissWordOfDay()" onclick="dismissWordOfDay()"
-          style="width:100%;padding:14px;border-radius:14px;border:none;background:var(--gold);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">
+          style="width:100%;padding:14px;border-radius:14px;border:none;background:var(--gold);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
           Got it ✓
         </button>
       </div>
@@ -5792,6 +5735,13 @@ function viewOutfitBuilder() {
             color:#6C3EBF;font-size:14px;font-weight:700;
             display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation;">
           🔄 Try a different outfit
+        </button>
+      
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();openSuggestionFeedback('outfit-builder');"
+          onclick="openSuggestionFeedback('outfit-builder');"
+          style="width:100%;background:none;border:none;padding:4px 0 0;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
+          📨 Send feedback on this suggestion
         </button>
       </div>
 
@@ -6229,6 +6179,7 @@ function render() {
     case 'edit':         html = viewEdit();         break;
     case 'wardrobe-item':html = viewWardrobeItem(); break;
     case 'rip':          html = viewRIP();          break;
+    case 'looking-back': html = viewLookingBack();   break;
     case 'receipt-add':  html = viewReceiptAdd();   break;
     case 'new-piece':    html = viewNewPiece();     break;
     case 'bulk-add':     html = viewBulkAdd();      break;
@@ -6275,6 +6226,7 @@ function render() {
   if (S._wishShareSheetOpen && S.view === 'wish-share') html += wishShareSheetHTML();
   if (S._fitsShareSheetOpen && S.view === 'closet') html += fitsShareSheetHTML();
   if (S._tripFlow && S.view === 'plan') html += tripFlowSheetHTML();
+  if (S._fbSheet) html += feedbackSheetHTML();
   if (S._closetLightbox) html += closetLightboxHTML();
   if (S._sellDraftOpen) html += sellDraftModalHTML();
   if (S._complimentModal) html += complimentModalHTML();
@@ -8732,6 +8684,10 @@ function viewDressMe() {
                   🔄 Try another
                 </button>
               </div>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();openSuggestionFeedback('dress-me');" onclick="openSuggestionFeedback('dress-me')"
+                style="width:100%;background:none;border:none;padding:10px 0 0;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
+                📨 Send feedback on this suggestion
+              </button>
             `;
           })() : ''}
 
@@ -10301,6 +10257,12 @@ function viewStyleRoulette() {
               style="width:100%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:13px;font-size:14px;font-weight:700;color:rgba(255,255,255,.8);cursor:pointer;font-family:inherit;touch-action:manipulation;">
               🔄 Spin again
             </button>
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();openSuggestionFeedback('style-roulette');"
+              onclick="openSuggestionFeedback('style-roulette');"
+              style="width:100%;background:none;border:none;padding:10px 0 0;font-size:12px;font-weight:700;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
+              📨 Send feedback on this suggestion
+            </button>
           </div>
         </div>`;
     } catch(e) { console.error('viewStyleRoulette render:', e); S.funRoulette = null; }
@@ -11060,12 +11022,6 @@ function viewProfile() {
         </div>`).join('')}
     </div>` : '';
 
-  // ── Aura summary for icon ─────────────────────────────────
-  const auraFilledCount = [
-    S.profileZodiac, S.profileMBTI, S.profileHeight, S.braSize,
-    S.profileWeight, S.signatureNailColor, S.signatureScent, S.hairstyle, S.eyeColor
-  ].filter(v => v && v.trim()).length;
-
   const html = `<div class="view">
     <div class="nav">
       <span class="nav-logo">My Style Portfolio</span>
@@ -11253,8 +11209,8 @@ function viewProfile() {
       const itemCounts = {};
       S.wardrobe.forEach(w => { if (w.brand?.trim()) itemCounts[w.brand.trim()] = (itemCounts[w.brand.trim()]||0) + 1; });
       const ranked = Object.entries(itemCounts).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
-      const showAll = S._brandsExpanded;
-      const visible = showAll ? ranked : ranked.slice(0, BRAND_CAP);
+      // Always top 3 only — the full list lives on the My Brands page
+      const visible = ranked.slice(0, BRAND_CAP);
       const MEDALS = [
         { bg:'linear-gradient(135deg,#E3BC4B,#B8860B)', ring:'rgba(184,134,11,0.35)' },   // gold
         { bg:'linear-gradient(135deg,#D7DBE0,#9CA3AF)', ring:'rgba(156,163,175,0.35)' },  // silver
@@ -11277,11 +11233,6 @@ function viewProfile() {
           </a>
         </div>`;
       }).join('');
-      const expandBtn = ranked.length > BRAND_CAP ? `
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=!S._brandsExpanded;render()" onclick="S._brandsExpanded=!S._brandsExpanded;render()"
-          style="width:100%;background:none;border:1px solid var(--border);border-radius:100px;padding:8px;font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:2px;">
-          ${showAll ? 'Show less ↑' : `Show ${ranked.length - BRAND_CAP} more ↓`}
-        </button>` : '';
       return `<div style="margin:16px 16px 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">🏷 Top Brands</div>
@@ -11291,7 +11242,6 @@ function viewProfile() {
           </button>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;">${rows}</div>
-        ${expandBtn}
       </div>`;
     })() : ''}
 
@@ -11306,106 +11256,38 @@ function viewProfile() {
         <div style="flex:1;min-width:0;">
           <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">Personal Details</div>
           <div style="font-size:12px;color:var(--text-3);">${(() => {
-            const parts = [];
-            if (auraFilledCount > 0) parts.push(`${auraFilledCount}/9 aura details`);
-            if (S.nonNegPhysical || S.nonNegAesthetic) parts.push('non-negotiables ✓');
-            return parts.length ? parts.join(' · ') : 'Your aura, therapy notes & non-negotiables';
+            const filled = [S.profileHeight, S.profileWeight, S.hairstyle, S.eyeColor, S.braSize, S.braStyle,
+              S.signatureNailColor, S.signatureScent, S.profileZodiac, S.profileMBTI,
+              S.nonNegPhysical, S.nonNegAesthetic].filter(v => v && String(v).trim()).length;
+            return `${Math.round(filled / 12 * 100)}% complete`;
           })()}</div>
         </div>
         <div style="font-size:18px;color:var(--text-3);">›</div>
       </button>
     </div>
 
-    <!-- 📦 Past Looks + 🌹 Memorial Garden — grouped as "Looking Back" -->
+    <!-- 🌙 Retired Looks & Pieces — one row, full page on tap -->
     ${(()=>{
-      const retiredFits = soloEntries.filter(e => e.photo && !e.battleId && isRetiredFit(e))
-        .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 12);
-      const memorialized = S.wardrobe.filter(w => w.memorial);
-      const retiredItems = S.wardrobe.filter(w => w.retiredFromCloset)
-        .sort((a,b) => new Date(b.retiredAt||0) - new Date(a.retiredAt||0));
-      if (!retiredFits.length && !memorialized.length && !retiredItems.length) return '';
-
-      const pastLooksHTML = retiredFits.length ? (() => {
-        const cards = retiredFits.map((e,i) => {
-          const rating = e.rating != null ? `<div style="position:absolute;bottom:5px;left:5px;background:rgba(0,0,0,0.6);border-radius:100px;padding:2px 7px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.85);">⭐ ${e.rating}</div>` : '';
-          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')" onclick="openEntry('${e.id}')"
-            style="flex-shrink:0;width:80px;cursor:pointer;touch-action:manipulation;">
-            <div style="width:80px;height:107px;border-radius:10px;overflow:hidden;border:1.5px solid rgba(150,80,220,0.2);background:#1A1520;position:relative;">
-              <img src="${esc(e.photo)}" loading="${i<4?'eager':'lazy'}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;filter:saturate(0.55);opacity:0.85;">
-              ${rating}
-            </div>
-            <div style="font-size:9px;color:rgba(150,80,220,0.65);margin-top:4px;text-align:center;font-weight:600;">${fmtDate(e.createdAt)}</div>
-          </div>`;
-        }).join('');
-        return `<div style="margin-bottom:${memorialized.length?'12px':'0'};">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(150,80,220,0.75);">📦 Past Looks</div>
-            <div style="font-size:11px;color:rgba(150,80,220,0.45);">${retiredFits.length} look${retiredFits.length===1?'':'s'}</div>
-          </div>
-          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none;margin:0 -16px;padding-left:16px;padding-right:16px;">
-            <div style="display:flex;gap:8px;width:max-content;">${cards}</div>
-          </div>
-        </div>`;
-      })() : '';
-
-      const gardenHTML = memorialized.length ? (() => {
-        const thumbs = memorialized.slice(0,4).map(w =>
-          w.photo
-            ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:40px;height:40px;border-radius:7px;object-fit:cover;border:1.5px solid rgba(150,80,220,0.2);filter:saturate(0.5);opacity:0.75;">`
-            : `<div style="width:40px;height:40px;border-radius:7px;background:rgba(150,80,220,0.1);border:1.5px solid rgba(150,80,220,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;">${w.icon||'👕'}</div>`
-        ).join('');
-        return `<button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('rip')" onclick="navigate('rip')"
-          style="width:100%;display:flex;align-items:center;gap:12px;background:rgba(150,80,220,0.07);border:1.5px solid rgba(150,80,220,0.18);border-radius:12px;padding:12px 14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
-          <div style="font-size:22px;flex-shrink:0;">🌹</div>
+      const retiredFitCount = soloEntries.filter(e => e.photo && !e.battleId && isRetiredFit(e)).length;
+      const retiredPieceCount = S.wardrobe.filter(w => w.retiredFromCloset).length;
+      const memorialCount = S.wardrobe.filter(w => w.memorial).length;
+      if (!retiredFitCount && !retiredPieceCount && !memorialCount) return '';
+      const bits = [];
+      if (retiredFitCount) bits.push(`${retiredFitCount} look${retiredFitCount===1?'':'s'}`);
+      if (retiredPieceCount) bits.push(`${retiredPieceCount} piece${retiredPieceCount===1?'':'s'}`);
+      if (memorialCount) bits.push(`${memorialCount} memorial${memorialCount===1?'':'s'}`);
+      return `<div style="margin:0 16px 16px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('looking-back')" onclick="navigate('looking-back')"
+          style="width:100%;background:var(--surface);border:1.5px solid rgba(150,80,220,0.2);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
+          <div style="width:44px;height:44px;border-radius:12px;background:rgba(150,80,220,0.08);border:1px solid rgba(150,80,220,0.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">🌙</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:12px;font-weight:800;color:rgba(196,160,240,0.85);margin-bottom:5px;">Memorial Garden</div>
-            <div style="display:flex;gap:5px;align-items:center;">${thumbs}</div>
+            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">Retired Looks & Pieces</div>
+            <div style="font-size:12px;color:var(--text-3);">${bits.join(' · ')}</div>
           </div>
-          <div style="font-size:12px;font-weight:700;color:rgba(160,100,240,0.55);flex-shrink:0;">${memorialized.length} piece${memorialized.length===1?'':'s'} ›</div>
-        </button>`;
-      })() : '';
-
-      const retiredItemsHTML = retiredItems.length ? (() => {
-        const isOpen = !!S.wardrobeRetiredExpanded;
-        const wastedSpend = retiredItems.filter(w => w.retireReason === 'didnt-suit-me' && w.price)
-          .reduce((s,w) => s + parseFloat(w.price||0), 0);
-        return `<div style="margin-bottom:${gardenHTML?'12px':'0'};">
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeRetiredExpanded=!S.wardrobeRetiredExpanded;render()" onclick="S.wardrobeRetiredExpanded=!S.wardrobeRetiredExpanded;render()"
-            style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(150,80,220,0.06);border:1.5px solid rgba(150,80,220,0.16);border-radius:${isOpen?'10px 10px 0 0':'10px'};padding:11px 14px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            <span style="font-size:13px;font-weight:700;color:rgba(150,80,220,0.8);">📦 Retired Pieces (${retiredItems.length})</span>
-            <div style="display:flex;align-items:center;gap:8px;">
-              ${wastedSpend > 0 ? `<span style="font-size:11px;color:rgba(150,80,220,0.5);">$${Math.round(wastedSpend)} didn't suit</span>` : ''}
-              <span style="font-size:12px;color:rgba(150,80,220,0.45);transform:${isOpen?'rotate(90deg)':'none'};transition:transform .15s;">▶</span>
-            </div>
-          </button>
-          ${isOpen ? `<div style="background:rgba(150,80,220,0.04);border:1.5px solid rgba(150,80,220,0.16);border-top:none;border-radius:0 0 10px 10px;padding:6px 0;">
-            ${retiredItems.map(w => {
-              const wears = w.wears?.length || 0;
-              const outcomeLabel = {donated:'Donated',sold:'Sold',tossed:'Tossed'}[w.retireOutcome] || '';
-              const reasonLabel = {'worn-out':'Worn out','didnt-suit-me':"Didn't suit me"}[w.retireReason] || '';
-              const meta = [outcomeLabel, reasonLabel, w.retiredAt ? fmtDate(w.retiredAt) : ''].filter(Boolean).join(' · ');
-              return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')" onclick="openWardrobeItem('${w.id}')"
-                style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid rgba(150,80,220,0.1);cursor:pointer;touch-action:manipulation;">
-                <div style="width:38px;height:38px;border-radius:9px;background:rgba(150,80,220,0.08);border:1px solid rgba(150,80,220,0.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${w.icon||'👕'}</div>
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:13px;font-weight:700;color:rgba(150,80,220,0.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
-                  ${meta ? `<div style="font-size:10px;color:rgba(150,80,220,0.45);margin-top:1px;">${meta}</div>` : ''}
-                </div>
-                <span style="font-size:11px;color:rgba(150,80,220,0.4);flex-shrink:0;">${wears} wear${wears===1?'':'s'}</span>
-              </div>`;
-            }).join('')}
-          </div>` : ''}
-        </div>`;
-      })() : '';
-
-      return `<div style="margin:0 16px 16px;background:rgba(120,60,200,0.06);border:1.5px solid rgba(150,80,220,0.16);border-radius:16px;padding:14px 14px 12px;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(150,80,220,0.5);margin-bottom:12px;">🌙 Looking Back</div>
-        ${pastLooksHTML}
-        ${retiredItemsHTML}
-        ${gardenHTML}
+          <div style="font-size:18px;color:var(--text-3);">›</div>
+        </button>
       </div>`;
-    })()}
+    })()}    })()}
 
     <div style="height:40px;"></div>
   </div>`;
@@ -12154,16 +12036,16 @@ function auraBodyHTML() {
       <div style="font-size:11px;color:var(--text-3);margin-bottom:20px;">${filledCount}/${total} filled in</div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px;">
-        ${auraFieldHTML('profileZodiac',     'closet-profile-zodiac',   '⭐', 'Star Sign',        'e.g. Scorpio, Libra…',            S.profileZodiac)}
-        ${auraFieldHTML('profileMBTI',       'closet-profile-mbti',     '🧠', 'Personality',      'e.g. ENFP, INTJ…',                S.profileMBTI)}
-        ${auraFieldHTML('profileHeight',     'closet-profile-height',   '📏', 'Height',           'e.g. 5\'7", 170cm…',              S.profileHeight)}
-        ${auraFieldHTML('braSize',           'closet-bra-size',         '🩱', 'Bra Size',         'e.g. 32C, 34B…',                  S.braSize)}
-        ${auraFieldHTML('braStyle',          'closet-bra-style',        '✨', 'Bra Style',        'e.g. Wireless, Bralette, Balconette…',S.braStyle)}
-        ${auraFieldHTML('profileWeight',     'closet-profile-weight',   '⚖️', 'Weight',           'e.g. 130 lbs, 58kg…',             S.profileWeight)}
-        ${auraFieldHTML('eyeColor',          'closet-eye-color',        '👁️', 'Eye Color',        'e.g. Hazel, Blue-green…',         S.eyeColor)}
-        ${auraFieldHTML('signatureNailColor','closet-nail-color',       '💅', 'Signature Nail',   'e.g. Bordeaux, OPI Bubble Bath…', S.signatureNailColor)}
-        ${auraFieldHTML('signatureScent',    'closet-signature-scent',  '🌸', 'Signature Scent',  'e.g. Chanel No. 5, Replica…',     S.signatureScent)}
-        ${auraFieldHTML('hairstyle',         'closet-hairstyle',        '💇', 'Hairstyle',        'e.g. Long waves, blunt bob…',     S.hairstyle)}
+        ${auraFieldHTML('profileHeight',     'closet-profile-height',   '📏', 'Height',               'e.g. 5\'7", 170cm…',              S.profileHeight)}
+        ${auraFieldHTML('profileWeight',     'closet-profile-weight',   '⚖️', 'Weight',               'e.g. 130 lbs, 58kg…',             S.profileWeight)}
+        ${auraFieldHTML('hairstyle',         'closet-hairstyle',        '💇', 'Hair Color',           'e.g. Brunette, auburn balayage…', S.hairstyle)}
+        ${auraFieldHTML('eyeColor',          'closet-eye-color',        '👁️', 'Eye Color',            'e.g. Hazel, Blue-green…',         S.eyeColor)}
+        ${auraFieldHTML('braSize',           'closet-bra-size',         '🩱', 'Bra Size',             'e.g. 32C, 34B…',                  S.braSize)}
+        ${auraFieldHTML('braStyle',          'closet-bra-style',        '✨', 'Favorite Bra',         'e.g. Wireless, Bralette, Balconette…',S.braStyle)}
+        ${auraFieldHTML('signatureNailColor','closet-nail-color',       '💅', 'Signature Nail Color', 'e.g. Bordeaux, OPI Bubble Bath…', S.signatureNailColor)}
+        ${auraFieldHTML('signatureScent',    'closet-signature-scent',  '🌸', 'Signature Scent',      'e.g. Chanel No. 5, Replica…',     S.signatureScent)}
+        ${auraFieldHTML('profileZodiac',     'closet-profile-zodiac',   '⭐', 'Star Sign',            'e.g. Scorpio, Libra…',            S.profileZodiac)}
+        ${auraFieldHTML('profileMBTI',       'closet-profile-mbti',     '🧠', 'Personality',          'e.g. ENFP, INTJ…',                S.profileMBTI)}
       </div>
 
       <!-- Closet Therapy Session notes — transcripts/recordings from styling sessions,
@@ -12695,7 +12577,6 @@ function viewHome() {
       <h2>Welcome to your Closet!</h2>
       <p>Log your first outfit or add wardrobe items to get started. Your style portrait will come to life as you use the app.</p>
     </div>` : ''}
-    ${newsFlashHTML()}
     ${tipsSection}
     ${trendsSection}
     ${pulseSection}
@@ -15034,6 +14915,7 @@ window.addEventListener('popstate', () => {
 function startRateMode() {
   const hasAny = S.wardrobe.some(w => !w.retiredFromCloset && !w.inMaybePile && (!!w.wearPhoto || !!w.photo));
   if (!hasAny) { toast('Add photos to your wardrobe items to start rating! ✨'); return; }
+  S.rateModePhotoMode = 'product'; // always default to "rate the item" (left box)
   S.rateMode = null; // show setup/chooser screen first
   navigate('rate-mode');
   history.pushState({ rateMode: true }, '', location.href);
@@ -15188,7 +15070,7 @@ function _rateDragEnd(e) {
 }
 
 function viewRateModeSetup() {
-  const mode = S.rateModePhotoMode || 'worn';
+  const mode = S.rateModePhotoMode || 'product';
   const optionCard = (val, icon, label, sub) => `
     <button ontouchend="if(_touchMoved)return;event.preventDefault();setRateModePhotoMode('${val}');" onclick="setRateModePhotoMode('${val}')"
       style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 12px;background:${mode===val?'rgba(255,255,255,.12)':'rgba(255,255,255,.04)'};border:2px solid ${mode===val?'#fff':'rgba(255,255,255,.15)'};border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
@@ -18157,7 +18039,7 @@ function viewSettings() {
     </div>
 
     <div style="padding:16px;text-align:center;">
-      <div style="font-size:12px;color:var(--text-3);line-height:1.6;">Closet · Powered by Claude AI<br>Your API key is only ever sent to Anthropic.</div>
+      <div style="font-size:12px;color:var(--text-3);line-height:1.6;">Closet · Powered by Claude AI<br>Your API key is only ever sent to Anthropic.<br><span style="opacity:.7;">Build ${APP_BUILD}</span></div>
     </div>
     <div style="height:8px"></div>
   </div>`;
@@ -20339,6 +20221,109 @@ async function saveTailoringNote(id, note) {
 /* ================================================================
    RIP MEMORIAL — VIEW + HANDLERS
    ================================================================ */
+
+// ── Retired Looks & Pieces — dedicated page (was the Portfolio "Looking Back"
+// section, condensed to a single card there) ─────────────────────────────────
+function viewLookingBack() {
+  const soloEntries = S.entries.filter(e => !e.battleId);
+
+      const retiredFits = soloEntries.filter(e => e.photo && !e.battleId && isRetiredFit(e))
+        .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 12);
+      const memorialized = S.wardrobe.filter(w => w.memorial);
+      const retiredItems = S.wardrobe.filter(w => w.retiredFromCloset)
+        .sort((a,b) => new Date(b.retiredAt||0) - new Date(a.retiredAt||0));
+      if (!retiredFits.length && !memorialized.length && !retiredItems.length) return '';
+
+      const pastLooksHTML = retiredFits.length ? (() => {
+        const cards = retiredFits.map((e,i) => {
+          const rating = e.rating != null ? `<div style="position:absolute;bottom:5px;left:5px;background:rgba(0,0,0,0.6);border-radius:100px;padding:2px 7px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.85);">⭐ ${e.rating}</div>` : '';
+          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')" onclick="openEntry('${e.id}')"
+            style="flex-shrink:0;width:80px;cursor:pointer;touch-action:manipulation;">
+            <div style="width:80px;height:107px;border-radius:10px;overflow:hidden;border:1.5px solid rgba(150,80,220,0.2);background:#1A1520;position:relative;">
+              <img src="${esc(e.photo)}" loading="${i<4?'eager':'lazy'}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;filter:saturate(0.55);opacity:0.85;">
+              ${rating}
+            </div>
+            <div style="font-size:9px;color:rgba(150,80,220,0.65);margin-top:4px;text-align:center;font-weight:600;">${fmtDate(e.createdAt)}</div>
+          </div>`;
+        }).join('');
+        return `<div style="margin-bottom:${memorialized.length?'12px':'0'};">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(150,80,220,0.75);">📦 Past Looks</div>
+            <div style="font-size:11px;color:rgba(150,80,220,0.45);">${retiredFits.length} look${retiredFits.length===1?'':'s'}</div>
+          </div>
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none;margin:0 -16px;padding-left:16px;padding-right:16px;">
+            <div style="display:flex;gap:8px;width:max-content;">${cards}</div>
+          </div>
+        </div>`;
+      })() : '';
+
+      const gardenHTML = memorialized.length ? (() => {
+        const thumbs = memorialized.slice(0,4).map(w =>
+          w.photo
+            ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:40px;height:40px;border-radius:7px;object-fit:cover;border:1.5px solid rgba(150,80,220,0.2);filter:saturate(0.5);opacity:0.75;">`
+            : `<div style="width:40px;height:40px;border-radius:7px;background:rgba(150,80,220,0.1);border:1.5px solid rgba(150,80,220,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;">${w.icon||'👕'}</div>`
+        ).join('');
+        return `<button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('rip')" onclick="navigate('rip')"
+          style="width:100%;display:flex;align-items:center;gap:12px;background:rgba(150,80,220,0.07);border:1.5px solid rgba(150,80,220,0.18);border-radius:12px;padding:12px 14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
+          <div style="font-size:22px;flex-shrink:0;">🌹</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:800;color:rgba(196,160,240,0.85);margin-bottom:5px;">Memorial Garden</div>
+            <div style="display:flex;gap:5px;align-items:center;">${thumbs}</div>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:rgba(160,100,240,0.55);flex-shrink:0;">${memorialized.length} piece${memorialized.length===1?'':'s'} ›</div>
+        </button>`;
+      })() : '';
+
+      const retiredItemsHTML = retiredItems.length ? (() => {
+        const isOpen = !!S.wardrobeRetiredExpanded;
+        const wastedSpend = retiredItems.filter(w => w.retireReason === 'didnt-suit-me' && w.price)
+          .reduce((s,w) => s + parseFloat(w.price||0), 0);
+        return `<div style="margin-bottom:${gardenHTML?'12px':'0'};">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeRetiredExpanded=!S.wardrobeRetiredExpanded;render()" onclick="S.wardrobeRetiredExpanded=!S.wardrobeRetiredExpanded;render()"
+            style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(150,80,220,0.06);border:1.5px solid rgba(150,80,220,0.16);border-radius:${isOpen?'10px 10px 0 0':'10px'};padding:11px 14px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            <span style="font-size:13px;font-weight:700;color:rgba(150,80,220,0.8);">📦 Retired Pieces (${retiredItems.length})</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              ${wastedSpend > 0 ? `<span style="font-size:11px;color:rgba(150,80,220,0.5);">$${Math.round(wastedSpend)} didn't suit</span>` : ''}
+              <span style="font-size:12px;color:rgba(150,80,220,0.45);transform:${isOpen?'rotate(90deg)':'none'};transition:transform .15s;">▶</span>
+            </div>
+          </button>
+          ${isOpen ? `<div style="background:rgba(150,80,220,0.04);border:1.5px solid rgba(150,80,220,0.16);border-top:none;border-radius:0 0 10px 10px;padding:6px 0;">
+            ${retiredItems.map(w => {
+              const wears = w.wears?.length || 0;
+              const outcomeLabel = {donated:'Donated',sold:'Sold',tossed:'Tossed'}[w.retireOutcome] || '';
+              const reasonLabel = {'worn-out':'Worn out','didnt-suit-me':"Didn't suit me"}[w.retireReason] || '';
+              const meta = [outcomeLabel, reasonLabel, w.retiredAt ? fmtDate(w.retiredAt) : ''].filter(Boolean).join(' · ');
+              return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')" onclick="openWardrobeItem('${w.id}')"
+                style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid rgba(150,80,220,0.1);cursor:pointer;touch-action:manipulation;">
+                <div style="width:38px;height:38px;border-radius:9px;background:rgba(150,80,220,0.08);border:1px solid rgba(150,80,220,0.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${w.icon||'👕'}</div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13px;font-weight:700;color:rgba(150,80,220,0.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
+                  ${meta ? `<div style="font-size:10px;color:rgba(150,80,220,0.45);margin-top:1px;">${meta}</div>` : ''}
+                </div>
+                <span style="font-size:11px;color:rgba(150,80,220,0.4);flex-shrink:0;">${wears} wear${wears===1?'':'s'}</span>
+              </div>`;
+            }).join('')}
+          </div>` : ''}
+        </div>`;
+      })() : '';
+
+      return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">‹</button>
+      <span class="nav-title">🌙 Retired Looks & Pieces</span>
+      <div style="width:40px;"></div>
+    </div>
+    <div style="margin:14px 16px 16px;background:rgba(120,60,200,0.06);border:1.5px solid rgba(150,80,220,0.16);border-radius:16px;padding:14px 14px 12px;">
+        ${pastLooksHTML || `<div style="font-size:12px;color:rgba(150,80,220,0.55);">No retired looks yet.</div>`}
+        ${retiredItemsHTML}
+        ${gardenHTML}
+    </div>
+    <div style="height:40px;"></div>
+  </div>`;
+    
+}
+
 function viewRIP() {
   const memorialized = S.wardrobe.filter(w => w.memorial).sort((a,b) => {
     return new Date(b.memorialDate||0) - new Date(a.memorialDate||0);
