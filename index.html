@@ -6038,6 +6038,37 @@ function toggleRouletteLook(id) {
 /* ================================================================
    VIEW: MY BRANDS
    ================================================================ */
+
+// "You Might Also Love" — AI brand discovery. Moved from the old Evolve brands
+// tab onto the My Brands page when Evolve was flattened to a single scroll.
+function brandDiscoveryHTML() {
+  return `<div style="padding:6px 16px 0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">✨ You Might Also Love</div>
+        ${S.brandDiscovery?.suggestions?.length ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↻</button>` : ''}
+      </div>
+      ${S._brandDiscoveryLoading ? `<div style="display:flex;align-items:center;gap:8px;">
+        <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>
+        <span style="font-size:12px;color:var(--text-3);">Finding brands that match your aesthetic…</span>
+      </div>` : S.brandDiscovery?.suggestions?.length ? `
+        <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+          ${S.brandDiscovery.suggestions.map(s=>`
+            <div style="flex-shrink:0;width:148px;scroll-snap-align:start;background:var(--surface);border-radius:12px;border:1.5px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:5px;">
+              <div style="font-size:20px;line-height:1;">${s.emoji||'✦'}</div>
+              <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(s.name)}</div>
+              <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 7px;align-self:flex-start;">${esc(s.vibe)}</div>
+              <div style="font-size:11px;color:var(--text-3);line-height:1.4;flex:1;">${esc(s.reason)}</div>
+              <a href="${brandInstagramUrl(s.name)}" target="_blank" rel="noopener"
+                style="margin-top:3px;display:inline-flex;align-items:center;gap:4px;color:var(--text-3);text-decoration:none;font-size:11px;font-weight:600;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                Instagram
+              </a>
+            </div>`).join('')}
+        </div>` : `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
+          style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:100px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">✦ Find similar brands</button>`}
+    </div>`;
+}
+
 function viewBrands() {
   // Build brand stats from all wardrobe items (including retired)
   const brandMap = {};
@@ -6114,6 +6145,7 @@ function viewBrands() {
     <div style="border-top:1px solid var(--border);">
       ${rows}
     </div>
+    ${brandDiscoveryHTML()}
     <div style="height:40px;"></div>
   </div>`;
 }
@@ -12177,9 +12209,9 @@ function auraBodyHTML() {
             </div>` :
             `<div style="font-size:12px;color:var(--text-3);font-style:italic;margin-bottom:10px;">No style words set yet.</div>`}
           <button
-            ontouchend="if(_touchMoved)return;event.preventDefault();closeMenu();switchTab('settings')"
-            onclick="closeMenu();switchTab('settings')"
-            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">Edit in Settings →</button>
+            ontouchend="if(_touchMoved)return;event.preventDefault();closeMenu();switchTab('home')"
+            onclick="closeMenu();switchTab('home')"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">Edit on Evolve →</button>
         </div>`;
       })()}
     </div>`;
@@ -12188,6 +12220,30 @@ function auraBodyHTML() {
 /* ================================================================
    VIEW: HOME
    ================================================================ */
+// Shared preset chips for both Style Identity buckets (who I am + goals)
+const GOAL_PRESETS = [
+    { label:'Feminine',      emoji:'🌸' },
+    { label:'Masculine',     emoji:'🤵' },
+    { label:'Androgynous',   emoji:'🌗' },
+    { label:'Punk Rock',     emoji:'🤘' },
+    { label:'Executive',     emoji:'💼' },
+    { label:'Minimalist',    emoji:'🖤' },
+    { label:'Maximalist',    emoji:'✨' },
+    { label:'Quiet Luxury',  emoji:'🥂' },
+    { label:'Streetwear',    emoji:'🛹' },
+    { label:'Techwear',      emoji:'🦾' },
+    { label:'Utility',       emoji:'🔧' },
+    { label:'Bohemian',      emoji:'🌿' },
+    { label:'Classic',       emoji:'👑' },
+    { label:'Vintage',       emoji:'📻' },
+    { label:'Preppy',        emoji:'⛵' },
+    { label:'Edgy',          emoji:'⚡' },
+    { label:'Romantic',      emoji:'💕' },
+    { label:'Athletic',      emoji:'🏃' },
+    { label:'Outdoorsy',     emoji:'🏔️' },
+    { label:'Artsy',         emoji:'🎨' },
+  ];
+
 function viewHome() {
   const name = S.profileName ? `${S.profileName}'s` : 'Your';
   const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
@@ -12419,200 +12475,163 @@ function viewHome() {
   })() : '';
 
   // ── Style Goals + Visual Tab Cards ───────────────────────
-  const dTab = S.discoverTab || 'tips';
-  const GOAL_PRESETS = [
-    { label:'Feminine',      emoji:'🌸' },
-    { label:'Masculine',     emoji:'🤵' },
-    { label:'Androgynous',   emoji:'🌗' },
-    { label:'Punk Rock',     emoji:'🤘' },
-    { label:'Executive',     emoji:'💼' },
-    { label:'Minimalist',    emoji:'🖤' },
-    { label:'Maximalist',    emoji:'✨' },
-    { label:'Quiet Luxury',  emoji:'🥂' },
-    { label:'Streetwear',    emoji:'🛹' },
-    { label:'Techwear',      emoji:'🦾' },
-    { label:'Utility',       emoji:'🔧' },
-    { label:'Bohemian',      emoji:'🌿' },
-    { label:'Classic',       emoji:'👑' },
-    { label:'Vintage',       emoji:'📻' },
-    { label:'Preppy',        emoji:'⛵' },
-    { label:'Edgy',          emoji:'⚡' },
-    { label:'Romantic',      emoji:'💕' },
-    { label:'Athletic',      emoji:'🏃' },
-    { label:'Outdoorsy',     emoji:'🏔️' },
-    { label:'Artsy',         emoji:'🎨' },
-  ];
-  const activeGoals = S.styleGoals || [];
-
-  const goalsHero = `
-    <div style="margin:14px 16px 0;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
-        <div style="font-size:13px;font-weight:800;color:var(--text);letter-spacing:-.1px;">Your Style Goals</div>
-        ${activeGoals.length ? `<div style="font-size:11px;color:var(--text-3);">${activeGoals.length} active · AI uses these</div>` : `<div style="font-size:11px;color:var(--text-3);">Tap to set your direction</div>`}
-      </div>
-      ${activeGoals.length ? `
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-        ${activeGoals.map(g => {
-          const preset = GOAL_PRESETS.find(p => p.label === g);
-          const emoji = preset ? preset.emoji : '✦';
-          const gEsc = g.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();toggleStyleGoal('${gEsc}')" onclick="toggleStyleGoal('${gEsc}')"
-            style="display:inline-flex;align-items:center;gap:5px;background:var(--gold);border-radius:100px;padding:6px 13px;cursor:pointer;touch-action:manipulation;">
-            <span style="font-size:14px;line-height:1;">${emoji}</span>
-            <span style="font-size:12px;font-weight:800;color:#fff;">${esc(g)}</span>
-            <span style="font-size:11px;color:rgba(255,255,255,.65);margin-left:1px;">✕</span>
-          </div>`;
-        }).join('')}
-      </div>` : ''}
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">
-        ${GOAL_PRESETS.filter(p => !activeGoals.includes(p.label)).map(p => `
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleStyleGoal('${p.label}')" onclick="toggleStyleGoal('${p.label}')"
-            style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1.5px solid var(--border);border-radius:100px;padding:5px 12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            <span style="font-size:13px;line-height:1;">${p.emoji}</span>
-            <span style="font-size:12px;font-weight:600;color:var(--text-2);">${p.label}</span>
-          </button>`).join('')}
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleCustomGoalInput();" onclick="toggleCustomGoalInput()"
-          style="display:inline-flex;align-items:center;gap:5px;background:${S._customGoalOpen?'var(--gold)':'var(--surface)'};border:${S._customGoalOpen?'1.5px solid var(--gold)':'1.5px dashed var(--border)'};border-radius:100px;padding:5px 12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          <span style="font-size:13px;line-height:1;">✏️</span>
-          <span style="font-size:12px;font-weight:600;color:${S._customGoalOpen?'#fff':'var(--text-2)'};">Custom</span>
+  // ── STYLE IDENTITY — who I am today + where I'm headed ──────────────────
+  const _jsEsc = s => s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const wordsArr = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const goalsArr = S.styleGoals || [];
+  const _idChip = (w, fn, dark) => {
+    const preset = GOAL_PRESETS.find(p => p.label === w);
+    return `<div ontouchend="if(_touchMoved)return;event.preventDefault();${fn}('${_jsEsc(w)}')" onclick="${fn}('${_jsEsc(w)}')"
+      style="display:inline-flex;align-items:center;gap:5px;background:${dark?'#3A3532':'var(--gold)'};border-radius:100px;padding:6px 13px;cursor:pointer;touch-action:manipulation;">
+      <span style="font-size:13px;line-height:1;">${preset?preset.emoji:'✦'}</span>
+      <span style="font-size:12px;font-weight:800;color:#fff;">${esc(w)}</span>
+      <span style="font-size:11px;color:rgba(255,255,255,.6);margin-left:1px;">✕</span>
+    </div>`;
+  };
+  const _presetChip = (p, fn) => `<button ontouchend="if(_touchMoved)return;event.preventDefault();${fn}('${p.label}')" onclick="${fn}('${p.label}')"
+      style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1.5px solid var(--border);border-radius:100px;padding:5px 12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+      <span style="font-size:13px;line-height:1;">${p.emoji}</span>
+      <span style="font-size:12px;font-weight:600;color:var(--text-2);">${p.label}</span>
+    </button>`;
+  const _bucketHTML = (o) => {
+    const picker = o.editing ? `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">
+        ${GOAL_PRESETS.filter(p => !o.selected.includes(p.label)).map(p => _presetChip(p, o.toggleFn)).join('')}
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();${o.customFn}();" onclick="${o.customFn}()"
+          style="display:inline-flex;align-items:center;gap:5px;background:${o.customOpen?'var(--gold)':'var(--surface)'};border:1.5px dashed ${o.customOpen?'var(--gold)':'var(--border)'};border-radius:100px;padding:5px 12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          <span style="font-size:13px;">✏️</span><span style="font-size:12px;font-weight:600;color:${o.customOpen?'#fff':'var(--text-2)'};">Custom</span>
         </button>
       </div>
-      ${S._customGoalOpen ? `
+      ${o.customOpen ? `
       <div style="display:flex;gap:8px;margin-top:10px;">
-        <input id="custom-goal-input" type="text" maxlength="30"
-          placeholder="e.g. Gender-fluid, Dark Academia, Y2K…"
-          value="${esc(S._customGoalDraft||'')}"
-          oninput="S._customGoalDraft=this.value"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomStyleGoal();}"
-          style="flex:1;min-width:0;padding:10px 13px;border-radius:100px;border:1.5px solid var(--gold);background:var(--surface);font-size:14px;font-family:inherit;color:var(--text);box-sizing:border-box;outline:none;-webkit-appearance:none;">
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();addCustomStyleGoal();" onclick="addCustomStyleGoal()"
-          style="flex-shrink:0;padding:10px 18px;border-radius:100px;border:none;background:var(--gold);color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">Add</button>
-      </div>` : ''}
-    </div>
-    <div style="margin:14px 16px 0;height:1px;background:var(--border);"></div>`;
-
-  // Counts for tab card subtitles
-  const trendCount = S.hotTrends?.trends?.length || 0;
-  const brandCount = (() => { const bc = {}; S.wardrobe.forEach(w => { if (w.brand) bc[w.brand] = 1; }); return Object.keys(bc).length; })();
-  const tipsCount = (() => { let n = 0; S.entries.forEach(e => { const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{}); if (!Object.keys(rx).length) return; if (e.stylingTips?.length) { e.stylingTips.forEach((_,i) => { if (rx[String(i)] === 'liked') n++; }); } else { (e.recommendations||[]).forEach((r,i) => { if (rx[String(i)] === 'liked' || rx[r] === 'liked') n++; }); } }); return n; })();
-
-  const tabCards = [
-    { key:'tips',   icon:'✂️', label:'Tips',    sub: tipsCount  ? `${tipsCount} tip${tipsCount===1?'':'s'} saved` : 'Style tips from your fits' },
-    { key:'trends', icon:'🔥', label:'Trends',  sub: trendCount ? `${trendCount} trends loaded` : 'What\'s hot in fashion now' },
-  ];
-
-  const subTabPills = `
-    <div style="display:flex;gap:10px;padding:14px 16px 0;">
-      ${tabCards.map(t => {
-        const active = dTab === t.key;
-        return `<button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.discoverTab='${t.key}';render()"
-          onclick="S.discoverTab='${t.key}';render()"
-          style="flex:1;padding:12px 8px 10px;border-radius:var(--r);border:${active?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${active?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px;">
-          <div style="font-size:22px;line-height:1;">${t.icon}</div>
-          <div style="font-size:13px;font-weight:${active?'800':'700'};color:${active?'var(--gold-dk)':'var(--text)'};">${t.label}</div>
-          <div style="font-size:10px;color:${active?'var(--gold-dk)':'var(--text-3)'};line-height:1.3;font-weight:${active?'600':'400'};">${t.sub}</div>
-        </button>`;
-      }).join('')}
+        <input id="${o.inputId}" type="text" maxlength="30" placeholder="${o.placeholder}"
+          value="${esc(o.draft||'')}" oninput="S.${o.draftVar}=this.value"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();${o.addFn}();}"
+          style="flex:1;min-width:0;padding:9px 13px;border-radius:100px;border:1.5px solid var(--gold);background:var(--surface);font-size:14px;font-family:inherit;color:var(--text);box-sizing:border-box;outline:none;-webkit-appearance:none;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();${o.addFn}();" onclick="${o.addFn}()"
+          style="flex-shrink:0;padding:9px 16px;border-radius:100px;border:none;background:var(--gold);color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">Add</button>
+      </div>` : ''}` : '';
+    return `<div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">${o.label}</div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S.${o.editFlag}=!S.${o.editFlag};render()" onclick="S.${o.editFlag}=!S.${o.editFlag};render()"
+          style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">${o.editing?'Done':'Edit'}</button>
+      </div>
+      ${o.selected.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${o.selected.map(w=>_idChip(w,o.toggleFn,o.dark)).join('')}</div>`
+        : `<div style="font-size:12px;color:var(--text-3);font-style:italic;">${o.hint}</div>`}
+      ${picker}
+    </div>`;
+  };
+  const identityHTML = `
+    <div style="margin:14px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px;">
+      ${_bucketHTML({ label:'✦ Who I Am Today', hint:'Tap Edit and pick a few words that describe your style now.',
+        selected:wordsArr, toggleFn:'toggleOnboardStyle', dark:true, editFlag:'_editWho', editing:!!S._editWho,
+        customFn:'toggleCustomWordInput', customOpen:!!S._customWordOpen, draftVar:'_customWordDraft', draft:S._customWordDraft,
+        addFn:'addCustomStyleWord', inputId:'custom-word-input', placeholder:'e.g. Effortless, Tailored…' })}
+      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+      ${_bucketHTML({ label:'🎯 Style Goals', hint:'Tap Edit to choose where your style is headed — every AI feature bends toward these.',
+        selected:goalsArr, toggleFn:'toggleStyleGoal', dark:false, editFlag:'_editGoals', editing:!!S._editGoals,
+        customFn:'toggleCustomGoalInput', customOpen:!!S._customGoalOpen, draftVar:'_customGoalDraft', draft:S._customGoalDraft,
+        addFn:'addCustomStyleGoal', inputId:'custom-goal-input', placeholder:'e.g. Gender-fluid, Dark Academia…' })}
     </div>`;
 
-  // ── Trends tab content ─────────────────────────────────
-  const trendsContent = `
-    ${S.weatherPin ? `
-    <div ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('plan')"
-      onclick="switchTab('plan')" style="margin:10px 16px 0;display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--surface);border-radius:var(--r-sm);border:1px solid var(--border);cursor:pointer;transition:background .15s;" onmouseenter="this.style.background='var(--surface-2)'" onmouseleave="this.style.background='var(--surface)'">
-      <span style="font-size:18px;line-height:1;flex-shrink:0;">${S.weatherPin.icon}</span>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:11px;font-weight:700;color:var(--text-3);display:flex;align-items:center;gap:4px;margin-bottom:2px;">
-          <span>📍</span>
-          <span>${esc(S.weatherPin.city)}</span>
-          <span style="opacity:.5;">·</span>
-          <span>${S.weatherPin.tempF}°F</span>
-        </div>
-        <div style="font-size:12px;color:var(--text-2);font-style:italic;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(S.weatherPin.quip)}</div>
+  // ── ✂️ STYLE TIPS — one carousel, removable cards ────────────────────────
+  const likedRecs = [];
+  S.entries.forEach(e => {
+    const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{});
+    if (!Object.keys(rx).length) return;
+    if (e.stylingTips?.length) {
+      e.stylingTips.forEach((r, i) => { if (rx[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e, idx: i }); });
+    } else {
+      (e.recommendations||[]).forEach((r, i) => { if (rx[String(i)] === 'liked' || rx[r] === 'liked') likedRecs.push({ rec: r, entry: e, idx: i }); });
+    }
+  });
+  likedRecs.sort((a,b)=>new Date(b.entry.createdAt)-new Date(a.entry.createdAt));
+  const tipsSection = `
+    <div class="home-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="home-section-label" style="margin-bottom:0;">✂️ Style Tips</div>
+        ${likedRecs.length ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('saved-tips')" onclick="navigate('saved-tips')"
+          style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">All tips →</button>` : ''}
       </div>
-    </div>` : ''}
+      ${likedRecs.length ? `
+      <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+        ${likedRecs.slice(0,10).map(({rec, entry, idx}) => `
+          <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')"
+            onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:210px;cursor:pointer;border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();removeSavedTip('${entry.id}',${idx})" onclick="event.stopPropagation();removeSavedTip('${entry.id}',${idx})"
+              style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(20,18,16,0.55);border:none;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;backdrop-filter:blur(3px);">✕</button>
+            ${entry.photo
+              ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
+              : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
+            <div style="padding:10px 12px 12px;flex:1;">
+              <div style="font-size:13px;color:var(--text);line-height:1.45;">${esc(rec)}</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:6px;">⭐ ${entry.rating}/10 · ${entry.occasionTag ? esc(entry.occasionTag) : fmtDateLong(entry.createdAt)}</div>
+            </div>
+          </div>`).join('')}
+      </div>` : `<div style="font-size:12px;color:var(--text-3);">Heart ♥ tips on your fit checks to collect them here.</div>`}
+    </div>`;
 
-    ${newsFlashHTML()}
-
-    ${(()=>{
-      const trends = S.hotTrends;
-      const loading = S._trendsLoading;
-      if (loading) return `<div class="home-section"><div style="display:flex;align-items:center;gap:10px;padding:4px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Curating trends…</span></div></div>`;
-      if (!trends?.trends?.length) return `<div class="home-section">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <div class="home-section-label" style="margin-bottom:0;">🔥 What's Trending</div>
-        </div>
+  // ── 🔥 TRENDS — one carousel, removable cards ────────────────────────────
+  const trendsSection = (()=>{
+    if (S._trendsLoading) return `<div class="home-section"><div style="display:flex;align-items:center;gap:10px;padding:4px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Curating trends…</span></div></div>`;
+    const trends = S.hotTrends;
+    if (!trends?.trends?.length) return `<div class="home-section">
+      <div class="home-section-label" style="margin-bottom:8px;">🔥 What's Trending</div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
+        style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        ✦ Generate this week's trend report
+      </button>
+    </div>`;
+    const reactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
+    return `<div class="home-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="home-section-label" style="margin-bottom:0;">🔥 What's Trending</div>
         <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
-          style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          ✦ Generate this week's trend report
-        </button>
-      </div>`;
-      const reactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
-      const allTrends = trends.trends || [];
-      return `<div class="home-section">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div class="home-section-label" style="margin-bottom:0;">🔥 What's Trending</div>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
-            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
-        </div>
-        <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-          ${allTrends.slice(0,10).map(trend => {
-            const r = reactions[trend.id];
-            return `<div style="scroll-snap-align:start;flex-shrink:0;width:200px;border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;position:relative;">
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteTrend('${esc(trend.id)}')" onclick="event.stopPropagation();deleteTrend('${esc(trend.id)}')"
-                style="position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);color:var(--text-3);font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;">✕</button>
-              <div style="padding:12px 12px 8px;">
-                <div style="font-size:24px;margin-bottom:6px;line-height:1;">${esc(trend.emoji||'🔥')}</div>
-                <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(trend.name)}</div>
-                <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(trend.description)}</div>
-                ${trend.tip ? `<div style="margin-top:8px;font-size:11px;color:var(--gold-dk);font-weight:600;background:var(--gold-bg);border-radius:6px;padding:5px 8px;line-height:1.4;">💡 ${esc(trend.tip)}</div>` : ''}
-                <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(trend.name)}" target="_blank" rel="noopener"
-                  style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:11px;font-weight:700;color:var(--gold-dk);text-decoration:none;">
-                  🔗 Shop this look
-                </a>
-              </div>
-              <div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border);margin-top:auto;">
-                <button ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(trend.id)}','up')" onclick="setTrendReaction('${esc(trend.id)}','up')"
-                  style="flex:1;background:${r==='up'?'var(--gold-bg)':'var(--surface-2)'};border:1px solid ${r==='up'?'var(--gold)':'var(--border)'};border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">👍</button>
-                <button ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(trend.id)}','down')" onclick="setTrendReaction('${esc(trend.id)}','down')"
-                  style="flex:1;background:${r==='down'?'#FEF2F2':'var(--surface-2)'};border:1px solid ${r==='down'?'#FCA5A5':'var(--border)'};border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">👎</button>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-        ${trends.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right;">AI-curated · ${fmtDaysAgo(trends.updated)}</div>` : ''}
-      </div>`;
-    })()}
+          style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
+      </div>
+      <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+        ${(trends.trends||[]).slice(0,10).map(trend => {
+          const r = reactions[trend.id];
+          return `<div style="scroll-snap-align:start;flex-shrink:0;width:200px;border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteTrend('${esc(trend.id)}')" onclick="event.stopPropagation();deleteTrend('${esc(trend.id)}')"
+              style="position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);color:var(--text-3);font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;">✕</button>
+            <div style="padding:12px 12px 8px;">
+              <div style="font-size:24px;margin-bottom:6px;line-height:1;">${esc(trend.emoji||'🔥')}</div>
+              <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(trend.name)}</div>
+              <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(trend.description)}</div>
+              ${trend.tip ? `<div style="margin-top:8px;font-size:11px;color:var(--gold-dk);font-weight:600;background:var(--gold-bg);border-radius:6px;padding:5px 8px;line-height:1.4;">💡 ${esc(trend.tip)}</div>` : ''}
+              <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(trend.name)}" target="_blank" rel="noopener"
+                style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:11px;font-weight:700;color:var(--gold-dk);text-decoration:none;">
+                🔗 Shop this look
+              </a>
+            </div>
+            <div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border);margin-top:auto;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(trend.id)}','up')" onclick="setTrendReaction('${esc(trend.id)}','up')"
+                style="flex:1;background:${r==='up'?'var(--gold-bg)':'var(--surface-2)'};border:1px solid ${r==='up'?'var(--gold)':'var(--border)'};border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">👍</button>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(trend.id)}','down')" onclick="setTrendReaction('${esc(trend.id)}','down')"
+                style="flex:1;background:${r==='down'?'#FEF2F2':'var(--surface-2)'};border:1px solid ${r==='down'?'#FCA5A5':'var(--border)'};border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">👎</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${trends.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right;">AI-curated · ${fmtDaysAgo(trends.updated)}</div>` : ''}
+    </div>`;
+  })();
 
-    ${(()=>{
+  // ── 💓 WARDROBE PULSE — folded each session until tapped ─────────────────
+  const pulseSection = (()=>{
+    const hasWardrobe = S.wardrobe.filter(w => !w.retired && !w.memorial).length >= 3;
+    if (!hasWardrobe) return '';
+    if (S._wardrobePulseLoading) return `<div class="home-section">
+      <div class="home-section-label" style="margin-bottom:6px;">💓 Wardrobe Pulse</div>
+      <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+        <div class="spinner" style="width:18px;height:18px;border-width:2px;"></div>
+        <span style="font-size:13px;color:var(--text-3);">Reading your closet's pulse…</span>
+      </div>
+    </div>`;
+    if (S._pulseRevealed && S.wardrobePulse?.rising?.length) {
       const pulse = S.wardrobePulse;
-      const pulseLoading = S._wardrobePulseLoading;
-      const hasWardrobe = S.wardrobe.filter(w => !w.retired && !w.memorial).length >= 3;
-
-      if (!hasWardrobe) return '';
-
-      if (pulseLoading) return `<div class="home-section">
-        <div class="home-section-label" style="margin-bottom:6px;">💓 Your Wardrobe Pulse</div>
-        <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
-          <div class="spinner" style="width:18px;height:18px;border-width:2px;"></div>
-          <span style="font-size:13px;color:var(--text-3);">Reading your closet's pulse…</span>
-        </div>
-      </div>`;
-
-      if (!pulse?.rising?.length) return `<div class="home-section">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <div>
-            <div class="home-section-label" style="margin-bottom:2px;">💓 Your Wardrobe Pulse</div>
-            <div style="font-size:11px;color:var(--text-3);">See which of your pieces are trending — and which to restyle.</div>
-          </div>
-        </div>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();generateWardrobePulse()" onclick="generateWardrobePulse()"
-          style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          ✦ Analyze my wardrobe
-        </button>
-      </div>`;
-
       const risingCards = (pulse.rising || []).slice(0,3).map(item => {
         const w = S.wardrobe.find(x => x.id === item.id);
         return `<div style="display:flex;align-items:flex-start;gap:11px;background:rgba(30,132,73,0.07);border:1.5px solid rgba(30,132,73,0.2);border-radius:14px;padding:12px 13px;">
@@ -12627,7 +12646,6 @@ function viewHome() {
           <div style="font-size:18px;flex-shrink:0;">📈</div>
         </div>`;
       }).join('');
-
       const fadingCards = (pulse.fading || []).slice(0,3).map(item => {
         const w = S.wardrobe.find(x => x.id === item.id);
         return `<div style="display:flex;align-items:flex-start;gap:11px;background:rgba(255,255,255,0.03);border:1.5px solid var(--border);border-radius:14px;padding:12px 13px;">
@@ -12640,13 +12658,9 @@ function viewHome() {
           <div style="font-size:18px;flex-shrink:0;">📉</div>
         </div>`;
       }).join('');
-
       return `<div class="home-section">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div>
-            <div class="home-section-label" style="margin-bottom:2px;">💓 Your Wardrobe Pulse</div>
-            <div style="font-size:11px;color:var(--text-3);">Personalized to your closet.</div>
-          </div>
+          <div class="home-section-label" style="margin-bottom:0;">💓 Wardrobe Pulse</div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();generateWardrobePulse()" onclick="generateWardrobePulse()"
             style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
         </div>
@@ -12656,148 +12670,35 @@ function viewHome() {
         <div style="display:flex;flex-direction:column;gap:8px;">${fadingCards}</div>
         ${pulse.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:8px;text-align:right;">${fmtDaysAgo(pulse.updated)}</div>` : ''}
       </div>`;
-    })()}
-
-    ${(()=>{
-      const _tReactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
-      const savedTrends = (S.hotTrends?.trends || []).filter(t => _tReactions[t.id] === 'up');
-      if (!savedTrends.length) return '';
-      return `<div class="home-section" style="padding-top:0;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">👍 Saved Trends</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;">
-          ${savedTrends.map(t=>`
-            <div style="display:inline-flex;align-items:center;gap:5px;background:var(--gold-bg);border:1px solid rgba(184,125,42,0.22);border-radius:100px;padding:5px 8px 5px 11px;">
-              <span style="font-size:13px;line-height:1;">${esc(t.emoji||'🔥')}</span>
-              <span style="font-size:12px;font-weight:600;color:var(--text);">${esc(t.name)}</span>
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();removeSavedTrend('${esc(t.id)}')" onclick="removeSavedTrend('${esc(t.id)}')"
-                style="background:none;border:none;color:var(--text-3);font-size:11px;line-height:1;cursor:pointer;padding:2px 3px;touch-action:manipulation;font-family:inherit;">✕</button>
-            </div>`).join('')}
-        </div>
-      </div>`;
-    })()}
-
-`;
-
-  // ── Brands tab content ─────────────────────────────────
-  const brandsContent = `
-    ${topBrands.length ? `<div class="home-section">
-      <div style="margin-bottom:10px;">
-        <div class="home-section-label" style="margin-bottom:0;">🏷 Your Top Brands</div>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        ${topBrands.map(([brand,count])=>`
-          <div style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:100px;padding:5px 7px 5px 11px;">
-            <span style="font-size:12px;font-weight:600;color:var(--text);">${esc(brand)}</span>
-            <span style="font-size:11px;color:var(--text-3);">${count}×</span>
-            <a href="${brandInstagramUrl(brand)}" target="_blank" rel="noopener"
-              style="display:flex;align-items:center;color:var(--text-3);text-decoration:none;padding:2px 1px;">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-            </a>
-          </div>`).join('')}
-      </div>
-    </div>` : `<div class="home-section"><div style="text-align:center;padding:32px 0;color:var(--text-3);font-size:13px;">Add brands to your wardrobe items to see your top brands here.</div></div>`}
-
-    <div class="home-section">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div class="home-section-label" style="margin-bottom:0;">✨ You Might Also Love</div>
-        ${S.brandDiscovery?.suggestions?.length ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↻</button>` : ''}
-      </div>
-      ${S._brandDiscoveryLoading ? `<div style="display:flex;align-items:center;gap:8px;">
-        <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>
-        <span style="font-size:12px;color:var(--text-3);">Finding brands that match your aesthetic…</span>
-      </div>` : S.brandDiscovery?.suggestions?.length ? `
-        <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-          ${S.brandDiscovery.suggestions.map(s=>`
-            <div style="flex-shrink:0;width:148px;scroll-snap-align:start;background:var(--surface);border-radius:12px;border:1.5px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:5px;">
-              <div style="font-size:20px;line-height:1;">${s.emoji||'✦'}</div>
-              <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(s.name)}</div>
-              <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 7px;align-self:flex-start;">${esc(s.vibe)}</div>
-              <div style="font-size:11px;color:var(--text-3);line-height:1.4;flex:1;">${esc(s.reason)}</div>
-              <a href="${brandInstagramUrl(s.name)}" target="_blank" rel="noopener"
-                style="margin-top:3px;display:inline-flex;align-items:center;gap:4px;color:var(--text-3);text-decoration:none;font-size:11px;font-weight:600;">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-                Instagram
-              </a>
-            </div>`).join('')}
-        </div>` : `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
-          style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:100px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">✦ Find similar brands</button>`}
-    </div>
-
-    <div class="home-section">
-      <div class="home-section-label" style="margin-bottom:8px;">🗂 My Brands</div>
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('brands')" onclick="navigate('brands')"
-        style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 16px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;display:flex;align-items:center;justify-content:space-between;">
-        <span>View all my brands</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    }
+    return `<div class="home-section">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();revealWardrobePulse();" onclick="revealWardrobePulse()"
+        style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);padding:14px 16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;display:flex;align-items:center;gap:12px;">
+        <span style="font-size:22px;flex-shrink:0;">💓</span>
+        <span style="flex:1;min-width:0;">
+          <span style="display:block;font-size:13px;font-weight:800;color:var(--text);">Wardrobe Pulse</span>
+          <span style="display:block;font-size:11px;color:var(--text-3);margin-top:1px;">Tap for a fresh read on what's rising and fading in your closet.</span>
+        </span>
+        <span style="font-size:14px;color:var(--text-3);flex-shrink:0;">→</span>
       </button>
     </div>`;
-
-  // ── Tips tab content ───────────────────────────────────
-  const tipsContent = (()=>{
-    const likedRecs = [];
-    S.entries.forEach(e => {
-      const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{});
-      if (!Object.keys(rx).length) return;
-      if (e.stylingTips?.length) {
-        e.stylingTips.forEach((r, i) => { if (rx[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e, idx: i }); });
-      } else {
-        (e.recommendations||[]).forEach((r, i) => { if (rx[String(i)] === 'liked' || rx[r] === 'liked') likedRecs.push({ rec: r, entry: e, idx: i }); });
-      }
-    });
-    const count = likedRecs.length;
-    return `
-      <div class="home-section">
-        <div style="font-size:13px;color:var(--text-3);line-height:1.55;margin-bottom:16px;">Style tips you've saved from your fit checks. Use these to level up your look and get closer to the wardrobe you want.</div>
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();navigate('saved-tips')"
-          onclick="navigate('saved-tips')"
-          style="width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;box-sizing:border-box;">
-          <div style="width:40px;height:40px;border-radius:12px;background:rgba(100,74,138,0.1);border:1px solid rgba(100,74,138,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">✂️</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:1px;">Saved Styling Tips</div>
-            <div style="font-size:12px;color:var(--text-3);">${count > 0 ? count+' tip'+(count===1?'':'s')+' saved from your fit checks' : 'Like tips from your fit checks to save them here'}</div>
-          </div>
-          <div style="font-size:18px;color:var(--text-3);">›</div>
-        </button>
-        ${count > 0 ? `
-        <div style="margin-top:16px;">
-          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">✂️ Recent Tips</div>
-          <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-            ${likedRecs.slice(0,8).map(({rec, entry, idx}) => `
-              <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')"
-                onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:210px;cursor:pointer;
-                border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;position:relative;">
-                <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();removeSavedTip('${entry.id}',${idx})" onclick="event.stopPropagation();removeSavedTip('${entry.id}',${idx})"
-                  style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(20,18,16,0.55);border:none;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;backdrop-filter:blur(3px);">✕</button>
-                ${entry.photo
-                  ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
-                  : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
-                <div style="padding:10px 12px 12px;flex:1;">
-                  <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:5px;">Styling tip</div>
-                  <div style="font-size:13px;color:var(--text);line-height:1.45;">${esc(rec)}</div>
-                  <div style="font-size:11px;color:var(--text-3);margin-top:6px;">⭐ ${entry.rating}/10 · ${entry.occasionTag ? esc(entry.occasionTag) : fmtDateLong(entry.createdAt)}</div>
-                </div>
-              </div>`).join('')}
-          </div>
-        </div>` : ''}
-      </div>`;
   })();
-
-  const tabContent = dTab === 'brands' ? brandsContent : dTab === 'tips' ? tipsContent : trendsContent;
 
   return `<div class="view">
     <div class="nav">
       <span class="nav-logo">Evolve</span>
       <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload')" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
     </div>
-    ${goalsHero}
-    ${subTabPills}
-    ${!hasData && dTab === 'trends' ? `<div class="empty" style="padding-top:52px;">
+    ${identityHTML}
+    ${!hasData ? `<div class="empty" style="padding-top:36px;">
       <div class="empty-icon">✨</div>
       <h2>Welcome to your Closet!</h2>
       <p>Log your first outfit or add wardrobe items to get started. Your style portrait will come to life as you use the app.</p>
     </div>` : ''}
-    ${tabContent}
+    ${newsFlashHTML()}
+    ${tipsSection}
+    ${trendsSection}
+    ${pulseSection}
     <div style="height:16px"></div>
   </div>`;
 }
@@ -14411,6 +14312,35 @@ function toggleOnboardStyle(word) {
   localStorage.setItem('closet-profile-style-words', S.profileStyleWords);
   try { fsSet('profileStyleWords', S.profileStyleWords); } catch(e) {}
   render();
+}
+
+function toggleCustomWordInput() {
+  S._customWordOpen = !S._customWordOpen;
+  S._customWordDraft = '';
+  render();
+  if (S._customWordOpen) requestAnimationFrame(() => document.getElementById('custom-word-input')?.focus());
+}
+function addCustomStyleWord() {
+  const val = (S._customWordDraft || '').trim().replace(/\s+/g, ' ');
+  if (!val) return;
+  if (val.length > 30) { toast('Keep it under 30 characters'); return; }
+  const list = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
+  if (list.some(w => w.toLowerCase() === val.toLowerCase())) { toast('Already one of your words!'); return; }
+  list.push(val);
+  S.profileStyleWords = list.join(', ');
+  localStorage.setItem('closet-profile-style-words', S.profileStyleWords);
+  try { fsSet('profileStyleWords', S.profileStyleWords); } catch(e) {}
+  S._customWordOpen = false; S._customWordDraft = '';
+  toast('Added ✦');
+  render();
+}
+// Wardrobe Pulse stays folded each session — tapping reveals (cached if fresh,
+// regenerated otherwise). _pulseRevealed is session-only by design.
+function revealWardrobePulse() {
+  S._pulseRevealed = true;
+  const fresh = S.wardrobePulse?.updated && (Date.now() - new Date(S.wardrobePulse.updated).getTime() < 3*24*3600*1000);
+  if (fresh && S.wardrobePulse?.rising?.length) { render(); return; }
+  generateWardrobePulse();
 }
 
 function finishOnboarding() {
@@ -18062,16 +17992,12 @@ function viewSettings() {
     <div class="settings-group-label">Your Style</div>
     <div class="settings-section">
       <div class="settings-row">
-        <div class="settings-hint" style="margin-bottom:12px;">How would you describe your aesthetic? Claude uses these to personalise every recommendation and style suggestion.</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;">
-          ${['Minimal','Classic','Bold','Romantic','Edgy','Preppy','Boho','Sporty','Vintage','Maximalist','Streetwear','Elevated Casual'].map(o => {
-            const on = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean).includes(o);
-            return `<button
-              ontouchend="if(_touchMoved)return;event.preventDefault();toggleOnboardStyle('${o}')"
-              onclick="toggleOnboardStyle('${o}')"
-              style="padding:9px 16px;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${on?'var(--gold)':'var(--border)'};background:${on?'var(--gold-bg)':'var(--surface)'};color:${on?'var(--gold-dk)':'var(--text-2)'};">${on?'✓ ':''}${o}</button>`;
-          }).join('')}
-        </div>
+        <div class="settings-hint" style="margin-bottom:12px;">Your style words now live on the Evolve page — together with your Style Goals, under Style Identity.</div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('home')" onclick="switchTab('home')"
+          style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 16px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;display:flex;align-items:center;justify-content:space-between;">
+          <span>✦ Edit on Evolve</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
       </div>
     </div>
 
