@@ -4102,7 +4102,6 @@ function viewWishShare() {
       </button>
     </div>
 
-    ${S._wishShareSheetOpen ? wishShareSheetHTML() : ''}
   </div>`;
 }
 
@@ -6210,6 +6209,12 @@ function render() {
   // About Me flyout retired — Profile is now its own tab. Kept for safety but never shown.
   // if (S.showAboutMe) html += aboutMeSheetHTML();
   if (S.wordOfDay) html += wordOfDaySheetHTML();
+  // Share sheets render as siblings of .view — never inside it. The .view
+  // fadeUp animation applies a transform, and a transformed ancestor becomes
+  // the containing block for position:fixed children, which strands the sheet
+  // below the fold on tall scrollable pages (screen dims, no sheet = "frozen").
+  if (S._wishShareSheetOpen && S.view === 'wish-share') html += wishShareSheetHTML();
+  if (S._fitsShareSheetOpen && S.view === 'closet') html += fitsShareSheetHTML();
   if (S._closetLightbox) html += closetLightboxHTML();
   if (S._sellDraftOpen) html += sellDraftModalHTML();
   if (S._complimentModal) html += complimentModalHTML();
@@ -8293,6 +8298,39 @@ function setTrendReaction(trendId, reaction) {
   localStorage.setItem(key, JSON.stringify(reactions));
   render();
 }
+// Remove a trend card from the current report entirely (and drop any reaction on it)
+function deleteTrend(trendId) {
+  if (!S.hotTrends?.trends) return;
+  S.hotTrends.trends = S.hotTrends.trends.filter(t => t.id !== trendId);
+  localStorage.setItem('closet-hot-trends', JSON.stringify(S.hotTrends));
+  const rx = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
+  if (rx[trendId]) { delete rx[trendId]; localStorage.setItem('closet-hot-reactions', JSON.stringify(rx)); }
+  toast('Trend removed');
+  render();
+}
+// Un-save a 👍 trend (clears the reaction; the card itself stays in the report)
+function removeSavedTrend(trendId) {
+  const rx = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
+  delete rx[trendId];
+  localStorage.setItem('closet-hot-reactions', JSON.stringify(rx));
+  render();
+}
+// Remove a saved styling tip — clears the 'liked'/'doing' reaction on that tip
+function removeSavedTip(entryId, idx) {
+  const e = S.entries.find(x => x.id === entryId); if (!e) return;
+  const key = String(idx);
+  if (e.tipReactions?.[key]) delete e.tipReactions[key];
+  if (e.recReactions) {
+    if (e.recReactions[key]) delete e.recReactions[key];
+    // Legacy entries keyed reactions by tip text rather than index
+    const tips = e.stylingTips?.length ? e.stylingTips : (e.recommendations || []);
+    const txt = tips[idx];
+    if (txt != null && e.recReactions[txt]) delete e.recReactions[txt];
+  }
+  DB.entries.put(e);
+  toast('Tip removed');
+  render();
+}
 
 /* ================================================================
    GEMS — helper, toggle
@@ -8656,7 +8694,6 @@ function viewCloset() {
       </button>
     </div>` : ''}
 
-    ${S._fitsShareSheetOpen ? fitsShareSheetHTML() : ''}
   </div>`;
 }
 
@@ -9252,6 +9289,18 @@ function viewShop() {
         </button>
         <div style="width:1px;background:rgba(184,125,42,.15);flex-shrink:0;"></div>
         <button ontouchend="if(_touchMoved)return;event.preventDefault();setPurchaseReaction('${item.entry.id}',${item.recIdx},'liked');toast('Removed from wish list');" onclick="setPurchaseReaction('${item.entry.id}',${item.recIdx},'liked');toast('Removed from wish list');"
+          style="flex:1;background:none;border:none;padding:6px 4px;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
+          ✕ Remove
+        </button>
+      </div>` : ''}
+      ${src === 'recs' ? `
+      <div style="display:flex;gap:0;margin-top:14px;border-top:1px solid rgba(184,125,42,.15);padding-top:12px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();markPurchased(window._shopQ[${activeIdx}]);" onclick="markPurchased(window._shopQ[${activeIdx}]);"
+          style="flex:1;background:none;border:none;padding:6px 4px;font-size:12px;font-weight:700;color:#2E9E6B;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
+          ✓ Bought it
+        </button>
+        <div style="width:1px;background:rgba(184,125,42,.15);flex-shrink:0;"></div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();blockShopItem(window._shopQ[${activeIdx}]);" onclick="blockShopItem(window._shopQ[${activeIdx}]);"
           style="flex:1;background:none;border:none;padding:6px 4px;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
           ✕ Remove
         </button>
@@ -10811,6 +10860,11 @@ function viewProfile() {
   const totalRatedOutfits = soloEntries.filter(e => e.rating != null).length;
 
 
+  // Thin stroked trend arrow — replaces the chunky ▲/▼ glyphs in the stat pills
+  const trendArrowSVG = (up) => `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;">${up
+    ? '<polyline points="2 17 9 10 13 14 22 5"/><polyline points="16 5 22 5 22 11"/>'
+    : '<polyline points="2 7 9 14 13 10 22 19"/><polyline points="16 19 22 19 22 13"/>'}</svg>`;
+
   // ── Precompute: confidence stat ──────────────────────────
   const confScored = soloEntries.filter(e => e.confidence != null);
   const confStat = (() => {
@@ -11066,8 +11120,8 @@ function viewProfile() {
           <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
             <span style="font-size:13px;font-weight:900;color:var(--text);">${isNaN(scoreNum) ? '—' : avgRating}</span>
           </div>
-          ${scoreStat?.label ? `<div style="position:absolute;bottom:-8px;right:-6px;background:${scoreStat.bg};border-radius:100px;padding:2px 6px;font-size:10px;font-weight:900;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);letter-spacing:0;">
-            ${scoreStat.label}
+          ${scoreStat?.label ? `<div style="position:absolute;bottom:-8px;right:-6px;background:${scoreStat.bg};border-radius:100px;padding:3px 6px;box-shadow:0 1px 4px rgba(0,0,0,.25);">
+            ${trendArrowSVG(scoreStat.label === '▲')}
           </div>` : ''}
         </div>
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);display:flex;align-items:center;gap:2px;">Style Score <span style="font-size:8px;color:var(--text-3);opacity:.55;">▸</span></div>
@@ -11077,7 +11131,7 @@ function viewProfile() {
         ontouchend="if(_touchMoved)return;event.preventDefault();navigate('confidence-history');" onclick="navigate('confidence-history')">
         <div style="display:flex;align-items:baseline;gap:2px;line-height:1;">
           <span style="font-size:26px;font-weight:900;color:#4A8FA8;">${confStat ? confStat.val.toFixed(1) : '—'}</span>
-          ${confStat?.label ? `<span style="background:${confStat.bg};border-radius:100px;padding:2px 7px;font-size:11px;font-weight:900;color:#fff;margin-left:4px;line-height:1;">${confStat.label}</span>` : ''}
+          ${confStat?.label ? `<span style="background:${confStat.bg};border-radius:100px;padding:4px 7px;margin-left:4px;line-height:0;display:inline-flex;align-items:center;align-self:center;">${trendArrowSVG(confStat.label === '▲')}</span>` : ''}
         </div>
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);display:flex;align-items:center;gap:2px;">Confidence <span style="font-size:8px;color:var(--text-3);opacity:.55;">▸</span></div>
       </div>
@@ -11760,15 +11814,15 @@ function viewSavedTips() {
     if (!Object.keys(rx).length) return;
     if (e.stylingTips?.length) {
       e.stylingTips.forEach((r, i) => {
-        if (rx[String(i)] === 'liked') tips.push({ text: r, entry: e });
-        else if (rx[String(i)] === 'doing') doingTips.push({ text: r, entry: e });
+        if (rx[String(i)] === 'liked') tips.push({ text: r, entry: e, idx: i });
+        else if (rx[String(i)] === 'doing') doingTips.push({ text: r, entry: e, idx: i });
       });
     } else {
       (e.recommendations||[]).forEach((r, i) => {
         const liked = rx[String(i)] === 'liked' || rx[r] === 'liked';
         const doing = rx[String(i)] === 'doing' || rx[r] === 'doing';
-        if (liked) tips.push({ text: r, entry: e });
-        else if (doing) doingTips.push({ text: r, entry: e });
+        if (liked) tips.push({ text: r, entry: e, idx: i });
+        else if (doing) doingTips.push({ text: r, entry: e, idx: i });
       });
     }
   });
@@ -11776,7 +11830,7 @@ function viewSavedTips() {
   tips.sort((a,b) => new Date(b.entry.createdAt) - new Date(a.entry.createdAt));
   doingTips.sort((a,b) => new Date(b.entry.createdAt) - new Date(a.entry.createdAt));
 
-  const tipRow = ({text, entry}) => `
+  const tipRow = ({text, entry, idx}) => `
     <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')" onclick="openEntry('${entry.id}')"
       style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;cursor:pointer;touch-action:manipulation;">
       ${entry.photo
@@ -11788,6 +11842,8 @@ function viewSavedTips() {
           ${entry.rating != null ? `⭐ ${entry.rating}` : ''}${entry.occasionTag ? (entry.rating!=null?' · ':'')+esc(entry.occasionTag) : ''} · ${fmtDate(entry.createdAt)}
         </div>
       </div>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();removeSavedTip('${entry.id}',${idx})" onclick="event.stopPropagation();removeSavedTip('${entry.id}',${idx})"
+        style="background:none;border:none;color:var(--text-3);font-size:13px;line-height:1;cursor:pointer;padding:2px 4px;flex-shrink:0;touch-action:manipulation;font-family:inherit;">✕</button>
     </div>`;
 
   const rows = tips.length ? tips.map(tipRow).join('') : `
@@ -12416,18 +12472,26 @@ function viewHome() {
   // ── Style Goals + Visual Tab Cards ───────────────────────
   const dTab = S.discoverTab || 'tips';
   const GOAL_PRESETS = [
-    { label:'Feminine',    emoji:'🌸' },
-    { label:'Punk Rock',   emoji:'🤘' },
-    { label:'Executive',   emoji:'💼' },
-    { label:'Minimalist',  emoji:'🖤' },
-    { label:'Maximalist',  emoji:'✨' },
-    { label:'Streetwear',  emoji:'🛹' },
-    { label:'Bohemian',    emoji:'🌿' },
-    { label:'Classic',     emoji:'👑' },
-    { label:'Edgy',        emoji:'⚡' },
-    { label:'Romantic',    emoji:'💕' },
-    { label:'Athletic',    emoji:'🏃' },
-    { label:'Artsy',       emoji:'🎨' },
+    { label:'Feminine',      emoji:'🌸' },
+    { label:'Masculine',     emoji:'🤵' },
+    { label:'Androgynous',   emoji:'🌗' },
+    { label:'Punk Rock',     emoji:'🤘' },
+    { label:'Executive',     emoji:'💼' },
+    { label:'Minimalist',    emoji:'🖤' },
+    { label:'Maximalist',    emoji:'✨' },
+    { label:'Quiet Luxury',  emoji:'🥂' },
+    { label:'Streetwear',    emoji:'🛹' },
+    { label:'Techwear',      emoji:'🦾' },
+    { label:'Utility',       emoji:'🔧' },
+    { label:'Bohemian',      emoji:'🌿' },
+    { label:'Classic',       emoji:'👑' },
+    { label:'Vintage',       emoji:'📻' },
+    { label:'Preppy',        emoji:'⛵' },
+    { label:'Edgy',          emoji:'⚡' },
+    { label:'Romantic',      emoji:'💕' },
+    { label:'Athletic',      emoji:'🏃' },
+    { label:'Outdoorsy',     emoji:'🏔️' },
+    { label:'Artsy',         emoji:'🎨' },
   ];
   const activeGoals = S.styleGoals || [];
 
@@ -12442,7 +12506,8 @@ function viewHome() {
         ${activeGoals.map(g => {
           const preset = GOAL_PRESETS.find(p => p.label === g);
           const emoji = preset ? preset.emoji : '✦';
-          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();toggleStyleGoal('${g}')" onclick="toggleStyleGoal('${g}')"
+          const gEsc = g.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();toggleStyleGoal('${gEsc}')" onclick="toggleStyleGoal('${gEsc}')"
             style="display:inline-flex;align-items:center;gap:5px;background:var(--gold);border-radius:100px;padding:6px 13px;cursor:pointer;touch-action:manipulation;">
             <span style="font-size:14px;line-height:1;">${emoji}</span>
             <span style="font-size:12px;font-weight:800;color:#fff;">${esc(g)}</span>
@@ -12457,7 +12522,23 @@ function viewHome() {
             <span style="font-size:13px;line-height:1;">${p.emoji}</span>
             <span style="font-size:12px;font-weight:600;color:var(--text-2);">${p.label}</span>
           </button>`).join('')}
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleCustomGoalInput();" onclick="toggleCustomGoalInput()"
+          style="display:inline-flex;align-items:center;gap:5px;background:${S._customGoalOpen?'var(--gold)':'var(--surface)'};border:${S._customGoalOpen?'1.5px solid var(--gold)':'1.5px dashed var(--border)'};border-radius:100px;padding:5px 12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+          <span style="font-size:13px;line-height:1;">✏️</span>
+          <span style="font-size:12px;font-weight:600;color:${S._customGoalOpen?'#fff':'var(--text-2)'};">Custom</span>
+        </button>
       </div>
+      ${S._customGoalOpen ? `
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <input id="custom-goal-input" type="text" maxlength="30"
+          placeholder="e.g. Gender-fluid, Dark Academia, Y2K…"
+          value="${esc(S._customGoalDraft||'')}"
+          oninput="S._customGoalDraft=this.value"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomStyleGoal();}"
+          style="flex:1;min-width:0;padding:10px 13px;border-radius:100px;border:1.5px solid var(--gold);background:var(--surface);font-size:14px;font-family:inherit;color:var(--text);box-sizing:border-box;outline:none;-webkit-appearance:none;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();addCustomStyleGoal();" onclick="addCustomStyleGoal()"
+          style="flex-shrink:0;padding:10px 18px;border-radius:100px;border:none;background:var(--gold);color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">Add</button>
+      </div>` : ''}
     </div>
     <div style="margin:14px 16px 0;height:1px;background:var(--border);"></div>`;
 
@@ -12529,7 +12610,9 @@ function viewHome() {
         <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
           ${allTrends.slice(0,10).map(trend => {
             const r = reactions[trend.id];
-            return `<div style="scroll-snap-align:start;flex-shrink:0;width:200px;border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
+            return `<div style="scroll-snap-align:start;flex-shrink:0;width:200px;border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteTrend('${esc(trend.id)}')" onclick="event.stopPropagation();deleteTrend('${esc(trend.id)}')"
+                style="position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);color:var(--text-3);font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;">✕</button>
               <div style="padding:12px 12px 8px;">
                 <div style="font-size:24px;margin-bottom:6px;line-height:1;">${esc(trend.emoji||'🔥')}</div>
                 <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(trend.name)}</div>
@@ -12634,9 +12717,11 @@ function viewHome() {
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">👍 Saved Trends</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;">
           ${savedTrends.map(t=>`
-            <div style="display:inline-flex;align-items:center;gap:5px;background:var(--gold-bg);border:1px solid rgba(184,125,42,0.22);border-radius:100px;padding:5px 11px;">
+            <div style="display:inline-flex;align-items:center;gap:5px;background:var(--gold-bg);border:1px solid rgba(184,125,42,0.22);border-radius:100px;padding:5px 8px 5px 11px;">
               <span style="font-size:13px;line-height:1;">${esc(t.emoji||'🔥')}</span>
               <span style="font-size:12px;font-weight:600;color:var(--text);">${esc(t.name)}</span>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();removeSavedTrend('${esc(t.id)}')" onclick="removeSavedTrend('${esc(t.id)}')"
+                style="background:none;border:none;color:var(--text-3);font-size:11px;line-height:1;cursor:pointer;padding:2px 3px;touch-action:manipulation;font-family:inherit;">✕</button>
             </div>`).join('')}
         </div>
       </div>`;
@@ -12705,9 +12790,9 @@ function viewHome() {
       const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{});
       if (!Object.keys(rx).length) return;
       if (e.stylingTips?.length) {
-        e.stylingTips.forEach((r, i) => { if (rx[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e }); });
+        e.stylingTips.forEach((r, i) => { if (rx[String(i)] === 'liked') likedRecs.push({ rec: r, entry: e, idx: i }); });
       } else {
-        (e.recommendations||[]).forEach((r, i) => { if (rx[String(i)] === 'liked' || rx[r] === 'liked') likedRecs.push({ rec: r, entry: e }); });
+        (e.recommendations||[]).forEach((r, i) => { if (rx[String(i)] === 'liked' || rx[r] === 'liked') likedRecs.push({ rec: r, entry: e, idx: i }); });
       }
     });
     const count = likedRecs.length;
@@ -12729,10 +12814,12 @@ function viewHome() {
         <div style="margin-top:16px;">
           <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">✂️ Recent Tips</div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-            ${likedRecs.slice(0,8).map(({rec, entry}) => `
+            ${likedRecs.slice(0,8).map(({rec, entry, idx}) => `
               <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')"
                 onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:210px;cursor:pointer;
-                border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;">
+                border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();removeSavedTip('${entry.id}',${idx})" onclick="event.stopPropagation();removeSavedTip('${entry.id}',${idx})"
+                  style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(20,18,16,0.55);border:none;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;backdrop-filter:blur(3px);">✕</button>
                 ${entry.photo
                   ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
                   : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
@@ -15015,6 +15102,14 @@ const GOAL_KEYWORDS = {
   'Romantic':    ['floral','lace','ruffle','pastel','bow','tulle','silk'],
   'Athletic':    ['sport','athletic','jogger','sneaker','performance','legging','track'],
   'Artsy':       ['print','sculptural','asymmetric','unique','statement','colorblock'],
+  'Masculine':   ['tailored','oxford','chino','henley','flannel','boot','rugged','crewneck'],
+  'Androgynous': ['oversized','boxy','unisex','straight','neutral','minimal','tailored'],
+  'Quiet Luxury':['cashmere','wool','silk','tailored','neutral','camel','loafer','merino'],
+  'Techwear':    ['nylon','waterproof','technical','shell','zip','cargo','ripstop'],
+  'Utility':     ['cargo','canvas','workwear','chore','carpenter','pocket','denim','boot'],
+  'Vintage':     ['vintage','retro','70s','80s','90s','thrifted','corduroy','suede'],
+  'Preppy':      ['polo','oxford','stripe','navy','khaki','loafer','cable','pleated'],
+  'Outdoorsy':   ['fleece','flannel','hiking','puffer','wool','boot','canvas','quilted'],
 };
 function itemMatchesGoal(w, goal) {
   const kws = GOAL_KEYWORDS[goal];
@@ -18747,6 +18842,29 @@ function toggleStyleGoal(goal) {
   }
   S.styleGoals = goals;
   localStorage.setItem('closet-style-goals', JSON.stringify(goals));
+  render();
+}
+function toggleCustomGoalInput() {
+  S._customGoalOpen = !S._customGoalOpen;
+  S._customGoalDraft = '';
+  render();
+  if (S._customGoalOpen) requestAnimationFrame(() => document.getElementById('custom-goal-input')?.focus());
+}
+function addCustomStyleGoal() {
+  const val = (S._customGoalDraft || '').trim().replace(/\s+/g, ' ');
+  if (!val) return;
+  if (val.length > 30) { toast('Keep it under 30 characters'); return; }
+  const goals = S.styleGoals || [];
+  if (goals.some(g => g.toLowerCase() === val.toLowerCase()) ||
+      (typeof GOAL_KEYWORDS === 'object' && Object.keys(GOAL_KEYWORDS).some(k => k.toLowerCase() === val.toLowerCase() && goals.includes(k)))) {
+    toast('Already one of your goals!');
+    return;
+  }
+  S.styleGoals = [...goals, val];
+  localStorage.setItem('closet-style-goals', JSON.stringify(S.styleGoals));
+  S._customGoalOpen = false;
+  S._customGoalDraft = '';
+  toast('Goal added 🎯');
   render();
 }
 
