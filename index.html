@@ -253,6 +253,16 @@ body {
   color: var(--gold-dk); font-weight: 600;
 }
 .filter-chip-sub.active { background: var(--gold); border-color: var(--gold); color: #fff; }
+/* Sort pills — deliberately distinct from filter chips: borderless, quieter,
+   charcoal (not gold) when active, so "what you see" vs "how it's ordered"
+   read as two different controls. */
+.sort-chip {
+  padding: 5px 12px; border-radius: 100px; border: 1px solid transparent;
+  background: var(--surface-2); font-size: 12px; font-weight: 600;
+  color: var(--text-2); cursor: pointer; white-space: nowrap; transition: all .15s;
+  flex-shrink: 0;
+}
+.sort-chip.active { background: var(--text); color: var(--bg); }
 
 /* ── OUTFIT GRID ─────────────────────────────────────────── */
 .outfit-grid {
@@ -2939,8 +2949,6 @@ const S = {
   _therapyDraft: null,  // { id, season, transcript, audioDataUrl, hasAudio, source, recording, recordSeconds }
   _therapyRecorder: null, // live MediaRecorder + SpeechRecognition handles, not persisted
   catRackLevels: JSON.parse(localStorage.getItem('closet-cat-rack-levels') || '{}'),
-  funCompliment: null,      // { lines: [...], generatedAt }
-  _funComplimentLoading: false,
   funRoulette: null,        // { items: [...], generatedAt }
   _funRouletteLoading: false,
   _rouletteOpen: false,
@@ -3948,6 +3956,24 @@ function shareWishListCard() {
   render();
 }
 function closeWishShareSheet() { S._wishShareSheetOpen = false; render(); }
+// Generic share helper — native share sheet with clipboard fallback.
+// (Referenced by several buttons but lost in a refactor; restored 2026-07.)
+function shareText(title, text, url) {
+  const full = text + (url ? `\n${url}` : '');
+  if (navigator.share) {
+    navigator.share(url ? { title, text, url } : { title, text }).catch(() => {});
+  } else if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(full).then(() => toast('Copied to clipboard! 📋')).catch(() => toast('Sharing not available'));
+  } else {
+    _wishShareCopyFallback(full);
+    toast('Copied to clipboard! 📋');
+  }
+}
+function shareClosetApp() {
+  shareText('Closet — your personal style journal',
+    "Okay I need to tell you about Closet 💗 it's basically a wardrobe brain — it tracks everything I own, tells me what to wear, and somehow makes getting dressed actually fun. You'd love it.",
+    location.href);
+}
 function _wishShareCopyFallback(text) {
   const ta = document.createElement('textarea');
   ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
@@ -4062,8 +4088,8 @@ function viewWishShare() {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);">Items — ${S._wishShareItems.length} of ${allItems.length} selected</div>
           <button
-            ontouchend="if(_touchMoved)return;event.preventDefault();S._wishShareItems=S._wishShareItems.length===allItems.length?[]:allItems.map(i=>i.query);render();"
-            onclick="S._wishShareItems=S._wishShareItems.length===allItems.length?[]:allItems.map(i=>i.query);render();"
+            ontouchend="if(_touchMoved)return;event.preventDefault();S._wishShareItems=S._wishShareItems.length===${allItems.length}?[]:_buildWishItems().map(i=>i.query);render();"
+            onclick="S._wishShareItems=S._wishShareItems.length===${allItems.length}?[]:_buildWishItems().map(i=>i.query);render();"
             style="font-size:12px;font-weight:700;color:var(--gold-dk);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0;touch-action:manipulation;">
             ${S._wishShareItems.length === allItems.length ? 'Deselect all' : 'Select all'}
           </button>
@@ -4825,7 +4851,6 @@ function featuresMenuHTML() {
         { icon: '⚔️', text: '<strong>Fashion Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best. Results shared as a full scorecard card.' },
         { icon: '👯', text: '<strong>Friend\'s Fit Check</strong> — Rate a friend\'s outfit instantly — honest, fun, and never saved to your journal.' },
         { icon: '💌', text: '<strong>Thank Someone</strong> — All the pieces you\'ve received as gifts in one place. Send a heartfelt note to the people who gave them to you.' },
-        { icon: '🌟', text: '<strong>Claude Compliments</strong> — Get one genuinely thoughtful compliment about your personal style, refreshed whenever you want.' },
         { icon: '🥂', text: '<strong>Outfit × Drink Pairing</strong> — Pick an outfit and Claude suggests the perfect drink to have while wearing it (NA option included).' },
         { icon: '📚', text: '<strong>Outfit × Book Pairing</strong> — Pick an outfit and Claude finds the book you should be reading while wearing it.' },
       ],
@@ -5818,9 +5843,10 @@ function viewOutfitBuilder() {
       <div style="display:flex;flex-wrap:wrap;gap:7px;">
         ${occasions.map(occ => {
           const active = ob.occasion === occ;
+          const occEsc = (active ? '' : occ).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
           return `<button
-            ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder.occasion='${active ? '' : occ}';render()"
-            onclick="S.outfitBuilder.occasion='${active ? '' : occ}';render()"
+            ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder.occasion='${occEsc}';render()"
+            onclick="S.outfitBuilder.occasion='${occEsc}';render()"
             style="padding:8px 16px;border-radius:100px;border:1.5px solid ${active ? 'rgba(108,62,191,0.7)' : 'var(--border)'};background:${active ? 'rgba(108,62,191,0.1)' : 'var(--surface)'};color:${active ? '#6C3EBF' : 'var(--text-2)'};font-size:13px;font-weight:${active ? '700' : '500'};cursor:pointer;font-family:inherit;touch-action:manipulation;">
             ${occ}
           </button>`;
@@ -6152,8 +6178,9 @@ function render() {
     case 'plan':         html = viewPlan();         break;
     case 'home':         html = viewHome();         break;
     case 'profile':      html = viewProfile();      break;
-    case 'aura':              html = viewAura();              break;
-    case 'non-negotiables':   html = viewNonNegotiables();   break;
+    case 'personal-details':  html = viewPersonalDetails();   break;
+    case 'aura':              navigate('personal-details'); return; // merged into Personal Details
+    case 'non-negotiables':   navigate('personal-details'); return; // merged into Personal Details
     case 'saved-tips':        html = viewSavedTips();         break;
     case 'closet-assistant':  html = viewClosetAssistant();   break;
     case 'assistant-book':    html = viewAssistantBook();     break;
@@ -6215,6 +6242,7 @@ function render() {
   // below the fold on tall scrollable pages (screen dims, no sheet = "frozen").
   if (S._wishShareSheetOpen && S.view === 'wish-share') html += wishShareSheetHTML();
   if (S._fitsShareSheetOpen && S.view === 'closet') html += fitsShareSheetHTML();
+  if (S._tripFlow && S.view === 'plan') html += tripFlowSheetHTML();
   if (S._closetLightbox) html += closetLightboxHTML();
   if (S._sellDraftOpen) html += sellDraftModalHTML();
   if (S._complimentModal) html += complimentModalHTML();
@@ -6238,10 +6266,14 @@ function render() {
   }
   // Post-render: re-focus wardrobe search input after debounced re-render
   if (S._wardrobeSearchOpen && S.view === 'wardrobe') {
-    requestAnimationFrame(() => {
-      const inp = document.getElementById('wardrobe-search-input');
-      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
-    });
+    // Refocus SYNCHRONOUSLY (not rAF) — a frame of lost focus lets Safari's
+    // URL bar expand/collapse on every debounced re-render ("the URL jumps"),
+    // and can dismiss the iOS keyboard. preventScroll stops focus-scroll jumps.
+    const inp = document.getElementById('wardrobe-search-input');
+    if (inp && document.activeElement !== inp) {
+      try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); }
+      inp.setSelectionRange(inp.value.length, inp.value.length);
+    }
   }
   // Post-render: re-focus the closet picker search in the match-review flow
   if (S.wardrobePickerFor) {
@@ -6788,71 +6820,6 @@ function uploadReturnPhoto(input) {
 /* ================================================================
    VIEW: FUN
    ================================================================ */
-
-async function generateCompliment() {
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
-  if (S._funComplimentLoading) return;
-  S._funComplimentLoading = true;
-  render();
-  // Build a pool of specific wardrobe items to compliment
-  const active = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
-  const mostWorn = [...active].filter(w=>(w.wears?.length||0)>0).sort((a,b)=>b.wears.length-a.wears.length).slice(0,5);
-  const gems = active.filter(w=>w.isGem||w.isHero||w.isSignature).slice(0,4);
-  const recentlyAdded = [...active].sort((a,b)=>new Date(b.addedAt||0)-new Date(a.addedAt||0)).slice(0,4);
-  const paidOff = active.filter(w=>w.paidOff).slice(0,3);
-
-  const itemPool = [...new Map([...gems,...mostWorn,...recentlyAdded,...paidOff].map(w=>[w.id,w])).values()].slice(0,12);
-  const itemList = itemPool.map(w => {
-    const wears = w.wears?.length||0;
-    const parts = [
-      `"${w.name}"`,
-      w.brand ? `by ${w.brand}` : null,
-      w.category || null,
-      wears > 0 ? `worn ${wears}×` : 'newly added',
-      w.isGem||w.isHero||w.isSignature ? 'marked as a gem piece' : null,
-      w.paidOff ? 'fully paid off in cost-per-wear' : null,
-      w.description ? `described as: ${w.description}` : null,
-    ].filter(Boolean).join(', ');
-    return `• ${parts}`;
-  }).join('\n');
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 350,
-        messages: [{ role: 'user', content: `You are a warm, perceptive stylist who notices and appreciates specific pieces of clothing. Write 3 short compliments, each focused on a specific item from this person's wardrobe. Make each one feel like a genuine observation about that particular piece — why it's special, what it says about the person's taste, or why reaching for it so often makes total sense. Be specific and warm, not generic.
-
-Each compliment should name the item directly and feel like something a stylish friend would say, not a marketing tagline.
-
-Wardrobe items:
-${itemList || '• a carefully curated wardrobe'}
-
-Return ONLY valid JSON — no markdown:
-{"compliments":["...", "...", "..."]}` }],
-      }),
-    });
-    if (!res.ok) throw new Error(`API ${res.status}`);
-    const data = await res.json();
-    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('No JSON');
-    const parsed = JSON.parse(m[0]);
-    S.funCompliment = { lines: parsed.compliments || [], generatedAt: new Date().toISOString() };
-  } catch(e) {
-    console.error('generateCompliment:', e);
-    toast('Couldn\'t generate — try again in a moment.');
-  }
-  S._funComplimentLoading = false;
-  render();
-}
 
 async function generateRoulette() {
   if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
@@ -7832,41 +7799,6 @@ function viewFun() {
         ${thankSomeoneHTML}
       </div>
 
-      <!-- Claude Compliments -->
-      <div style="margin:10px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:18px;">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:2px;">
-          <div style="font-size:32px;line-height:1;">🌟</div>
-          <div style="flex:1;">
-            <div style="font-size:16px;font-weight:800;color:var(--text);">Claude Compliments</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Sometimes you just need a fresh perspective. Claude will say something genuinely nice about your style.</div>
-          </div>
-        </div>
-        ${!S.funCompliment && !S._funComplimentLoading ? `
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();generateCompliment()"
-          onclick="generateCompliment()"
-          style="margin-top:14px;width:100%;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:100px;padding:10px;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          ✨ Flatter me
-        </button>` : ''}
-        ${(()=>{
-          if (S._funComplimentLoading) return `<div style="display:flex;align-items:center;gap:10px;padding:16px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Claude is thinking about you…</span></div>`;
-          if (!S.funCompliment?.lines?.length) return '';
-          const line = S.funCompliment.lines[0] || '';
-          return `<div style="margin-top:14px;">
-            <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;">
-              <span style="font-size:20px;flex-shrink:0;margin-top:1px;">💛</span>
-              <div style="font-size:13px;color:var(--text);line-height:1.6;font-style:italic;">"${esc(line)}"</div>
-            </div>
-            <button
-              ontouchend="if(_touchMoved)return;event.preventDefault();generateCompliment()"
-              onclick="generateCompliment()"
-              style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;padding:8px 0;width:100%;">
-              ↻ New compliment
-            </button>
-          </div>`;
-        })()}
-      </div>
-
       <!-- ── PAIRINGS ────────────────────────────────── -->
       <div style="margin:20px 16px 0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);">✦ Pairings</div>
 
@@ -8586,7 +8518,7 @@ function viewCloset() {
   const allTags = [...new Set(S.entries.map(e => e.occasionTag).filter(Boolean))];
   // Tag chips — toggle-off when already active
   const tagChips = allTags.map(tag => {
-    const esc2 = tag.replace(/'/g, '&#39;');
+    const esc2 = tag.replace(/\\/g, '\\\\').replace(/'/g, "\\'"); // JS-escape for the inline handler string
     const key  = `tag:${esc2}`;
     const active = S.filter === 'tag:' + tag;
     return `<div class="filter-chip ${active ? 'active' : ''}"
@@ -8656,7 +8588,7 @@ function viewCloset() {
       const todayKey = new Date().toISOString().slice(0,10);
       const loggedToday = S.entries.some(e => e.createdAt && e.createdAt.slice(0,10) === todayKey);
       const activeWardrobeCount = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile).length;
-      const inviteHTML = activeWardrobeCount >= 3 ? `
+      const inviteHTML = (activeWardrobeCount >= 3 && !S._dressMeDismissedSession) ? `
         <div style="margin:10px 16px 0;display:flex;align-items:center;gap:10px;padding:12px 14px;background:linear-gradient(135deg,#1C1A18 0%,#2a2520 100%);border-radius:var(--r-sm);">
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:700;color:#fff;">Want Claude to dress you today?</div>
@@ -8664,6 +8596,8 @@ function viewCloset() {
           </div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();openDressMe();" onclick="openDressMe();"
             style="background:var(--gold);border:none;border-radius:100px;padding:7px 14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;flex-shrink:0;">Dress me →</button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissDressMe();" onclick="dismissDressMe();"
+            style="background:none;border:none;color:rgba(255,255,255,.45);font-size:13px;line-height:1;cursor:pointer;padding:4px;flex-shrink:0;touch-action:manipulation;font-family:inherit;">✕</button>
         </div>` : '';
       const ctaHTML = (!loggedToday && S.entries.length > 0) ? `
         <div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload')"
@@ -9817,23 +9751,6 @@ function viewPlan() {
         </div>
       ` : ''}
 
-      ${S._tripFlow ? `
-        <!-- TRIP NAMING BOTTOM SHEET -->
-        <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;" ontouchend="if(event.target===this){S._tripFlow=null;render();}">
-          <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:24px 20px 40px;width:100%;box-sizing:border-box;">
-            <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:16px;">Name this trip ✈️</div>
-            <input class="form-input" id="tripNameInput" placeholder="e.g. Paris Summer, NYC Work Trip…"
-              value="${esc(S._tripFlow?.name||'')}"
-              oninput="S._tripFlow.name=this.value"
-              style="margin-bottom:16px;">
-            <div style="display:flex;gap:10px;">
-              <button class="btn btn-secondary" style="flex:1;margin:0;" ontouchend="if(_touchMoved)return;event.preventDefault();S._tripFlow=null;render();" onclick="S._tripFlow=null;render()">Cancel</button>
-              <button class="btn btn-primary" style="flex:1;margin:0;" ontouchend="if(_touchMoved)return;event.preventDefault();confirmNewTrip();" onclick="confirmNewTrip()">Create Trip</button>
-            </div>
-          </div>
-        </div>
-      ` : ''}
-
     <div style="height:30px"></div>
   </div>
 
@@ -9851,6 +9768,25 @@ function heroScore(name, category) {
   if (/bag|purse|clutch|tote|backpack|wallet/.test(t)) return -1;
   if (/earring|necklace|bracelet|ring|watch|jewelry|belt|sock|scarf|hat|cap|glove|sungl/.test(t)) return -1;
   return 1;
+}
+
+// Trip naming bottom sheet — rendered at top level (sibling of .view) so the
+// view's fadeUp transform can't hijack its fixed positioning.
+function tripFlowSheetHTML() {
+  return `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-end;" ontouchend="if(event.target===this){S._tripFlow=null;render();}" onclick="if(event.target===this){S._tripFlow=null;render();}">
+      <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:24px 20px 40px;width:100%;box-sizing:border-box;">
+        <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:16px;">Name this trip ✈️</div>
+        <input class="form-input" id="tripNameInput" placeholder="e.g. Paris Summer, NYC Work Trip…"
+          value="${esc(S._tripFlow?.name||'')}"
+          oninput="S._tripFlow.name=this.value"
+          style="margin-bottom:16px;">
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-secondary" style="flex:1;margin:0;" ontouchend="if(_touchMoved)return;event.preventDefault();S._tripFlow=null;render();" onclick="S._tripFlow=null;render()">Cancel</button>
+          <button class="btn btn-primary" style="flex:1;margin:0;" ontouchend="if(_touchMoved)return;event.preventDefault();confirmNewTrip();" onclick="confirmNewTrip()">Create Trip</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 function getSavedLookData(type, id) {
@@ -11190,15 +11126,13 @@ function viewProfile() {
           .filter(w => w.paidOff)
           .sort((a,b) => (b.wears||[]).length - (a.wears||[]).length);
         if (!heroes.length) return '';
-        const totalValue = heroes.reduce((s,w) => s + (parseFloat(w.price)||0), 0);
         const totalWears = heroes.reduce((s,w) => s + (w.wears?.length||0), 0);
         const summaryLine = [
           `${heroes.length} piece${heroes.length===1?'':'s'}`,
-          totalValue > 0 ? `$${Math.round(totalValue)} paid off` : null,
           `${totalWears} total wears`
         ].filter(Boolean).join(' · ');
         return `<div style="margin:16px 0 0;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:4px;padding:0 14px;">💚 Paid Off Heroes</div>
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:4px;padding:0 14px;">💚 Value Unlocked</div>
           <div style="font-size:10px;color:#1E8449;font-weight:600;padding:0 14px;margin-bottom:10px;">${summaryLine}</div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding:0 14px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
             ${heroes.map((w,i) => {
@@ -11222,16 +11156,7 @@ function viewProfile() {
         </div>`;
       })();
 
-      return `<div style="margin:16px 16px 0;background:rgba(184,125,42,0.05);border:1.5px solid rgba(184,125,42,0.18);border-radius:16px;padding:14px 0 14px;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(184,125,42,0.45);margin-bottom:12px;padding:0 14px;">✦ Your Best</div>
-        ${bestOutfitsHTML}
-        ${gemsCarouselHTML}
-        ${paidOffHeroesHTML}
-      </div>`;
-    })()}
-
-    <!-- ══ Recent Compliments ══ -->
-    ${(()=>{
+      const complimentsHTML = (()=>{
       const allC = [];
       S.wardrobe.forEach(w => (w.compliments||[]).forEach(c => allC.push({w, date:c.date})));
       if (!allC.length) return '';
@@ -11243,12 +11168,12 @@ function viewProfile() {
       const total = allC.length; // tally always uses full count, unaffected by dismissals
       const visible = recent.filter(({w}) => !S._dismissedComplimentIds.has(w.id));
       const relDate = iso => { const d=daysSince(iso); return d===0?'today':d===1?'yesterday':d<7?d+'d ago':fmtDate(iso); };
-      return `<div style="margin:16px 16px 0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">💬 Recent Compliments</div>
+      return `<div style="margin:16px 0 0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 14px;">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">💬 Compliments</div>
           <div style="font-size:11px;font-weight:700;color:var(--gold-dk);">${total} total</div>
         </div>
-        ${visible.length ? `<div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -16px;padding:0 16px 4px;">
+        ${visible.length ? `<div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 14px 4px;">
           ${visible.slice(0,10).map(({w,lastDate,count}) => {
             const isLongPress = S._complimentLongPressId === w.id;
             const latestFrom = [...(w.compliments||[])].reverse().find(c=>c.from)?.from || null;
@@ -11274,20 +11199,43 @@ function viewProfile() {
                 style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:var(--gold);border:none;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;animation:fadeIn .15s;">✕</button>` : ''}
             </div>`;
           }).join('')}
-        </div>` : `<div style="font-size:12px;color:var(--text-3);padding:8px 0;">All caught up — no items showing.</div>`}
+        </div>` : `<div style="font-size:12px;color:var(--text-3);padding:8px 14px 0;">All caught up — no items showing.</div>`}
+      </div>`;
+    })();
+
+      return `<div style="margin:16px 16px 0;background:rgba(184,125,42,0.05);border:1.5px solid rgba(184,125,42,0.18);border-radius:16px;padding:14px 0 14px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(184,125,42,0.45);margin-bottom:12px;padding:0 14px;">✦ Your Best</div>
+        ${bestOutfitsHTML}
+        ${gemsCarouselHTML}
+        ${paidOffHeroesHTML}
+        ${complimentsHTML}
       </div>`;
     })()}
 
+    <!-- Recent Compliments now lives inside the ✦ Your Best box above -->
+
     <!-- ══ Top Brands ══ -->
     ${topBrands.length ? (()=>{
-      const BRAND_CAP = 5;
+      const BRAND_CAP = 3;
+      // Podium ranking: by number of items owned (not wears), ties alphabetical
+      const itemCounts = {};
+      S.wardrobe.forEach(w => { if (w.brand?.trim()) itemCounts[w.brand.trim()] = (itemCounts[w.brand.trim()]||0) + 1; });
+      const ranked = Object.entries(itemCounts).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
       const showAll = S._brandsExpanded;
-      const visible = showAll ? topBrands : topBrands.slice(0, BRAND_CAP);
-      const rows = visible.map(([brand,count])=>`
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;">
+      const visible = showAll ? ranked : ranked.slice(0, BRAND_CAP);
+      const MEDALS = [
+        { bg:'linear-gradient(135deg,#E3BC4B,#B8860B)', ring:'rgba(184,134,11,0.35)' },   // gold
+        { bg:'linear-gradient(135deg,#D7DBE0,#9CA3AF)', ring:'rgba(156,163,175,0.35)' },  // silver
+        { bg:'linear-gradient(135deg,#D29A6B,#B87333)', ring:'rgba(184,115,51,0.35)' },   // bronze
+      ];
+      const rows = visible.map(([brand,count],i)=>{
+        const medal = i < 3 ? MEDALS[i] : null;
+        return `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid ${medal?medal.ring:'var(--border)'};border-radius:12px;">
+          <div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;${medal?`background:${medal.bg};color:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.18);`:'background:var(--surface-2);color:var(--text-3);'}">${i+1}</div>
           <div style="flex:1;min-width:0;">
             <span style="font-size:13px;font-weight:700;color:var(--text);">${esc(brand)}</span>
-            <span style="font-size:12px;color:var(--text-3);margin-left:6px;">${count}×</span>
+            <span style="font-size:12px;color:var(--text-3);margin-left:6px;">${count} item${count===1?'':'s'}</span>
           </div>
           <a href="${brandInstagramUrl(brand)}" target="_blank" rel="noopener"
             style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);border-radius:100px;padding:5px 10px;text-decoration:none;flex-shrink:0;"
@@ -11295,11 +11243,12 @@ function viewProfile() {
             <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
             <span style="font-size:10px;font-weight:700;color:#fff;">Instagram</span>
           </a>
-        </div>`).join('');
-      const expandBtn = topBrands.length > BRAND_CAP ? `
+        </div>`;
+      }).join('');
+      const expandBtn = ranked.length > BRAND_CAP ? `
         <button ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=!S._brandsExpanded;render()" onclick="S._brandsExpanded=!S._brandsExpanded;render()"
           style="width:100%;background:none;border:1px solid var(--border);border-radius:100px;padding:8px;font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:2px;">
-          ${showAll ? 'Show less ↑' : `Show ${topBrands.length - BRAND_CAP} more ↓`}
+          ${showAll ? 'Show less ↑' : `Show ${ranked.length - BRAND_CAP} more ↓`}
         </button>` : '';
       return `<div style="margin:16px 16px 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -11317,31 +11266,22 @@ function viewProfile() {
     <!-- ══ Divider ══ -->
     <div style="height:1px;background:var(--border);margin:20px 16px;"></div>
 
-    <!-- ══ ZONE 3: Your Identity — Style Portrait + Aura grouped ══ -->
-    <div style="margin:0 16px 16px;background:rgba(100,74,138,0.05);border:1.5px solid rgba(100,74,138,0.15);border-radius:16px;padding:14px 14px 14px;">
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(100,74,138,0.45);margin-bottom:12px;">✨ Your Identity</div>
-      <div style="margin-top:12px;">
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('aura')" onclick="navigate('aura')"
-          style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
-          <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#F3E8FF,#E8D5F5);border:1px solid #D5B8F0;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">✨</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">Your Aura</div>
-            <div style="font-size:12px;color:var(--text-3);">${auraFilledCount === 0 ? 'Add your personal details' : auraFilledCount === 9 ? 'All details filled in ✓' : `${auraFilledCount}/9 details filled in`}</div>
-          </div>
-          <div style="font-size:18px;color:var(--text-3);">›</div>
-        </button>
-      </div>
-      <div style="margin-top:8px;">
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('non-negotiables')" onclick="navigate('non-negotiables')"
-          style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
-          <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#FFF3E0,#FFE0B2);border:1px solid #FFD180;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">🚫</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">My Non-Negotiables</div>
-            <div style="font-size:12px;color:var(--text-3);">${(S.nonNegPhysical||S.nonNegAesthetic) ? 'What I know about myself ✓' : 'What I always skip — and what my body needs'}</div>
-          </div>
-          <div style="font-size:18px;color:var(--text-3);">›</div>
-        </button>
-      </div>
+    <!-- ══ ZONE 3: Personal Details — one card, one combined page ══ -->
+    <div style="margin:0 16px 16px;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('personal-details')" onclick="navigate('personal-details')"
+        style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
+        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#F3E8FF,#E8D5F5);border:1px solid #D5B8F0;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">👤</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;">Personal Details</div>
+          <div style="font-size:12px;color:var(--text-3);">${(() => {
+            const parts = [];
+            if (auraFilledCount > 0) parts.push(`${auraFilledCount}/9 aura details`);
+            if (S.nonNegPhysical || S.nonNegAesthetic) parts.push('non-negotiables ✓');
+            return parts.length ? parts.join(' · ') : 'Your aura, therapy notes & non-negotiables';
+          })()}</div>
+        </div>
+        <div style="font-size:18px;color:var(--text-3);">›</div>
+      </button>
     </div>
 
     <!-- 📦 Past Looks + 🌹 Memorial Garden — grouped as "Looking Back" -->
@@ -11746,16 +11686,10 @@ function saveNonNeg(field, localKey) {
   toast('Saved');
 }
 
-function viewNonNegotiables() {
+// Body-only — composed into the combined Personal Details page
+function nonNegBodyHTML() {
   const hasSomething = S.nonNegPhysical || S.nonNegAesthetic;
-  return `<div class="view">
-    <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">‹</button>
-      <span class="nav-title">🚫 My Non-Negotiables</span>
-      <div style="width:40px;"></div>
-    </div>
-
-    <div style="padding:16px;">
+  return `<div style="padding:16px;">
 
       <!-- Intro -->
       <div style="background:linear-gradient(135deg,rgba(255,193,7,0.08),rgba(255,152,0,0.06));border:1.5px solid rgba(255,193,7,0.25);border-radius:16px;padding:16px 16px 14px;margin-bottom:20px;">
@@ -11799,7 +11733,31 @@ function viewNonNegotiables() {
 
       ${hasSomething ? '' : `<div style="font-size:12px;color:var(--text-3);text-align:center;line-height:1.5;">You can update this any time. Knowing yourself is part of the work.</div>`}
 
+    </div>`;
+}
+
+// ── Personal Details — combined single page: Aura fields + Non-Negotiables ───
+function viewPersonalDetails() {
+  return `<div class="view">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">‹</button>
+      <span class="nav-title">👤 Personal Details</span>
+      <div style="width:40px;"></div>
     </div>
+
+    <div style="padding:16px 16px 0;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">✨ Your Aura</div>
+    </div>
+    ${auraBodyHTML()}
+
+    <div style="height:1px;background:var(--border);margin:24px 16px 8px;"></div>
+
+    <div style="padding:16px 16px 0;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">🚫 My Non-Negotiables</div>
+    </div>
+    ${nonNegBodyHTML()}
+
+    <div style="height:40px;"></div>
   </div>`;
 }
 
@@ -12120,7 +12078,8 @@ function viewTherapySessionEdit() {
 /* ================================================================
    VIEW: AURA
    ================================================================ */
-function viewAura() {
+// Body-only — composed into the combined Personal Details page
+function auraBodyHTML() {
   const auraFieldHTML = (fieldKey, localKey, icon, label, placeholder, stateVal) => {
     const isEditing = S._auraEdit === fieldKey;
     const id = `aura-${fieldKey}`;
@@ -12156,14 +12115,7 @@ function viewAura() {
   ].filter(v => v && v.trim()).length;
   const total = 10;
 
-  return `<div class="view">
-    <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')">‹</button>
-      <span class="nav-title">✨ Your Aura</span>
-      <div style="width:40px;"></div>
-    </div>
-
-    <div style="padding:16px 16px 0;">
+  return `<div style="padding:16px 16px 0;">
       <div style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:6px;">
         The personal details that complete your style picture — for Claude to give you the most tailored advice.
       </div>
@@ -12230,10 +12182,7 @@ function viewAura() {
             style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">Edit in Settings →</button>
         </div>`;
       })()}
-    </div>
-
-    <div style="height:40px;"></div>
-  </div>`;
+    </div>`;
 }
 
 /* ================================================================
@@ -13192,6 +13141,18 @@ function _rdEnd() {
   }
   render();
 }
+// Debounced wardrobe search — re-renders with scroll preserved so the page
+// (and Safari's URL bar) doesn't jump on every keystroke.
+function wardrobeSearchInput(v) {
+  S.wardrobeSearch = v;
+  clearTimeout(window._wsDebounce);
+  window._wsDebounce = setTimeout(() => {
+    if (S.view !== 'wardrobe') return;
+    const scroll = _saveWardrobeScroll();
+    render();
+    _restoreWardrobeScroll(scroll); // synchronous — restored before the next paint
+  }, 280);
+}
 // Save scroll position of all rod-track containers + window Y
 function _saveWardrobeScroll() {
   return {
@@ -13459,7 +13420,7 @@ function viewWardrobe() {
           onclick="event.stopPropagation();confirmDeleteCustomShelf(${JSON.stringify(c)})"
           style="font-size:11px;line-height:1;opacity:${active?'0.75':'0.45'};padding:0 0 0 3px;cursor:pointer;touch-action:manipulation;" title="Delete shelf">✕</span>` : '';
         return `<div class="filter-chip ${active?'active':''} ${empty?'filter-chip-empty':''}" style="${isCustom?'border-style:dashed;':''}display:inline-flex;align-items:center;gap:2px;"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'&&!S._wardrobeHeroFilter?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;renderRAF()"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;renderRAF()"
           onclick="S._wardrobeHeroFilter=false;S._wardrobeMaybePileFilter=false;S.wardrobeTailoringFilter=false;S.wardrobeCategory=(S.wardrobeCategory==='${c}'?'All':'${c}');S.wardrobeSubCategory='All';S.wardrobeExpanded=false;S._addingShelf=false;render()">${c}${badge}${deleteX}</div>`;
       }).join('')}
       ${(() => {
@@ -13552,27 +13513,28 @@ function viewWardrobe() {
   const _colorSortLabel  = S.wardrobeSort === 'color-desc' ? '🌈 Rainbow ↩' : '🌈 Rainbow';
   const _colorNextSort   = S.wardrobeSort === 'color-asc' ? 'color-desc' : 'color-asc';
   const sortBar = S.wardrobe.length > 1 ? `
-    <div style="padding:0 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-      <div class="filter-chip ${S.wardrobeSort==='smart'?'active':''}"
+    <div style="margin:2px 16px 10px;padding-top:9px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+      <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);flex-shrink:0;margin-right:2px;">Sort</span>
+      <div class="sort-chip ${S.wardrobeSort==='smart'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='smart';render()"
         onclick="S.wardrobeSort='smart';render()">✨ Smart</div>
-      <div class="filter-chip ${S.wardrobeSort==='newest'?'active':''}"
+      <div class="sort-chip ${S.wardrobeSort==='newest'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='newest';render()"
         onclick="S.wardrobeSort='newest';render()">Newest</div>
-      <div class="filter-chip ${S.wardrobeSort==='most-worn'?'active':''}"
+      <div class="sort-chip ${S.wardrobeSort==='most-worn'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='most-worn';render()"
         onclick="S.wardrobeSort='most-worn';render()">Most Worn</div>
-      <div class="filter-chip ${S.wardrobeSort==='recent-worn'?'active':''}"
+      <div class="sort-chip ${S.wardrobeSort==='recent-worn'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='recent-worn';render()"
         onclick="S.wardrobeSort='recent-worn';render()">🕐 Recently Worn</div>
 
-      <div class="filter-chip ${_colorSortActive?'active':''}"
+      <div class="sort-chip ${_colorSortActive?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort=(S.wardrobeSort==='color-asc')?'color-desc':'color-asc';render()"
         onclick="S.wardrobeSort=(S.wardrobeSort==='color-asc')?'color-desc':'color-asc';render()">${_colorSortLabel}</div>
-      <div class="filter-chip ${S.wardrobeSort==='az'?'active':''}"
+      <div class="sort-chip ${S.wardrobeSort==='az'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S.wardrobeSort='az';render()"
         onclick="S.wardrobeSort='az';render()">A–Z</div>
-      <div class="filter-chip ${S.wardrobeSort==='custom'||S._wardrobeReorderMode?'active':''}"
+      <div class="sort-chip ${S.wardrobeSort==='custom'||S._wardrobeReorderMode?'active':''}"
         style="${S._wardrobeReorderMode?'background:#9B7FE0;border-color:#9B7FE0;color:#fff;':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeReorderMode=!S._wardrobeReorderMode;if(S._wardrobeReorderMode){S.wardrobeSort='custom';}render()"
         onclick="S._wardrobeReorderMode=!S._wardrobeReorderMode;if(S._wardrobeReorderMode){S.wardrobeSort='custom';}render()">⇄ Reorder</div>
@@ -13698,7 +13660,7 @@ function viewWardrobe() {
         <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();S._wardrobeSearchOpen=false;S.wardrobeSearch='';render()" onclick="S._wardrobeSearchOpen=false;S.wardrobeSearch='';render()" style="touch-action:manipulation;">✕</button>
         <input id="wardrobe-search-input" type="search" value="${esc(S.wardrobeSearch)}"
           placeholder="Brand, name, category…"
-          oninput="S.wardrobeSearch=this.value;clearTimeout(window._wsDebounce);window._wsDebounce=setTimeout(()=>render(),280);"
+          oninput="wardrobeSearchInput(this.value)"
           style="flex:1;border:none;background:transparent;font-size:15px;color:var(--text);outline:none;padding:0 6px;font-family:inherit;min-width:0;">
         <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('new-piece')" onclick="navigate('new-piece')" title="New Piece" style="background:none;border:none;cursor:pointer;width:33px;height:33px;display:flex;align-items:center;justify-content:center;color:var(--gold-dk,#8a5e1c);touch-action:manipulation;line-height:0;flex-shrink:0;">
           ${iconPlus()}
@@ -14343,13 +14305,6 @@ function viewOnboarding() {
               <div style="font-size:10px;color:rgba(255,255,255,.5);line-height:1.4;">Upload two looks — Claude picks a winner</div>
             </div>
             <div style="background:rgba(220,50,50,.75);border-radius:100px;padding:5px 12px;font-size:10px;font-weight:800;color:#fff;white-space:nowrap;">Start →</div>
-          </div>
-          <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px;">
-            <div style="font-size:28px;line-height:1;flex-shrink:0;">🌟</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px;">Claude Compliments</div>
-              <div style="font-size:10px;color:var(--text-3);line-height:1.4;">Something genuinely nice about your style</div>
-            </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:11px 12px;text-align:center;">
