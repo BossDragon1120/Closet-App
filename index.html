@@ -15488,6 +15488,15 @@ function viewRatingSummary() {
 /* ================================================================
    VIEW: WARDROBE ITEM DETAIL
    ================================================================ */
+// Where the wardrobe-item Back button should land: the view the user came
+// from — unless that view is a child of the item page itself (outfit-builder),
+// which would create an endless item ↔ builder back-and-forth loop.
+function wardrobeItemBackTarget() {
+  const p = S._prevView;
+  if (p && p !== 'wardrobe-item' && p !== 'outfit-builder') return p;
+  return S.activeTab || 'wardrobe';
+}
+
 function viewWardrobeItem() {
   const w = S.wardrobe.find(i => i.id === S.selectedWardrobeId);
   if (!w) { navigate('wardrobe'); return ''; }
@@ -15510,7 +15519,7 @@ function viewWardrobeItem() {
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(S._prevView&&S._prevView!=='wardrobe-item'?S._prevView:(S.activeTab||'wardrobe'))" onclick="navigate(S._prevView&&S._prevView!=='wardrobe-item'?S._prevView:(S.activeTab||'wardrobe'))">${iconBack()} ${(()=>{const _bv=S._prevView&&S._prevView!=='wardrobe-item'?S._prevView:(S.activeTab||'wardrobe');return {profile:'Portfolio',plan:'Plan',shop:'Shop',closet:'Fits',home:'Home',wardrobe:'Wardrobe'}[_bv]||'Back';})()}</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(wardrobeItemBackTarget())" onclick="navigate(wardrobeItemBackTarget())">${iconBack()} ${(()=>{const _bv=wardrobeItemBackTarget();return {profile:'Portfolio',plan:'Plan',shop:'Shop',closet:'Fits',home:'Home',wardrobe:'Wardrobe'}[_bv]||'Back';})()}</button>
       <span class="nav-title"></span>
       <div style="display:flex;align-items:center;gap:2px;">
         <button class="nav-btn" ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witem-edit-section')?.scrollIntoView({behavior:'smooth',block:'start'})" onclick="document.getElementById('witem-edit-section')?.scrollIntoView({behavior:'smooth',block:'start'})" title="Edit details" style="touch-action:manipulation;">
