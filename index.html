@@ -3056,7 +3056,7 @@ const S = {
   nonNegAesthetic:    localStorage.getItem('closet-non-neg-aesthetic')   || '',
   bulkAutoIdentify:   localStorage.getItem('closet-bulk-auto-id') === 'true',
   memorialFlow:       null,   // { id, note, photo, mime } — inline memorial editor
-  eulogyPolishing:    false,  // true while Claude is rewriting the eulogy
+  eulogyPolishing:    false,  // true while Closet is rewriting the eulogy
   weatherPin:         JSON.parse(localStorage.getItem('closet-weather-pin') || 'null'),
   _weatherPinLoading: false,
   // What's Hot trends
@@ -3341,7 +3341,7 @@ async function analyzeOutfit(photoBase64, mime, occasion, isFriend = false, frie
       ].filter(Boolean).join(', ');
   // Build a compact wardrobe summary so Claude knows what's already owned (own outfits only)
   const wardrobeSummary = (!isFriend && S.wardrobe.filter(w => !w.retiredFromCloset).length > 0)
-    ? '\nWARDROBE — items already owned (DO NOT recommend purchasing these):\n' +
+    ? '\nWARDROBE — items already owned. CRITICAL ASSUMPTION: treat items visible in the photo as very likely being the SAME items from this wardrobe list — the wearer is almost certainly dressed in their own clothes. Do NOT recommend purchasing any of these, and do NOT suggest swapping a visible item for a wardrobe item of the same type (they are the same object):\n' +
       S.wardrobe.filter(w => !w.retiredFromCloset).slice(0, 40)
         .map(w => `• ${w.icon||'👕'} ${w.name}${w.brand ? ' by '+w.brand : ''}${w.category ? ' ['+w.category+']' : ''}`)
         .join('\n') + '\n'
@@ -3424,8 +3424,8 @@ MANDATORY rules — violating any of these makes the response unusable:
 • Item names must be specific: "Ivory Linen Wide-Leg Trouser" not "pants"
 • Pick an accurate emoji icon per item
 • Use the SCORING CRITERIA from the user message — do not fall back to generic fashion scoring when an occasion is provided
-• "stylingTips": 1–3 actionable tips using items they ALREADY OWN (tucking, swapping a logged wardrobe piece, adjusting proportions, etc.) — never suggest buying something here. In a two-person battle, base tips on general styling only, not the primary user's owned wardrobe.
-• "purchaseRecs": 1–3 items NOT in their wardrobe that would visibly elevate this outfit. Each entry must have "item" (specific name), "reason" (one sentence), and "query" (retail search term). Price tier and blocked categories are specified in the user message. CRITICAL: never recommend any item that is already visible in the photo — if it appears in the "items" array of your response, the person is already wearing it and likely owns it. Only suggest pieces that are entirely absent from the outfit.
+• "stylingTips": 1–3 actionable tips using items they ALREADY OWN (tucking, swapping a logged wardrobe piece, adjusting proportions, etc.) — never suggest buying something here. CRITICAL CROSS-CHECK: before suggesting any swap, compare the items visible in the photo against the wardrobe list. If a visible item (e.g. "white bag") closely matches a wardrobe item (e.g. "White Leather Bag"), they are almost certainly the SAME item — never tell the user to swap the item they're wearing for what is obviously the same thing they already have on. Only suggest a wardrobe swap when the wardrobe item is clearly DIFFERENT from what's in the photo. In a two-person battle, base tips on general styling only, not the primary user's owned wardrobe.
+• "purchaseRecs": 1–3 items NOT in their wardrobe that would visibly elevate this outfit. Each entry must have "item" (specific name), "reason" (one sentence), and "query" (retail search term). Price tier and blocked categories are specified in the user message. CRITICAL: never recommend any item that is already visible in the photo — if it appears in the "items" array of your response, the person is already wearing it and almost certainly owns it. Cross-check the "items" array against the wardrobe list above — a match in color + type means it IS that wardrobe item. Only suggest pieces that are entirely absent from the outfit.
 • "suggestedOccasion": Pick the single best-matching tag from the occasion list in the user message. Return exactly one tag from that list.
 ${goalsLine ? '• If STYLE GOALS are provided above AND exactly one person is in the photo ("battle": false), weave a brief, specific reference to them into "ratingNote" (e.g. "leans into your Quiet Luxury goal" or "fights your Minimalist goal with all the print mixing") — don\'t force it if genuinely irrelevant. NEVER reference style goals in a two-person battle.\n' : ''}• Output ONLY the JSON object — no text before or after, no code fences`;
 
@@ -4441,7 +4441,7 @@ async function fetchNewsFlash() {
   const raw = (data.content?.[0]?.text || '').trim();
   const clean = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
   const jsonMatch = clean.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Could not parse trend from Claude response');
+  if (!jsonMatch) throw new Error('Could not parse trend from Closet response');
   return { ...JSON.parse(jsonMatch[0]), url: null, thumbnail: null, fetchedAt: Date.now() };
 }
 
@@ -4705,9 +4705,9 @@ function featuresMenuHTML() {
     {
       title: 'Portfolio',
       items: [
-        { icon: '✦', text: '<strong>AI Style Portrait</strong> — Claude writes a personal headline and style description based on your outfits, wardrobe, and vibe words. Share or refresh anytime as your taste evolves.' },
+        { icon: '✦', text: '<strong>AI Style Portrait</strong> — Closet writes a personal headline and style description based on your outfits, wardrobe, and vibe words. Share or refresh anytime as your taste evolves.' },
         { icon: '📖', text: '<strong>Style Playbook</strong> — A living guide to your personal style: your aesthetic identity, what works, what to build next, and how to shop smarter.' },
-        { icon: '✨', text: '<strong>Your Aura</strong> — Personal details (height, eye colour, scent, personality type, nail colour, hairstyle) that help Claude give you the most tailored advice possible.' },
+        { icon: '✨', text: '<strong>Your Details</strong> — Personal details (height, eye colour, scent, personality type, nail colour, hairstyle) that help Closet give you the most tailored advice possible.' },
         { icon: '⭐', text: '<strong>Best Outfits</strong> — All your 8+ rated looks in a swipeable carousel, alongside your 💎 Gem Pieces in a gold-accented showcase.' },
         { icon: '📈', text: '<strong>Score &amp; Confidence History</strong> — Tap your Style Score or Confidence tile to see trend graphs of how your numbers have moved over time.' },
         { icon: '🗓', text: '<strong>Streak Calendar</strong> — Tap your day streak tile to open a full calendar of your outfit logging history.' },
@@ -4716,23 +4716,23 @@ function featuresMenuHTML() {
     {
       title: 'Fits & Outfit Journal',
       items: [
-        { icon: '📸', text: '<strong>AI Style Rating</strong> — Upload any outfit photo and get an instant 1–10 score with detailed, honest feedback from Claude.' },
-        { icon: '🎯', text: '<strong>Occasion-Aware Scoring</strong> — Tell Claude the context before analysis. A gym look scores differently from a cocktail event.' },
+        { icon: '📸', text: '<strong>AI Style Rating</strong> — Upload any outfit photo and get an instant 1–10 score with detailed, honest feedback from Closet.' },
+        { icon: '🎯', text: '<strong>Occasion-Aware Scoring</strong> — Tell Closet the context before analysis. A gym look scores differently from a cocktail event.' },
         { icon: '💪', text: '<strong>Confidence Score</strong> — Log how confident you felt alongside your style rating.' },
         { icon: '⚡', text: '<strong>Rate Mode</strong> — Rapid-fire swipe sessions to rate how every wardrobe piece makes you feel right now. Low scores trigger a Sell It prompt.' },
         { icon: '👗', text: '<strong>Dress Me</strong> — Get a complete outfit for any occasion built from your actual closet, with a save option for looks you love.' },
         { icon: '📝', text: '<strong>Auto Occasion Tagging</strong> — Outfits are tagged by occasion from your notes automatically if you skip the picker.' },
-        { icon: '🔗', text: '<strong>Item Linking Wizard</strong> — After a fit check, Claude walks you through identifying each item in your photo and linking it to your wardrobe.' },
-        { icon: '🪄', text: '<strong>Style it With…</strong> — Tap any outfit item and Claude suggests what to pair it with from your wardrobe.' },
+        { icon: '🔗', text: '<strong>Item Linking Wizard</strong> — After a fit check, Closet walks you through identifying each item in your photo and linking it to your wardrobe.' },
+        { icon: '🪄', text: '<strong>Style it With…</strong> — Tap any outfit item and Closet suggests what to pair it with from your wardrobe.' },
         { icon: '💌', text: '<strong>Share Your Look</strong> — Share any outfit entry as a styled photo card with your rating and notes included.' },
       ],
     },
     {
       title: 'Closet & Wardrobe',
       items: [
-        { icon: '📷', text: '<strong>Add from Photo</strong> — Snap your new piece and Claude identifies it, suggests a name, category, brand, and icon automatically.' },
-        { icon: '📧', text: '<strong>Add from Receipt</strong> — Screenshot a shopping confirmation and Claude parses it into a wardrobe entry in seconds.' },
-        { icon: '📦', text: '<strong>Bulk Photo Upload</strong> — Import multiple pieces at once from your camera roll — Claude analyses each one individually.' },
+        { icon: '📷', text: '<strong>Add from Photo</strong> — Snap your new piece and Closet identifies it, suggests a name, category, brand, and icon automatically.' },
+        { icon: '📧', text: '<strong>Add from Receipt</strong> — Screenshot a shopping confirmation and Closet parses it into a wardrobe entry in seconds.' },
+        { icon: '📦', text: '<strong>Bulk Photo Upload</strong> — Import multiple pieces at once from your camera roll — Closet analyses each one individually.' },
         { icon: '💸', text: '<strong>Cost per Wear</strong> — Track what you paid and watch your cost-per-wear shrink as you wear each piece more.' },
         { icon: '💎', text: '<strong>Gems</strong> — Mark the pieces that are unmistakably you. Your Gems shine in your Portfolio carousel and get a 💎 badge in your wardrobe.', action: `S.featureMenuOpen=false;switchTab('wardrobe')` },
         { icon: '💝', text: '<strong>Gifted Items</strong> — Mark pieces as gifts, note the gifter, and send them a note when you first wear it.' },
@@ -4740,8 +4740,8 @@ function featuresMenuHTML() {
         { icon: '📦', text: '<strong>Retire & Memorial Garden</strong> — Log when pieces leave your closet. Beloved pieces can be memorialised with a photo and a eulogy.' },
         { icon: '🔍', text: '<strong>Wardrobe Search</strong> — Search across all your pieces by name, brand, or category instantly.' },
         { icon: '🎨', text: '<strong>Colour Stripes</strong> — Each wardrobe card picks up the piece\'s colour for fast visual scanning.' },
-        { icon: '🔮', text: '<strong>Hidden Gems</strong> — Claude surfaces owned-but-neglected pieces worth rediscovering and offers a restyle tip to bring them back.' },
-        { icon: '💰', text: '<strong>Sell It</strong> — When a piece rates consistently low, Claude writes a Poshmark-ready listing for it in seconds.' },
+        { icon: '🔮', text: '<strong>Hidden Gems</strong> — Closet surfaces owned-but-neglected pieces worth rediscovering and offers a restyle tip to bring them back.' },
+        { icon: '💰', text: '<strong>Sell It</strong> — When a piece rates consistently low, Closet writes a Poshmark-ready listing for it in seconds.' },
       ],
     },
     {
@@ -4749,27 +4749,27 @@ function featuresMenuHTML() {
       items: [
         { icon: '✨', text: '<strong>AI Outfit Ideas</strong> — Describe an event and get personalised outfit suggestions drawn from your actual wardrobe.' },
         { icon: '🌤', text: '<strong>Weather-Aware</strong> — Suggestions factor in today\'s forecast so you\'re never under- or over-dressed.' },
-        { icon: '🧩', text: '<strong>Outfit Builder</strong> — Pick any wardrobe piece and Claude builds a complete look around it.' },
-        { icon: '🎲', text: '<strong>Style Roulette</strong> — Can\'t decide what to wear? Let Claude spin a surprise outfit from your wardrobe — a different pick every time.' },
-        { icon: '🗓', text: '<strong>Trip Packing</strong> — Tell Claude where you\'re going and for how long. It builds a day-by-day packing list from what you already own.' },
+        { icon: '🧩', text: '<strong>Outfit Builder</strong> — Pick any wardrobe piece and Closet builds a complete look around it.' },
+        { icon: '🎲', text: '<strong>Style Roulette</strong> — Can\'t decide what to wear? Let Closet spin a surprise outfit from your wardrobe — a different pick every time.' },
+        { icon: '🗓', text: '<strong>Trip Packing</strong> — Tell Closet where you\'re going and for how long. It builds a day-by-day packing list from what you already own.' },
         { icon: '💾', text: '<strong>Save Everything</strong> — Save any AI-built outfit, Dress Me result, Roulette spin, or Trip Plan to your Plan page for later.' },
       ],
     },
     {
       title: 'Shop & Wish List',
       items: [
-        { icon: '🛍', text: '<strong>AI Gap Analysis</strong> — Claude studies your wardrobe and surfaces only what\'s missing — pieces that would unlock more of your existing outfits.' },
+        { icon: '🛍', text: '<strong>AI Gap Analysis</strong> — Closet studies your wardrobe and surfaces only what\'s missing — pieces that would unlock more of your existing outfits.' },
         { icon: '💛', text: '<strong>Wish List</strong> — Save pieces you\'re considering and share your curated list with friends or gift-givers.' },
         { icon: '🔗', text: '<strong>Live Search Links</strong> — Each recommendation links directly to real product results so you can shop immediately.' },
-        { icon: '💰', text: '<strong>Budget Mode</strong> — Tell Claude your current budget mood and it adjusts from splurge-worthy to budget-savvy.' },
+        { icon: '💰', text: '<strong>Budget Mode</strong> — Tell Closet your current budget mood and it adjusts from splurge-worthy to budget-savvy.' },
       ],
     },
     {
       title: 'Evolve',
       items: [
         { icon: '🎯', text: '<strong>Style Goals</strong> — Set personal fashion goals (e.g. More Feminine, Quiet Luxury, Punk Edge) and every Evolve feature bends toward helping you get there.' },
-        { icon: '🔥', text: '<strong>Trend Reports</strong> — Claude curates the top fashion trends each week, filtered toward your style goals with tips on how to wear them.' },
-        { icon: '💓', text: '<strong>Wardrobe Pulse</strong> — Claude reads your closet and surfaces which pieces are rising and which are fading — with actionable restyle tips.' },
+        { icon: '🔥', text: '<strong>Trend Reports</strong> — Closet curates the top fashion trends each week, filtered toward your style goals with tips on how to wear them.' },
+        { icon: '💓', text: '<strong>Wardrobe Pulse</strong> — Closet reads your closet and surfaces which pieces are rising and which are fading — with actionable restyle tips.' },
         { icon: '🏷️', text: '<strong>Brand Discovery</strong> — AI-curated brand recommendations tailored to your style goals, budget, and aesthetic.' },
         { icon: '💡', text: '<strong>Styling Tips</strong> — Personalised style advice generated from your wardrobe and aesthetic, saved for you to revisit anytime.' },
         { icon: '♥', text: '<strong>Saved Trends</strong> — Heart any trend to save it. Your saved trends live in a dedicated section you can revisit anytime.' },
@@ -4781,8 +4781,8 @@ function featuresMenuHTML() {
         { icon: '⚔️', text: '<strong>Fashion Battle</strong> — Upload a photo with two people and get a head-to-head verdict on who wore it best. Results shared as a full scorecard card.' },
         { icon: '👯', text: '<strong>Friend\'s Fit Check</strong> — Rate a friend\'s outfit instantly — honest, fun, and never saved to your journal.' },
         { icon: '💌', text: '<strong>Thank Someone</strong> — All the pieces you\'ve received as gifts in one place. Send a heartfelt note to the people who gave them to you.' },
-        { icon: '🥂', text: '<strong>Outfit × Drink Pairing</strong> — Pick an outfit and Claude suggests the perfect drink to have while wearing it (NA option included).' },
-        { icon: '📚', text: '<strong>Outfit × Book Pairing</strong> — Pick an outfit and Claude finds the book you should be reading while wearing it.' },
+        { icon: '🥂', text: '<strong>Outfit × Drink Pairing</strong> — Pick an outfit and Closet suggests the perfect drink to have while wearing it (NA option included).' },
+        { icon: '📚', text: '<strong>Outfit × Book Pairing</strong> — Pick an outfit and Closet finds the book you should be reading while wearing it.' },
       ],
     },
     {
@@ -4799,8 +4799,8 @@ function featuresMenuHTML() {
     {
       title: 'Customise Your Experience',
       items: [
-        { icon: '🎨', text: '<strong>Your Style Words</strong> — Pick the aesthetic descriptors that feel like you (Minimal, Classic, Bold…) in Settings. Claude uses these to personalise everything.' },
-        { icon: '✨', text: '<strong>Your Aura</strong> — Fill in your physical and personal details for hyper-tailored Claude recommendations.' },
+        { icon: '🎨', text: '<strong>Your Style Words</strong> — Pick the aesthetic descriptors that feel like you (Minimal, Classic, Bold…) in Settings. Closet uses these to personalise everything.' },
+        { icon: '✨', text: '<strong>Your Details</strong> — Fill in your physical and personal details for hyper-tailored Closet recommendations.' },
         { icon: '🎭', text: '<strong>Custom Occasions</strong> — Edit your occasion list in Settings — add, remove, or reset to defaults. Your life, your categories.' },
         { icon: '🌸', text: '<strong>Cycle Sync</strong> — Optionally track your cycle phase for pattern awareness in your outfit calendar.' },
         { icon: '🌙', text: '<strong>Dark Mode</strong> — Toggle between light and dark in Settings.' },
@@ -4811,7 +4811,7 @@ function featuresMenuHTML() {
       items: [
         { icon: '☁️', text: '<strong>Cloud Sync</strong> — Your outfit journal and wardrobe metadata sync securely to your personal Firebase account so your data is never lost.' },
         { icon: '📱', text: '<strong>Photos Stay Local</strong> — Outfit and wardrobe photos are stored on your device only — they\'re never uploaded to the cloud.' },
-        { icon: '🔑', text: '<strong>Your Own API Key</strong> — You connect directly to Claude with your own Anthropic key — no middleman, no subscription on top.' },
+        { icon: '🔑', text: '<strong>Your Own API Key</strong> — You connect directly to Closet with your own Anthropic key — no middleman, no subscription on top.' },
       ],
     },
   ];
@@ -5760,7 +5760,7 @@ function viewOutfitBuilder() {
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;padding:20px;text-align:center;">
         <div style="font-size:48px;">✨</div>
         <div style="font-size:17px;font-weight:800;color:var(--text);">Styling your look…</div>
-        <div style="font-size:13px;color:var(--text-3);line-height:1.5;">Claude is browsing your closet and putting together something great.</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.5;">Closet is browsing your closet and putting together something great.</div>
       </div>
     </div>`;
   }
@@ -5807,7 +5807,7 @@ function viewOutfitBuilder() {
     <!-- Wardrobe count note -->
     <div style="padding:20px 20px 0;">
       <p style="font-size:12px;color:var(--text-3);margin:0;line-height:1.5;">
-        Claude will browse your ${S.wardrobe.filter(wi => !wi.retiredFromCloset && wi.id !== w.id).length} other wardrobe pieces and pick what works best${ob.occasion ? ` for ${ob.occasion.toLowerCase()}` : ''}.
+        Closet will browse your ${S.wardrobe.filter(wi => !wi.retiredFromCloset && wi.id !== w.id).length} other wardrobe pieces and pick what works best${ob.occasion ? ` for ${ob.occasion.toLowerCase()}` : ''}.
       </p>
     </div>
 
@@ -5831,7 +5831,7 @@ function viewOutfitBuilder() {
 async function doOutfitBuild() {
   const ob = S.outfitBuilder;
   if (!ob) return;
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
 
   const anchor = S.wardrobe.find(i => i.id === ob.wardrobeId);
   if (!anchor) return;
@@ -6185,7 +6185,6 @@ function render() {
     case 'bulk-add':     html = viewBulkAdd();      break;
     case 'onboarding':   html = viewOnboarding();   break;
     case 'local':        html = viewLocal();        break;
-    case 'returns':      html = viewReturns();      break;
     case 'fun':          html = viewFun();          break;
     case 'thanked-log':   html = viewThankedLog();   break;
     case 'hot':               navigate('home'); return; // merged into Discover trends
@@ -6212,7 +6211,7 @@ function render() {
     html = html.replace(/<div class="nav">[\s\S]*?<\/div>/, m => m + tabBarHTML());
   }
   if (S.loading) {
-    html += `<div class="loading-overlay"><div class="spinner"></div><h3>${esc(S.loadingMsg)}</h3><p>Sit tight — Claude is on it</p></div>`;
+    html += `<div class="loading-overlay"><div class="spinner"></div><h3>${esc(S.loadingMsg)}</h3><p>Sit tight — Closet is on it</p></div>`;
   }
   if (TAB_VIEWS.has(S.view) && !isNotabForm) html += bottomBarHTML();
   if (S.featureMenuOpen) html += featuresMenuHTML();
@@ -6592,221 +6591,13 @@ function viewLocal() {
   </div>`;
 }
 
-/* ================================================================
-   VIEW: RETURNS — Track items you need to return
-   ================================================================ */
-function viewReturns() {
-  const rf = S._returnForm;
-
-  // ── Countdown helpers ──────────────────────────────────────
-  const today = new Date(); today.setHours(0,0,0,0);
-  function daysLeft(deadline) {
-    if (!deadline) return null;
-    const d = new Date(deadline + 'T23:59:59');
-    return Math.ceil((d - today) / 86400000);
-  }
-  function returnUrgency(dl) {
-    if (dl === null) return 'none';
-    if (dl < 0)  return 'expired';
-    if (dl <= 2) return 'urgent';
-    if (dl <= 6) return 'soon';
-    return 'ok';
-  }
-  const urgencyColor  = { expired:'#DC2626', urgent:'#DC2626', soon:'#D97706', ok:'#16A34A', none:'var(--text-3)' };
-  const urgencyBg     = { expired:'#FEF2F2', urgent:'#FEF2F2', soon:'#FFFBEB', ok:'#F0FDF4', none:'var(--surface)' };
-  const urgencyBorder = { expired:'#FCA5A5', urgent:'#FCA5A5', soon:'#FCD34D', ok:'#86EFAC', none:'var(--border)' };
-
-  const returnsWithDays = (S.returnItems || []).map(r => ({ ...r, dl: daysLeft(r.deadline) }))
-    .sort((a,b) => (a.dl??999) - (b.dl??999));
-
-  // ── Return form ────────────────────────────────────────────
-  if (rf) {
-    return `<div class="view view-notab">
-      <div class="nav">
-        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();S._returnForm=null;render()" onclick="S._returnForm=null;render()">${iconBack()} Back</button>
-        <span class="nav-title">${rf.id ? 'Edit Return' : 'New Return'}</span>
-        <div style="width:72px"></div>
-      </div>
-      <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding:16px 16px 100px;">
-        <div style="margin-bottom:20px;">
-          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Photo <span style="font-weight:400;text-transform:none;">(optional)</span></div>
-          <label style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1.5px dashed var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;touch-action:manipulation;">
-            ${rf.photo
-              ? `<img src="${rf.photo}" style="width:64px;height:64px;object-fit:cover;border-radius:10px;flex-shrink:0;">`
-              : `<div style="width:64px;height:64px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">📸</div>`}
-            <div style="flex:1;">
-              <div style="font-size:13px;font-weight:700;color:var(--text);">${rf.photo ? 'Change photo' : 'Add a photo'}</div>
-              <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Helps you remember what to bring back</div>
-            </div>
-            <input type="file" accept="image/*" style="display:none;" onchange="uploadReturnPhoto(this)">
-          </label>
-          ${rf.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();S._returnForm.photo=null;render()" onclick="S._returnForm.photo=null;render()" style="margin-top:6px;background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Remove photo</button>` : ''}
-        </div>
-        <div class="form-group">
-          <label class="form-label">Item Name *</label>
-          <input class="form-input" placeholder='e.g. Black blazer' value="${esc(rf.name||'')}" oninput="S._returnForm.name=this.value">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Store *</label>
-          <input class="form-input" placeholder='e.g. Zara, ASOS, Nordstrom' value="${esc(rf.store||'')}" oninput="S._returnForm.store=this.value">
-        </div>
-        <div class="form-group">
-          <label class="form-label">How to return</label>
-          <div style="display:flex;gap:8px;margin-top:4px;">
-            ${['online','in-store'].map(ch=>`
-              <button
-                ontouchend="if(_touchMoved)return;event.preventDefault();S._returnForm.channel='${ch}';render()"
-                onclick="S._returnForm.channel='${ch}';render()"
-                style="flex:1;padding:10px 0;border-radius:var(--r-sm);border:${rf.channel===ch?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${rf.channel===ch?'var(--gold-bg)':'var(--surface)'};font-size:13px;font-weight:${rf.channel===ch?'800':'600'};color:${rf.channel===ch?'var(--gold-dk)':'var(--text-2)'};cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                ${ch==='online'?'🌐 Online':'🏪 In-Store'}
-              </button>`).join('')}
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Return deadline *</label>
-          <input class="form-input" type="date" value="${esc(rf.deadline||'')}" onchange="S._returnForm.deadline=this.value">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Notes <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
-          <input class="form-input" placeholder='e.g. need original tags, receipt in email' value="${esc(rf.notes||'')}" oninput="S._returnForm.notes=this.value">
-        </div>
-        <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();saveReturnItem()" onclick="saveReturnItem()" style="margin:4px 0 0;touch-action:manipulation;">
-          ${rf.id ? '✓ Save Changes' : '🔄 Add Return'}
-        </button>
-      </div>
-    </div>`;
-  }
-
-  // ── Returns list ───────────────────────────────────────────
-  return `<div class="view view-notab">
-    <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();switchTab('shop')" onclick="switchTab('shop')">${iconBack()} Shop</button>
-      <span class="nav-title">Returns</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm()" onclick="openReturnForm()">＋ Add</button>
-    </div>
-    <div style="overflow-y:auto;height:calc(100% - 56px);-webkit-overflow-scrolling:touch;padding:16px 16px 100px;">
-      ${!returnsWithDays.length ? `
-        <div style="padding:40px 0;text-align:center;">
-          <div style="font-size:48px;margin-bottom:16px;">🔄</div>
-          <div style="font-size:18px;font-weight:900;color:var(--text);margin-bottom:8px;">No returns tracked</div>
-          <div style="font-size:13px;color:var(--text-3);line-height:1.6;margin-bottom:24px;">Add items you need to return and get a countdown so you never miss the window.</div>
-          <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm()" onclick="openReturnForm()" style="margin:0;touch-action:manipulation;">+ Add Return</button>
-        </div>` :
-        returnsWithDays.map(r => {
-          const urg = returnUrgency(r.dl);
-          const dlLabel = r.dl === null ? 'No deadline' : r.dl < 0 ? `Expired ${Math.abs(r.dl)}d ago` : r.dl === 0 ? '⚠️ Due today!' : r.dl === 1 ? '⚠️ Due tomorrow!' : `${r.dl} days left`;
-          const fmtDeadline = r.deadline ? new Date(r.deadline+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
-          return `<div style="display:flex;gap:12px;background:${urgencyBg[urg]};border:1.5px solid ${urgencyBorder[urg]};border-radius:16px;padding:12px;margin-bottom:10px;">
-            <div style="width:58px;height:72px;border-radius:10px;overflow:hidden;background:var(--surface);border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-              ${r.photo?`<img src="${r.photo}" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:24px;">🛍</span>`}
-            </div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:2px;">${esc(r.name||'Unnamed item')}</div>
-              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px;">${esc(r.store||'')}${r.channel?` · ${r.channel==='online'?'🌐 Online':'🏪 In-store'}`:''}</div>
-              <div style="font-size:13px;font-weight:800;color:${urgencyColor[urg]};margin-bottom:${r.notes?'4':'8'}px;">${dlLabel}${fmtDeadline?' · '+fmtDeadline:''}</div>
-              ${r.notes?`<div style="font-size:11px;color:var(--text-3);margin-bottom:8px;line-height:1.4;">${esc(r.notes)}</div>`:''}
-              <div style="display:flex;gap:6px;">
-                <button ontouchend="if(_touchMoved)return;event.preventDefault();openReturnForm('${r.id}')" onclick="openReturnForm('${r.id}')"
-                  style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">✏️ Edit</button>
-                <button ontouchend="if(_touchMoved)return;event.preventDefault();markReturned('${r.id}')" onclick="markReturned('${r.id}')"
-                  style="flex:1;padding:7px 0;border-radius:var(--r-sm);border:1.5px solid ${urgencyBorder[urg]};background:var(--surface);font-size:12px;font-weight:700;color:#16A34A;cursor:pointer;font-family:inherit;touch-action:manipulation;">✓ Returned</button>
-              </div>
-            </div>
-          </div>`;
-        }).join('')
-      }
-    </div>
-  </div>`;
-}
-
-function openReturnForm(id) {
-  if (id) {
-    const existing = S.returnItems.find(r => r.id === id);
-    S._returnForm = existing ? { ...existing } : null;
-  } else {
-    S._returnForm = { id: null, photo: null, name: '', store: '', channel: 'online', deadline: '', notes: '' };
-  }
-  render();
-}
-
-function saveReturnItem() {
-  const rf = S._returnForm;
-  if (!rf) return;
-  if (!rf.name || !rf.name.trim()) { toast('Please add an item name.'); return; }
-  if (!rf.store || !rf.store.trim()) { toast('Please add the store name.'); return; }
-  if (!rf.deadline) { toast('Please set a return deadline.'); return; }
-  const now = new Date().toISOString();
-  if (rf.id) {
-    const idx = S.returnItems.findIndex(r => r.id === rf.id);
-    if (idx !== -1) S.returnItems[idx] = { ...rf };
-  } else {
-    S.returnItems.unshift({ ...rf, id: uid(), createdAt: now });
-  }
-  localStorage.setItem('closet-return-items', JSON.stringify(S.returnItems));
-  S._returnForm = null;
-  toast(rf.id ? 'Return updated!' : 'Return added!');
-  render();
-}
-
-function deleteReturnItem(id) {
-  S.returnItems = S.returnItems.filter(r => r.id !== id);
-  localStorage.setItem('closet-return-items', JSON.stringify(S.returnItems));
-  render();
-}
-
-function markReturned(id) {
-  // Celebrate first, then delete
-  celebrateReturn();
-  toast('💸 Money back in your pocket!');
-  S.returnItems = S.returnItems.filter(r => r.id !== id);
-  localStorage.setItem('closet-return-items', JSON.stringify(S.returnItems));
-  render();
-}
-
-function celebrateReturn() {
-  const emojis = ['💰','💵','💸','🤑','💴','💶'];
-  const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;';
-  document.body.appendChild(container);
-  const count = 28;
-  for (let i = 0; i < count; i++) {
-    const el = document.createElement('div');
-    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-    const left = 5 + Math.random() * 90; // % across screen
-    const drift = (Math.random() - 0.5) * 80; // px sideways drift
-    const delay = Math.random() * 0.6; // s stagger
-    const dur = 1.1 + Math.random() * 0.7; // s duration
-    const size = 20 + Math.random() * 18; // px font size
-    el.textContent = emoji;
-    el.style.cssText = `
-      position:absolute;
-      left:${left}%;
-      bottom:${10 + Math.random() * 30}%;
-      font-size:${size}px;
-      --drift:${drift}px;
-      animation:emojiPop ${dur}s ease-out ${delay}s forwards;
-      opacity:0;
-    `;
-    container.appendChild(el);
-  }
-  setTimeout(() => container.remove(), 2200);
-}
-
-function uploadReturnPhoto(input) {
-  if (!input.files || !input.files[0]) return;
-  compressImage(input.files[0]).then(({ data }) => {
-    if (!S._returnForm) return;
-    S._returnForm.photo = data;
-    render();
-  }).catch(() => toast('Could not load photo.'));
-}
 
 /* ================================================================
    VIEW: FUN
    ================================================================ */
 
 async function generateRoulette() {
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._funRouletteLoading) return;
   const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
   if (activeWardrobe.length < 3) { toast('Add more wardrobe items first!'); return; }
@@ -6908,7 +6699,7 @@ function openDressMe() {
 function closeDressMe() { navigate('closet'); }
 
 async function generateDressMe() {
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._dressMeLoading) return;
   const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
   if (activeWardrobe.length < 3) { toast('Add more wardrobe items first!'); return; }
@@ -7043,7 +6834,7 @@ function closeSellDraft() {
 async function generateSellDraft(wardrobeId) {
   const w = S.wardrobe.find(i => i.id === wardrobeId);
   if (!w) return;
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); S._sellDraftOpen = false; render(); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); S._sellDraftOpen = false; render(); return; }
   S.sellDraft = { wardrobeId, loading: true };
   render();
 
@@ -7211,7 +7002,7 @@ function _restoreBookCarousel() {
 }
 
 async function generateBookRec(entryId) {
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._funBookLoading) return;
   const entry = S.entries.find(e => e.id === entryId);
   if (!entry) return;
@@ -7298,7 +7089,7 @@ function _restoreDrinkCarousel() {
 }
 
 async function generateDrinkRec(entryId) {
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._funDrinkLoading) return;
   const entry = S.entries.find(e => e.id === entryId);
   if (!entry) return;
@@ -7698,7 +7489,7 @@ function viewFun() {
               <div style="font-size:40px;line-height:1;flex-shrink:0;">⚔️</div>
               <div style="flex:1;">
                 <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:4px;">Fashion Battle</div>
-                <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;">Upload a photo of two people — Claude picks a winner and delivers a head-to-head verdict.</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;">Upload a photo of two people — Closet picks a winner and delivers a head-to-head verdict.</div>
               </div>
             </div>
             <button
@@ -7758,7 +7549,7 @@ function viewFun() {
               <div style="font-size:40px;line-height:1;flex-shrink:0;">🎲</div>
               <div style="flex:1;">
                 <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:4px;">Style Roulette</div>
-                <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;">Can't decide what to wear? Let Claude spin a surprise outfit from your wardrobe — a different pick every time.</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;">Can't decide what to wear? Let Closet spin a surprise outfit from your wardrobe — a different pick every time.</div>
               </div>
             </div>
             <button
@@ -7792,7 +7583,7 @@ function viewFun() {
           <div style="font-size:32px;line-height:1;">🥂</div>
           <div style="flex:1;">
             <div style="font-size:16px;font-weight:800;color:var(--text);">Outfit × Drink Pairing</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Pick an outfit — Claude suggests the perfect drink to have while wearing it.</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Pick an outfit — Closet suggests the perfect drink to have while wearing it.</div>
           </div>
           <!-- NA toggle -->
           <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;">
@@ -7862,7 +7653,7 @@ function viewFun() {
           <div style="font-size:32px;line-height:1;">📚</div>
           <div style="flex:1;">
             <div style="font-size:16px;font-weight:800;color:var(--text);">Outfit × Book Pairing</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Pick an outfit — Claude finds the book you should be reading while wearing it.</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Pick an outfit — Closet finds the book you should be reading while wearing it.</div>
           </div>
         </div>
         ${(()=>{
@@ -8547,7 +8338,7 @@ function viewCloset() {
     : `<div class="empty">
         <div class="empty-icon">👗</div>
         <h2>No Fits Yet</h2>
-        <p>Tap <strong>+ Log Outfit</strong> above to log your first look. Claude will analyze it and give expert style feedback!</p>
+        <p>Tap <strong>+ Log Outfit</strong> above to log your first look. Closet will analyze it and give expert style feedback!</p>
       </div>`;
 
   return `<div class="view">
@@ -8575,7 +8366,7 @@ function viewCloset() {
       const inviteHTML = (activeWardrobeCount >= 3 && !S._dressMeDismissedSession) ? `
         <div style="margin:10px 16px 0;display:flex;align-items:center;gap:10px;padding:12px 14px;background:linear-gradient(135deg,#1C1A18 0%,#2a2520 100%);border-radius:var(--r-sm);">
           <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:700;color:#fff;">Want Claude to dress you today?</div>
+            <div style="font-size:13px;font-weight:700;color:#fff;">Want Closet to dress you today?</div>
             <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:1px;">Tell me what's on your plate and I'll pick the look.</div>
           </div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();openDressMe();" onclick="openDressMe();"
@@ -8816,7 +8607,7 @@ function outfitCardHTML(e) {
         title="${e.doNotRepeat?'Remove flag':'Flag: won\'t wear again'}">✕</button>`}
       ${wearBadge}
       ${retired ? `<div style="position:absolute;bottom:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);backdrop-filter:blur(4px);">📦 Retired</div>` : ''}
-      ${e.claudeRecommended ? `<div style="position:absolute;top:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:var(--gold);backdrop-filter:blur(4px);">✨ Claude's Pick</div>` : ''}
+      ${e.claudeRecommended ? `<div style="position:absolute;top:6px;left:6px;background:rgba(20,18,16,0.78);border-radius:100px;padding:3px 8px;font-size:10px;font-weight:700;color:var(--gold);backdrop-filter:blur(4px);">✨ Closet's Pick</div>` : ''}
     </div>
     <div class="outfit-card-body">
       <div class="outfit-card-date">${fmtDate(e.createdAt)}</div>
@@ -9110,17 +8901,21 @@ function viewShop() {
     });
   });
 
-  // Claude's Recs: shopping list from outfit queries, filtered/sorted
-  const recsRawAll = [...list]
+  // All recs: shopping list from outfit queries, filtered/sorted
+  const _allFiltered = [...list]
     .filter(i => !S.shopBlocked.has(i.query.toLowerCase().trim()))
     .sort((a, b) => b.count - a.count);
-  const rateModeCount = recsRawAll.filter(i => i.restock).length;
-  const recsRaw = (S.shopSource === 'recs' && S.shopRateModeOnly) ? recsRawAll.filter(i => i.restock) : recsRawAll;
+  // AI Picks: outfit-derived recs (excludes Rate Mode restocks)
+  const recsRawAll = _allFiltered.filter(i => !i.restock);
+  // Buy Again: Rate Mode saves only
+  const buyAgainItems = _allFiltered.filter(i => i.restock);
 
   const src = S.shopSource || 'wishlist';
   const activeItems = src === 'wishlist'
     ? wishItems.map(w => ({ label: w.label, query: w.query, sub: w.reason, entry: w.entry, recIdx: w.recIdx, outfitIds: [w.entry?.id].filter(Boolean) }))
-    : recsRaw.map(i => ({ label: i.query, query: i.query, sub: i.restock ? '🔍 From Rate Mode' : (i.count > 1 ? `×${i.count} outfits` : '×1 outfit'), priority: i.count > 1, outfitIds: i.outfitIds || [] }));
+    : src === 'buyagain'
+    ? buyAgainItems.map(i => ({ label: i.query, query: i.query, sub: i.count > 1 ? `×${i.count} outfits` : '', priority: true, outfitIds: i.outfitIds || [] }))
+    : recsRawAll.map(i => ({ label: i.query, query: i.query, sub: i.count > 1 ? `×${i.count} outfits` : '×1 outfit', priority: i.count > 1, outfitIds: i.outfitIds || [] }));
 
   const SHOP_LIMIT = 5;
   const showItems = S.shopExpanded ? activeItems : activeItems.slice(0, SHOP_LIMIT);
@@ -9247,43 +9042,43 @@ function viewShop() {
 
       <!-- Step 1: Source picker -->
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">What are you shopping from?</div>
-      <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <div style="display:flex;gap:6px;margin-bottom:20px;">
         <button
           ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
           onclick="S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
-          style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${src==='wishlist'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='wishlist'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
-          <div style="font-size:16px;margin-bottom:3px;">♥</div>
-          <div style="font-size:12px;font-weight:${src==='wishlist'?'800':'600'};color:${src==='wishlist'?'var(--gold-dk)':'var(--text-2)'};">Saved</div>
-          <div style="font-size:10px;color:${src==='wishlist'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${wishItems.length} item${wishItems.length===1?'':'s'}</div>
+          style="flex:1;padding:9px 4px;border-radius:var(--r-sm);border:${src==='wishlist'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='wishlist'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
+          <div style="font-size:15px;margin-bottom:3px;">♥</div>
+          <div style="font-size:11px;font-weight:${src==='wishlist'?'800':'600'};color:${src==='wishlist'?'var(--gold-dk)':'var(--text-2)'};">Saved</div>
+          <div style="font-size:9px;color:${src==='wishlist'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${wishItems.length}</div>
         </button>
         <button
           ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
           onclick="S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
-          style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${src==='recs'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='recs'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
-          <div style="font-size:16px;margin-bottom:3px;">✦</div>
-          <div style="font-size:12px;font-weight:${src==='recs'?'800':'600'};color:${src==='recs'?'var(--gold-dk)':'var(--text-2)'};">AI Picks</div>
-          <div style="font-size:10px;color:${src==='recs'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${recsRawAll.length} item${recsRawAll.length===1?'':'s'}</div>
+          style="flex:1;padding:9px 4px;border-radius:var(--r-sm);border:${src==='recs'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='recs'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
+          <div style="font-size:15px;margin-bottom:3px;">✦</div>
+          <div style="font-size:11px;font-weight:${src==='recs'?'800':'600'};color:${src==='recs'?'var(--gold-dk)':'var(--text-2)'};">AI Picks</div>
+          <div style="font-size:9px;color:${src==='recs'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${recsRawAll.length}</div>
+        </button>
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='buyagain';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
+          onclick="S.shopSource='buyagain';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
+          style="flex:1;padding:9px 4px;border-radius:var(--r-sm);border:${src==='buyagain'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='buyagain'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
+          <div style="font-size:15px;margin-bottom:3px;">🔁</div>
+          <div style="font-size:11px;font-weight:${src==='buyagain'?'800':'600'};color:${src==='buyagain'?'var(--gold-dk)':'var(--text-2)'};">Buy Again</div>
+          <div style="font-size:9px;color:${src==='buyagain'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${buyAgainItems.length}</div>
         </button>
         <button
           ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
           onclick="S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
-          style="flex:1;padding:10px 6px;border-radius:var(--r-sm);border:${src==='spotted'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='spotted'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
-          <div style="font-size:16px;margin-bottom:3px;">📌</div>
-          <div style="font-size:12px;font-weight:${src==='spotted'?'800':'600'};color:${src==='spotted'?'var(--gold-dk)':'var(--text-2)'};">Spotted</div>
-          <div style="font-size:10px;color:${src==='spotted'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${(S.spottedItems||[]).length} item${(S.spottedItems||[]).length===1?'':'s'}</div>
+          style="flex:1;padding:9px 4px;border-radius:var(--r-sm);border:${src==='spotted'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='spotted'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
+          <div style="font-size:15px;margin-bottom:3px;">📌</div>
+          <div style="font-size:11px;font-weight:${src==='spotted'?'800':'600'};color:${src==='spotted'?'var(--gold-dk)':'var(--text-2)'};">Spotted</div>
+          <div style="font-size:9px;color:${src==='spotted'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${(S.spottedItems||[]).length}</div>
         </button>
       </div>
 
       <!-- Step 2: Item list -->
       ${src !== 'spotted' ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">Pick an item</div>` : ''}
-      ${src === 'recs' && rateModeCount > 0 ? `
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.shopRateModeOnly=!S.shopRateModeOnly;S.shopSelectedQuery=null;renderRAF();"
-        onclick="S.shopRateModeOnly=!S.shopRateModeOnly;S.shopSelectedQuery=null;renderRAF()"
-        style="display:inline-flex;align-items:center;gap:6px;padding:7px 13px;margin-bottom:14px;border-radius:100px;border:${S.shopRateModeOnly?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${S.shopRateModeOnly?'var(--gold-bg)':'var(--surface)'};color:${S.shopRateModeOnly?'var(--gold-dk)':'var(--text-2)'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-        🔍 From Rate Mode${S.shopRateModeOnly ? '' : ` (${rateModeCount})`}
-        ${S.shopRateModeOnly ? '✕' : ''}
-      </button>` : ''}
       ${src === 'spotted' ? (() => {
         const spotted = S.spottedItems || [];
         if (!spotted.length) return `
@@ -9324,7 +9119,7 @@ function viewShop() {
         }).join('');
       })() : (
         activeItems.length === 0
-          ? `<div style="text-align:center;padding:28px 16px;color:var(--text-3);font-size:13px;line-height:1.6;">${src==='wishlist' ? '♥ Heart items in your outfit recs to build your Wish List.' : 'Log outfits — Claude will recommend items based on your style gaps.'}</div>`
+          ? `<div style="text-align:center;padding:28px 16px;color:var(--text-3);font-size:13px;line-height:1.6;">${src==='wishlist' ? '♥ Heart items in your outfit recs to build your Wish List.' : src==='buyagain' ? '🔁 Run Rate Mode to flag items worth buying again.' : 'Log outfits — Closet will recommend items based on your style gaps.'}</div>`
           : showItems.map(itemRowHTML).join('')
       )}
       ${src !== 'spotted' && moreCount > 0 ? `<button class="show-more-btn" style="margin-bottom:16px;" ontouchend="if(_touchMoved)return;event.preventDefault();S.shopExpanded=true;renderRAF();" onclick="S.shopExpanded=true;renderRAF()">Show ${moreCount} more ↓</button>` : ''}
@@ -9425,7 +9220,7 @@ function viewShop() {
               <button ontouchend="if(_touchMoved)return;event.preventDefault();analyzeSpottedItem();" onclick="analyzeSpottedItem();"
                 ${cap.analyzing ? 'disabled' : ''}
                 style="width:100%;margin-bottom:16px;padding:12px;background:${cap.analyzing?'var(--surface-2)':'var(--gold-bg)'};border:1.5px solid var(--gold);border-radius:var(--r-sm);font-size:13px;font-weight:700;color:var(--gold-dk);cursor:${cap.analyzing?'default':'pointer'};font-family:inherit;touch-action:manipulation;transition:all .15s;">
-                ${cap.analyzing ? '✦ Identifying…' : '✦ Identify with Claude'}
+                ${cap.analyzing ? '✦ Identifying…' : '✦ Identify with Closet'}
               </button>` : ''}
 
             <!-- Fields -->
@@ -9449,21 +9244,6 @@ function viewShop() {
       </div>`;
     })() : ''}
 
-
-  ${/* Returns entry point — subtle utility row at bottom of Shop */ ''}
-  ${src !== 'spotted' && src !== 'wishlist' ? `
-    <div style="margin:4px 16px 0;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:space-between;cursor:pointer;touch-action:manipulation;"
-      ontouchend="if(_touchMoved)return;event.preventDefault();navigate('returns')"
-      onclick="navigate('returns')">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:20px;">🔄</span>
-        <div>
-          <div style="font-size:13px;font-weight:700;color:var(--text);">Track a Return${(S.returnItems||[]).length ? ` <span style="font-size:11px;font-weight:600;color:var(--text-3);">(${(S.returnItems||[]).length} active)</span>` : ''}</div>
-          <div style="font-size:11px;color:var(--text-3);">Never miss a return window</div>
-        </div>
-      </div>
-      <span style="font-size:18px;color:var(--text-3);">›</span>
-    </div>` : ''}
   </div>`;
 }
 
@@ -9523,7 +9303,7 @@ function viewPlan() {
         <div style="padding:0 20px 16px;">
           <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();doSuggestOutfits();" onclick="doSuggestOutfits()" style="margin:0;touch-action:manipulation;${p.loadingSuggest?'opacity:.65;':''}"
             ${p.loadingSuggest?'disabled':''}>
-            ${p.loadingSuggest ? '✨ Claude is thinking…' : '✨ Get Recommendation'}
+            ${p.loadingSuggest ? '✨ Closet is thinking…' : '✨ Get Recommendation'}
           </button>
         </div>
 
@@ -11233,9 +11013,13 @@ function viewProfile() {
           </a>
         </div>`;
       }).join('');
+      const totalBrands = Object.keys(itemCounts).length;
       return `<div style="margin:16px 16px 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">🏷 Top Brands</div>
+          <div style="display:flex;align-items:baseline;gap:7px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">🏷 Top Brands</div>
+            <div style="font-size:11px;color:var(--text-3);">${totalBrands} total</div>
+          </div>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('brands')" onclick="navigate('brands')"
             style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:2px 0;">
             My Brands →
@@ -11287,7 +11071,7 @@ function viewProfile() {
           <div style="font-size:18px;color:var(--text-3);">›</div>
         </button>
       </div>`;
-    })()}    })()}
+    })()}
 
     <div style="height:40px;"></div>
   </div>`;
@@ -11609,7 +11393,7 @@ function nonNegBodyHTML() {
       <div style="background:linear-gradient(135deg,rgba(255,193,7,0.08),rgba(255,152,0,0.06));border:1.5px solid rgba(255,193,7,0.25);border-radius:16px;padding:16px 16px 14px;margin-bottom:20px;">
         <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;">What I know about myself.</div>
         <div style="font-size:13px;color:var(--text-2);line-height:1.6;">
-          Not rules. Not limits. Just the things experience has taught you — what your body needs, and what you consistently skip. Claude uses this to make sure recommendations actually work for you.
+          Not rules. Not limits. Just the things experience has taught you — what your body needs, and what you consistently skip. Closet uses this to make sure recommendations actually work for you.
         </div>
       </div>
 
@@ -11660,7 +11444,7 @@ function viewPersonalDetails() {
     </div>
 
     <div style="padding:16px 16px 0;">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">✨ Your Aura</div>
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">✨ Your Details</div>
     </div>
     ${auraBodyHTML()}
 
@@ -11759,7 +11543,7 @@ function viewSavedTips() {
    CLOSET THERAPY SESSIONS — transcript/recording notes
    Replaces the old single "Fit Notes" field with a running log of
    context from each Closet Therapy visit (or any styling conversation),
-   so Claude has richer, longer-term context about the user.
+   so Closet has richer, longer-term context about the user.
    ================================================================ */
 function openTherapySessionEditor(sessionId) {
   const existing = sessionId ? S.therapySessions.find(s => s.id === sessionId) : null;
@@ -11934,21 +11718,21 @@ function viewTherapySessionEdit() {
 
   return `<div class="view">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();stopTherapyRecording();S._therapyDraft=null;navigate('aura')" onclick="stopTherapyRecording();S._therapyDraft=null;navigate('aura')">${iconBack()} Aura</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();stopTherapyRecording();S._therapyDraft=null;navigate('aura')" onclick="stopTherapyRecording();S._therapyDraft=null;navigate('aura')">${iconBack()} Details</button>
       <span class="nav-title">🌿 Therapy Session</span>
       <span style="width:30px;"></span>
     </div>
 
     <div style="padding:18px 16px 100px;">
       <div style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:16px;">
-        Paste a transcript, type notes, or record/upload audio from your Closet Therapy session. Private — used only to help Claude style you better.
+        Paste a transcript, type notes, or record/upload audio from your Closet Therapy session. Private — used only to help Closet style you better.
       </div>
 
       <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:8px;">Season (optional)</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;">${seasonChips}</div>
 
       <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:8px;">Transcript / notes</div>
-      <textarea id="therapy-transcript" rows="7" placeholder="Paste or type what was discussed — likes/dislikes, fit preferences, goals, anything that helps Claude style you better…"
+      <textarea id="therapy-transcript" rows="7" placeholder="Paste or type what was discussed — likes/dislikes, fit preferences, goals, anything that helps Closet style you better…"
         style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13.5px;color:var(--text);resize:vertical;font-family:inherit;line-height:1.55;margin-bottom:14px;"
         oninput="S._therapyDraft.transcript=this.value">${esc(d.transcript)}</textarea>
 
@@ -11977,7 +11761,7 @@ function viewTherapySessionEdit() {
       ` : ''}
       <div style="font-size:11px;color:var(--text-3);margin-bottom:16px;line-height:1.5;">${speechSupported
         ? 'While recording, your words are auto-transcribed into the notes box above.'
-        : '🎤 Recording saves audio for playback. This browser can\'t auto-transcribe while recording — type or paste notes above too so Claude can use them as context.'}</div>
+        : '🎤 Recording saves audio for playback. This browser can\'t auto-transcribe while recording — type or paste notes above too so Closet can use them as context.'}</div>
 
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button ontouchend="if(_touchMoved)return;event.preventDefault();saveTherapySession()" onclick="saveTherapySession()"
@@ -12031,7 +11815,7 @@ function auraBodyHTML() {
 
   return `<div style="padding:16px 16px 0;">
       <div style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:6px;">
-        The personal details that complete your style picture — for Claude to give you the most tailored advice.
+        The personal details that complete your style picture — for Closet to give you the most tailored advice.
       </div>
       <div style="font-size:11px;color:var(--text-3);margin-bottom:20px;">${filledCount}/${total} filled in</div>
 
@@ -12071,7 +11855,7 @@ function auraBodyHTML() {
         }).join('');
 
         return `<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;">
-          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:${sessions.length?'4':'8'}px;">🌿 Closet Therapy Notes <span style="font-weight:500;text-transform:none;letter-spacing:0;margin-left:6px;font-size:10px;color:var(--text-3);">Private — helps Claude style you better</span></div>
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:${sessions.length?'4':'8'}px;">🌿 Closet Therapy Notes <span style="font-weight:500;text-transform:none;letter-spacing:0;margin-left:6px;font-size:10px;color:var(--text-3);">Private — helps Closet style you better</span></div>
           ${sessions.length ? rows : `<div style="font-size:12px;color:var(--text-3);font-style:italic;margin-bottom:8px;">No sessions logged yet — add a transcript or recording from your Closet Therapy visit.</div>`}
           <div style="margin-top:${sessions.length?'10':'0'}px;">
             <button ontouchend="if(_touchMoved)return;event.preventDefault();openTherapySessionEditor(null)" onclick="openTherapySessionEditor(null)"
@@ -12404,18 +12188,53 @@ function viewHome() {
       ${picker}
     </div>`;
   };
-  const identityHTML = `
-    <div style="margin:14px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px;">
-      ${_bucketHTML({ label:'✦ Who I Am Today', hint:'Tap Edit and pick a few words that describe your style now.',
-        selected:wordsArr, toggleFn:'toggleOnboardStyle', dark:true, editFlag:'_editWho', editing:!!S._editWho,
-        customFn:'toggleCustomWordInput', customOpen:!!S._customWordOpen, draftVar:'_customWordDraft', draft:S._customWordDraft,
-        addFn:'addCustomStyleWord', inputId:'custom-word-input', placeholder:'e.g. Effortless, Tailored…' })}
-      <div style="height:1px;background:var(--border);margin:12px 0;"></div>
-      ${_bucketHTML({ label:'🎯 Style Goals', hint:'Tap Edit to choose where your style is headed — every AI feature bends toward these.',
-        selected:goalsArr, toggleFn:'toggleStyleGoal', dark:false, editFlag:'_editGoals', editing:!!S._editGoals,
-        customFn:'toggleCustomGoalInput', customOpen:!!S._customGoalOpen, draftVar:'_customGoalDraft', draft:S._customGoalDraft,
-        addFn:'addCustomStyleGoal', inputId:'custom-goal-input', placeholder:'e.g. Gender-fluid, Dark Academia…' })}
+  const _wordsConfig = { label:'✦ Who I Am Today', hint:'Tap Edit and pick a few words that describe your style now.',
+    selected:wordsArr, toggleFn:'toggleOnboardStyle', dark:true, editFlag:'_editWho', editing:!!S._editWho,
+    customFn:'toggleCustomWordInput', customOpen:!!S._customWordOpen, draftVar:'_customWordDraft', draft:S._customWordDraft,
+    addFn:'addCustomStyleWord', inputId:'custom-word-input', placeholder:'e.g. Effortless, Tailored…' };
+  const _goalsConfig = { label:'🎯 Style Goals', hint:'Tap Edit to choose where your style is headed — every AI feature bends toward these.',
+    selected:goalsArr, toggleFn:'toggleStyleGoal', dark:false, editFlag:'_editGoals', editing:!!S._editGoals,
+    customFn:'toggleCustomGoalInput', customOpen:!!S._customGoalOpen, draftVar:'_customGoalDraft', draft:S._customGoalDraft,
+    addFn:'addCustomStyleGoal', inputId:'custom-goal-input', placeholder:'e.g. Gender-fluid, Dark Academia…' };
+
+  const identityHTML = (() => {
+    if (S._editWho || S._editGoals) {
+      return `<div style="margin:14px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:14px;">
+        ${_bucketHTML(_wordsConfig)}
+        <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+        ${_bucketHTML(_goalsConfig)}
+      </div>`;
+    }
+    const _miniChip = (label, dark) => {
+      const preset = GOAL_PRESETS.find(p => p.label === label);
+      return `<span style="display:inline-flex;align-items:center;gap:3px;background:${dark?'rgba(255,255,255,0.1)':'rgba(184,125,42,0.18)'};border-radius:100px;padding:3px 9px;white-space:nowrap;">
+        ${preset ? `<span style="font-size:11px;line-height:1;">${preset.emoji}</span>` : ''}
+        <span style="font-size:11px;font-weight:700;color:${dark?'#fff':'var(--gold-dk)'};">${esc(label)}</span>
+      </span>`;
+    };
+    return `<div style="margin:14px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="background:#1C1A18;border:1.5px solid #38332E;border-radius:14px;padding:11px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.4);">✦ Me Today</div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._editWho=true;render()" onclick="S._editWho=true;render()"
+            style="background:none;border:none;font-size:11px;font-weight:700;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">Edit</button>
+        </div>
+        ${wordsArr.length
+          ? `<div style="display:flex;flex-wrap:wrap;gap:4px;">${wordsArr.map(w=>_miniChip(w,true)).join('')}</div>`
+          : `<div style="font-size:11px;color:rgba(255,255,255,.28);font-style:italic;line-height:1.4;">Tap Edit to add your current style words</div>`}
+      </div>
+      <div style="background:linear-gradient(145deg,#FFFBF2,#FFF4D8);border:1.5px solid rgba(184,125,42,0.3);border-radius:14px;padding:11px 12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);">🎯 Goals</div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._editGoals=true;render()" onclick="S._editGoals=true;render()"
+            style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);opacity:0.65;cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">Edit</button>
+        </div>
+        ${goalsArr.length
+          ? `<div style="display:flex;flex-wrap:wrap;gap:4px;">${goalsArr.map(g=>_miniChip(g,false)).join('')}</div>`
+          : `<div style="font-size:11px;color:var(--text-3);font-style:italic;line-height:1.4;">Tap Edit to set your style goals</div>`}
+      </div>
     </div>`;
+  })();
 
   // ── ✂️ STYLE TIPS — one carousel, removable cards ────────────────────────
   const likedRecs = [];
@@ -12429,6 +12248,57 @@ function viewHome() {
     }
   });
   likedRecs.sort((a,b)=>new Date(b.entry.createdAt)-new Date(a.entry.createdAt));
+
+  // ── ⚡ ACTION SUMMARY — top priority moves ────────────────────────────────
+  const actionSummaryHTML = (() => {
+    const rows = [];
+    if (likedRecs.length > 0) {
+      const { rec, entry } = likedRecs[0];
+      const short = rec.length > 85 ? rec.slice(0, 85).replace(/\s\S*$/, '…') : rec;
+      rows.push(`<div style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">✂️</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:3px;">Top Style Tip</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.4;">${esc(short)}</div>
+          <div style="font-size:10px;color:var(--text-3);margin-top:4px;">from your ⭐ ${entry.rating}/10 outfit${entry.occasionTag ? ' · ' + esc(entry.occasionTag) : ''}</div>
+        </div>
+      </div>`);
+    }
+    const trends = S.hotTrends?.trends;
+    if (trends?.length) {
+      const t = trends[0];
+      const desc = t.tip || t.description || '';
+      const shortDesc = desc.length > 70 ? desc.slice(0, 70).replace(/\s\S*$/, '…') : desc;
+      rows.push(`<div style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;${rows.length ? 'border-bottom:1px solid var(--border);' : ''}">
+        <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#FF6B35,#FF8C5A);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">${esc(t.emoji||'🔥')}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">Trending Now</div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(t.name)}</div>
+          ${shortDesc ? `<div style="font-size:12px;color:var(--text-3);margin-top:2px;line-height:1.35;">${esc(shortDesc)}</div>` : ''}
+        </div>
+      </div>`);
+    }
+    if (wordsArr.length > 0 && goalsArr.length > 0) {
+      const hasOverlap = goalsArr.some(g => wordsArr.some(w =>
+        w.toLowerCase() === g.toLowerCase() || w.toLowerCase().includes(g.toLowerCase()) || g.toLowerCase().includes(w.toLowerCase())
+      ));
+      if (!hasOverlap) {
+        rows.push(`<div style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;">
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(108,62,191,0.15);border:1px solid rgba(108,62,191,0.25);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">🔮</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#6C3EBF;margin-bottom:3px;">Your Style Gap</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.4;">Your current vibe and goals haven't crossed yet — that's your evolve opportunity.</div>
+          </div>
+        </div>`);
+      }
+    }
+    if (!rows.length) return '';
+    return `<div style="margin:12px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:2px 14px;">
+      <div style="padding:10px 0 2px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">⚡ Priority Moves</div>
+      ${rows.join('')}
+    </div>`;
+  })();
+
   const tipsSection = `
     <div class="home-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -12438,19 +12308,22 @@ function viewHome() {
       </div>
       ${likedRecs.length ? `
       <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-        ${likedRecs.slice(0,10).map(({rec, entry, idx}) => `
-          <div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')"
-            onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:210px;cursor:pointer;border-radius:var(--r);background:var(--surface);border:1.5px solid var(--border);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+        ${likedRecs.slice(0,10).map(({rec, entry, idx}) => {
+          const tipText = rec.length > 100 ? rec.slice(0, 100).replace(/\s\S*$/, '…') : rec;
+          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')"
+            onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:155px;cursor:pointer;border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:2/3;background:#111;">
             <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();removeSavedTip('${entry.id}',${idx})" onclick="event.stopPropagation();removeSavedTip('${entry.id}',${idx})"
-              style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(20,18,16,0.55);border:none;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;backdrop-filter:blur(3px);">✕</button>
+              style="position:absolute;top:7px;right:7px;z-index:2;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.55);border:none;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;backdrop-filter:blur(3px);">✕</button>
             ${entry.photo
-              ? `<div style="width:100%;height:80px;overflow:hidden;flex-shrink:0;"><img src="${entry.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
-              : `<div style="width:100%;height:80px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">👗</div>`}
-            <div style="padding:10px 12px 12px;flex:1;">
-              <div style="font-size:13px;color:var(--text);line-height:1.45;">${esc(rec)}</div>
-              <div style="font-size:11px;color:var(--text-3);margin-top:6px;">⭐ ${entry.rating}/10 · ${entry.occasionTag ? esc(entry.occasionTag) : fmtDateLong(entry.createdAt)}</div>
+              ? `<img src="${entry.photo}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 15%;" loading="lazy">`
+              : `<div style="position:absolute;inset:0;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:40px;">👗</div>`}
+            <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 35%,rgba(0,0,0,0.92) 100%);pointer-events:none;"></div>
+            <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 10px 12px;">
+              <div style="font-size:12px;color:#fff;line-height:1.4;font-weight:500;">${esc(tipText)}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:5px;">⭐ ${entry.rating}/10${entry.occasionTag ? ' · ' + esc(entry.occasionTag) : ''}</div>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>` : `<div style="font-size:12px;color:var(--text-3);">Heart ♥ tips on your fit checks to collect them here.</div>`}
     </div>`;
 
@@ -12572,6 +12445,7 @@ function viewHome() {
       <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload')" onclick="navigate('upload')">${iconPlus()} New Outfit</button>
     </div>
     ${identityHTML}
+    ${actionSummaryHTML}
     ${!hasData ? `<div class="empty" style="padding-top:36px;">
       <div class="empty-icon">✨</div>
       <h2>Welcome to your Closet!</h2>
@@ -13332,7 +13206,7 @@ function viewWardrobe() {
     : `<div class="empty">
         <div class="empty-icon">🧺</div>
         <h2>Wardrobe is Empty</h2>
-        <p>After you log an outfit, Claude will offer to add the items to your Wardrobe so you can track wear counts and price per wear.</p>
+        <p>After you log an outfit, Closet will offer to add the items to your Wardrobe so you can track wear counts and price per wear.</p>
       </div>`;
 
   // ── Grid content (rod view) ─────────────────────────────────
@@ -13797,7 +13671,7 @@ function hangerHTML(w, _siblings) {
 }
 
 /* ================================================================
-   VIEW: RECEIPT ADD (📧 → Claude parse → wardrobe item)
+   VIEW: RECEIPT ADD (📧 → Closet parse → wardrobe item)
    ================================================================ */
 /* ================================================================
    VIEW: NEW PIECE — entry screen (manual or receipt)
@@ -13836,7 +13710,7 @@ function viewNewPiece() {
           <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">📸</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;">From a photo</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Snap or upload your item — Claude identifies the name, category &amp; details</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Snap or upload your item — Closet identifies the name, category &amp; details</div>
           </div>
           <div style="font-size:18px;color:var(--text-3);">›</div>
         </button>
@@ -13859,7 +13733,7 @@ function viewNewPiece() {
           <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">🧾</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;">Scan a receipt</div>
-            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Upload or paste your order confirmation — Claude fills in the details</div>
+            <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Upload or paste your order confirmation — Closet fills in the details</div>
           </div>
           <div style="font-size:18px;color:var(--text-3);">›</div>
         </button>
@@ -13923,7 +13797,7 @@ function viewOnboarding() {
     // 1 — Fits
     { label:'Fits', dark:true, img:'onboarding/fits.jpg',
       headline:'Your daily look,\nobjectively rated.',
-      sub:'Snap your outfit, get Claude\'s honest style feedback, and build a personal log of your best looks over time. Use Rate Mode to swipe through your whole wardrobe and rate how each piece makes you feel right now.',
+      sub:'Snap your outfit, get Closet\'s honest style feedback, and build a personal log of your best looks over time. Use Rate Mode to swipe through your whole wardrobe and rate how each piece makes you feel right now.',
       mock:`<div style="padding:0 24px;">
         <div style="background:linear-gradient(150deg,#2B2318,#1C1A18);border-radius:18px;padding:16px;">
           <div style="background:linear-gradient(160deg,#3B3020,#252018);border-radius:12px;height:136px;position:relative;margin-bottom:14px;display:flex;align-items:flex-end;padding:12px;overflow:hidden;">
@@ -13949,7 +13823,7 @@ function viewOnboarding() {
     // 2 — Closet
     { label:'Closet', dark:false, img:'onboarding/closet.jpg',
       headline:'Everything you own.\nFinally organised.',
-      sub:'Log your full wardrobe, track wears, flag Hero Pieces, and surface Hidden Gems you\'ve been sleeping on. Hit Dress Me and Claude builds a complete outfit from what you already own.',
+      sub:'Log your full wardrobe, track wears, flag Hero Pieces, and surface Hidden Gems you\'ve been sleeping on. Hit Dress Me and Closet builds a complete outfit from what you already own.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -14004,7 +13878,7 @@ function viewOnboarding() {
     // 4 — Plan
     { label:'Plan', dark:false, img:'onboarding/plan.jpg',
       headline:'Never scramble\nbefore an event again.',
-      sub:'Tell Claude your occasion and it builds an outfit from your actual wardrobe — weather-aware and personal to what you own. Use Outfit Builder to build a look around any piece, or spin Style Roulette when you can\'t decide. Save your favourites to Plan for later.',
+      sub:'Tell Closet your occasion and it builds an outfit from your actual wardrobe — weather-aware and personal to what you own. Use Outfit Builder to build a look around any piece, or spin Style Roulette when you can\'t decide. Save your favourites to Plan for later.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
           <div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:11px;padding:12px 14px;margin-bottom:12px;">
@@ -14012,7 +13886,7 @@ function viewOnboarding() {
             <div style="font-size:15px;font-weight:900;color:var(--text);margin-bottom:2px;">Smart Casual · Warm Evening</div>
             <div style="font-size:11px;color:var(--text-2);">Dress to impress, not to overheat</div>
           </div>
-          <div style="font-size:9px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">✦ Claude's Build</div>
+          <div style="font-size:9px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">✦ Closet's Build</div>
           <div style="display:flex;gap:6px;margin-bottom:10px;">
             ${['👗 Silk Slip Dress','👡 Strappy Heels','✨ Gold Cuff'].map(i=>`<div style="flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:7px 4px;text-align:center;font-size:9px;font-weight:700;color:var(--text-2);line-height:1.5;">${i}</div>`).join('')}
           </div>
@@ -14024,24 +13898,27 @@ function viewOnboarding() {
     // 5 — Shop
     { label:'Shop', dark:false, img:'onboarding/shop.jpg',
       headline:'Spend with intention.\nClose the gaps.',
-      sub:'Claude studies your actual wardrobe and surfaces only what\'s missing — then links you straight to shop it. Build a Wish List so nothing slips away.',
+      sub:'Four tabs, one mission. ♥ Saved is your Wish List. ✦ AI Picks surfaces wardrobe gaps. 🔁 Buy Again holds Rate Mode saves — pieces worth re-buying. 📌 Spotted is your in-store and online capture board.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
-          <div style="font-size:9px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">✦ Your Closet Gaps</div>
-          ${[
-            {icon:'👟',name:'White Leather Sneakers',fits:'Works in 4 saved looks',urg:'High'},
-            {icon:'🎒',name:'Structured Tote',fits:'Missing from 6 outfits',urg:'Medium'},
-          ].map(i=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:9px;margin-bottom:7px;">
-            <div style="width:36px;height:36px;border-radius:8px;background:var(--gold-bg);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${i.icon}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:12px;font-weight:800;color:var(--text);">${i.name}</div>
-              <div style="font-size:10px;color:var(--text-3);margin-top:1px;">${i.fits}</div>
-            </div>
-            <div style="font-size:8px;font-weight:800;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 7px;white-space:nowrap;">${i.urg}</div>
-          </div>`).join('')}
-          <div style="background:var(--gold);border-radius:9px;padding:10px;text-align:center;">
-            <span style="font-size:12px;font-weight:900;color:#fff;">🛍 Shop it now</span>
+          <div style="display:flex;gap:5px;margin-bottom:12px;">
+            ${[['♥','Saved'],['✦','AI Picks'],['🔁','Buy Again'],['📌','Spotted']].map(([ic,lb],i)=>`
+              <div style="flex:1;padding:7px 3px;border-radius:8px;border:${i===0?'2px solid var(--gold)':'1px solid var(--border)'};background:${i===0?'var(--gold-bg)':'var(--surface-2)'};text-align:center;">
+                <div style="font-size:12px;margin-bottom:2px;">${ic}</div>
+                <div style="font-size:8px;font-weight:${i===0?'800':'600'};color:${i===0?'var(--gold-dk)':'var(--text-3)'};">${lb}</div>
+              </div>`).join('')}
           </div>
+          <div style="font-size:8px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">♥ Your Wish List</div>
+          ${[
+            {icon:'👟',name:'White Leather Sneakers',note:'Works in 4 saved looks'},
+            {icon:'🎒',name:'Structured Tote',note:'Missing from 6 outfits'},
+          ].map(i=>`<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">
+            <div style="width:32px;height:32px;border-radius:7px;background:var(--gold-bg);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">${i.icon}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:11px;font-weight:800;color:var(--text);">${i.name}</div>
+              <div style="font-size:9px;color:var(--text-3);margin-top:1px;">${i.note}</div>
+            </div>
+          </div>`).join('')}
         </div>
       </div>`
     },
@@ -14049,27 +13926,36 @@ function viewOnboarding() {
     // 6 — Evolve
     { label:'Evolve', dark:true, img:'onboarding/evolve.jpg',
       headline:'Set goals. Track trends.\nLevel up your style.',
-      sub:'Declare your style goals and let AI-curated trends, brand picks, and styling tips bend toward them. Evolve is your personal fashion growth engine.',
+      sub:'Me Today on the left, Goals on the right — see the gap, then close it. Priority Moves surfaces your top style tip and trending look every time you open Evolve. Every AI feature in the app bends toward your goals.',
       mock:`<div style="padding:0 24px;">
-        <div style="background:#1C1A18;border-radius:18px;padding:16px;">
-          <div style="font-size:9px;font-weight:800;color:rgba(201,168,76,.65);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">✦ Your Style Goals</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
-            ${['More Feminine','Elevated Basics','Quiet Luxury'].map(g=>`<div style="background:rgba(201,168,76,.18);border:1px solid rgba(201,168,76,.4);border-radius:100px;padding:4px 11px;font-size:10px;font-weight:700;color:#C9A84C;">${g}</div>`).join('')}
-            <div style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);border-radius:100px;padding:4px 11px;font-size:10px;font-weight:700;color:rgba(255,255,255,.3);">+ Add goal</div>
-          </div>
-          <div style="font-size:9px;font-weight:800;color:rgba(201,168,76,.65);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">🔥 Trending Toward Your Goals</div>
-          ${[
-            {e:'🤍',t:'Quiet Luxury',d:'Understated basics, impeccable cuts'},
-            {e:'🌊',t:'Coastal Feminine',d:'Flowing silhouettes, soft neutrals'},
-            {e:'✨',t:'Polished Minimalism',d:'One statement piece, everything else clean'},
-          ].map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);">
-            <div style="font-size:16px;flex-shrink:0;">${r.e}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:12px;font-weight:800;color:#fff;">${r.t}</div>
-              <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px;">${r.d}</div>
+        <div style="background:#1C1A18;border-radius:18px;padding:14px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;">
+            <div style="background:#161412;border:1px solid #38332E;border-radius:11px;padding:9px 10px;">
+              <div style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.35);margin-bottom:7px;">✦ Me Today</div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${['Minimal','Edgy','Classic'].map(w=>`<span style="background:rgba(255,255,255,.1);border-radius:100px;padding:2px 8px;font-size:9px;font-weight:700;color:#fff;">${w}</span>`).join('')}
+              </div>
             </div>
-            <div style="font-size:14px;color:rgba(201,168,76,.5);">♡</div>
-          </div>`).join('')}
+            <div style="background:linear-gradient(145deg,#FFFBF2,#FFF4D8);border:1px solid rgba(201,168,76,.3);border-radius:11px;padding:9px 10px;">
+              <div style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#8B6010;margin-bottom:7px;">🎯 Goals</div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${['Quiet Luxury','Elevated'].map(g=>`<span style="background:rgba(184,125,42,.15);border-radius:100px;padding:2px 8px;font-size:9px;font-weight:700;color:#8B6010;">${g}</span>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;">
+            <div style="font-size:8px;font-weight:800;color:rgba(201,168,76,.7);letter-spacing:.1em;margin-bottom:7px;">⚡ PRIORITY MOVES</div>
+            ${[
+              {ic:'✂️',label:'Top Style Tip',text:'Add a belt — it anchors your midi dress silhouette.'},
+              {ic:'🔥',label:'Trending Now',text:'Quiet Luxury · Understated basics, impeccable cuts'},
+            ].map(r=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);">
+              <div style="font-size:12px;margin-top:1px;flex-shrink:0;">${r.ic}</div>
+              <div>
+                <div style="font-size:8px;font-weight:800;color:rgba(201,168,76,.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">${r.label}</div>
+                <div style="font-size:9.5px;color:rgba(255,255,255,.55);line-height:1.4;">${r.text}</div>
+              </div>
+            </div>`).join('')}
+          </div>
         </div>
       </div>`
     },
@@ -14077,14 +13963,14 @@ function viewOnboarding() {
     // 7 — Fun
     { label:'Fun', dark:false, img:'onboarding/fun.jpg',
       headline:'Fashion battles,\ncompliments & more.',
-      sub:'Challenge a friend to a Fashion Battle, get a genuine Claude compliment about your style, pair outfits with drinks or books, and send love to the people who gifted your favourite pieces.',
+      sub:'Challenge a friend to a Fashion Battle, get a genuine Closet compliment about your style, pair outfits with drinks or books, and send love to the people who gifted your favourite pieces.',
       mock:`<div style="padding:0 24px;">
         <div style="display:flex;flex-direction:column;gap:8px;">
           <div style="background:linear-gradient(135deg,#1A1010 0%,#3A1010 100%);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px;">
             <div style="font-size:28px;line-height:1;flex-shrink:0;">⚔️</div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:13px;font-weight:900;color:#fff;margin-bottom:2px;">Fashion Battle</div>
-              <div style="font-size:10px;color:rgba(255,255,255,.5);line-height:1.4;">Upload two looks — Claude picks a winner</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.5);line-height:1.4;">Upload two looks — Closet picks a winner</div>
             </div>
             <div style="background:rgba(220,50,50,.75);border-radius:100px;padding:5px 12px;font-size:10px;font-weight:800;color:#fff;white-space:nowrap;">Start →</div>
           </div>
@@ -14158,13 +14044,13 @@ function viewOnboarding() {
       <div style="padding:20px 24px 0;">
         <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:var(--gold-dk);margin-bottom:10px;">First Look</div>
         <div style="font-size:24px;font-weight:900;color:var(--text);letter-spacing:-.4px;margin-bottom:10px;line-height:1.2;">Log your first fit. 📸</div>
-        <div style="font-size:14px;color:var(--text-2);line-height:1.65;margin-bottom:24px;">Snap what you're wearing right now — Claude rates your look and gives you real, honest style feedback.</div>
+        <div style="font-size:14px;color:var(--text-2);line-height:1.65;margin-bottom:24px;">Snap what you're wearing right now — Closet rates your look and gives you real, honest style feedback.</div>
         <div style="background:var(--surface);border:2px dashed var(--gold);border-radius:16px;padding:36px 20px;text-align:center;cursor:pointer;margin-bottom:8px;"
           ontouchend="if(_touchMoved)return;event.preventDefault();finishOnboardingAndUpload()"
           onclick="finishOnboardingAndUpload()">
           <div style="font-size:52px;margin-bottom:14px;">📷</div>
           <div style="font-size:15px;font-weight:800;color:var(--gold-dk);margin-bottom:6px;">Take or upload a photo</div>
-          <div style="font-size:12px;color:var(--text-3);line-height:1.55;">Get your first style score from Claude</div>
+          <div style="font-size:12px;color:var(--text-3);line-height:1.55;">Get your first style score from Closet</div>
         </div>
       </div>
       <div style="padding:0 24px 28px;">
@@ -14255,7 +14141,7 @@ function viewBulkAdd() {
       <div style="padding:32px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;">
         <div style="font-size:56px;margin-bottom:16px;">📦</div>
         <div style="font-size:20px;font-weight:900;color:var(--text);margin-bottom:8px;">Add many pieces at once</div>
-        <div style="font-size:14px;color:var(--text-3);line-height:1.6;margin-bottom:32px;max-width:290px;">Select all your photos from your camera roll — you'll fill in the details one piece at a time, and Claude will identify each one for you.</div>
+        <div style="font-size:14px;color:var(--text-3);line-height:1.6;margin-bottom:32px;max-width:290px;">Select all your photos from your camera roll — you'll fill in the details one piece at a time, and Closet will identify each one for you.</div>
 
         <div style="width:100%;background:var(--surface);border:2px dashed var(--gold);border-radius:var(--r);padding:36px 20px;cursor:pointer;margin-bottom:20px;"
           ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('bulkFileInput').click()"
@@ -14338,7 +14224,7 @@ function viewBulkAdd() {
           </div>`
         : current.preview
           ? `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r-sm);">
-              <div style="font-size:12px;font-weight:700;color:var(--gold-dk);">✦ Claude identified this</div>
+              <div style="font-size:12px;font-weight:700;color:var(--gold-dk);">✦ Closet identified this</div>
               <button ontouchend="if(_touchMoved)return;event.preventDefault();bulkAnalyzeCurrent()" onclick="bulkAnalyzeCurrent()" style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">Re-identify</button>
             </div>`
           : `<button class="btn btn-primary"
@@ -14478,7 +14364,7 @@ function viewReceiptAdd() {
         <span style="width:72px"></span>
       </div>
       <div style="padding:20px;">
-        <div style="font-size:13px;color:var(--text-3);margin-bottom:18px;line-height:1.5;">Take or upload a photo of the item — Claude will identify the name, category, and details for you.</div>
+        <div style="font-size:13px;color:var(--text-3);margin-bottom:18px;line-height:1.5;">Take or upload a photo of the item — Closet will identify the name, category, and details for you.</div>
 
         <div style="background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px;cursor:pointer;min-height:220px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;"
           ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('photoItemInput').click()"
@@ -14526,7 +14412,7 @@ function viewReceiptAdd() {
         <div style="font-size:48px;">${isPhoto ? '📷' : '🧾'}</div>
         <div class="loading-dots" style="font-size:28px;"><span>·</span><span>·</span><span>·</span></div>
         <div style="font-size:15px;font-weight:600;color:var(--text);">${isPhoto ? 'Identifying your piece…' : 'Reading your receipt…'}</div>
-        <div style="font-size:13px;color:var(--text-3);text-align:center;max-width:260px;">${isPhoto ? 'Claude is analyzing the photo to fill in the details' : 'Claude is extracting item details from your order confirmation'}</div>
+        <div style="font-size:13px;color:var(--text-3);text-align:center;max-width:260px;">${isPhoto ? 'Closet is analyzing the photo to fill in the details' : 'Closet is extracting item details from your order confirmation'}</div>
       </div>
     </div>`;
   }
@@ -14690,7 +14576,7 @@ function viewReceiptAdd() {
           : `<div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r);padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:14px;">
                <div style="font-size:40px;line-height:1;">${esc(p.icon||'👕')}</div>
                <div>
-                 <div style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">Claude found this item</div>
+                 <div style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">Closet found this item</div>
                  <div style="font-size:15px;font-weight:700;color:var(--text);">${esc(p.name||'Unknown item')}</div>
                  ${p.brand ? `<div style="font-size:13px;color:var(--text-3);">${esc(p.brand)}</div>` : ''}
                </div>
@@ -14816,7 +14702,7 @@ function viewReceiptAdd() {
           ? `<img src="data:${rf.imageMime};base64,${rf.imageData}" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;">`
           : `<div style="font-size:48px;margin-bottom:10px;">📸</div>
              <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;">Upload your receipt screenshot</div>
-             <div style="font-size:13px;color:var(--text-3);line-height:1.5;">Screenshot your order confirmation email, then upload it here. Claude will read the item name, brand, and price automatically.</div>`}
+             <div style="font-size:13px;color:var(--text-3);line-height:1.5;">Screenshot your order confirmation email, then upload it here. Closet will read the item name, brand, and price automatically.</div>`}
         <input id="receiptImgInput" type="file" accept="image/*" style="display:none;"
           onchange="receiptImageSelected(this)">
       </div>
@@ -14842,7 +14728,7 @@ function viewReceiptAdd() {
       </button>
       <div style="height:12px;"></div>
       <div style="font-size:12px;color:var(--text-3);text-align:center;line-height:1.6;">
-        Works with order confirmations from any retailer.<br>Your receipt stays private — only sent to Claude for parsing.
+        Works with order confirmations from any retailer.<br>Your receipt stays private — only sent to Closet for parsing.
       </div>
       <div style="height:32px;"></div>
     </div>
@@ -15211,7 +15097,7 @@ function viewRateMode() {
         <span style="font-size:20px;flex-shrink:0;">💸</span>
         <div style="flex:1;min-width:0;">
           <div style="font-size:12.5px;font-weight:700;color:#fff;">Not feeling it? Sell it instead of letting it sit.</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:1px;">Claude can draft a Poshmark/Depop listing and suggest a price.</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:1px;">Closet can draft a Poshmark/Depop listing and suggest a price.</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
           <button ontouchend="if(_touchMoved)return;event.preventDefault();openSellDraft('${w.id}');" onclick="openSellDraft('${w.id}')"
@@ -15557,12 +15443,24 @@ function viewWardrobeItem() {
               🧍 Worn
             </button>
           </div>` : '';
+        const _hasLinked = linkedEntries.length > 0;
+        const _tapAction = isFlipped
+          ? (_hasLinked ? `S._wearPhotoPicker=(S._wearPhotoPicker==='${w.id}'?null:'${w.id}');render()` : `document.getElementById('witemWearPhotoInput').click()`)
+          : `document.getElementById('witemPhotoInput').click()`;
+        const _removeBtn = isFlipped
+          ? (w.wearPhoto && !pendingWear && !isAutoWear ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();removeWardrobeWearPhoto('${w.id}')" onclick="event.stopPropagation();removeWardrobeWearPhoto('${w.id}')" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.55);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;backdrop-filter:blur(4px);">✕</button>` : '')
+          : (w.photo && !pendingItem ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();removeWardrobeItemPhoto('${w.id}')" onclick="event.stopPropagation();removeWardrobeItemPhoto('${w.id}')" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.55);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;backdrop-filter:blur(4px);">✕</button>` : '');
         const imgEl = displaySrc
-          ? `<div class="witem-img-wrap" style="position:relative;">
-               <img src="${esc(displaySrc)}" class="witem-img" alt="${esc(w.name)}" onerror="this.style.display='none'">
-               ${isAutoWear && showWear ? `<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.62);color:#fff;border-radius:100px;padding:3px 10px;font-size:10px;font-weight:700;white-space:nowrap;backdrop-filter:blur(4px);">from linked outfit</div>` : ''}
+          ? `<div class="witem-img-wrap" style="position:relative;cursor:pointer;touch-action:manipulation;"
+               ontouchend="if(_touchMoved)return;event.preventDefault();${_tapAction}"
+               onclick="${_tapAction}">
+               <img src="${esc(displaySrc)}" class="witem-img" alt="${esc(w.name)}" onerror="this.style.display='none'" style="pointer-events:none;">
+               ${isAutoWear && showWear ? `<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.62);color:#fff;border-radius:100px;padding:3px 10px;font-size:10px;font-weight:700;white-space:nowrap;backdrop-filter:blur(4px);pointer-events:none;">from linked outfit</div>` : ''}
+               ${_removeBtn}
              </div>`
-          : `<div class="witem-emoji" style="${w.retiredFromCloset?'opacity:0.45;filter:saturate(0.3)':w.retiring?'opacity:0.72;filter:saturate(0.7)':''}">${w.icon||'👕'}</div>`;
+          : `<div class="witem-emoji" style="${w.retiredFromCloset?'opacity:0.45;filter:saturate(0.3)':w.retiring?'opacity:0.72;filter:saturate(0.7)':''};cursor:pointer;touch-action:manipulation;"
+               ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witemPhotoInput').click()"
+               onclick="document.getElementById('witemPhotoInput').click()">${w.icon||'👕'}</div>`;
         return toggle + imgEl;
       })()}
       <div class="witem-name" style="${!w.name?'color:var(--text-3);font-style:italic;':''}">${w.name ? esc(w.name) : 'New piece'}</div>
@@ -15600,26 +15498,9 @@ function viewWardrobeItem() {
           ✕ Cancel
         </button>
         ` : (() => {
-          // Compute linked outfits here too (in scope for this IIFE)
           const _le = _linkedOutfitEntries(w);
           const _pickerOpen = S._wearPhotoPicker === w.id;
-          const _hasLinked = _le.length > 0;
           return `
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();document.getElementById('witemPhotoInput').click()" onclick="document.getElementById('witemPhotoInput').click()"
-          style="background:none;border:1.5px solid var(--gold);color:var(--gold-dk);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          📸 ${w.photo ? 'Replace item photo' : 'Add item photo'}
-        </button>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();${_hasLinked ? `S._wearPhotoPicker=(S._wearPhotoPicker==='${w.id}'?null:'${w.id}');render()` : `document.getElementById('witemWearPhotoInput').click()`}" onclick="${_hasLinked ? `S._wearPhotoPicker=(S._wearPhotoPicker==='${w.id}'?null:'${w.id}');render()` : `document.getElementById('witemWearPhotoInput').click()`}"
-          style="background:none;border:1.5px solid var(--gold);color:var(--gold-dk);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">
-          🧍 ${w.wearPhoto ? 'Change worn photo' : 'Set worn photo'}
-        </button>
-        ${(w.photo || w.wearPhoto) ? `
-        <div style="display:flex;gap:8px;justify-content:center;margin-top:6px;flex-wrap:wrap;width:100%;">
-          ${w.photo ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();removeWardrobeItemPhoto('${w.id}')" onclick="removeWardrobeItemPhoto('${w.id}')"
-            style="background:none;border:1.5px solid var(--border);color:var(--text-3);border-radius:100px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕ Remove item photo</button>` : ''}
-          ${w.wearPhoto ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();removeWardrobeWearPhoto('${w.id}')" onclick="removeWardrobeWearPhoto('${w.id}')"
-            style="background:none;border:1.5px solid var(--border);color:var(--text-3);border-radius:100px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕ Remove worn photo</button>` : ''}
-        </div>` : ''}
         ${_pickerOpen ? `
         <div style="width:100%;margin-top:10px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:12px;">
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);margin-bottom:10px;">Choose from your outfits</div>
@@ -15641,18 +15522,23 @@ function viewWardrobeItem() {
 
       <!-- Quick wear + stats -->
       <div style="margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:8px;">
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();logQuickWear('${w.id}')"
-          onclick="logQuickWear('${w.id}')"
-          style="display:flex;align-items:center;gap:7px;padding:10px 24px;border-radius:100px;border:none;background:linear-gradient(135deg,#2C7A2C,#3DAA3D);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;box-shadow:0 2px 10px rgba(44,122,44,0.28);">
-          👟 Wore Today
-        </button>
+        <div style="display:flex;gap:8px;justify-content:center;">
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();logQuickWear('${w.id}')"
+            onclick="logQuickWear('${w.id}')"
+            style="display:flex;align-items:center;gap:7px;padding:10px 20px;border-radius:100px;border:none;background:linear-gradient(135deg,#2C7A2C,#3DAA3D);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;box-shadow:0 2px 10px rgba(44,122,44,0.28);">
+            👟 Wore Today
+          </button>
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();logCompliment('${w.id}')"
+            onclick="logCompliment('${w.id}')"
+            style="display:flex;align-items:center;gap:7px;padding:10px 20px;border-radius:100px;border:none;background:var(--surface-2);color:var(--text-2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid var(--border);">
+            ⭐ Compliment
+          </button>
+        </div>
         <div style="font-size:12px;color:var(--text-3);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;">
           <span>${wears} wear${wears===1?'':'s'}${ppw ? ' · $'+ppw+'/wear' : ''}${w.paidOff ? ' · 💚 paid off' : ''}</span>
           ${complimentCount > 0 ? `<span>· <span style="color:var(--gold-dk);">${complimentCount} compliment${complimentCount===1?'':'s'}</span></span>` : ''}
-          <span style="color:var(--border);">·</span>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();logCompliment('${w.id}')" onclick="logCompliment('${w.id}')"
-            style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;touch-action:manipulation;">Got a compliment?</button>
         </div>
       </div>
     </div>
@@ -15664,7 +15550,7 @@ function viewWardrobeItem() {
         <div style="font-size:28px;flex-shrink:0;">${isLoading ? '⏳' : '✨'}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${isLoading ? 'Analyzing your photo…' : 'Use AI to fill in details'}</div>
-          <div style="font-size:11.5px;color:var(--text-3);line-height:1.4;">${isLoading ? 'Claude is identifying the name, category, color, and description.' : 'Claude will identify the name, category, color, and description from your photo.'}</div>
+          <div style="font-size:11.5px;color:var(--text-3);line-height:1.4;">${isLoading ? 'Closet is identifying the name, category, color, and description.' : 'Closet will identify the name, category, color, and description from your photo.'}</div>
         </div>
         ${!isLoading ? `<button
           ontouchend="if(_touchMoved)return;event.preventDefault();fillItemDetailsWithAI('${w.id}')"
@@ -16003,7 +15889,7 @@ function viewWardrobeItem() {
               </label>
               <textarea class="rip-note-input" id="eulogyTextarea_${w.id}" placeholder="Write a little eulogy… what made this piece special? Where did you wear it? How did it make you feel?" oninput="if(S.memorialFlow)S.memorialFlow.note=this.value">${esc(mf.note||'')}</textarea>
               <button onclick="aiPolishEulogy('${w.id}')" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;padding:9px;border-radius:var(--r-sm);background:rgba(150,80,220,0.14);border:1px solid rgba(150,80,220,0.35);font-size:13px;font-weight:600;color:rgba(180,130,255,0.95);cursor:pointer;font-family:inherit;transition:background .15s;" ${S.eulogyPolishing?'disabled':''}>
-                ${S.eulogyPolishing ? `<span style="font-size:12px;opacity:0.7;">Claude is writing…</span>` : `✦ Revise with AI`}
+                ${S.eulogyPolishing ? `<span style="font-size:12px;opacity:0.7;">Closet is writing…</span>` : `✦ Revise with AI`}
               </button>
               <button class="rip-save-btn" onclick="saveMemorial('${w.id}')">Save to Memorial Garden 🌹</button>
               <button onclick="S.memorialFlow=null;render()" style="display:block;width:100%;margin-top:8px;background:none;border:none;font-size:13px;color:rgba(255,255,255,0.3);cursor:pointer;padding:6px;font-family:inherit;">Cancel</button>
@@ -16133,7 +16019,7 @@ function viewUpload() {
           placeholder="e.g. sushi dinner on a first date, park with friends, errands…"
           oninput="S.pendingContext=this.value"
           style="width:100%;box-sizing:border-box;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:inherit;color:var(--text);background:var(--surface);outline:none;">
-        <div style="margin-top:6px;font-size:11px;color:var(--text-3);">Optional — Claude will score and categorize the look for you</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--text-3);">Optional — Closet will score and categorize the look for you</div>
       </div>` : ''}
       ${isFriend ? `
       <div style="padding:14px 20px 0;">
@@ -16147,7 +16033,7 @@ function viewUpload() {
       <div style="padding:12px 20px 0;">
         <div style="background:linear-gradient(135deg,#1C1A18,#2a2520);border-radius:var(--r-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;">
           <span style="font-size:20px;">⚔️</span>
-          <div style="font-size:12px;color:rgba(255,255,255,0.75);line-height:1.4;">Claude will detect both people and deliver a head-to-head style verdict.</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.75);line-height:1.4;">Closet will detect both people and deliver a head-to-head style verdict.</div>
         </div>
       </div>` : ''}
       <div style="height:16px"></div>
@@ -16163,8 +16049,8 @@ function viewUpload() {
     ` : `
       <div style="padding:0 20px 0;margin-top:12px;">
         <p style="font-size:14px;color:var(--text-2);line-height:1.65;margin:0;">${
-          isFriend ? "Take or upload a photo of your friend's outfit — Claude will rate it and you can share the result instantly."
-          : isBattle ? 'Upload a photo of two people together. Claude will judge the fits head-to-head and declare a winner.'
+          isFriend ? "Take or upload a photo of your friend's outfit — Closet will rate it and you can share the result instantly."
+          : isBattle ? 'Upload a photo of two people together. Closet will judge the fits head-to-head and declare a winner.'
           : 'Upload a full-length mirror selfie of your outfit. Portrait photos work best!'}</p>
       </div>
       <div class="upload-zone" id="uploadZone" onclick="triggerPicker()">
@@ -16188,7 +16074,7 @@ function viewUpload() {
           placeholder="e.g. black tie wedding, summer festival, date night…"
           value="${esc(S.pendingContext||'')}"
           oninput="S.pendingContext=this.value">
-        <div style="font-size:11px;color:var(--text-3);margin-top:5px;">Claude will judge both looks against this context.</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:5px;">Closet will judge both looks against this context.</div>
       </div>
       <div style="padding:0 20px;margin-top:12px;display:flex;gap:8px;">
         <button ontouchend="if(_touchMoved)return;event.preventDefault();S.battleMode=false;S.friendRatingMode=true;render()" onclick="S.battleMode=false;S.friendRatingMode=true;render()"
@@ -16381,7 +16267,7 @@ function viewBattle() {
     </div>
 
     <div class="battle-verdict-wrap">
-      <div class="battle-verdict-label">👩‍⚖️ Claude's Verdict</div>
+      <div class="battle-verdict-label">👩‍⚖️ Closet's Verdict</div>
       <div class="battle-verdict-text">"${esc(bd.verdict||'')}"</div>
     </div>
 
@@ -16452,7 +16338,7 @@ function viewBattleReplay() {
     </div>
 
     <div class="battle-verdict-wrap">
-      <div class="battle-verdict-label">👩‍⚖️ Claude's Verdict</div>
+      <div class="battle-verdict-label">👩‍⚖️ Closet's Verdict</div>
       <div class="battle-verdict-text">"${esc(entry.battleVerdict || '')}"</div>
     </div>
     <button class="btn btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:7px;"
@@ -16505,7 +16391,7 @@ function shareBattleDraft() {
 async function shareBattleResult({ photo, label1, label2, rating1, rating2, note1, note2, items1, items2, winner, verdict }) {
   const winnerLabel = winner === 1 ? label1 : winner === 2 ? label2 : null;
   const winLine = winnerLabel ? `👑 ${winnerLabel} takes the crown` : "🤝 It's a tie!";
-  const shareText = `⚔️ Fashion Battle\n${winLine}\n${label1} ${rating1}/10  ·  ${label2} ${rating2}/10\n\nClaude's verdict: "${verdict}"\n\nvia Closet 🪞`;
+  const shareText = `⚔️ Fashion Battle\n${winLine}\n${label1} ${rating1}/10  ·  ${label2} ${rating2}/10\n\nCloset's verdict: "${verdict}"\n\nvia Closet 🪞`;
 
   // Resolved CSS variable values — matches the actual battle screen exactly
   const C = {
@@ -16835,7 +16721,7 @@ function viewFriendRating() {
         <div style="font-size:15px;font-weight:800;color:var(--text);">
           ${fr.rating >= 9 ? 'Incredible look! 🔥' : fr.rating >= 7 ? 'Really solid outfit ✨' : fr.rating >= 5 ? 'Good start 👍' : 'Room to grow 💪'}
         </div>
-        <div style="color:var(--text-3);font-size:12px;margin-top:2px;">Style rating from Claude AI</div>
+        <div style="color:var(--text-3);font-size:12px;margin-top:2px;">Style rating from Closet AI</div>
       </div>
     </div>
 
@@ -16955,7 +16841,7 @@ function viewReview() {
       if (sw?.loading) return `<div class="form-section" style="text-align:center;padding:20px;">
         <div style="font-size:24px;margin-bottom:8px;">🪄</div>
         <div style="font-size:14px;font-weight:600;color:var(--text);">Finding the perfect ${esc(sw.need)}…</div>
-        <div style="font-size:12px;color:var(--text-3);margin-top:4px;">Claude is analysing your outfit</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:4px;">Closet is analysing your outfit</div>
       </div>`;
       if (sw?.result) {
         const r = sw.result;
@@ -17015,7 +16901,7 @@ function viewReview() {
       return `<div class="form-section">
         <label class="form-label">Occasion</label>
         <div style="margin-bottom:10px;">
-          <div style="font-size:13px;color:var(--text-2);line-height:1.45;">Claude suggests: <strong style="color:var(--gold-dk);">${esc(suggested)}</strong>${confirmed && confirmed !== suggested ? ` &middot; <strong style="color:var(--text);">You chose: ${esc(confirmed)}</strong>` : ''}</div>
+          <div style="font-size:13px;color:var(--text-2);line-height:1.45;">Closet suggests: <strong style="color:var(--gold-dk);">${esc(suggested)}</strong>${confirmed && confirmed !== suggested ? ` &middot; <strong style="color:var(--text);">You chose: ${esc(confirmed)}</strong>` : ''}</div>
           ${!confirmed ? `<div style="font-size:11px;color:var(--text-3);margin-top:3px;">Tap to confirm, or pick a different category</div>` : ''}
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -17128,10 +17014,12 @@ function viewMatchReview() {
         grid = S.wardrobe.filter(w =>
           (w.name||'').toLowerCase().includes(pickerQuery) ||
           (w.brand||'').toLowerCase().includes(pickerQuery)
-        ).slice(0, 20);
+        ).slice(0, 30);
       } else {
-        grid = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat);
-        if (!grid.length) grid = S.wardrobe.slice(0, 20);
+        // Show full wardrobe — same-category items floated to the top
+        const sameCat = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat);
+        const rest    = S.wardrobe.filter(w => normalizeCat(w.category||'Other') !== itemCat);
+        grid = [...sameCat, ...rest].slice(0, 30);
       }
 
       decisionArea = `
@@ -17176,9 +17064,12 @@ function viewMatchReview() {
       grid = S.wardrobe.filter(w =>
         (w.name||'').toLowerCase().includes(pickerQuery) ||
         (w.brand||'').toLowerCase().includes(pickerQuery)
-      ).slice(0, 20);
+      ).slice(0, 30);
     } else {
-      grid = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat).slice(0, 16);
+      // Show full wardrobe — same-category items floated to the top
+      const sameCat = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat);
+      const rest    = S.wardrobe.filter(w => normalizeCat(w.category||'Other') !== itemCat);
+      grid = [...sameCat, ...rest].slice(0, 30);
     }
 
     decisionArea = `
@@ -17204,7 +17095,7 @@ function viewMatchReview() {
           }).join('')}
         </div>` : `
         <div style="padding:14px;text-align:center;background:var(--surface);border-radius:var(--r-sm);border:1px dashed var(--border);margin-bottom:12px;color:var(--text-3);font-size:13px;">
-          No ${itemCat.toLowerCase()} items in your closet yet
+          Nothing matched — try a different search
         </div>`}
         <button ontouchend="if(_touchMoved)return;event.preventDefault();advanceMatchStep(${step},'add')" onclick="advanceMatchStep(${step},'add')"
           style="width:100%;padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#2C7A2C,#3DAA3D);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:8px;">
@@ -17344,7 +17235,7 @@ function viewDetail() {
       <div class="detail-header">
         <div>
           <div class="detail-date">${fmtDateLong(entry.createdAt)}</div>
-          ${entry.claudeRecommended ? `<div style="display:inline-flex;align-items:center;gap:4px;background:var(--gold-bg);color:var(--gold-dk);border-radius:100px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:8px;">✨ Claude's Pick${entry.dressMeVibe ? ' · ' + esc(entry.dressMeVibe) : ''}</div>` : ''}
+          ${entry.claudeRecommended ? `<div style="display:inline-flex;align-items:center;gap:4px;background:var(--gold-bg);color:var(--gold-dk);border-radius:100px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:8px;">✨ Closet's Pick${entry.dressMeVibe ? ' · ' + esc(entry.dressMeVibe) : ''}</div>` : ''}
           ${entry.occasionTag ? `<div class="occasion-tag" style="margin-bottom:8px;">${entry.occasionTag===WFH_TAG?'🏠':'🏷'} ${esc(entry.occasionTag)}</div>` : ''}
           ${isWFH(entry) ? `<div style="font-size:12px;color:var(--text-3);margin-bottom:6px;">🙈 Comfort first — not counted in your style score</div>` : ''}
           ${entry.weather ? `<div class="weather-chip" style="margin-bottom:8px;">${entry.weather.icon} ${entry.weather.tempF}°F · ${esc(entry.weather.condition)}</div>` : ''}
@@ -17431,7 +17322,7 @@ function viewDetail() {
         <div style="margin:0 20px 20px;padding:20px;background:var(--surface);border:1.5px solid var(--gold);border-radius:var(--r);text-align:center;">
           <div style="font-size:24px;margin-bottom:8px;">🪄</div>
           <div style="font-size:14px;font-weight:600;color:var(--text);">Finding the perfect ${esc(sw.need)}…</div>
-          <div style="font-size:12px;color:var(--text-3);margin-top:4px;">Claude is analysing your outfit</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:4px;">Closet is analysing your outfit</div>
         </div>`;
 
       if (sw?.result) {
@@ -17834,7 +17725,7 @@ function viewSettings() {
     </div>
 
     <!-- ── CLAUDE AI (REQUIRED) ──────────────────── -->
-    ${sectionLabel('Claude AI', 'required')}
+    ${sectionLabel('Closet AI', 'required')}
     <div class="settings-section">
       <div class="settings-row">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
@@ -17849,7 +17740,7 @@ function viewSettings() {
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
             <div class="settings-label" style="margin-bottom:2px;">Auto-identify photos ✨</div>
-            <div class="settings-hint" style="margin:0;">When ON, Claude automatically identifies each photo during bulk upload. When OFF (default), tap <strong>✨ Identify</strong> only on the pieces you want analyzed — saves tokens for heavy uploaders.</div>
+            <div class="settings-hint" style="margin:0;">When ON, Closet automatically identifies each photo during bulk upload. When OFF (default), tap <strong>✨ Identify</strong> only on the pieces you want analyzed — saves tokens for heavy uploaders.</div>
           </div>
           <div ontouchend="if(_touchMoved)return;event.preventDefault();S.bulkAutoIdentify=!S.bulkAutoIdentify;localStorage.setItem('closet-bulk-auto-id',S.bulkAutoIdentify);render();" onclick="S.bulkAutoIdentify=!S.bulkAutoIdentify;localStorage.setItem('closet-bulk-auto-id',S.bulkAutoIdentify);render();" style="flex-shrink:0;margin-left:12px;cursor:pointer;touch-action:manipulation;">
             <div style="width:44px;height:26px;border-radius:13px;background:${S.bulkAutoIdentify?'var(--accent)':'var(--border)'};transition:background .2s;position:relative;">
@@ -17872,7 +17763,7 @@ function viewSettings() {
       </div>
       <div class="settings-row">
         <div class="settings-label">Your City</div>
-        <div class="settings-hint" style="margin-bottom:8px;">Sets the city shown in your Local tab — including the nav icon, city banner, and nearby brand store search. Also used by Claude for climate-aware outfit suggestions.</div>
+        <div class="settings-hint" style="margin-bottom:8px;">Sets the city shown in your Local tab — including the nav icon, city banner, and nearby brand store search. Also used by Closet for climate-aware outfit suggestions.</div>
         <input class="form-input" type="text" placeholder="e.g. San Francisco, CA"
           value="${esc(S.profileLocation)}"
           onchange="S.profileLocation=this.value.trim();S._bannerLoaded=false;localStorage.setItem('closet-profile-location',S.profileLocation);fsSet('profileLocation',S.profileLocation);">
@@ -18048,7 +17939,7 @@ function viewSettings() {
     </div>
 
     <div style="padding:16px;text-align:center;">
-      <div style="font-size:12px;color:var(--text-3);line-height:1.6;">Closet · Powered by Claude AI<br>Your API key is only ever sent to Anthropic.<br><span style="opacity:.7;">Build ${APP_BUILD}</span></div>
+      <div style="font-size:12px;color:var(--text-3);line-height:1.6;">Closet · Powered by Closet AI<br>Your API key is only ever sent to Anthropic.<br><span style="opacity:.7;">Build ${APP_BUILD}</span></div>
     </div>
     <div style="height:8px"></div>
   </div>`;
@@ -18225,7 +18116,7 @@ function celebrateOutfitSave() {
 // ── Style it with… ───────────────────────────────────────────────────────────
 async function doStyleWith(entryId, need) {
   if (!need?.trim()) return;
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
 
   const entry = S.entries.find(e => e.id === entryId);
   if (!entry) return;
@@ -18293,7 +18184,7 @@ Return ONLY valid JSON (no markdown, no code fences):
 // ── Style it with… (draft / pre-save version) ────────────────────────────────
 async function doStyleWithDraft(need) {
   if (!need?.trim()) return;
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
   const d = S.draft;
   if (!d) return;
   S.styleWith = { entryId: 'draft', need: need.trim(), loading: true, result: null };
@@ -18911,7 +18802,7 @@ function bulkSkip() { bulkAdvance(); }
 // Read current bulk form field values into preview so re-renders don't wipe typed values
 // ── Description generator — shared by bulk, receipt, and wardrobe-item edit ──
 async function _genDescText(name, brand, category) {
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return null; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return null; }
   if (!name?.trim()) { toast('Add an item name first.'); return null; }
   const context = [name.trim(), brand && `by ${brand}`, category && `(${category})`].filter(Boolean).join(' ');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -19015,7 +18906,7 @@ function bulkExitConfirm() {
 async function analyzeItemPhoto() {
   const rf = S.receiptFlow;
   if (!rf?.imageData) { toast('Please add a photo first.'); return; }
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
 
   rf.step = 'parsing'; render();
 
@@ -19071,7 +18962,7 @@ async function fillItemDetailsWithAI(id) {
   const w = S.wardrobe.find(i => i.id === id);
   if (!w) return;
   if (!w.photo) { toast('No photo found to analyze.'); return; }
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
 
   S._aiItemFillLoading = id;
   render();
@@ -19144,7 +19035,7 @@ async function parseReceipt() {
   const rf = S.receiptFlow;
   if (!rf) return;
   if (!rf.imageData && !rf.pasteText?.trim()) { toast('Upload a screenshot or paste some text first.'); return; }
-  if (!S.apiKey) { toast('Add your Claude API key in Settings first.'); return; }
+  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
 
   rf.step = 'parsing'; render();
 
@@ -19336,7 +19227,7 @@ async function doAnalyzeFriend() {
 async function shareFriendRating() {
   const fr = S.friendRating; if (!fr) return;
   const who = fr.friendName ? `${fr.friendName}'s look` : 'this look';
-  const caption = `✨ ${fr.rating}/10 — ${fr.ratingNote || `Claude rated ${who}!`}\n\nRated with Closet · Style Journal`;
+  const caption = `✨ ${fr.rating}/10 — ${fr.ratingNote || `Closet rated ${who}!`}\n\nRated with Closet · Style Journal`;
   try {
     const res = await fetch(fr.photo);
     const blob = await res.blob();
@@ -19839,7 +19730,7 @@ async function generateWardrobeSketchFromPhoto(id, file) {
 
   const key = S.apiKey?.trim();
   if (!key) {
-    toast('Add your Claude API key in Settings to sketch from photos.');
+    toast('Add your Closet API key in Settings to sketch from photos.');
     return;
   }
 
@@ -20631,7 +20522,7 @@ async function aiPolishEulogy(id) {
   // Capture whatever is currently in the textarea
   const textareaEl = document.getElementById(`eulogyTextarea_${id}`);
   const raw = (textareaEl ? textareaEl.value : S.memorialFlow.note || '').trim();
-  if (!raw) { toast('Write a few words first — Claude will give them a poetic touch.'); return; }
+  if (!raw) { toast('Write a few words first — Closet will give them a poetic touch.'); return; }
   const w = S.wardrobe.find(i => i.id === id);
   const itemName = w ? w.name : 'this piece';
   S.eulogyPolishing = true; render();
@@ -20664,7 +20555,7 @@ Please rewrite this as a short, heartfelt eulogy — keep their voice and all th
     if (!polished) throw new Error('Empty response');
     S.memorialFlow.note = polished;
   } catch(e) {
-    toast('Could not reach Claude — try again.');
+    toast('Could not reach Closet — try again.');
   }
   S.eulogyPolishing = false; render();
 }
