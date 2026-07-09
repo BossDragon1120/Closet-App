@@ -10038,7 +10038,6 @@ function viewStylistReport() {
       </div>
 
     </div>
-  </div>`
   </div>`;
 }
 
@@ -10251,7 +10250,6 @@ function openStylistPDF() {
   } else {
     toast('Allow pop-ups to open the PDF report');
   }
-}
 }
 
 function viewStyleRoulette() {
@@ -11441,7 +11439,7 @@ function bookAssistantSession() {
     '',
     '— Sent from Closet App'
   ].filter(l => l !== null).join('\n');
-  const mailtoUrl = 'mailto:hello@closetapp.com?subject=' + subject + '&body=' + encodeURIComponent(bodyLines);
+  const mailtoUrl = 'mailto:helloclosetapp@gmail.com?subject=' + subject + '&body=' + encodeURIComponent(bodyLines);
   window.open(mailtoUrl);
   S._assistantBooked = { name, email, tier: t.name, price: t.price };
   render();
@@ -11545,7 +11543,7 @@ function viewClosetAssistant() {
 
       '<div style="padding:0 16px 36px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.6;">' +
         'Pricing confirmed when we get in touch. Questions? ' +
-        '<a href="mailto:hello@closetapp.com" style="color:' + t.color + ';font-weight:700;">hello@closetapp.com</a>' +
+        '<a href="mailto:helloclosetapp@gmail.com" style="color:' + t.color + ';font-weight:700;">helloclosetapp@gmail.com</a>' +
       '</div>' +
     '</div>' +
   '</div>';
