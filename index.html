@@ -3918,28 +3918,26 @@ function _buildWishItems() {
   });
   return items;
 }
-function shareShopList() {
-  const src = S.shopSource || 'wishlist';
-  if (src === 'wishlist') { openWishShareSheet(); return; }
+function _buildShareItems(src) {
+  src = src || 'wishlist';
+  if (src === 'wishlist') return _buildWishItems();
   const list = buildShoppingList();
-  const _allFiltered = [...list]
+  const filtered = [...list]
     .filter(i => !S.shopBlocked.has(i.query.toLowerCase().trim()))
     .sort((a, b) => b.count - a.count);
-  const items = src === 'buyagain'
-    ? _allFiltered.filter(i => i.restock)
-    : _allFiltered.filter(i => !i.restock);
-  if (!items.length) { toast('Nothing to share yet!'); return; }
-  const name = S.profileName || 'My';
-  const label = src === 'buyagain' ? 'Buy Again' : 'AI Picks';
-  let text = `✨ ${name}'s ${label} Shopping List\n\n`;
-  items.slice(0, 20).forEach((it, n) => { text += `${n + 1}. ${it.query}\n`; });
-  text += '\n(curated with my Closet App 💛)';
-  shareText(`${name}'s ${label} List`, text);
+  const srcItems = src === 'buyagain'
+    ? filtered.filter(i => i.restock)
+    : filtered.filter(i => !i.restock);
+  return srcItems.slice(0, 20).map(i => ({ label: i.query, query: i.query, reason: i.reason || '' }));
+}
+function shareShopList() {
+  openWishShareSheet();
 }
 
 function openWishShareSheet() {
-  const items = _buildWishItems();
-  S.shopWishShareOpen = false; // not used for sheet anymore
+  const src = S.shopSource || 'wishlist';
+  const items = _buildShareItems(src);
+  S.shopWishShareOpen = false;
   S._wishShareItems = items.map(i => i.query); // all selected by default
   S.shopWishOccasion = '';
   S._wishOccCustom = false;
@@ -3959,10 +3957,12 @@ function toggleWishShareItem(query) {
   render();
 }
 function _buildWishShareText() {
-  const items = _buildWishItems().filter(i => S._wishShareItems.includes(i.query));
+  const src = S.shopSource || 'wishlist';
+  const listLabel = src === 'buyagain' ? 'Buy Again List' : src === 'recs' ? 'AI Picks List' : 'Wish List';
+  const items = _buildShareItems(src).filter(i => S._wishShareItems.includes(i.query));
   const name = S.profileName || 'My';
   const occ  = (S.shopWishOccasion || '').trim() ? ` — ${S.shopWishOccasion.trim()}` : '';
-  let text = `✨ ${name}'s Wish List${occ}\n\n`;
+  let text = `✨ ${name}'s ${listLabel}${occ}\n\n`;
   items.forEach((it, n) => {
     text += `${n + 1}. ${it.label}`;
     if (it.reason) text += `\n   ${it.reason}`;
@@ -4148,8 +4148,12 @@ function wishShareSheetHTML() {
 }
 
 function viewWishShare() {
-  const allItems = _buildWishItems();
+  const src = S.shopSource || 'wishlist';
+  const listLabel = src === 'buyagain' ? 'Buy Again List' : src === 'recs' ? 'AI Picks List' : 'Wish List';
+  const allItems = _buildShareItems(src);
   const OCCASIONS = ['🎁 Gift Ideas', '🎂 Birthday', '🎄 Holiday', '💝 Valentine\'s', '👰 Wedding', '🌸 Spring Refresh'];
+
+  const activeOcc = (S.shopWishOccasion || '').trim();
 
   return `<div class="view" style="display:flex;flex-direction:column;height:100%;background:var(--bg);">
     <div class="nav" style="flex-shrink:0;">
@@ -4163,9 +4167,19 @@ function viewWishShare() {
         onclick="shareWishListCard()"
         style="border:none;background:${S._wishShareItems.length?'var(--gold)':'var(--border)'};color:${S._wishShareItems.length?'#fff':'var(--text-3)'};"
         ${S._wishShareItems.length?'':'disabled'}>
-        ↗ Share Wish List
+        ↗ Share ${listLabel}
       </button>
     </div>
+
+    ${activeOcc ? `
+    <div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:9px 16px;background:var(--gold-bg);border-bottom:1.5px solid rgba(184,125,42,0.2);">
+      <div style="font-size:15px;flex-shrink:0;">🎀</div>
+      <div style="flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--gold-dk);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(activeOcc)}</div>
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.shopWishOccasion='';S._wishOccCustom=false;render();"
+        onclick="S.shopWishOccasion='';S._wishOccCustom=false;render();"
+        style="flex-shrink:0;background:none;border:none;color:var(--gold-dk);font-size:16px;cursor:pointer;padding:2px 4px;line-height:1;touch-action:manipulation;font-family:inherit;">✕</button>
+    </div>` : ''}
 
     <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 16px;padding-bottom:calc(100px + env(safe-area-inset-bottom,0px));">
 
@@ -4202,8 +4216,8 @@ function viewWishShare() {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);">Items — ${S._wishShareItems.length} of ${allItems.length} selected</div>
           <button
-            ontouchend="if(_touchMoved)return;event.preventDefault();S._wishShareItems=S._wishShareItems.length===${allItems.length}?[]:_buildWishItems().map(i=>i.query);render();"
-            onclick="S._wishShareItems=S._wishShareItems.length===${allItems.length}?[]:_buildWishItems().map(i=>i.query);render();"
+            ontouchend="if(_touchMoved)return;event.preventDefault();S._wishShareItems=S._wishShareItems.length===${allItems.length}?[]:_buildShareItems('${src}').map(i=>i.query);render();"
+            onclick="S._wishShareItems=S._wishShareItems.length===${allItems.length}?[]:_buildShareItems('${src}').map(i=>i.query);render();"
             style="font-size:12px;font-weight:700;color:var(--gold-dk);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 0;touch-action:manipulation;">
             ${S._wishShareItems.length === allItems.length ? 'Deselect all' : 'Select all'}
           </button>
@@ -4238,7 +4252,7 @@ function viewWishShare() {
         onclick="shareWishListCard()"
         style="width:100%;padding:15px;background:${S._wishShareItems.length?'var(--gold)':'var(--border)'};color:${S._wishShareItems.length?'#fff':'var(--text-3)'};border:none;border-radius:100px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:all .15s;"
         ${S._wishShareItems.length?'':'disabled'}>
-        ↗ Share${S._wishShareItems.length && S._wishShareItems.length < allItems.length ? ` (${S._wishShareItems.length} items)` : ' Wish List'}
+        ↗ Share${S._wishShareItems.length && S._wishShareItems.length < allItems.length ? ` (${S._wishShareItems.length} items)` : ` ${listLabel}`}
       </button>
     </div>
 
@@ -5893,7 +5907,7 @@ async function doOutfitBuild() {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
+        max_tokens: 1024,
         messages: [{
           role: 'user',
           content: `You are a personal stylist. Build a complete outfit around this anchor piece using items from the wardrobe below.
@@ -5925,10 +5939,14 @@ Rules:
       })
     });
 
-    if (!res.ok) throw new Error(`API ${res.status}`);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(`API ${res.status}: ${errBody?.error?.message || ''}`);
+    }
     const data = await res.json();
-    const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
-    const result = JSON.parse(text);
+    const raw = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+    const result = JSON.parse(raw);
+    if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Unexpected response format');
 
     S.outfitBuilder = { ...ob, loading: false, result };
     logSuggestion('builder', result.occasion||'', result.stylistNote||'', (result.picks||[]).map(p=>({emoji:'💜',name:p.name||'',reason:p.reason||''})));
@@ -5937,7 +5955,14 @@ Rules:
     console.error('doOutfitBuild error', e);
     S.outfitBuilder = { ...ob, loading: false, result: null };
     render();
-    toast('Couldn\'t build the outfit — check your API key and try again.');
+    const msg = e.message || '';
+    if (msg.includes('401') || msg.includes('403')) {
+      toast('API key issue — check Settings and try again.');
+    } else if (msg.includes('429')) {
+      toast('Too many requests — wait a moment and try again.');
+    } else {
+      toast('Couldn\'t build the outfit — please try again.');
+    }
   }
 }
 
@@ -6311,12 +6336,16 @@ function render() {
     });
   }
   // Post-render: re-focus match-picker search in match-review flow
+  // Synchronous + preventScroll (same as wardrobe-search-input above) — rAF lets
+  // Safari's URL bar expand/collapse on every debounced re-render, causing the
+  // "jumping" effect and potentially dismissing the iOS keyboard.
   if (window._matchPickerFocused) {
     window._matchPickerFocused = false;
-    requestAnimationFrame(() => {
-      const inp = document.getElementById('match-picker-search');
-      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
-    });
+    const inp = document.getElementById('match-picker-search');
+    if (inp && document.activeElement !== inp) {
+      try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); }
+      inp.setSelectionRange(inp.value.length, inp.value.length);
+    }
   }
 }
 
@@ -9821,16 +9850,28 @@ function viewStylistReport() {
   const name = S.profileName || 'Your';
   const soloEntries = S.entries.filter(e => !e.battleId);
   const scoreVal = styleScore(soloEntries);
+  const height = S.profileHeight || '';
+  const nonNegPhysical = S.nonNegPhysical || '';
+  const nonNegAesthetic = S.nonNegAesthetic || '';
 
-  // Signature Pieces: top 4 by wear+rating, photo only
-  const scored = aw.map(w => ({ w, score: (w.wears?.length||0)*2+(w.rating||0)*3 })).sort((a,b)=>b.score-a.score);
-  const topPieces = scored.filter(x => x.w.photo || x.w.photoThumb).slice(0, 4).map(x => x.w);
+  // Signature Pieces — Gems (highest rated) vs Workhorses (most worn)
+  const _photoItems = aw.filter(w => w.photo || w.photoThumb);
+  const gems = [..._photoItems].sort((a,b)=>((b.rating||0)*4+(b.wears?.length||0)*0.5)-((a.rating||0)*4+(a.wears?.length||0)*0.5)).slice(0,4);
+  const _gemIds = new Set(gems.map(w=>w.id));
+  const workhorses = [..._photoItems].filter(w=>!_gemIds.has(w.id)&&(w.wears?.length||0)>0).sort((a,b)=>(b.wears?.length||0)-(a.wears?.length||0)).slice(0,4);
 
-  // Best Fits: top 3 rated outfit entries with photos
-  const bestFits = [...soloEntries]
-    .filter(e => e.photo && e.rating != null)
-    .sort((a,b) => (b.rating-a.rating)||(new Date(b.createdAt)-new Date(a.createdAt)))
-    .slice(0, 3);
+  // Best Fits: up to 6, variety by occasion tag, exclude hidden (doNotRepeat)
+  const _allFits = [...soloEntries]
+    .filter(e => e.photo && e.rating != null && !e.doNotRepeat)
+    .sort((a,b) => (b.rating-a.rating)||(new Date(b.createdAt)-new Date(a.createdAt)));
+  const bestFits = [];
+  const _usedTags = new Set();
+  for (const e of _allFits) {
+    if (bestFits.length >= 6) break;
+    const tag = e.occasionTag || '';
+    if (!tag || !_usedTags.has(tag)) { bestFits.push(e); if (tag) _usedTags.add(tag); }
+  }
+  for (const e of _allFits) { if (bestFits.length >= 6) break; if (!bestFits.includes(e)) bestFits.push(e); }
 
   // Most Complimented: top 3
   const complimented = aw
@@ -9869,6 +9910,18 @@ function viewStylistReport() {
     });
   });
 
+  // Top brands owned
+  const _brandMap = {};
+  aw.forEach(w => { if (!w.brand) return; const b=w.brand.trim(); if (!b) return; if (!_brandMap[b]) _brandMap[b]={items:0,wears:0}; _brandMap[b].items++; _brandMap[b].wears+=(w.wears?.length||0); });
+  const topBrands = Object.entries(_brandMap).sort((a,b)=>(b[1].items+b[1].wears*0.5)-(a[1].items+a[1].wears*0.5)).slice(0,3);
+
+  // Suggested brands (AI discovery or GOAL_BRANDS fallback)
+  const _ownedBrandSet = new Set(aw.map(w=>(w.brand||'').trim().toLowerCase()));
+  const suggestedBrands = (() => {
+    if (S.brandDiscovery?.suggestions?.length) return S.brandDiscovery.suggestions.slice(0,3).map(s=>({name:s.name,vibe:s.vibe||''}));
+    const r=[]; for (const g of goals) { for (const b of (GOAL_BRANDS[g]||[])) { if (!_ownedBrandSet.has(b.toLowerCase())&&!r.find(x=>x.name===b)) { r.push({name:b,vibe:g}); if(r.length>=3) return r; } } } return r;
+  })();
+
   return `
   <div style="display:flex;flex-direction:column;height:100%;background:var(--bg);overflow:hidden;">
     <div class="nav" style="flex-shrink:0;">
@@ -9901,45 +9954,73 @@ function viewStylistReport() {
           <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.35);align-self:center;">My style:</div>
           ${styleWords.slice(0,6).map(w=>`<div style="background:rgba(255,255,255,0.08);border-radius:100px;padding:3px 9px;font-size:10px;color:rgba(255,255,255,.65);font-weight:600;">${esc(w)}</div>`).join('')}
         </div>` : ''}
+        ${height ? `<div style="margin-top:8px;font-size:10px;color:rgba(255,255,255,.45);">📏 ${esc(height)}</div>` : ''}
       </div>
+
+      <!-- NON-NEGOTIABLES (below header) -->
+      ${(nonNegPhysical || nonNegAesthetic) ? `
+      <div style="padding:12px 16px 0;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">🚫 My Non-Negotiables</div>
+        ${nonNegPhysical ? `<div style="margin-bottom:6px;"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-dk);margin-bottom:3px;">Physical & Practical</div><div style="font-size:12px;color:var(--text-2);line-height:1.5;">${esc(nonNegPhysical)}</div></div>` : ''}
+        ${nonNegAesthetic ? `<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gold-dk);margin-bottom:3px;">Aesthetic</div><div style="font-size:12px;color:var(--text-2);line-height:1.5;">${esc(nonNegAesthetic)}</div></div>` : ''}
+      </div>` : ''}
 
       <!-- BEST FITS (Portfolio) -->
       ${bestFits.length ? `
       <div style="padding:18px 16px 4px;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">⭐ Your Best Fits</div>
-        <div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-          ${bestFits.map(e => `<div style="flex-shrink:0;width:130px;border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
-            <div style="height:165px;overflow:hidden;background:var(--surface-2);">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">⭐ Best Fits</div>
+        <div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px;">
+          ${bestFits.map(e => `<div style="flex-shrink:0;width:120px;border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
+            <div style="height:152px;overflow:hidden;background:var(--surface-2);">
               <img src="${esc(photoBlobUrl(e.photo))}" style="width:100%;height:100%;object-fit:cover;object-position:center 15%;" loading="lazy">
             </div>
-            <div style="padding:8px 10px;">
-              <div style="font-size:14px;font-weight:900;color:var(--gold-dk);">⭐ ${e.rating}/10</div>
-              ${e.occasionTag ? `<div style="font-size:9px;color:var(--text-3);margin-top:2px;">${esc(e.occasionTag)}</div>` : ''}
+            <div style="padding:7px 9px;">
+              <div style="font-size:13px;font-weight:900;color:var(--gold-dk);">⭐ ${e.rating}/10</div>
+              ${e.occasionTag ? `<div style="font-size:9px;font-weight:600;color:var(--text-3);margin-top:2px;background:var(--surface-2);border-radius:100px;padding:1px 6px;display:inline-block;">${esc(e.occasionTag)}</div>` : ''}
             </div>
           </div>`).join('')}
         </div>
       </div>` : ''}
 
       <!-- SIGNATURE PIECES -->
-      ${topPieces.length ? `
+      ${(gems.length || workhorses.length) ? `
       <div style="padding:18px 16px 4px;">
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">👗 Signature Pieces</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          ${topPieces.map(w => {
-            const src = w.photo || w.photoThumb || '';
-            const wears = w.wears?.length || 0;
-            return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
-              <div style="height:120px;overflow:hidden;background:var(--surface-2);">
-                ${src ? `<img src="${esc(photoBlobUrl(src))}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:40px;">${esc(w.icon||'👕')}</div>`}
-              </div>
-              <div style="padding:9px 10px;">
-                <div style="font-size:12px;font-weight:800;color:var(--text);line-height:1.25;">${esc(w.name)}</div>
-                ${w.brand ? `<div style="font-size:10px;color:var(--text-3);margin-top:2px;">${esc(w.brand)}</div>` : ''}
-                ${wears ? `<div style="font-size:10px;color:var(--gold-dk);font-weight:700;margin-top:3px;">${wears}× worn</div>` : ''}
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
+        ${gems.length ? `
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:8px;">✨ Closet Gems</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+            ${gems.map(w => {
+              const src = w.photo || w.photoThumb || '';
+              return `<div style="border:1.5px solid rgba(184,125,42,0.3);border-radius:var(--r);overflow:hidden;background:var(--surface);">
+                <div style="height:110px;overflow:hidden;background:var(--surface-2);">
+                  ${src ? `<img src="${esc(photoBlobUrl(src))}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${esc(w.icon||'👕')}</div>`}
+                </div>
+                <div style="padding:7px 9px;">
+                  <div style="font-size:11px;font-weight:800;color:var(--text);line-height:1.2;">${esc(w.name)}</div>
+                  ${w.brand ? `<div style="font-size:9px;color:var(--text-3);margin-top:1px;">${esc(w.brand)}</div>` : ''}
+                  ${w.rating ? `<div style="font-size:9px;color:var(--gold-dk);font-weight:700;margin-top:2px;">⭐ ${w.rating}/10</div>` : ''}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>` : ''}
+        ${workhorses.length ? `
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-2);margin-bottom:8px;">💪 Everyday Workhorses</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            ${workhorses.map(w => {
+              const src = w.photo || w.photoThumb || '';
+              const wears = w.wears?.length || 0;
+              return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
+                <div style="height:110px;overflow:hidden;background:var(--surface-2);">
+                  ${src ? `<img src="${esc(photoBlobUrl(src))}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${esc(w.icon||'👕')}</div>`}
+                </div>
+                <div style="padding:7px 9px;">
+                  <div style="font-size:11px;font-weight:800;color:var(--text);line-height:1.2;">${esc(w.name)}</div>
+                  ${w.brand ? `<div style="font-size:9px;color:var(--text-3);margin-top:1px;">${esc(w.brand)}</div>` : ''}
+                  ${wears ? `<div style="font-size:9px;color:var(--text-2);font-weight:700;margin-top:2px;">${wears}× worn</div>` : ''}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>` : ''}
       </div>` : ''}
 
       <!-- MOST COMPLIMENTED (Portfolio) -->
@@ -9963,6 +10044,28 @@ function viewStylistReport() {
             </div>`;
           }).join('')}
         </div>
+      </div>` : ''}
+
+      <!-- BRANDS -->
+      ${(topBrands.length || suggestedBrands.length) ? `
+      <div style="padding:18px 16px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">🏷 Brands</div>
+        ${topBrands.length ? `
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-2);margin-bottom:8px;">My Go-Tos</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
+            ${topBrands.map(([brand, data]) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--surface);">
+              <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(brand)}</div>
+              <div style="font-size:10px;color:var(--text-3);">${data.items} piece${data.items===1?'':'s'}${data.wears?' · '+data.wears+'× worn':''}</div>
+            </div>`).join('')}
+          </div>` : ''}
+        ${suggestedBrands.length ? `
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:8px;">✨ You Might Love</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${suggestedBrands.map(b => `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1.5px dashed rgba(184,125,42,0.4);border-radius:10px;background:var(--gold-bg);">
+              <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(b.name)}</div>
+              ${b.vibe ? `<div style="font-size:10px;color:var(--gold-dk);font-weight:600;">${esc(b.vibe)}</div>` : ''}
+            </div>`).join('')}
+          </div>` : ''}
       </div>` : ''}
 
       <!-- SAVED LOOKS -->
@@ -10061,16 +10164,28 @@ function openStylistPDF() {
   const soloEntries = S.entries.filter(e => !e.battleId);
   const scoreVal = styleScore(soloEntries);
   const dateStr = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  const height = S.profileHeight || '';
+  const nonNegPhysical = S.nonNegPhysical || '';
+  const nonNegAesthetic = S.nonNegAesthetic || '';
 
-  // Signature Pieces: top 4 by wear+rating, photo only
-  const scored = aw.map(w => ({ w, score: (w.wears?.length||0)*2+(w.rating||0)*3 })).sort((a,b)=>b.score-a.score);
-  const topPieces = scored.filter(x => x.w.photo || x.w.photoThumb).slice(0, 4).map(x => x.w);
+  // Signature Pieces — Gems (highest rated) vs Workhorses (most worn), photo only
+  const _photoItems = aw.filter(w => w.photo || w.photoThumb);
+  const gems = [..._photoItems].sort((a,b)=>((b.rating||0)*4+(b.wears?.length||0)*0.5)-((a.rating||0)*4+(a.wears?.length||0)*0.5)).slice(0,4);
+  const _gemIds = new Set(gems.map(w=>w.id));
+  const workhorses = [..._photoItems].filter(w=>!_gemIds.has(w.id)&&(w.wears?.length||0)>0).sort((a,b)=>(b.wears?.length||0)-(a.wears?.length||0)).slice(0,4);
 
-  // Best Fits: top 3 rated outfit entries with photos
-  const bestFits = [...soloEntries]
-    .filter(e => e.photo && e.rating != null)
-    .sort((a,b) => (b.rating-a.rating)||(new Date(b.createdAt)-new Date(a.createdAt)))
-    .slice(0, 3);
+  // Best Fits: up to 6, variety by occasion tag, exclude hidden (doNotRepeat)
+  const _allFits = [...soloEntries]
+    .filter(e => e.photo && e.rating != null && !e.doNotRepeat)
+    .sort((a,b) => (b.rating-a.rating)||(new Date(b.createdAt)-new Date(a.createdAt)));
+  const bestFits = [];
+  const _usedTags = new Set();
+  for (const e of _allFits) {
+    if (bestFits.length >= 6) break;
+    const tag = e.occasionTag || '';
+    if (!tag || !_usedTags.has(tag)) { bestFits.push(e); if (tag) _usedTags.add(tag); }
+  }
+  for (const e of _allFits) { if (bestFits.length >= 6) break; if (!bestFits.includes(e)) bestFits.push(e); }
 
   // Most Complimented: top 3
   const complimented = aw
@@ -10109,41 +10224,71 @@ function openStylistPDF() {
     });
   });
 
+  // Top brands owned
+  const _brandMap = {};
+  aw.forEach(w => { if (!w.brand) return; const b=w.brand.trim(); if (!b) return; if (!_brandMap[b]) _brandMap[b]={items:0,wears:0}; _brandMap[b].items++; _brandMap[b].wears+=(w.wears?.length||0); });
+  const topBrands = Object.entries(_brandMap).sort((a,b)=>(b[1].items+b[1].wears*0.5)-(a[1].items+a[1].wears*0.5)).slice(0,3);
+
+  // Suggested brands (AI discovery or GOAL_BRANDS fallback)
+  const _ownedBrandSet = new Set(aw.map(w=>(w.brand||'').trim().toLowerCase()));
+  const suggestedBrands = (() => {
+    if (S.brandDiscovery?.suggestions?.length) return S.brandDiscovery.suggestions.slice(0,3).map(s=>({name:s.name,vibe:s.vibe||''}));
+    const r=[]; for (const g of goals) { for (const b of (GOAL_BRANDS[g]||[])) { if (!_ownedBrandSet.has(b.toLowerCase())&&!r.find(x=>x.name===b)) { r.push({name:b,vibe:g}); if(r.length>=3) return r; } } } return r;
+  })();
+
   const sec = label => `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:#888;margin:28px 0 12px;border-top:1px solid #e8e0d0;padding-top:20px;">${label}</div>`;
 
   const bestFitsHTML = bestFits.length ? `
-    ${sec('⭐ Your Best Fits')}
-    <div style="display:grid;grid-template-columns:repeat(${bestFits.length},1fr);gap:10px;">
-      ${bestFits.map(e => `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;break-inside:avoid;">
-        <div style="height:200px;overflow:hidden;background:#f5f0e8;">
+    ${sec('⭐ Best Fits')}
+    <div style="display:grid;grid-template-columns:repeat(${Math.min(bestFits.length,3)},1fr);gap:10px;${bestFits.length>3?'margin-bottom:10px;':''}">
+      ${bestFits.slice(0,3).map(e => `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;break-inside:avoid;">
+        <div style="height:180px;overflow:hidden;background:#f5f0e8;">
           <img src="${e.photo}" style="width:100%;height:100%;object-fit:cover;object-position:center 15%;">
         </div>
-        <div style="padding:10px 12px;">
-          <div style="font-size:16px;font-weight:900;color:#B8860B;">⭐ ${e.rating}/10</div>
-          ${e.occasionTag ? `<div style="font-size:10px;color:#888;margin-top:2px;">${e.occasionTag}</div>` : ''}
-          ${e.comment ? `<div style="font-size:11px;color:#555;margin-top:5px;line-height:1.4;">"${e.comment.slice(0,80)}${e.comment.length>80?'…':''}"</div>` : ''}
+        <div style="padding:9px 11px;">
+          <div style="font-size:15px;font-weight:900;color:#B8860B;">⭐ ${e.rating}/10</div>
+          ${e.occasionTag ? `<div style="display:inline-block;font-size:9px;font-weight:700;color:#B8860B;background:rgba(184,134,11,0.1);border-radius:100px;padding:1px 7px;margin-top:3px;">${e.occasionTag}</div>` : ''}
+          ${e.comment ? `<div style="font-size:10px;color:#555;margin-top:4px;line-height:1.4;">"${e.comment.slice(0,70)}${e.comment.length>70?'…':''}"</div>` : ''}
         </div>
       </div>`).join('')}
-    </div>` : '';
+    </div>
+    ${bestFits.length > 3 ? `<div style="display:grid;grid-template-columns:repeat(${bestFits.slice(3).length},1fr);gap:10px;">
+      ${bestFits.slice(3).map(e => `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;break-inside:avoid;">
+        <div style="height:160px;overflow:hidden;background:#f5f0e8;">
+          <img src="${e.photo}" style="width:100%;height:100%;object-fit:cover;object-position:center 15%;">
+        </div>
+        <div style="padding:8px 10px;">
+          <div style="font-size:13px;font-weight:900;color:#B8860B;">⭐ ${e.rating}/10</div>
+          ${e.occasionTag ? `<div style="display:inline-block;font-size:9px;font-weight:700;color:#B8860B;background:rgba(184,134,11,0.1);border-radius:100px;padding:1px 7px;margin-top:2px;">${e.occasionTag}</div>` : ''}
+        </div>
+      </div>`).join('')}
+    </div>` : ''}` : '';
 
-  const piecesHTML = topPieces.length ? `
+  const pieceCard = (w, badge, badgeColor) => {
+    const src = w.photo || w.photoThumb || '';
+    const wears = w.wears?.length || 0;
+    return `<div style="border:1.5px solid ${badgeColor==='#B8860B'?'rgba(184,134,11,0.3)':'#e0d5c0'};border-radius:12px;overflow:hidden;break-inside:avoid;">
+      <div style="height:130px;overflow:hidden;background:#f5f0e8;">
+        ${src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:40px;">${w.icon||'👕'}</div>`}
+      </div>
+      <div style="padding:8px 10px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:${badgeColor};margin-bottom:4px;">${badge}</div>
+        <div style="font-size:11px;font-weight:800;color:#1C1A18;line-height:1.25;">${w.name}</div>
+        ${w.brand ? `<div style="font-size:9px;color:#888;margin-top:2px;">${w.brand}</div>` : ''}
+        ${w.rating ? `<div style="font-size:9px;color:#B8860B;font-weight:700;margin-top:2px;">⭐ ${w.rating}/10</div>` : (wears ? `<div style="font-size:9px;color:#555;font-weight:700;margin-top:2px;">${wears}× worn</div>` : '')}
+      </div>
+    </div>`;
+  };
+  const piecesHTML = (gems.length || workhorses.length) ? `
     ${sec('👗 Signature Pieces')}
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
-      ${topPieces.map(w => {
-        const src = w.photo || w.photoThumb || '';
-        const wears = w.wears?.length || 0;
-        return `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;break-inside:avoid;">
-          <div style="height:140px;overflow:hidden;background:#f5f0e8;">
-            ${src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:44px;">${w.icon||'👕'}</div>`}
-          </div>
-          <div style="padding:9px 10px;">
-            <div style="font-size:12px;font-weight:800;color:#1C1A18;line-height:1.3;">${w.name}</div>
-            ${w.brand ? `<div style="font-size:10px;color:#888;margin-top:2px;">${w.brand}</div>` : ''}
-            ${wears ? `<div style="font-size:10px;color:#B8860B;font-weight:700;margin-top:3px;">${wears}× worn</div>` : ''}
-          </div>
-        </div>`;
-      }).join('')}
-    </div>` : '';
+    ${gems.length ? `<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#B8860B;margin-bottom:10px;">✨ CLOSET GEMS</div>
+    <div style="display:grid;grid-template-columns:repeat(${Math.min(gems.length,4)},1fr);gap:10px;margin-bottom:20px;">
+      ${gems.map(w => pieceCard(w,'✨ Gem','#B8860B')).join('')}
+    </div>` : ''}
+    ${workhorses.length ? `<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#555;margin-bottom:10px;">💪 EVERYDAY WORKHORSES</div>
+    <div style="display:grid;grid-template-columns:repeat(${Math.min(workhorses.length,4)},1fr);gap:10px;">
+      ${workhorses.map(w => pieceCard(w,'💪 Workhorse','#555')).join('')}
+    </div>` : ''}` : '';
 
   const complimentedHTML = complimented.length ? `
     ${sec('💬 Most Complimented')}
@@ -10210,6 +10355,32 @@ function openStylistPDF() {
       </div>`).join('')}
     </div>` : '';
 
+  const brandsHTML = (topBrands.length || suggestedBrands.length) ? `
+    ${sec('🏷 Brands')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+      ${topBrands.length ? `<div>
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#555;margin-bottom:10px;">My Go-Tos</div>
+        ${topBrands.map(([brand,data]) => `<div style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0ebe0;padding-bottom:7px;">
+          <div style="font-size:13px;font-weight:700;color:#1C1A18;">${brand}</div>
+          <div style="font-size:10px;color:#888;">${data.items} piece${data.items===1?'':'s'}${data.wears?' · '+data.wears+'×':''}</div>
+        </div>`).join('')}
+      </div>` : ''}
+      ${suggestedBrands.length ? `<div>
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#B8860B;margin-bottom:10px;">✨ You Might Love</div>
+        ${suggestedBrands.map(b => `<div style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0ebe0;padding-bottom:7px;">
+          <div style="font-size:13px;font-weight:700;color:#1C1A18;">${b.name}</div>
+          ${b.vibe ? `<div style="font-size:10px;color:#B8860B;font-style:italic;">${b.vibe}</div>` : ''}
+        </div>`).join('')}
+      </div>` : ''}
+    </div>` : '';
+
+  const nonNegHTML = (nonNegPhysical || nonNegAesthetic) ? `
+    ${sec('🚫 Non-Negotiables')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      ${nonNegPhysical ? `<div><div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px;">Physical &amp; Practical</div><div style="font-size:12px;color:#333;line-height:1.6;">${nonNegPhysical}</div></div>` : ''}
+      ${nonNegAesthetic ? `<div><div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px;">Aesthetic</div><div style="font-size:12px;color:#333;line-height:1.6;">${nonNegAesthetic}</div></div>` : ''}
+    </div>` : '';
+
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
   <title>${name} — Style Report</title>
   <style>
@@ -10229,6 +10400,7 @@ function openStylistPDF() {
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(212,168,32,0.7);margin-bottom:6px;">Style Profile · ${dateStr}</div>
         <div style="font-size:28px;font-weight:900;">${name}</div>
         ${scoreVal && !isNaN(parseFloat(scoreVal)) ? `<div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:4px;">Style Score: <span style="color:#D4A820;font-weight:800;">${scoreVal}/10</span></div>` : ''}
+        ${height ? `<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;">📏 ${height}</div>` : ''}
       </div>
       ${goals.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;max-width:220px;">
         ${goals.slice(0,4).map(g=>`<div style="background:rgba(184,134,11,0.2);border:1px solid rgba(212,168,32,0.4);border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;color:rgba(212,168,32,0.9);">${g}</div>`).join('')}
@@ -10243,9 +10415,11 @@ function openStylistPDF() {
   ${bestFitsHTML}
   ${piecesHTML}
   ${complimentedHTML}
+  ${brandsHTML}
   ${allSaved.length ? `${sec('💜 Saved Looks')}${lookCards}` : ''}
   ${tipsHTML}
   ${wishHTML}
+  ${nonNegHTML}
 
   ${sec('📊 Wardrobe at a Glance')}
   <div style="display:flex;gap:12px;flex-wrap:wrap;">
