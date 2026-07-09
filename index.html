@@ -3067,6 +3067,8 @@ const S = {
   wardrobePulse:          JSON.parse(localStorage.getItem('closet-wardrobe-pulse') || 'null'),
   _wardrobePulseLoading:  false,
   _brandsExpanded:        false,
+  _tipsExpanded:          false,
+  _trendsExpanded:        false,
   _brandSort:             'count', // 'count' | 'az'
   // Custom shelves
   customCategories:       JSON.parse(localStorage.getItem('closet-custom-categories') || '[]'),
@@ -3095,6 +3097,7 @@ const S = {
   braFitNotes:        localStorage.getItem('closet-bra-fit-notes') || '',
   eyeColor:           localStorage.getItem('closet-eye-color') || '',
   _auraEdit:          null,
+  _tagPickerFor:      null,  // entryId when the inline tag picker sheet is open
   _expandedEvents:    {},
   assistantTier:      'therapy', _therapySeason: 'spring',
   _assistantBooked:   null,
@@ -6011,31 +6014,59 @@ function toggleRouletteLook(id) {
 // "You Might Also Love" — AI brand discovery. Moved from the old Evolve brands
 // tab onto the My Brands page when Evolve was flattened to a single scroll.
 function brandDiscoveryHTML() {
-  return `<div style="padding:6px 16px 0;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">✨ You Might Also Love</div>
-        ${S.brandDiscovery?.suggestions?.length ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↻</button>` : ''}
-      </div>
-      ${S._brandDiscoveryLoading ? `<div style="display:flex;align-items:center;gap:8px;">
+  if (S._brandDiscoveryLoading) {
+    return `<div style="padding:6px 16px 0;">
+      <div style="display:flex;align-items:center;gap:8px;">
         <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>
         <span style="font-size:12px;color:var(--text-3);">Finding brands that match your aesthetic…</span>
-      </div>` : S.brandDiscovery?.suggestions?.length ? `
-        <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-          ${S.brandDiscovery.suggestions.map(s=>`
-            <div style="flex-shrink:0;width:148px;scroll-snap-align:start;background:var(--surface);border-radius:12px;border:1.5px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:5px;">
-              <div style="font-size:20px;line-height:1;">${s.emoji||'✦'}</div>
-              <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(s.name)}</div>
-              <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 7px;align-self:flex-start;">${esc(s.vibe)}</div>
-              <div style="font-size:11px;color:var(--text-3);line-height:1.4;flex:1;">${esc(s.reason)}</div>
-              <a href="${brandInstagramUrl(s.name)}" target="_blank" rel="noopener"
-                style="margin-top:3px;display:inline-flex;align-items:center;gap:4px;color:var(--text-3);text-decoration:none;font-size:11px;font-weight:600;">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-                Instagram
-              </a>
-            </div>`).join('')}
-        </div>` : `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
-          style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:100px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">✦ Find similar brands</button>`}
+      </div>
     </div>`;
+  }
+  if (!S.brandDiscovery?.suggestions?.length) {
+    return `<div style="padding:6px 16px 0;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
+        style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:100px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">✦ Find similar brands</button>
+    </div>`;
+  }
+  const suggs = S.brandDiscovery.suggestions;
+  if (!S._brandsExpanded) {
+    const s = suggs[0];
+    return `<div style="padding:6px 16px 0;">
+      <div ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=true;render()" onclick="S._brandsExpanded=true;render()"
+        style="cursor:pointer;touch-action:manipulation;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:11px;">
+        <div style="font-size:22px;line-height:1;flex-shrink:0;">${s.emoji||'✦'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-2);margin-bottom:3px;">✨ You Might Also Love <span style="font-weight:500;color:var(--text-3);">· ${suggs.length}</span></div>
+          <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(s.name)}</div>
+          <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:1px 7px;display:inline-block;margin-top:3px;">${esc(s.vibe)}</div>
+        </div>
+        <div style="font-size:16px;color:var(--text-3);flex-shrink:0;line-height:1;">›</div>
+      </div>
+    </div>`;
+  }
+  return `<div style="padding:6px 16px 0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">✨ You Might Also Love</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↻</button>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=false;render()" onclick="S._brandsExpanded=false;render()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">▲</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+      ${suggs.map(s=>`
+        <div style="flex-shrink:0;width:148px;scroll-snap-align:start;background:var(--surface);border-radius:12px;border:1.5px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:5px;">
+          <div style="font-size:20px;line-height:1;">${s.emoji||'✦'}</div>
+          <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(s.name)}</div>
+          <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 7px;align-self:flex-start;">${esc(s.vibe)}</div>
+          <div style="font-size:11px;color:var(--text-3);line-height:1.4;flex:1;">${esc(s.reason)}</div>
+          <a href="${brandInstagramUrl(s.name)}" target="_blank" rel="noopener"
+            style="margin-top:3px;display:inline-flex;align-items:center;gap:4px;color:var(--text-3);text-decoration:none;font-size:11px;font-weight:600;">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            Instagram
+          </a>
+        </div>`).join('')}
+    </div>
+  </div>`;
 }
 
 function viewBrands() {
@@ -6114,7 +6145,6 @@ function viewBrands() {
     <div style="border-top:1px solid var(--border);">
       ${rows}
     </div>
-    ${brandDiscoveryHTML()}
     <div style="height:40px;"></div>
   </div>`;
 }
@@ -9774,37 +9804,67 @@ function viewSavedLook() {
    ================================================================ */
 function viewStylistReport() {
   const aw = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+  const goals = S.styleGoals || [];
+  const styleWords = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const name = S.profileName || 'Your';
+  const soloEntries = S.entries.filter(e => !e.battleId);
+  const scoreVal = styleScore(soloEntries);
 
-  // Top pieces: score by (wears * 2) + (rating * 3), take top 8 with photos first
-  const scored = aw.map(w => ({
-    w,
-    score: (w.wears?.length || 0) * 2 + (w.rating || 0) * 3
-  })).sort((a, b) => b.score - a.score);
-  const topPieces = scored.filter(x => x.w.photo || x.w.photoThumb).slice(0, 8).map(x => x.w);
+  // Signature Pieces: top 4 by wear+rating, photo only
+  const scored = aw.map(w => ({ w, score: (w.wears?.length||0)*2+(w.rating||0)*3 })).sort((a,b)=>b.score-a.score);
+  const topPieces = scored.filter(x => x.w.photo || x.w.photoThumb).slice(0, 4).map(x => x.w);
 
-  // Best saved looks (most recent 6, across all three types)
+  // Best Fits: top 3 rated outfit entries with photos
+  const bestFits = [...soloEntries]
+    .filter(e => e.photo && e.rating != null)
+    .sort((a,b) => (b.rating-a.rating)||(new Date(b.createdAt)-new Date(a.createdAt)))
+    .slice(0, 3);
+
+  // Most Complimented: top 3
+  const complimented = aw
+    .filter(w => (w.compliments||[]).length > 0)
+    .sort((a,b) => (b.compliments?.length||0)-(a.compliments?.length||0))
+    .slice(0, 3);
+
+  // Saved Looks: top 3
   const allSaved = [
     ...S.savedDressMe.map(d => ({ type: 'dressme', id: d.id, at: d.createdAt })),
     ...S.savedOutfitBuilds.map(o => ({ type: 'builder', id: o.id, at: o.createdAt })),
     ...S.savedRouletteLooks.map(r => ({ type: 'roulette', id: r.id, at: r.createdAt })),
-  ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 6);
+  ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 3);
 
-  const goals = S.styleGoals || [];
-  const name = S.profileName || 'Your';
+  // Liked Style Tips: top 3
+  const likedTips = [];
+  soloEntries.forEach(e => {
+    const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{});
+    if (e.stylingTips?.length) {
+      e.stylingTips.forEach((r, i) => { if (rx[String(i)] === 'liked') likedTips.push(r); });
+    } else {
+      (e.recommendations||[]).forEach((r, i) => { if (rx[String(i)] === 'liked' || rx[r] === 'liked') likedTips.push(r); });
+    }
+  });
+
+  // Wish List: top 6 hearted purchase recs
+  const wishItems = [];
+  const _wSeen = new Set();
+  S.entries.forEach(e => {
+    if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
+    e.purchaseRecs.forEach((r, i) => {
+      if (e.purchaseReactions[String(i)] === 'liked') {
+        const n = (r.item || r); const k = n.toLowerCase().trim();
+        if (!_wSeen.has(k)) { _wSeen.add(k); wishItems.push({ label: n, reason: r.reason || '' }); }
+      }
+    });
+  });
 
   return `
   <div style="display:flex;flex-direction:column;height:100%;background:var(--bg);overflow:hidden;">
-    <!-- Nav -->
     <div class="nav" style="flex-shrink:0;">
       <button class="nav-back"
-        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('closet');"
-        onclick="navigate('closet')">
-        ${iconBack()} Back
-      </button>
+        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile');"
+        onclick="navigate('profile')">${iconBack()} Back</button>
       <span class="nav-title">📋 Stylist Report</span>
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();openStylistPDF();"
-        onclick="openStylistPDF()"
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();openStylistPDF();" onclick="openStylistPDF()"
         style="background:linear-gradient(135deg,#B8860B,#D4A820);border:none;border-radius:100px;padding:7px 14px;font-size:12px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
         ↗ Open PDF
       </button>
@@ -9812,55 +9872,92 @@ function viewStylistReport() {
 
     <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));">
 
-      <!-- ── HEADER ─────────────────────────────────── -->
-      <div style="background:linear-gradient(160deg,#1C1A18,#2a2318);padding:28px 20px 24px;position:relative;overflow:hidden;">
+      <!-- HEADER -->
+      <div style="background:linear-gradient(160deg,#1C1A18,#2a2318);padding:22px 20px 18px;position:relative;overflow:hidden;">
         <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#B8860B,#D4A820);"></div>
-        <div style="display:flex;align-items:center;gap:16px;">
-          <div style="width:72px;height:72px;border-radius:50%;background:rgba(184,134,11,0.15);border:2.5px solid rgba(212,168,32,0.4);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:32px;">🪞</div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <div>
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(212,168,32,0.7);margin-bottom:4px;">Style Profile</div>
+            <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(212,168,32,0.7);margin-bottom:4px;">Style Profile · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
             <div style="font-size:22px;font-weight:900;color:#fff;line-height:1.1;">${esc(name)}</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px;">${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+            ${scoreVal && !isNaN(parseFloat(scoreVal)) ? `<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;">Style Score <span style="color:#D4A820;font-weight:800;">${scoreVal}/10</span></div>` : ''}
           </div>
+          ${goals.length ? `<div style="display:flex;flex-wrap:wrap;gap:5px;max-width:160px;">
+            ${goals.slice(0,3).map(g=>`<div style="background:rgba(184,134,11,0.2);border:1px solid rgba(212,168,32,0.35);border-radius:100px;padding:3px 9px;font-size:10px;font-weight:700;color:rgba(212,168,32,0.9);">${esc(g)}</div>`).join('')}
+          </div>` : ''}
         </div>
+        ${styleWords.length ? `<div style="margin-top:11px;display:flex;flex-wrap:wrap;gap:5px;">
+          <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.35);align-self:center;">My style:</div>
+          ${styleWords.slice(0,6).map(w=>`<div style="background:rgba(255,255,255,0.08);border-radius:100px;padding:3px 9px;font-size:10px;color:rgba(255,255,255,.65);font-weight:600;">${esc(w)}</div>`).join('')}
+        </div>` : ''}
       </div>
 
-      <!-- ── STYLE GOALS ──────────────────────────────── -->
-      ${goals.length ? `
-      <div style="padding:20px 20px 4px;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Style Goals</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;">
-          ${goals.map(g => `<div style="background:var(--gold-bg);border:1px solid var(--gold);border-radius:100px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--gold-dk);">${esc(g)}</div>`).join('')}
+      <!-- BEST FITS (Portfolio) -->
+      ${bestFits.length ? `
+      <div style="padding:18px 16px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">⭐ Your Best Fits</div>
+        <div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+          ${bestFits.map(e => `<div style="flex-shrink:0;width:130px;border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
+            <div style="height:165px;overflow:hidden;background:var(--surface-2);">
+              <img src="${esc(photoBlobUrl(e.photo))}" style="width:100%;height:100%;object-fit:cover;object-position:center 15%;" loading="lazy">
+            </div>
+            <div style="padding:8px 10px;">
+              <div style="font-size:14px;font-weight:900;color:var(--gold-dk);">⭐ ${e.rating}/10</div>
+              ${e.occasionTag ? `<div style="font-size:9px;color:var(--text-3);margin-top:2px;">${esc(e.occasionTag)}</div>` : ''}
+            </div>
+          </div>`).join('')}
         </div>
       </div>` : ''}
 
-      <!-- ── TOP PIECES ───────────────────────────────── -->
+      <!-- SIGNATURE PIECES -->
       ${topPieces.length ? `
-      <div style="padding:20px 20px 4px;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Signature Pieces</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="padding:18px 16px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">👗 Signature Pieces</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           ${topPieces.map(w => {
             const src = w.photo || w.photoThumb || '';
             const wears = w.wears?.length || 0;
             return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
-              <div style="height:140px;overflow:hidden;background:var(--surface-2);">
-                ${src ? `<img src="${esc(src)}" style="width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;">${esc(w.icon||'👕')}</div>`}
+              <div style="height:120px;overflow:hidden;background:var(--surface-2);">
+                ${src ? `<img src="${esc(photoBlobUrl(src))}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:40px;">${esc(w.icon||'👕')}</div>`}
               </div>
-              <div style="padding:10px;">
-                <div style="font-size:12px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:3px;">${esc(w.name)}</div>
-                ${w.brand ? `<div style="font-size:10px;color:var(--text-3);">${esc(w.brand)}</div>` : ''}
-                ${wears ? `<div style="font-size:10px;color:var(--gold-dk);font-weight:700;margin-top:4px;">Worn ${wears}×</div>` : ''}
+              <div style="padding:9px 10px;">
+                <div style="font-size:12px;font-weight:800;color:var(--text);line-height:1.25;">${esc(w.name)}</div>
+                ${w.brand ? `<div style="font-size:10px;color:var(--text-3);margin-top:2px;">${esc(w.brand)}</div>` : ''}
+                ${wears ? `<div style="font-size:10px;color:var(--gold-dk);font-weight:700;margin-top:3px;">${wears}× worn</div>` : ''}
               </div>
             </div>`;
           }).join('')}
         </div>
       </div>` : ''}
 
-      <!-- ── BEST LOOKS ───────────────────────────────── -->
+      <!-- MOST COMPLIMENTED (Portfolio) -->
+      ${complimented.length ? `
+      <div style="padding:18px 16px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">💬 Most Complimented</div>
+        <div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+          ${complimented.map(w => {
+            const src = w.photo || w.photoThumb || '';
+            const count = (w.compliments||[]).length;
+            const latestFrom = [...(w.compliments||[])].reverse().find(c=>c.from)?.from || null;
+            return `<div style="flex-shrink:0;width:110px;border:1.5px solid rgba(184,125,42,.3);border-radius:var(--r);overflow:hidden;background:var(--surface);">
+              <div style="height:130px;overflow:hidden;background:var(--surface-2);">
+                ${src ? `<img src="${esc(photoBlobUrl(src))}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${esc(w.icon||'👕')}</div>`}
+              </div>
+              <div style="padding:8px 10px;">
+                <div style="font-size:11px;font-weight:800;color:var(--text);line-height:1.2;">${esc(w.name)}</div>
+                <div style="font-size:10px;color:var(--gold-dk);font-weight:700;margin-top:3px;">💬 ${count}</div>
+                ${latestFrom ? `<div style="font-size:9px;color:var(--text-3);margin-top:1px;">incl. ${esc(latestFrom)}</div>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : ''}
+
+      <!-- SAVED LOOKS -->
       ${allSaved.length ? `
-      <div style="padding:20px 20px 4px;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Best Looks</div>
-        <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="padding:18px 16px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">💜 Saved Looks</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
           ${allSaved.map(sl => {
             const data = getSavedLookData(sl.type, sl.id);
             if (!data) return '';
@@ -9868,28 +9965,28 @@ function viewStylistReport() {
             const anchorWI = anchor?.wardrobeItem || null;
             const anchorSrc = anchorWI ? (anchorWI.photo || anchorWI.photoThumb || '') : '';
             return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
-              <div style="padding:10px 12px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-                <div style="font-size:10px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">${esc(badge)}</div>
-                ${quote ? `<div style="font-size:10px;color:var(--text-3);font-style:italic;flex:1;min-width:0;margin-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(quote)}</div>` : ''}
+              <div style="padding:9px 12px 7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+                <div style="font-size:9px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">${esc(badge)}</div>
+                ${quote ? `<div style="font-size:10px;color:var(--text-3);font-style:italic;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(quote)}</div>` : ''}
               </div>
-              <div style="padding:12px;">
-                <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">Start with</div>
-                ${anchor ? `<div style="display:inline-block;text-align:center;margin-bottom:12px;">
+              <div style="padding:10px 12px;">
+                <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:7px;">Start with</div>
+                ${anchor ? `<div style="display:inline-block;text-align:center;margin-bottom:10px;">
                   ${anchorSrc
-                    ? `<div style="width:80px;height:100px;border-radius:10px;overflow:hidden;border:2px solid var(--gold);"><img src="${esc(anchorSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
-                    : `<div style="width:80px;height:100px;border-radius:10px;background:var(--surface-2);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:34px;">${esc(anchor.emoji||'👕')}</div>`}
-                  <div style="font-size:10px;font-weight:700;color:var(--text);margin-top:5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(anchor.name)}</div>
+                    ? `<div style="width:68px;height:86px;border-radius:8px;overflow:hidden;border:2px solid var(--gold);"><img src="${esc(photoBlobUrl(anchorSrc))}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
+                    : `<div style="width:68px;height:86px;border-radius:8px;background:var(--surface-2);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:28px;">${esc(anchor.emoji||'👕')}</div>`}
+                  <div style="font-size:9px;font-weight:700;color:var(--text);margin-top:4px;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(anchor.name)}</div>
                 </div>` : ''}
                 ${pairs.length ? `
-                  <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px;">Pair with</div>
-                  <div style="display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;">
-                    ${pairs.map(p => {
+                  <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:6px;">Pair with</div>
+                  <div style="display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;">
+                    ${pairs.slice(0,4).map(p => {
                       const pwi = p.wardrobeItem;
                       const psrc = pwi ? (pwi.photo || pwi.photoThumb || '') : '';
-                      return `<div style="flex-shrink:0;text-align:center;width:58px;">
+                      return `<div style="flex-shrink:0;text-align:center;width:52px;">
                         ${psrc
-                          ? `<div style="width:58px;height:72px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);"><img src="${esc(psrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
-                          : `<div style="width:58px;height:72px;border-radius:8px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:24px;">${esc(p.emoji||'👕')}</div>`}
+                          ? `<div style="width:52px;height:66px;border-radius:7px;overflow:hidden;border:1.5px solid var(--border);"><img src="${esc(photoBlobUrl(psrc))}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="lazy"></div>`
+                          : `<div style="width:52px;height:66px;border-radius:7px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;">${esc(p.emoji||'👕')}</div>`}
                         <div style="font-size:9px;color:var(--text-2);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</div>
                       </div>`;
                     }).join('')}
@@ -9900,9 +9997,33 @@ function viewStylistReport() {
         </div>
       </div>` : ''}
 
-      <!-- ── STATS ────────────────────────────────────── -->
-      <div style="padding:20px;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:12px;">Wardrobe at a Glance</div>
+      <!-- STYLE TIPS (Evolve) -->
+      ${likedTips.length ? `
+      <div style="padding:18px 16px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">✂️ Style Tips I've Saved</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${likedTips.slice(0,3).map(tip => `<div style="background:var(--gold-bg);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;color:var(--text);line-height:1.5;">${esc(tip)}</div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      <!-- WISH LIST (Shop) -->
+      ${wishItems.length ? `
+      <div style="padding:18px 16px 4px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">♥ Shopping Wish List</div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          ${wishItems.slice(0,6).map((item, i) => `<div style="display:flex;align-items:flex-start;gap:9px;">
+            <div style="width:20px;height:20px;border:1.5px solid var(--gold);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--gold-dk);">${i+1}</div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(item.label)}</div>
+              ${item.reason ? `<div style="font-size:10px;color:var(--text-3);margin-top:1px;line-height:1.3;">${esc(item.reason)}</div>` : ''}
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      <!-- STATS -->
+      <div style="padding:18px 16px 20px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">📊 Wardrobe at a Glance</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
           ${[
             ['👗', aw.length, 'pieces'],
@@ -9917,40 +10038,121 @@ function viewStylistReport() {
       </div>
 
     </div>
+  </div>`
   </div>`;
 }
 
 function openStylistPDF() {
   const aw = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
   const goals = S.styleGoals || [];
+  const styleWords = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
   const name = S.profileName || 'Your Closet';
+  const soloEntries = S.entries.filter(e => !e.battleId);
+  const scoreVal = styleScore(soloEntries);
+  const dateStr = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
 
-  const scored = aw.map(w => ({ w, score: (w.wears?.length||0)*2 + (w.rating||0)*3 }))
-    .sort((a,b) => b.score - a.score);
-  const topPieces = scored.filter(x => x.w.photo || x.w.photoThumb).slice(0, 8).map(x => x.w);
+  // Signature Pieces: top 4 by wear+rating, photo only
+  const scored = aw.map(w => ({ w, score: (w.wears?.length||0)*2+(w.rating||0)*3 })).sort((a,b)=>b.score-a.score);
+  const topPieces = scored.filter(x => x.w.photo || x.w.photoThumb).slice(0, 4).map(x => x.w);
 
+  // Best Fits: top 3 rated outfit entries with photos
+  const bestFits = [...soloEntries]
+    .filter(e => e.photo && e.rating != null)
+    .sort((a,b) => (b.rating-a.rating)||(new Date(b.createdAt)-new Date(a.createdAt)))
+    .slice(0, 3);
+
+  // Most Complimented: top 3
+  const complimented = aw
+    .filter(w => (w.compliments||[]).length > 0)
+    .sort((a,b) => (b.compliments?.length||0)-(a.compliments?.length||0))
+    .slice(0, 3);
+
+  // Saved Looks: top 3
   const allSaved = [
     ...S.savedDressMe.map(d=>({type:'dressme',id:d.id,at:d.createdAt})),
     ...S.savedOutfitBuilds.map(o=>({type:'builder',id:o.id,at:o.createdAt})),
     ...S.savedRouletteLooks.map(r=>({type:'roulette',id:r.id,at:r.createdAt})),
-  ].sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6);
+  ].sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,3);
 
-  const dateStr = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  // Liked tips: top 3
+  const likedTips = [];
+  soloEntries.forEach(e => {
+    const rx = Object.assign({}, e.tipReactions||{}, e.recReactions||{});
+    if (e.stylingTips?.length) {
+      e.stylingTips.forEach((r, i) => { if (rx[String(i)] === 'liked') likedTips.push(r); });
+    } else {
+      (e.recommendations||[]).forEach((r, i) => { if (rx[String(i)] === 'liked' || rx[r] === 'liked') likedTips.push(r); });
+    }
+  });
 
-  const pieceCards = topPieces.map(w => {
-    const src = w.photo || w.photoThumb || '';
-    const wears = w.wears?.length || 0;
-    return `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;break-inside:avoid;">
-      <div style="height:160px;overflow:hidden;background:#f5f0e8;">
-        ${src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:56px;">${w.icon||'👕'}</div>`}
-      </div>
-      <div style="padding:10px 12px;">
-        <div style="font-size:13px;font-weight:800;color:#1C1A18;line-height:1.3;">${w.name}</div>
-        ${w.brand ? `<div style="font-size:11px;color:#888;margin-top:2px;">${w.brand}</div>` : ''}
-        ${wears ? `<div style="font-size:11px;color:#B8860B;font-weight:700;margin-top:4px;">Worn ${wears}×</div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
+  // Wish list: top 8 hearted purchase recs
+  const wishItems = [];
+  const _wSeen = new Set();
+  S.entries.forEach(e => {
+    if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
+    e.purchaseRecs.forEach((r, i) => {
+      if (e.purchaseReactions[String(i)] === 'liked') {
+        const n = (r.item || r); const k = n.toLowerCase().trim();
+        if (!_wSeen.has(k)) { _wSeen.add(k); wishItems.push({ label: n, reason: r.reason || '' }); }
+      }
+    });
+  });
+
+  const sec = label => `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:#888;margin:28px 0 12px;border-top:1px solid #e8e0d0;padding-top:20px;">${label}</div>`;
+
+  const bestFitsHTML = bestFits.length ? `
+    ${sec('⭐ Your Best Fits')}
+    <div style="display:grid;grid-template-columns:repeat(${bestFits.length},1fr);gap:10px;">
+      ${bestFits.map(e => `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;break-inside:avoid;">
+        <div style="height:200px;overflow:hidden;background:#f5f0e8;">
+          <img src="${e.photo}" style="width:100%;height:100%;object-fit:cover;object-position:center 15%;">
+        </div>
+        <div style="padding:10px 12px;">
+          <div style="font-size:16px;font-weight:900;color:#B8860B;">⭐ ${e.rating}/10</div>
+          ${e.occasionTag ? `<div style="font-size:10px;color:#888;margin-top:2px;">${e.occasionTag}</div>` : ''}
+          ${e.comment ? `<div style="font-size:11px;color:#555;margin-top:5px;line-height:1.4;">"${e.comment.slice(0,80)}${e.comment.length>80?'…':''}"</div>` : ''}
+        </div>
+      </div>`).join('')}
+    </div>` : '';
+
+  const piecesHTML = topPieces.length ? `
+    ${sec('👗 Signature Pieces')}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+      ${topPieces.map(w => {
+        const src = w.photo || w.photoThumb || '';
+        const wears = w.wears?.length || 0;
+        return `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;break-inside:avoid;">
+          <div style="height:140px;overflow:hidden;background:#f5f0e8;">
+            ${src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:44px;">${w.icon||'👕'}</div>`}
+          </div>
+          <div style="padding:9px 10px;">
+            <div style="font-size:12px;font-weight:800;color:#1C1A18;line-height:1.3;">${w.name}</div>
+            ${w.brand ? `<div style="font-size:10px;color:#888;margin-top:2px;">${w.brand}</div>` : ''}
+            ${wears ? `<div style="font-size:10px;color:#B8860B;font-weight:700;margin-top:3px;">${wears}× worn</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  const complimentedHTML = complimented.length ? `
+    ${sec('💬 Most Complimented')}
+    <div style="display:flex;gap:14px;">
+      ${complimented.map(w => {
+        const src = w.photo || w.photoThumb || '';
+        const count = (w.compliments||[]).length;
+        const latestFrom = [...(w.compliments||[])].reverse().find(c=>c.from)?.from || null;
+        return `<div style="width:130px;flex-shrink:0;border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;">
+          <div style="height:150px;overflow:hidden;background:#f5f0e8;">
+            ${src ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;object-position:top;">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:38px;">${w.icon||'👕'}</div>`}
+          </div>
+          <div style="padding:9px 10px;">
+            <div style="font-size:12px;font-weight:800;color:#1C1A18;line-height:1.2;">${w.name}</div>
+            <div style="font-size:10px;color:#B8860B;font-weight:700;margin-top:3px;">💬 ${count} compliment${count===1?'':'s'}</div>
+            ${latestFrom ? `<div style="font-size:9px;color:#888;margin-top:1px;">incl. ${latestFrom}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
 
   const lookCards = allSaved.map(sl => {
     const data = getSavedLookData(sl.type, sl.id);
@@ -9958,69 +10160,88 @@ function openStylistPDF() {
     const { badge, quote, anchor, pairs } = data;
     const awi = anchor?.wardrobeItem;
     const asrc = awi ? (awi.photo || awi.photoThumb || '') : '';
-    return `<div style="border:1.5px solid #e0d5c0;border-radius:12px;overflow:hidden;padding:14px;break-inside:avoid;margin-bottom:16px;">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:4px;">${badge}${quote ? ' · ' + quote : ''}</div>
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#888;margin:10px 0 6px;">Start with</div>
-      ${anchor ? `<div style="display:inline-block;text-align:center;vertical-align:top;margin-right:16px;">
-        ${asrc ? `<div style="width:80px;height:100px;border-radius:10px;overflow:hidden;border:2px solid #B8860B;display:inline-block;"><img src="${asrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>` : `<div style="width:80px;height:100px;border-radius:10px;background:#f5f0e8;border:2px solid #B8860B;display:inline-flex;align-items:center;justify-content:center;font-size:34px;">${anchor.emoji||'👕'}</div>`}
-        <div style="font-size:10px;font-weight:700;color:#1C1A18;margin-top:5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${anchor.name}</div>
-      </div>` : ''}
-      ${pairs.length ? `<div style="margin-top:10px;">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px;">Pair with</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          ${pairs.map(p => {
+    return `<div style="border:1.5px solid #e0d5c0;border-radius:12px;padding:14px;break-inside:avoid;margin-bottom:12px;">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:8px;">${badge}${quote?' · '+quote:''}</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        ${anchor ? `<div style="text-align:center;width:70px;">
+          ${asrc ? `<div style="width:70px;height:88px;border-radius:8px;overflow:hidden;border:2px solid #B8860B;"><img src="${asrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>` : `<div style="width:70px;height:88px;border-radius:8px;background:#f5f0e8;border:2px solid #B8860B;display:flex;align-items:center;justify-content:center;font-size:28px;">${anchor.emoji||'👕'}</div>`}
+          <div style="font-size:10px;font-weight:700;color:#1C1A18;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${anchor.name}</div>
+        </div>` : ''}
+        ${pairs.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+          ${pairs.slice(0,4).map(p => {
             const pwi = p.wardrobeItem;
             const psrc = pwi ? (pwi.photo || pwi.photoThumb || '') : '';
-            return `<div style="text-align:center;width:58px;">
-              ${psrc ? `<div style="width:58px;height:72px;border-radius:8px;overflow:hidden;border:1.5px solid #e0d5c0;"><img src="${psrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>` : `<div style="width:58px;height:72px;border-radius:8px;background:#f5f0e8;border:1.5px solid #e0d5c0;display:flex;align-items:center;justify-content:center;font-size:22px;">${p.emoji||'👕'}</div>`}
-              <div style="font-size:9px;color:#555;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</div>
+            return `<div style="text-align:center;width:52px;">
+              ${psrc ? `<div style="width:52px;height:66px;border-radius:7px;overflow:hidden;border:1.5px solid #e0d5c0;"><img src="${psrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>` : `<div style="width:52px;height:66px;border-radius:7px;background:#f5f0e8;border:1.5px solid #e0d5c0;display:flex;align-items:center;justify-content:center;font-size:20px;">${p.emoji||'👕'}</div>`}
+              <div style="font-size:9px;color:#555;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</div>
             </div>`;
           }).join('')}
-        </div>
-      </div>` : ''}
+        </div>` : ''}
+      </div>
     </div>`;
   }).join('');
+
+  const tipsHTML = likedTips.length ? `
+    ${sec("✂️ Style Tips I've Saved")}
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${likedTips.slice(0,3).map(tip => `<div style="background:#fffaed;border-left:3px solid #B8860B;border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;color:#1C1A18;line-height:1.5;">${tip}</div>`).join('')}
+    </div>` : '';
+
+  const wishHTML = wishItems.length ? `
+    ${sec('♥ Shopping Wish List')}
+    <div style="columns:2;column-gap:20px;">
+      ${wishItems.slice(0,8).map((item,i) => `<div style="break-inside:avoid;margin-bottom:8px;display:flex;align-items:flex-start;gap:8px;">
+        <div style="width:18px;height:18px;border:1.5px solid #B8860B;border-radius:4px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#B8860B;font-weight:800;">${i+1}</div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#1C1A18;">${item.label}</div>
+          ${item.reason ? `<div style="font-size:10px;color:#888;margin-top:1px;line-height:1.3;">${item.reason}</div>` : ''}
+        </div>
+      </div>`).join('')}
+    </div>` : '';
 
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
   <title>${name} — Style Report</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;color:#1C1A18;max-width:780px;margin:0 auto;padding:32px 24px;}
-    @media print{body{padding:16px;}.no-print{display:none!important;}@page{margin:20mm;}}
-    h2{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#888;margin:32px 0 14px;}
-    .print-btn{background:linear-gradient(135deg,#B8860B,#D4A820);color:#fff;border:none;border-radius:100px;padding:10px 22px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:24px;}
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-    @media(min-width:600px){.grid-2{grid-template-columns:1fr 1fr 1fr 1fr;}}
+    @media print{body{padding:16px;}.no-print{display:none!important;}@page{margin:16mm;size:A4;}}
+    .print-btn{background:linear-gradient(135deg,#B8860B,#D4A820);color:#fff;border:none;border-radius:100px;padding:10px 22px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;}
   </style></head><body>
   <div class="no-print" style="text-align:right;margin-bottom:24px;">
     <button class="print-btn" onclick="window.print()">🖨 Save as PDF</button>
   </div>
 
-  <!-- HEADER -->
-  <div style="background:linear-gradient(160deg,#1C1A18,#2a2318);border-radius:16px;padding:28px 24px;margin-bottom:8px;color:#fff;position:relative;overflow:hidden;">
+  <div style="background:linear-gradient(160deg,#1C1A18,#2a2318);border-radius:16px;padding:28px 24px 24px;margin-bottom:4px;position:relative;overflow:hidden;">
     <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#B8860B,#D4A820);"></div>
-    <div style="display:flex;align-items:center;gap:18px;margin-bottom:0;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;color:#fff;">
       <div>
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:rgba(212,168,32,0.7);margin-bottom:6px;">Style Profile · ${dateStr}</div>
         <div style="font-size:28px;font-weight:900;">${name}</div>
+        ${scoreVal && !isNaN(parseFloat(scoreVal)) ? `<div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:4px;">Style Score: <span style="color:#D4A820;font-weight:800;">${scoreVal}/10</span></div>` : ''}
       </div>
+      ${goals.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;max-width:220px;">
+        ${goals.slice(0,4).map(g=>`<div style="background:rgba(184,134,11,0.2);border:1px solid rgba(212,168,32,0.4);border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;color:rgba(212,168,32,0.9);">${g}</div>`).join('')}
+      </div>` : ''}
     </div>
+    ${styleWords.length ? `<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">
+      <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.4);align-self:center;margin-right:2px;">My style:</div>
+      ${styleWords.slice(0,6).map(w=>`<div style="background:rgba(255,255,255,0.08);border-radius:100px;padding:3px 10px;font-size:11px;color:rgba(255,255,255,.7);font-weight:600;">${w}</div>`).join('')}
+    </div>` : ''}
   </div>
 
-  ${goals.length ? `<h2>Style Goals</h2>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
-    ${goals.map(g=>`<div style="background:#fffaed;border:1px solid #B8860B;border-radius:100px;padding:5px 14px;font-size:12px;font-weight:700;color:#8a5f00;">${g}</div>`).join('')}
-  </div>` : ''}
+  ${bestFitsHTML}
+  ${piecesHTML}
+  ${complimentedHTML}
+  ${allSaved.length ? `${sec('💜 Saved Looks')}${lookCards}` : ''}
+  ${tipsHTML}
+  ${wishHTML}
 
-  ${topPieces.length ? `<h2>Signature Pieces</h2>
-  <div class="grid-2">${pieceCards}</div>` : ''}
-
-  ${allSaved.length ? `<h2>Best Looks</h2>${lookCards}` : ''}
-
-  <h2>Wardrobe at a Glance</h2>
-  <div style="display:flex;gap:16px;flex-wrap:wrap;">
-    ${[['👗',aw.length,'Pieces'],['📓',S.entries.length,'Outfits Logged'],['💜',allSaved.length,'Saved Looks']].map(([ic,n,lb])=>`<div style="border:1.5px solid #e0d5c0;border-radius:12px;padding:14px 18px;text-align:center;min-width:90px;"><div style="font-size:22px;">${ic}</div><div style="font-size:22px;font-weight:900;margin:4px 0 2px;">${n}</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">${lb}</div></div>`).join('')}
+  ${sec('📊 Wardrobe at a Glance')}
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    ${[['👗',aw.length,'Pieces'],['📓',S.entries.length,'Outfits Logged'],['💜',allSaved.length,'Saved Looks'],...(wishItems.length?[['♥',wishItems.length,'On Wish List']]:[])]
+      .map(([ic,n,lb])=>`<div style="border:1.5px solid #e0d5c0;border-radius:12px;padding:14px 18px;text-align:center;min-width:90px;"><div style="font-size:22px;">${ic}</div><div style="font-size:22px;font-weight:900;margin:4px 0 2px;">${n}</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">${lb}</div></div>`).join('')}
   </div>
+
   </body></html>`;
 
   const win = window.open('', '_blank');
@@ -10030,6 +10251,7 @@ function openStylistPDF() {
   } else {
     toast('Allow pop-ups to open the PDF report');
   }
+}
 }
 
 function viewStyleRoulette() {
@@ -10868,7 +11090,7 @@ function viewProfile() {
   const html = `<div class="view">
     <div class="nav">
       <span class="nav-logo">My Style Portfolio</span>
-      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload')" onclick="navigate('upload')" style="touch-action:manipulation;">${iconPlus()} Log Outfit</button>
+      <button class="nav-add" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('stylist-report')" onclick="navigate('stylist-report')" style="touch-action:manipulation;">📋 Stylist PDF</button>
     </div>
 
     <!-- ══ ZONE 1: You at a glance ══ -->
@@ -10911,7 +11133,7 @@ function viewProfile() {
     </div>
 
     ${_pmFeelAvg ? `
-    <div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('ratings-summary')" onclick="navigate('ratings-summary')"
+    <div ontouchend="if(_touchMoved)return;event.preventDefault();navigate('rating-summary')" onclick="navigate('rating-summary')"
       style="margin:6px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;touch-action:manipulation;">
       <div style="font-size:20px;line-height:1;flex-shrink:0;">${_pmEmoji}</div>
       <div style="flex:1;min-width:0;">
@@ -11019,7 +11241,7 @@ function viewProfile() {
           ${visible.slice(0,10).map(({w,lastDate,count}) => {
             const isLongPress = S._complimentLongPressId === w.id;
             const latestFrom = [...(w.compliments||[])].reverse().find(c=>c.from)?.from || null;
-            return `<div style="flex-shrink:0;width:106px;position:relative;"
+            return `<div style="flex-shrink:0;width:88px;position:relative;"
               ontouchstart="complimentPressStart('${w.id}')"
               ontouchmove="complimentPressCancel()"
               ontouchend="complimentPressCancel()"
@@ -11029,16 +11251,19 @@ function viewProfile() {
               onmouseleave="complimentPressCancel()"
               oncontextmenu="event.preventDefault()">
               <div ontouchend="if(_touchMoved)return;event.preventDefault();complimentCardTap('${w.id}')" onclick="complimentCardTap('${w.id}')"
-                style="background:var(--surface);border:1.5px solid ${isLongPress?'var(--gold)':'var(--border)'};border-radius:12px;padding:10px 8px;cursor:pointer;touch-action:manipulation;text-align:center;transition:border-color .15s;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;">
-                ${w.photo ? `<img src="${esc(photoBlobUrl(w.photo))}" style="width:46px;height:46px;border-radius:8px;object-fit:cover;margin-bottom:6px;display:block;margin-left:auto;margin-right:auto;" loading="lazy">` : `<div style="font-size:28px;margin-bottom:6px;line-height:1;">${w.icon||'👕'}</div>`}
-                <div style="font-size:11px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(w.name)}</div>
-                <div style="font-size:11px;color:var(--gold-dk);margin-top:2px;font-weight:600;">${count}×</div>
-                ${latestFrom ? `<div style="font-size:10px;color:var(--text-3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">from ${esc(latestFrom)}</div>` : `<div style="font-size:10px;color:var(--text-3);margin-top:1px;">${relDate(lastDate)}</div>`}
+                style="width:88px;height:117px;border-radius:12px;overflow:hidden;position:relative;background:var(--surface-2);border:${isLongPress?'2px solid var(--gold)':'1.5px solid rgba(184,125,42,.3)'};cursor:pointer;touch-action:manipulation;transition:border-color .15s;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;">
+                ${w.photo
+                  ? `<img src="${esc(photoBlobUrl(w.photo))}" loading="lazy" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                  : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;">${w.icon||'👕'}</div>`}
+                <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 45%,rgba(0,0,0,.72) 100%);pointer-events:none;"></div>
+                <div style="position:absolute;top:5px;right:5px;background:var(--gold);border-radius:100px;padding:1px 6px;font-size:9px;font-weight:800;color:#fff;line-height:1.6;">💬${count}</div>
+                <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:10px;font-weight:700;color:rgba(255,255,255,.8);line-height:1.2;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${latestFrom ? `from ${esc(latestFrom)}` : relDate(lastDate)}</div>
               </div>
+              <div style="font-size:10px;font-weight:700;color:var(--text);margin-top:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px;">${esc(w.name)}</div>
               ${isLongPress ? `<button
                 ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();complimentPressCancel();S._complimentLongPressId=null;dismissComplimentCard('${w.id}');"
                 onclick="event.stopPropagation();complimentPressCancel();S._complimentLongPressId=null;dismissComplimentCard('${w.id}');"
-                style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:var(--gold);border:none;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;animation:fadeIn .15s;">✕</button>` : ''}
+                style="position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:var(--gold);border:none;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;animation:fadeIn .15s;">✕</button>` : ''}
             </div>`;
           }).join('')}
         </div>` : `<div style="font-size:12px;color:var(--text-3);padding:8px 14px 0;">All caught up — no items showing.</div>`}
@@ -12380,14 +12605,42 @@ function viewHome() {
     </div>`;
   })();
 
-  const tipsSection = `
-    <div class="home-section">
+  const tipsSection = (() => {
+    if (!likedRecs.length) {
+      return `<div class="home-section">
+        <div class="home-section-label" style="margin-bottom:8px;">✂️ Style Tips</div>
+        <div style="font-size:12px;color:var(--text-3);">Heart ♥ tips on your fit checks to collect them here.</div>
+      </div>`;
+    }
+    if (!S._tipsExpanded) {
+      const { rec, entry } = likedRecs[0];
+      const short = rec.length > 90 ? rec.slice(0, 90).replace(/\s\S*$/, '…') : rec;
+      return `<div class="home-section">
+        <div ontouchend="if(_touchMoved)return;event.preventDefault();S._tipsExpanded=true;render()" onclick="S._tipsExpanded=true;render()"
+          style="cursor:pointer;touch-action:manipulation;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:11px;">
+          <div style="width:36px;height:48px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#111;position:relative;">
+            ${entry.photo
+              ? `<img src="${entry.photo}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 10%;" loading="lazy">`
+              : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;">👗</div>`}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:3px;">✂️ Style Tips <span style="font-weight:500;color:var(--text-3);">· ${likedRecs.length}</span></div>
+            <div style="font-size:12px;color:var(--text);line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${esc(short)}</div>
+          </div>
+          <div style="font-size:16px;color:var(--text-3);flex-shrink:0;line-height:1;">›</div>
+        </div>
+      </div>`;
+    }
+    return `<div class="home-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div class="home-section-label" style="margin-bottom:0;">✂️ Style Tips</div>
-        ${likedRecs.length ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('saved-tips')" onclick="navigate('saved-tips')"
-          style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">All tips →</button>` : ''}
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('saved-tips')" onclick="navigate('saved-tips')"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">All tips →</button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._tipsExpanded=false;render()" onclick="S._tipsExpanded=false;render()"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">▲</button>
+        </div>
       </div>
-      ${likedRecs.length ? `
       <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
         ${likedRecs.slice(0,10).map(({rec, entry, idx}) => {
           const tipText = rec.length > 100 ? rec.slice(0, 100).replace(/\s\S*$/, '…') : rec;
@@ -12405,8 +12658,9 @@ function viewHome() {
             </div>
           </div>`;
         }).join('')}
-      </div>` : `<div style="font-size:12px;color:var(--text-3);">Heart ♥ tips on your fit checks to collect them here.</div>`}
+      </div>
     </div>`;
+  })();
 
   // ── 🔥 TRENDS — one carousel, removable cards ────────────────────────────
   const trendsSection = (()=>{
@@ -12420,11 +12674,29 @@ function viewHome() {
       </button>
     </div>`;
     const reactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
+    if (!S._trendsExpanded) {
+      const t = trends.trends[0];
+      return `<div class="home-section">
+        <div ontouchend="if(_touchMoved)return;event.preventDefault();S._trendsExpanded=true;render()" onclick="S._trendsExpanded=true;render()"
+          style="cursor:pointer;touch-action:manipulation;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:11px;">
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#FF6B35,#FF8C5A);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;line-height:1;">${esc(t.emoji||'🔥')}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">🔥 What's Trending <span style="font-weight:500;color:var(--text-3);">· ${trends.trends.length}</span></div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.2;">${esc(t.name)}</div>
+          </div>
+          <div style="font-size:16px;color:var(--text-3);flex-shrink:0;line-height:1;">›</div>
+        </div>
+      </div>`;
+    }
     return `<div class="home-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div class="home-section-label" style="margin-bottom:0;">🔥 What's Trending</div>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
-          style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._trendsExpanded=false;render()" onclick="S._trendsExpanded=false;render()"
+            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">▲</button>
+        </div>
       </div>
       <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
         ${(trends.trends||[]).slice(0,10).map(trend => {
@@ -12533,6 +12805,9 @@ function viewHome() {
     ${tipsSection}
     ${trendsSection}
     ${pulseSection}
+    <div class="home-section" style="padding:0;">
+      ${brandDiscoveryHTML()}
+    </div>
     <div style="height:16px"></div>
   </div>`;
 }
@@ -17376,7 +17651,12 @@ function viewDetail() {
         <div>
           <div class="detail-date">${fmtDateLong(entry.createdAt)}</div>
           ${entry.claudeRecommended ? `<div style="display:inline-flex;align-items:center;gap:4px;background:var(--gold-bg);color:var(--gold-dk);border-radius:100px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:8px;">✨ Closet's Pick${entry.dressMeVibe ? ' · ' + esc(entry.dressMeVibe) : ''}</div>` : ''}
-          ${entry.occasionTag ? `<div class="occasion-tag" style="margin-bottom:8px;">${entry.occasionTag===WFH_TAG?'🏠':'🏷'} ${esc(entry.occasionTag)}</div>` : ''}
+          <div ontouchend="if(_touchMoved)return;event.preventDefault();openTagPicker('${entry.id}')" onclick="openTagPicker('${entry.id}')"
+            style="display:inline-flex;align-items:center;gap:5px;margin-bottom:8px;cursor:pointer;touch-action:manipulation;">
+            ${entry.occasionTag
+              ? `<div class="occasion-tag">${entry.occasionTag===WFH_TAG?'🏠':'🏷'} ${esc(entry.occasionTag)}</div><div style="font-size:10px;color:var(--text-3);font-weight:600;">✎</div>`
+              : `<div style="font-size:12px;font-weight:700;color:var(--text-3);border:1px dashed var(--border);border-radius:100px;padding:4px 12px;">＋ Add tag</div>`}
+          </div>
           ${isWFH(entry) ? `<div style="font-size:12px;color:var(--text-3);margin-bottom:6px;">🙈 Comfort first — not counted in your style score</div>` : ''}
           ${entry.weather ? `<div class="weather-chip" style="margin-bottom:8px;">${entry.weather.icon} ${entry.weather.tempF}°F · ${esc(entry.weather.condition)}</div>` : ''}
           <div class="rating-big"><span class="rating-num">${entry.rating}</span><span class="rating-denom">/10</span></div>
@@ -17726,6 +18006,33 @@ function viewDetail() {
       <button onclick="shareOutfit('${entry.id}')" style="background:#fff;color:var(--gold-dk);border:none;border-radius:100px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">✨ Share this Look</button>
     </div>` : ''}
     <div style="height:40px"></div>
+
+    ${S._tagPickerFor === entry.id ? (() => {
+      const tags = getOccasionTags();
+      const current = entry.occasionTag || null;
+      return `<div ontouchend="if(_touchMoved)return;event.preventDefault();closeTagPicker()" onclick="closeTagPicker()"
+        style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:flex;align-items:flex-end;touch-action:manipulation;">
+        <div ontouchend="event.stopPropagation()" onclick="event.stopPropagation()"
+          style="width:100%;background:var(--bg);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:75vh;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;">
+          <div style="width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 20px;"></div>
+          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:16px;">Change Fit Tag</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+            <div ontouchend="if(_touchMoved)return;event.preventDefault();setEntryTag('${entry.id}',null)" onclick="setEntryTag('${entry.id}',null)"
+              style="padding:8px 16px;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;border:${!current?'none':'1.5px solid var(--border)'};background:${!current?'var(--surface-2)':'var(--surface)'};color:${!current?'var(--text)':'var(--text-3)'};">
+              ✕ None
+            </div>
+            ${tags.map(tag => {
+              const tEsc = tag.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+              const active = current === tag;
+              return `<div ontouchend="if(_touchMoved)return;event.preventDefault();setEntryTag('${entry.id}','${tEsc}')" onclick="setEntryTag('${entry.id}','${tEsc}')"
+                style="padding:8px 16px;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;border:${active?'none':'1.5px solid var(--border)'};background:${active?'var(--gold)':'var(--surface)'};color:${active?'#fff':'var(--text-2)'};">
+                🏷 ${esc(tag)}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>`;
+    })() : ''}
   </div>`;
 }
 
@@ -18560,6 +18867,17 @@ async function shareOutfit(id) {
   const a = Object.assign(document.createElement('a'), { href:entry.photo, download:`outfit-${entry.id.slice(0,6)}.jpg` });
   a.click();
   toast('Photo saved — share it however you like! 📸');
+}
+
+function openTagPicker(entryId) { S._tagPickerFor = entryId; render(); }
+function closeTagPicker()        { S._tagPickerFor = null;   render(); }
+async function setEntryTag(entryId, tag) {
+  const e = S.entries.find(e => e.id === entryId); if (!e) return;
+  e.occasionTag = tag || null;
+  S._tagPickerFor = null;
+  await DB.entries.put(e);
+  render();
+  toast(tag ? `Tag updated to "${tag}" 🏷` : 'Tag removed');
 }
 
 function openEntry(id) {
