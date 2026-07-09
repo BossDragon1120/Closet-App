@@ -1752,22 +1752,22 @@ body {
 }
 
 /* ── RIP MEMORIAL ──────────────────────────────────────── */
-.rip-header { background: linear-gradient(180deg, #0F0D0C 0%, #1C1520 100%); padding: calc(var(--safe-t) + 20px) 20px 28px; text-align: center; position: relative; overflow: hidden; }
-.rip-header::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 110%, rgba(150,80,220,0.22) 0%, transparent 65%); pointer-events: none; }
-.rip-header-title { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.4px; position: relative; margin-top: 6px; }
-.rip-header-sub { font-size: 13px; color: rgba(255,255,255,0.38); margin-top: 6px; line-height: 1.55; position: relative; }
-.rip-card { background: linear-gradient(160deg, #16121A 0%, #1D1825 100%); border: 1px solid rgba(150,80,220,0.22); border-radius: var(--r-lg); overflow: hidden; margin: 0 16px 16px; position: relative; }
-.rip-card-photo { width: 100%; aspect-ratio: 4/3; object-fit: cover; object-position: center; display: block; }
-.rip-card-photo-empty { width: 100%; aspect-ratio: 4/3; background: #120F18; display: flex; align-items: center; justify-content: center; font-size: 44px; opacity: 0.3; }
-.rip-card-body { padding: 16px 18px 20px; }
-.rip-card-label { font-size: 10px; font-weight: 800; letter-spacing: 0.14em; color: rgba(160,100,240,0.8); text-transform: uppercase; margin-bottom: 5px; }
-.rip-card-name { font-size: 18px; font-weight: 800; color: #fff; line-height: 1.25; margin-bottom: 3px; }
-.rip-card-meta { font-size: 12px; color: rgba(255,255,255,0.35); margin-bottom: 12px; }
-.rip-card-note { font-size: 13px; color: rgba(255,255,255,0.58); line-height: 1.65; font-style: italic; border-left: 2px solid rgba(150,80,220,0.45); padding-left: 12px; }
-.rip-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
-.rip-card-epitaph { font-size: 10px; color: rgba(160,100,240,0.6); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
-.rip-card-view-btn { background: none; border: none; font-size: 12px; color: rgba(255,255,255,0.28); cursor: pointer; padding: 4px 8px; border-radius: 6px; font-family: inherit; }
-.rip-card-view-btn:active { background: rgba(255,255,255,0.07); }
+.rip-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: calc(var(--safe-t) + 12px) 20px 14px; text-align: center; position: relative; }
+.rip-header::before { display: none; }
+.rip-header-title { font-size: 17px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; margin-top: 4px; }
+.rip-header-sub { font-size: 12px; color: var(--text-3); margin-top: 4px; line-height: 1.5; }
+.rip-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; margin: 0 16px 12px; }
+.rip-card-photo { width: 100%; aspect-ratio: 3/2; object-fit: cover; object-position: center; display: block; }
+.rip-card-photo-empty { width: 100%; aspect-ratio: 3/2; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 32px; opacity: 0.35; }
+.rip-card-body { padding: 12px 14px 14px; }
+.rip-card-label { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; color: rgba(140,80,210,0.75); text-transform: uppercase; margin-bottom: 3px; }
+.rip-card-name { font-size: 15px; font-weight: 800; color: var(--text); line-height: 1.25; margin-bottom: 2px; }
+.rip-card-meta { font-size: 11px; color: var(--text-3); margin-bottom: 8px; }
+.rip-card-note { font-size: 12px; color: var(--text-2); line-height: 1.6; font-style: italic; border-left: 2px solid rgba(140,80,210,0.3); padding-left: 10px; }
+.rip-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.rip-card-epitaph { font-size: 10px; color: rgba(140,80,210,0.65); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.rip-card-view-btn { background: none; border: none; font-size: 12px; color: var(--text-3); cursor: pointer; padding: 4px 8px; border-radius: 6px; font-family: inherit; }
+.rip-card-view-btn:active { background: var(--surface-2); }
 .rip-memorial-box { margin: 0 20px 20px; background: linear-gradient(135deg, #16121A 0%, #1D1825 100%); border: 1.5px solid rgba(150,80,220,0.28); border-radius: var(--r); padding: 16px; }
 .rip-memorial-title { font-weight: 700; font-size: 14px; color: #C4A0F0; margin-bottom: 3px; }
 .rip-memorial-sub { font-size: 12px; color: rgba(255,255,255,0.36); margin-bottom: 14px; line-height: 1.5; }
@@ -4860,7 +4860,7 @@ function featuresMenuHTML() {
       <div class="feat-section">
         <div class="feat-section-title">${s.title}</div>
         ${s.items.map(item => `
-          <div class="feat-item" ${item.action ? `onclick="${item.action}" style="cursor:pointer;"` : ''}>
+          <div class="feat-item" ${item.action ? `onclick="${item.action}" ontouchend="if(_touchMoved)return;event.preventDefault();${item.action}" style="cursor:pointer;touch-action:manipulation;"` : ''}>
             <span class="feat-icon">${item.icon}</span>
             <span class="feat-text">${item.text}</span>
             ${item.action ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;margin-left:auto;"><path d="M9 18l6-6-6-6"/></svg>` : ''}
@@ -4870,7 +4870,7 @@ function featuresMenuHTML() {
       <div class="feat-backdrop" ontouchend="if(_touchMoved)return;event.preventDefault();closeMenu();" onclick="closeMenu()"></div>
       <div class="feat-panel">
         <div class="feat-header">
-          <button onclick="S.menuSection=null;render()" style="background:none;border:none;display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;padding:0;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.menuSection=null;render()" onclick="S.menuSection=null;render()" style="background:none;border:none;display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> Menu
           </button>
           <div style="flex:1;text-align:center;">
@@ -4885,7 +4885,7 @@ function featuresMenuHTML() {
   // ── SERVICES sub-page ─────────────────────────────────────
   if (S.menuSection === 'services') {
     const serviceRow = (icon, title, sub, action) => `
-      <div onclick="${action}" style="display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid var(--border);cursor:pointer;" ontouchstart="this.style.background='var(--surface-2)'" ontouchend="this.style.background=''">
+      <div onclick="${action}" ontouchend="if(_touchMoved)return;event.preventDefault();this.style.background='';${action}" ontouchstart="this.style.background='var(--surface-2)'" style="display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
         <div style="width:42px;height:42px;border-radius:12px;background:var(--gold-bg);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">${icon}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;">${title}</div>
@@ -4897,7 +4897,7 @@ function featuresMenuHTML() {
       <div class="feat-backdrop" ontouchend="if(_touchMoved)return;event.preventDefault();closeMenu();" onclick="closeMenu()"></div>
       <div class="feat-panel">
         <div class="feat-header">
-          <button onclick="S.menuSection=null;render()" style="background:none;border:none;display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;padding:0;">
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();S.menuSection=null;render()" onclick="S.menuSection=null;render()" style="background:none;border:none;display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> Menu
           </button>
           <div style="flex:1;text-align:center;">
@@ -4914,7 +4914,7 @@ function featuresMenuHTML() {
 
   // ── MAIN MENU ─────────────────────────────────────────────
   const menuRow = (icon, label, sub, action) => `
-    <div onclick="${action}" style="display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid var(--border);cursor:pointer;" ontouchstart="this.style.background='var(--surface-2)'" ontouchend="this.style.background=''">
+    <div onclick="${action}" ontouchend="if(_touchMoved)return;event.preventDefault();this.style.background='';${action}" ontouchstart="this.style.background='var(--surface-2)'" style="display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
       <div style="width:42px;height:42px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;">${icon}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;">${label}</div>
@@ -4924,14 +4924,14 @@ function featuresMenuHTML() {
     </div>`;
 
   return `
-    <div class="feat-backdrop" onclick="closeMenu()"></div>
+    <div class="feat-backdrop" ontouchend="if(_touchMoved)return;event.preventDefault();closeMenu();" onclick="closeMenu()"></div>
     <div class="feat-panel">
       <div class="feat-header">
         <div>
           <div class="feat-title">🪞 Closet</div>
           <div class="feat-subtitle">${S.profileName ? esc(S.profileName) : 'Your style journal'}</div>
         </div>
-        <button class="feat-close" onclick="closeMenu()">✕</button>
+        <button class="feat-close" ontouchend="if(_touchMoved)return;event.preventDefault();closeMenu();" onclick="closeMenu()">✕</button>
       </div>
       <div class="feat-body" style="padding:0;">
         ${menuRow('🌿', 'Book Closet Therapy', 'Seasonal in-person visit — photograph, organise & digitise your wardrobe', "S.menuSection='services';render()")}
@@ -4943,7 +4943,7 @@ function featuresMenuHTML() {
         ${menuRow('⚙️', 'Settings', 'API key, sync, and app preferences', "closeMenu();switchTab('settings')")}
       </div>
       <div style="padding:12px 16px calc(12px + var(--safe-b));border-top:1px solid var(--border);flex-shrink:0;">
-        <button onclick="S.featureMenuOpen=false;S.menuSection=null;signOut();" style="width:100%;background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Sign out</button>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S.featureMenuOpen=false;S.menuSection=null;signOut();" onclick="S.featureMenuOpen=false;S.menuSection=null;signOut();" style="width:100%;background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 14px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">Sign out</button>
       </div>
     </div>`;
 }
@@ -16056,7 +16056,7 @@ function viewWardrobeItem() {
         ${w.isNew && !w.retiredFromCloset ? `<div style="display:inline-flex;align-items:center;gap:3px;background:#FFF9E6;color:#B87000;border-radius:100px;padding:2px 9px;font-size:11px;font-weight:600;border:1px solid #F0D070;">✨ New${w.purchasedDate?' · '+fmtMonth(w.purchasedDate):''}</div>` : w.purchasedDate && !w.retiredFromCloset ? `<div style="display:inline-flex;align-items:center;gap:3px;background:var(--surface-2);color:var(--text-3);border-radius:100px;padding:2px 9px;font-size:11px;font-weight:500;border:1px solid var(--border);">📅 Since ${fmtMonth(w.purchasedDate)}</div>` : ''}
       </div>
 
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:${(S._pendingWitemPhoto?.wId===w.id||S._pendingWearPhoto?.wId===w.id||S._wearPhotoPicker===w.id)?'10':'0'}px;flex-wrap:wrap;">
         <input id="witemPhotoInput" type="file" accept="image/*" style="display:none;"
           onchange="stageWardrobeItemPhoto('${w.id}', this)">
         <input id="witemWearPhotoInput" type="file" accept="image/*" style="display:none;"
@@ -16103,7 +16103,7 @@ function viewWardrobeItem() {
       </div>
 
       <!-- Quick wear + stats -->
-      <div style="margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:8px;">
+      <div style="margin-top:8px;display:flex;flex-direction:column;align-items:center;gap:8px;">
         <div style="display:flex;gap:8px;justify-content:center;">
           <button
             ontouchend="if(_touchMoved)return;event.preventDefault();logQuickWear('${w.id}')"
@@ -17612,7 +17612,7 @@ function viewMatchReview() {
             oninput="S.matchReview._pickerQuery=this.value;window._matchPickerFocused=true;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
             style="margin-bottom:10px;">
           ${grid.length ? `
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:220px;overflow-y:auto;margin-bottom:10px;">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
             ${grid.map(sw => {
               const sp = photoBlobUrl(sw.photo);
               return `<div ontouchend="if(_touchMoved)return;event.preventDefault();advanceMatchStep(${step},'relink','${sw.id}')" onclick="advanceMatchStep(${step},'relink','${sw.id}')"
@@ -17662,7 +17662,7 @@ function viewMatchReview() {
           oninput="S.matchReview._pickerQuery=this.value;window._matchPickerFocused=true;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
           style="margin-bottom:10px;">
         ${grid.length ? `
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:200px;overflow-y:auto;margin-bottom:12px;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
           ${grid.map(sw => {
             const sp = photoBlobUrl(sw.photo);
             return `<div ontouchend="if(_touchMoved)return;event.preventDefault();advanceMatchStep(${step},'link','${sw.id}')" onclick="advanceMatchStep(${step},'link','${sw.id}')"
@@ -17721,7 +17721,7 @@ function viewMatchReview() {
     </div>
 
     <!-- Scrollable decision area -->
-    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:14px;">
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:14px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px);">
       ${decisionArea}
     </div>
   </div>`;
@@ -20962,14 +20962,14 @@ function viewRIP() {
       </button>
     </div>`;
 
-  return `<div class="view view-notab" style="background:linear-gradient(180deg,#0F0D0C 0%,var(--bg) 320px);">
-    <div class="nav" style="background:rgba(15,13,12,0.9);">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="color:rgba(255,255,255,0.7);touch-action:manipulation;">${iconBack()} Wardrobe</button>
-      <span class="nav-title" style="color:#fff;">Memorial Garden</span>
+  return `<div class="view view-notab">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Wardrobe</button>
+      <span class="nav-title">Memorial Garden</span>
       <span style="width:72px"></span>
     </div>
     <div class="rip-header">
-      <div style="font-size:38px;margin-bottom:8px;position:relative;">🌹</div>
+      <div style="font-size:24px;margin-bottom:4px;">🌹</div>
       <div class="rip-header-title">Memorial Garden</div>
       <div class="rip-header-sub">A quiet place for the pieces that made you feel something.</div>
     </div>
@@ -21162,7 +21162,7 @@ async function aiPolishEulogy(id) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 250,
+        max_tokens: 150,
         messages: [{
           role: 'user',
           content: `You are helping someone write a short, warm memorial for a beloved clothing item they are retiring from their wardrobe. The item is called "${itemName}".
@@ -21170,7 +21170,7 @@ async function aiPolishEulogy(id) {
 Here is what they wrote:
 "${raw}"
 
-Please rewrite this as a short, heartfelt eulogy — keep their voice and all their details, but give it warmth, a little poetry, and emotional resonance. It should feel personal and genuine, not generic. Keep it to 2–4 sentences. Return only the revised text, no quotes, no preamble.`,
+Please rewrite this as a short, heartfelt eulogy — keep their voice and all their details, but give it warmth, a little poetry, and emotional resonance. It should feel personal and genuine, not generic. Keep it to 1–2 sentences. Return only the revised text, no quotes, no preamble.`,
         }],
       }),
     });
