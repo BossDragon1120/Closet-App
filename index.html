@@ -6015,36 +6015,25 @@ function toggleRouletteLook(id) {
 // tab onto the My Brands page when Evolve was flattened to a single scroll.
 function brandDiscoveryHTML() {
   if (S._brandDiscoveryLoading) {
-    return `<div style="padding:6px 16px 0;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>
-        <span style="font-size:12px;color:var(--text-3);">Finding brands that match your aesthetic…</span>
+    return `<div class="home-section">
+      <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+        <div class="spinner" style="width:18px;height:18px;border-width:2px;"></div>
+        <span style="font-size:13px;color:var(--text-3);">Finding brands that match your aesthetic…</span>
       </div>
     </div>`;
   }
-  if (!S.brandDiscovery?.suggestions?.length) {
-    return `<div style="padding:6px 16px 0;">
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
-        style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:100px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">✦ Find similar brands</button>
-    </div>`;
-  }
+  if (!S.brandDiscovery?.suggestions?.length || !S._brandsExpanded) return '';
   const suggs = S.brandDiscovery.suggestions;
-  if (!S._brandsExpanded) {
-    const s = suggs[0];
-    return `<div style="padding:6px 16px 0;">
-      <div ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=true;render()" onclick="S._brandsExpanded=true;render()"
-        style="cursor:pointer;touch-action:manipulation;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:11px;">
-        <div style="font-size:22px;line-height:1;flex-shrink:0;">${s.emoji||'✦'}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-2);margin-bottom:3px;">✨ You Might Also Love <span style="font-weight:500;color:var(--text-3);">· ${suggs.length}</span></div>
-          <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(s.name)}</div>
-          <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:1px 7px;display:inline-block;margin-top:3px;">${esc(s.vibe)}</div>
-        </div>
-        <div style="font-size:16px;color:var(--text-3);flex-shrink:0;line-height:1;">›</div>
+  return `<div class="home-section" style="padding-top:0;">
+    <div style="padding:0 0 10px;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="home-section-label" style="margin-bottom:0;">✨ You Might Also Love</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↻ Refresh</button>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=false;render()" onclick="S._brandsExpanded=false;render()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">▲</button>
       </div>
-    </div>`;
-  }
-  return `<div style="padding:6px 16px 0;">
+    </div>
+    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
       <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">✨ You Might Also Love</div>
       <div style="display:flex;align-items:center;gap:10px;">
@@ -8591,7 +8580,7 @@ function viewDressMe() {
         return `
         <div style="margin-top:30px;padding-top:24px;border-top:1.5px solid var(--border);">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);">Peruse saved looks</div>
+            <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);">Saved looks — ready to go!</div>
             <div style="font-size:11px;color:var(--text-3);">${allSaved.length} saved</div>
           </div>
 
@@ -9348,20 +9337,43 @@ function viewPlan() {
 
       <!-- SOLO SUB-MODE PICKER -->
       ${!p.soloMode ? `
-        <div style="padding:0 16px 16px;display:flex;gap:10px;">
+        <div style="padding:0 16px 10px;display:flex;gap:8px;">
           <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode='event';render();" onclick="S.plan.soloMode='event';render();"
-            style="flex:1;padding:20px 12px;border-radius:var(--r);border:2px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:center;touch-action:manipulation;">
-            <div style="font-size:28px;margin-bottom:8px;">🗓</div>
-            <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;">Event</div>
-            <div style="font-size:11px;color:var(--text-3);line-height:1.4;">Dinner, party, interview — get a one-look recommendation</div>
+            style="flex:1;padding:12px 10px;border-radius:var(--r);border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:center;touch-action:manipulation;">
+            <div style="font-size:22px;margin-bottom:5px;">🗓</div>
+            <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px;">Event</div>
+            <div style="font-size:10px;color:var(--text-3);line-height:1.35;">Dinner, party, interview — one-look rec</div>
           </button>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode='trip';render();" onclick="S.plan.soloMode='trip';render();"
-            style="flex:1;padding:20px 12px;border-radius:var(--r);border:2px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:center;touch-action:manipulation;">
-            <div style="font-size:28px;margin-bottom:8px;">✈️</div>
-            <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;">Trip</div>
-            <div style="font-size:11px;color:var(--text-3);line-height:1.4;">Pack smart — day-by-day outfits + what to buy</div>
+            style="flex:1;padding:12px 10px;border-radius:var(--r);border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;text-align:center;touch-action:manipulation;">
+            <div style="font-size:22px;margin-bottom:5px;">✈️</div>
+            <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px;">Trip</div>
+            <div style="font-size:10px;color:var(--text-3);line-height:1.35;">Pack smart — day-by-day outfits + what to buy</div>
           </button>
         </div>
+
+        ${S.eventBoard.length === 0 && !S.savedTripPlans.length ? `
+        <div style="padding:4px 16px 16px;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;padding:0 2px;">✦ Quick start</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+            ${[
+              { e:'🍝', l:'Date Night',    d:'Romantic dinner reservation or evening out' },
+              { e:'💼', l:'Job Interview', d:'First impression at a creative agency' },
+              { e:'🎊', l:'Wedding Guest', d:'Black tie or garden party, looking sharp' },
+              { e:'✈️', l:'Weekend Trip',  d:'3-day city getaway, pack light' },
+              { e:'🎵', l:'Concert Night', d:'Music venue or outdoor festival' },
+              { e:'🌿', l:'Brunch',        d:'Casual daytime dining with friends' },
+            ].map(({e,l,d}) => `<button
+              ontouchend="if(_touchMoved)return;event.preventDefault();S.plan.soloMode='event';S.plan.eventDesc='${d}';render();"
+              onclick="S.plan.soloMode='event';S.plan.eventDesc='${d}';render();"
+              style="padding:11px 11px;border-radius:12px;border:1.5px dashed var(--border);background:none;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;display:flex;flex-direction:column;gap:4px;">
+              <div style="font-size:20px;line-height:1;">${e}</div>
+              <div style="font-size:12px;font-weight:700;color:var(--text);">${l}</div>
+              <div style="font-size:10px;color:var(--text-3);line-height:1.3;">${d}</div>
+            </button>`).join('')}
+          </div>
+        </div>
+        ` : ''}
       ` : ''}
 
       <!-- SOLO EVENT FLOW -->
@@ -9529,7 +9541,7 @@ function viewPlan() {
               // Collect all unique emojis across all days
               const allEmojis = [...new Set((tp.suggestions||[]).flatMap(day=>(day.outfit||day.items||[]).map(p=>p.emoji||shopItemEmoji(p.item||p.name||''))))].slice(0,8);
               return `<div style="border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--surface);">
-                <div style="padding:10px 14px;cursor:pointer;touch-action:manipulation;"
+                <div style="padding:8px 12px;cursor:pointer;touch-action:manipulation;"
                   ontouchend="if(_touchMoved)return;event.preventDefault();toggleTripPlan('${tp.id}');" onclick="toggleTripPlan('${tp.id}')">
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
                     <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">✈️ ${esc(tp.destination||'Trip')}</div>
@@ -10618,9 +10630,9 @@ function eventCardHTML(ev, extraStyle) {
           const photoSrc = anchor.wi ? photoBlobUrl(anchor.wi.photo || anchor.wi.wearPhoto || null) : null;
           return `<div style="display:inline-block;text-align:center;">
             ${photoSrc
-              ? `<div style="width:88px;height:110px;border-radius:10px;overflow:hidden;border:2px solid var(--gold);"><img src="${esc(photoSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
-              : `<div style="width:88px;height:110px;border-radius:10px;background:var(--surface-2);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:36px;">${anchor.emoji}</div>`}
-            <div style="font-size:10px;font-weight:700;color:var(--text);margin-top:5px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(anchor.name)}</div>
+              ? `<div style="width:72px;height:88px;border-radius:10px;overflow:hidden;border:2px solid var(--gold);"><img src="${esc(photoSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
+              : `<div style="width:72px;height:88px;border-radius:10px;background:var(--surface-2);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:30px;">${anchor.emoji}</div>`}
+            <div style="font-size:10px;font-weight:700;color:var(--text);margin-top:5px;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(anchor.name)}</div>
           </div>`;
         })()}
       </div>
@@ -10629,11 +10641,11 @@ function eventCardHTML(ev, extraStyle) {
         <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;">
           ${pairs.map(p => {
             const photoSrc = p.wi ? photoBlobUrl(p.wi.photo || p.wi.wearPhoto || null) : null;
-            return `<div style="flex-shrink:0;text-align:center;width:64px;">
+            return `<div style="flex-shrink:0;text-align:center;width:52px;">
               ${photoSrc
-                ? `<div style="width:64px;height:80px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);"><img src="${esc(photoSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
-                : `<div style="width:64px;height:80px;border-radius:8px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;">${p.emoji}</div>`}
-              <div style="font-size:9px;color:var(--text-2);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</div>
+                ? `<div style="width:52px;height:64px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);"><img src="${esc(photoSrc)}" style="width:100%;height:100%;object-fit:cover;object-position:top;"></div>`
+                : `<div style="width:52px;height:64px;border-radius:8px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;">${p.emoji}</div>`}
+              <div style="font-size:9px;color:var(--text-2);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.name)}</div>
             </div>`;
           }).join('')}
         </div>
@@ -10642,10 +10654,10 @@ function eventCardHTML(ev, extraStyle) {
     </div>` : (sg?.reasoning ? `<div style="border-top:1px solid var(--border);padding:12px 14px;font-size:12px;color:var(--text-2);line-height:1.5;">${esc(sg.reasoning)}</div>` : '');
 
   return `<div class="event-card"${extraStyle ? ` style="${extraStyle}"` : ''}>
-    <div style="padding:10px 14px;cursor:pointer;touch-action:manipulation;"
+    <div style="padding:8px 12px;cursor:pointer;touch-action:manipulation;"
       ontouchend="if(_touchMoved)return;event.preventDefault();${toggleAct}" onclick="${toggleAct}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${evEmoji} ${title}</div>
+        <div style="font-size:12px;font-weight:800;color:var(--text);line-height:1.2;">${evEmoji} ${title}</div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
           <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteEventBoardItem('${ev.id}')" onclick="event.stopPropagation();deleteEventBoardItem('${ev.id}')"
             style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;padding:2px 3px;line-height:1;touch-action:manipulation;">✕</button>
@@ -12545,19 +12557,22 @@ function viewHome() {
   });
   likedRecs.sort((a,b)=>new Date(b.entry.createdAt)-new Date(a.entry.createdAt));
 
-  // ── ⚡ ACTION SUMMARY — top priority moves ────────────────────────────────
+  // ── ⚡ ACTION SUMMARY — top priority moves (rows are expand triggers) ───────
   const actionSummaryHTML = (() => {
     const rows = [];
     if (likedRecs.length > 0) {
       const { rec, entry } = likedRecs[0];
       const short = rec.length > 85 ? rec.slice(0, 85).replace(/\s\S*$/, '…') : rec;
-      rows.push(`<div style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);">
-        <div style="width:28px;height:28px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">✂️</div>
+      const active = S._tipsExpanded;
+      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();S._tipsExpanded=!S._tipsExpanded;render()" onclick="S._tipsExpanded=!S._tipsExpanded;render()"
+        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
+        <div style="width:28px;height:28px;border-radius:50%;background:${active?'var(--gold)':'rgba(184,125,42,0.18)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">✂️</div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:3px;">Top Style Tip</div>
+          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:3px;">Top Style Tip${likedRecs.length > 1 ? ` <span style="font-weight:500;color:var(--text-3);">· ${likedRecs.length}</span>` : ''}</div>
           <div style="font-size:13px;color:var(--text);line-height:1.4;">${esc(short)}</div>
           <div style="font-size:10px;color:var(--text-3);margin-top:4px;">from your ⭐ ${entry.rating}/10 outfit${entry.occasionTag ? ' · ' + esc(entry.occasionTag) : ''}</div>
         </div>
+        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">${active ? '▲' : '›'}</div>
       </div>`);
     }
     const trends = S.hotTrends?.trends;
@@ -12566,35 +12581,61 @@ function viewHome() {
       const t = trends.find(x => _trendRx[x.id] === 'up') || trends[0];
       const desc = t.tip || t.description || '';
       const shortDesc = desc.length > 70 ? desc.slice(0, 70).replace(/\s\S*$/, '…') : desc;
-      rows.push(`<div style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;${rows.length ? 'border-bottom:1px solid var(--border);' : ''}">
-        <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#FF6B35,#FF8C5A);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">${esc(t.emoji||'🔥')}</div>
+      const active = S._trendsExpanded;
+      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();S._trendsExpanded=!S._trendsExpanded;render()" onclick="S._trendsExpanded=!S._trendsExpanded;render()"
+        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;${rows.length ? 'border-bottom:1px solid var(--border);' : ''}cursor:pointer;touch-action:manipulation;">
+        <div style="width:28px;height:28px;border-radius:50%;background:${active?'linear-gradient(135deg,#FF6B35,#FF8C5A)':'rgba(255,107,53,0.12)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">${esc(t.emoji||'🔥')}</div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">Trending Now</div>
+          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">Trending Now <span style="font-weight:500;color:var(--text-3);">· ${trends.length}</span></div>
           <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(t.name)}</div>
           ${shortDesc ? `<div style="font-size:12px;color:var(--text-3);margin-top:2px;line-height:1.35;">${esc(shortDesc)}</div>` : ''}
         </div>
+        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">${active ? '▲' : '›'}</div>
+      </div>`);
+    } else if (!S._trendsLoading) {
+      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
+        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;${rows.length ? 'border-bottom:1px solid var(--border);' : ''}cursor:pointer;touch-action:manipulation;">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(255,107,53,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">🔥</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">What's Trending</div>
+          <div style="font-size:13px;color:var(--text-3);line-height:1.4;">Generate this week's trend report</div>
+        </div>
+        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">›</div>
       </div>`);
     }
-    if (goalsArr.length > 0) {
-      const ownedBrands = new Set(S.wardrobe.map(w => (w.brand||'').trim().toLowerCase()));
-      let pick = null;
+    if (S.brandDiscovery?.suggestions?.length) {
+      const s = S.brandDiscovery.suggestions[0];
+      const active = S._brandsExpanded;
+      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=!S._brandsExpanded;render()" onclick="S._brandsExpanded=!S._brandsExpanded;render()"
+        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;cursor:pointer;touch-action:manipulation;">
+        <div style="width:28px;height:28px;border-radius:50%;background:${active?'rgba(108,62,191,0.25)':'rgba(108,62,191,0.1)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">${esc(s.emoji||'🏷')}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#6C3EBF;margin-bottom:3px;">Brand to Explore <span style="font-weight:500;color:var(--text-3);">· ${S.brandDiscovery.suggestions.length}</span></div>
+          <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(s.name)}</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${esc(s.vibe)}</div>
+        </div>
+        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">${active ? '▲' : '›'}</div>
+      </div>`);
+    } else if (!S._brandDiscoveryLoading && goalsArr.length > 0) {
+      const _ownedBrands = new Set(S.wardrobe.map(w => (w.brand||'').trim().toLowerCase()));
+      let _pick = null;
       for (const goal of goalsArr) {
         const candidates = GOAL_BRANDS[goal] || [];
         for (const b of candidates) {
-          if (!ownedBrands.has(b.toLowerCase())) { pick = { brand: b, goal }; break; }
+          if (!_ownedBrands.has(b.toLowerCase())) { _pick = { brand: b, goal }; break; }
         }
-        if (pick) break;
+        if (_pick) break;
       }
-      if (pick) {
-        rows.push(`<div style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;">
-          <div style="width:28px;height:28px;border-radius:50%;background:rgba(108,62,191,0.15);border:1px solid rgba(108,62,191,0.25);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">🏷</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#6C3EBF;margin-bottom:3px;">Brand to Explore</div>
-            <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(pick.brand)}</div>
-            <div style="font-size:12px;color:var(--text-3);margin-top:2px;">Aligns with your ${esc(pick.goal)} goal</div>
-          </div>
-        </div>`);
-      }
+      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
+        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;cursor:pointer;touch-action:manipulation;">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(108,62,191,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">🏷</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#6C3EBF;margin-bottom:3px;">Brand to Explore</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.4;">${_pick ? esc(_pick.brand) : 'Discover your next go-to brand'}</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${_pick ? `Aligns with your ${esc(_pick.goal)} goal · tap to discover more` : 'Tap to find brands that match your aesthetic'}</div>
+        </div>
+        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">›</div>
+      </div>`);
     }
     if (!rows.length) return '';
     return `<div style="margin:12px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:2px 14px;">
@@ -12604,31 +12645,7 @@ function viewHome() {
   })();
 
   const tipsSection = (() => {
-    if (!likedRecs.length) {
-      return `<div class="home-section">
-        <div class="home-section-label" style="margin-bottom:8px;">✂️ Style Tips</div>
-        <div style="font-size:12px;color:var(--text-3);">Heart ♥ tips on your fit checks to collect them here.</div>
-      </div>`;
-    }
-    if (!S._tipsExpanded) {
-      const { rec, entry } = likedRecs[0];
-      const short = rec.length > 90 ? rec.slice(0, 90).replace(/\s\S*$/, '…') : rec;
-      return `<div class="home-section">
-        <div ontouchend="if(_touchMoved)return;event.preventDefault();S._tipsExpanded=true;render()" onclick="S._tipsExpanded=true;render()"
-          style="cursor:pointer;touch-action:manipulation;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:11px;">
-          <div style="width:36px;height:48px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#111;position:relative;">
-            ${entry.photo
-              ? `<img src="${entry.photo}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 10%;" loading="lazy">`
-              : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;">👗</div>`}
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:3px;">✂️ Style Tips <span style="font-weight:500;color:var(--text-3);">· ${likedRecs.length}</span></div>
-            <div style="font-size:12px;color:var(--text);line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${esc(short)}</div>
-          </div>
-          <div style="font-size:16px;color:var(--text-3);flex-shrink:0;line-height:1;">›</div>
-        </div>
-      </div>`;
-    }
+    if (!likedRecs.length || !S._tipsExpanded) return '';
     return `<div class="home-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div class="home-section-label" style="margin-bottom:0;">✂️ Style Tips</div>
@@ -12660,32 +12677,12 @@ function viewHome() {
     </div>`;
   })();
 
-  // ── 🔥 TRENDS — one carousel, removable cards ────────────────────────────
+  // ── 🔥 TRENDS — carousel, triggered from Priority Moves ─────────────────
   const trendsSection = (()=>{
     if (S._trendsLoading) return `<div class="home-section"><div style="display:flex;align-items:center;gap:10px;padding:4px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Curating trends…</span></div></div>`;
     const trends = S.hotTrends;
-    if (!trends?.trends?.length) return `<div class="home-section">
-      <div class="home-section-label" style="margin-bottom:8px;">🔥 What's Trending</div>
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
-        style="width:100%;background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-        ✦ Generate this week's trend report
-      </button>
-    </div>`;
+    if (!trends?.trends?.length || !S._trendsExpanded) return '';
     const reactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
-    if (!S._trendsExpanded) {
-      const t = trends.trends[0];
-      return `<div class="home-section">
-        <div ontouchend="if(_touchMoved)return;event.preventDefault();S._trendsExpanded=true;render()" onclick="S._trendsExpanded=true;render()"
-          style="cursor:pointer;touch-action:manipulation;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:11px;">
-          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#FF6B35,#FF8C5A);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;line-height:1;">${esc(t.emoji||'🔥')}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">🔥 What's Trending <span style="font-weight:500;color:var(--text-3);">· ${trends.trends.length}</span></div>
-            <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.2;">${esc(t.name)}</div>
-          </div>
-          <div style="font-size:16px;color:var(--text-3);flex-shrink:0;line-height:1;">›</div>
-        </div>
-      </div>`;
-    }
     return `<div class="home-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div class="home-section-label" style="margin-bottom:0;">🔥 What's Trending</div>
@@ -12802,10 +12799,8 @@ function viewHome() {
     </div>` : ''}
     ${tipsSection}
     ${trendsSection}
+    ${brandDiscoveryHTML()}
     ${pulseSection}
-    <div class="home-section" style="padding:0;">
-      ${brandDiscoveryHTML()}
-    </div>
     <div style="height:16px"></div>
   </div>`;
 }
