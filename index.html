@@ -3535,7 +3535,7 @@ async function matchToWardrobe(newItems, wardrobeItems) {
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 512,
+        model: 'claude-haiku-4-5-20251001', max_tokens: 1024,
         messages: [{ role: 'user', content:
 `You are matching outfit items detected in a photo against a user's saved wardrobe. Your job is to identify which detected items are the SAME PHYSICAL PIECE already in the wardrobe.
 
@@ -17591,26 +17591,32 @@ function viewMatchReview() {
 
     } else {
       // ── Picker: find the correct wardrobe item ──
+      const sameCatItems = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat);
+      const typeFiltered = !pickerQuery && sameCatItems.length > 0 && itemCat !== 'Other';
       let grid;
       if (pickerQuery) {
+        // Search everything — name, brand, category — no item cap
         grid = S.wardrobe.filter(w =>
           (w.name||'').toLowerCase().includes(pickerQuery) ||
-          (w.brand||'').toLowerCase().includes(pickerQuery)
-        ).slice(0, 30);
+          (w.brand||'').toLowerCase().includes(pickerQuery) ||
+          (w.category||'').toLowerCase().includes(pickerQuery)
+        );
+      } else if (typeFiltered) {
+        // Show ALL same-type items (bags, shoes, tops…) — no slice
+        grid = sameCatItems;
       } else {
-        // Show full wardrobe — same-category items floated to the top
-        const sameCat = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat);
-        const rest    = S.wardrobe.filter(w => normalizeCat(w.category||'Other') !== itemCat);
-        grid = [...sameCat, ...rest].slice(0, 30);
+        // No clear type match — show full wardrobe up to 60
+        grid = S.wardrobe.slice(0, 60);
       }
 
       decisionArea = `
         <div style="padding:0 16px 16px;">
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">Which piece is this?</div>
-          <input id="match-picker-search" class="form-input" type="text" placeholder="🔍 Search your closet…"
+          <input id="match-picker-search" class="form-input" type="text" placeholder="🔍 Search all ${S.wardrobe.length} items…"
             value="${esc(mr._pickerQuery||'')}"
             oninput="S.matchReview._pickerQuery=this.value;window._matchPickerFocused=true;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
-            style="margin-bottom:10px;">
+            style="margin-bottom:8px;">
+          ${typeFiltered ? `<div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Showing your ${itemCat} (${sameCatItems.length}) · search to find anything</div>` : pickerQuery ? `<div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">${grid.length} result${grid.length===1?'':'s'} across all items</div>` : ''}
           ${grid.length ? `
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
             ${grid.map(sw => {
@@ -17641,26 +17647,31 @@ function viewMatchReview() {
     itemCat  = normalizeCat(u.selectedCat || categoryFromIcon(u.item.icon, u.item.name));
 
     const pickerQuery = (mr._pickerQuery || '').trim().toLowerCase();
+    const umSameCatItems = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat);
+    const umTypeFiltered = !pickerQuery && umSameCatItems.length > 0 && itemCat !== 'Other';
     let grid;
     if (pickerQuery) {
+      // Search everything — name, brand, category — no item cap
       grid = S.wardrobe.filter(w =>
         (w.name||'').toLowerCase().includes(pickerQuery) ||
-        (w.brand||'').toLowerCase().includes(pickerQuery)
-      ).slice(0, 30);
+        (w.brand||'').toLowerCase().includes(pickerQuery) ||
+        (w.category||'').toLowerCase().includes(pickerQuery)
+      );
+    } else if (umTypeFiltered) {
+      // Show ALL same-type items — no slice
+      grid = umSameCatItems;
     } else {
-      // Show full wardrobe — same-category items floated to the top
-      const sameCat = S.wardrobe.filter(w => normalizeCat(w.category||'Other') === itemCat);
-      const rest    = S.wardrobe.filter(w => normalizeCat(w.category||'Other') !== itemCat);
-      grid = [...sameCat, ...rest].slice(0, 30);
+      grid = S.wardrobe.slice(0, 60);
     }
 
     decisionArea = `
       <div style="padding:0 16px 16px;">
         <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">Already own this?</div>
-        <input id="match-picker-search" class="form-input" type="text" placeholder="🔍 Search your closet…"
+        <input id="match-picker-search" class="form-input" type="text" placeholder="🔍 Search all ${S.wardrobe.length} items…"
           value="${esc(mr._pickerQuery||'')}"
           oninput="S.matchReview._pickerQuery=this.value;window._matchPickerFocused=true;clearTimeout(window._mpd);window._mpd=setTimeout(render,180);"
-          style="margin-bottom:10px;">
+          style="margin-bottom:8px;">
+        ${umTypeFiltered ? `<div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Showing your ${itemCat} (${umSameCatItems.length}) · search to find anything</div>` : pickerQuery ? `<div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">${grid.length} result${grid.length===1?'':'s'} across all items</div>` : ''}
         ${grid.length ? `
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
           ${grid.map(sw => {
