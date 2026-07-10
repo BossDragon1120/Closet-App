@@ -6059,14 +6059,6 @@ function brandDiscoveryHTML() {
       </div>
     </div>
     <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);">✨ You Might Also Love</div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↻</button>
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=false;render()" onclick="S._brandsExpanded=false;render()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">▲</button>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
       ${suggs.map(s=>`
         <div style="flex-shrink:0;width:148px;scroll-snap-align:start;background:var(--surface);border-radius:12px;border:1.5px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:5px;">
           <div style="font-size:20px;line-height:1;">${s.emoji||'✦'}</div>
@@ -6242,6 +6234,9 @@ function render() {
     case 'edit':         html = viewEdit();         break;
     case 'wardrobe-item':html = viewWardrobeItem(); break;
     case 'rip':          html = viewRIP();          break;
+    case 'gems':         html = viewGems();          break;
+    case 'hidden-gems':  html = viewHiddenGems();   break;
+    case 'value-items':  html = viewValueItems();    break;
     case 'looking-back': html = viewLookingBack();   break;
     case 'receipt-add':  html = viewReceiptAdd();   break;
     case 'new-piece':    html = viewNewPiece();     break;
@@ -11350,7 +11345,11 @@ function viewProfile() {
         const gems = S.wardrobe.filter(w => isGemPiece(w) && !w.retiredFromCloset);
         if (!gems.length) return '';
         return `<div style="margin:16px 0 0;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;padding:0 14px;">💎 Your Gems</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 14px;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">💎 Your Gems</div>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('gems')" onclick="navigate('gems')"
+              style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:2px 0;touch-action:manipulation;">See all →</button>
+          </div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding:0 14px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
             ${gems.map(w => `
               <div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')" onclick="S.selectedWardrobeId='${w.id}';navigate('wardrobe-item')"
@@ -11380,7 +11379,11 @@ function viewProfile() {
           `${totalWears} total wears`
         ].filter(Boolean).join(' · ');
         return `<div style="margin:16px 0 0;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:4px;padding:0 14px;">💚 Value Unlocked</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 14px;margin-bottom:4px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">💚 Value Unlocked</div>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('value-items')" onclick="navigate('value-items')"
+              style="background:none;border:none;font-size:11px;font-weight:700;color:#1E8449;cursor:pointer;font-family:inherit;padding:2px 0;touch-action:manipulation;">See all →</button>
+          </div>
           <div style="font-size:10px;color:#1E8449;font-weight:600;padding:0 14px;margin-bottom:10px;">${summaryLine}</div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding:0 14px 4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
             ${heroes.map((w,i) => {
@@ -13979,6 +13982,8 @@ function viewWardrobe() {
           <span style="font-weight:600;font-size:13px;color:var(--text-2);">🔮 Hidden Gems (${hiddenGems.length})</span>
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:11px;color:var(--text-3);font-style:italic;">paid for, rarely worn</span>
+            <span ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();navigate('hidden-gems')" onclick="event.stopPropagation();navigate('hidden-gems')"
+              style="font-size:11px;font-weight:700;color:var(--gold-dk);padding:2px 6px;border-radius:6px;background:var(--gold-bg);touch-action:manipulation;cursor:pointer;">See all</span>
             <span style="font-size:12px;color:var(--text-3);transform:${isOpen?'rotate(90deg)':'none'};transition:transform .15s;">▶</span>
           </div>
         </button>
@@ -20858,6 +20863,260 @@ function viewLookingBack() {
     <div style="height:40px;"></div>
   </div>`;
     
+}
+
+/* ================================================================
+   VIEW: GEMS
+   ================================================================ */
+function viewGems() {
+  const gems = S.wardrobe.filter(w => isGemPiece(w) && !w.retiredFromCloset);
+
+  if (!gems.length) {
+    return `<div class="view view-notab">
+      <div class="nav">
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Back</button>
+        <span class="nav-title">My Gems</span>
+        <span style="width:72px;"></span>
+      </div>
+      <div style="padding:60px 24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">💎</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">No gems yet</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;">Tap the 💎 on any wardrobe item to mark it as a gem.</div>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="view view-notab" style="display:flex;flex-direction:column;">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Back</button>
+      <span class="nav-title">My Gems</span>
+      <span style="width:72px;"></span>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 24px);">
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+        ${gems.map(w => {
+          const ph = photoBlobUrl(w.photo);
+          const wears = w.wears?.length || 0;
+          const ppw = w.price && wears > 0 ? `$${(parseFloat(w.price)/wears).toFixed(2)}/wear` : null;
+          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')" onclick="openWardrobeItem('${w.id}')"
+            style="cursor:pointer;touch-action:manipulation;border-radius:14px;overflow:hidden;background:var(--surface);border:1.5px solid rgba(184,125,42,.3);">
+            <div style="width:100%;aspect-ratio:3/4;position:relative;background:var(--surface-2);">
+              ${ph
+                ? `<img src="${esc(ph)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;">${w.icon||'👕'}</div>`}
+              <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 55%,rgba(0,0,0,.55) 100%);pointer-events:none;"></div>
+              <div style="position:absolute;top:7px;right:7px;font-size:14px;line-height:1;">💎</div>
+              ${wears > 0 ? `<div style="position:absolute;bottom:6px;left:8px;font-size:10px;font-weight:700;color:rgba(255,255,255,.85);">${wears}× worn</div>` : ''}
+              ${ppw ? `<div style="position:absolute;bottom:6px;right:8px;font-size:10px;font-weight:700;color:rgba(255,255,255,.75);">${ppw}</div>` : ''}
+            </div>
+            <div style="padding:8px 10px 10px;">
+              <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
+              ${w.brand ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.brand)}</div>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   VIEW: HIDDEN GEMS
+   ================================================================ */
+function viewHiddenGems() {
+  const gems = S.wardrobe
+    .filter(w => !w.retiredFromCloset && !w.inMaybePile && w.price && !w.paidOff && (w.wears?.length||0) < 3)
+    .sort((a, b) => b.price - a.price);
+
+  const totalValue = gems.reduce((s, w) => s + (parseFloat(w.price)||0), 0);
+  const totalWears = gems.reduce((s, w) => s + (w.wears?.length||0), 0);
+
+  function shareGems() {
+    const lines = [
+      `🔮 My Hidden Gems (${gems.length} items · $${totalValue.toFixed(0)} invested)\n`,
+      ...gems.map(w => {
+        const wears = w.wears?.length || 0;
+        const ppw = w.price && wears > 0 ? ` · $${(w.price/wears).toFixed(2)}/wear` : '';
+        return `${w.icon||'👕'} ${w.name}${w.brand ? ' — ' + w.brand : ''}\n   $${parseFloat(w.price).toFixed(0)} paid · worn ${wears}×${ppw}`;
+      })
+    ];
+    shareText('My Hidden Gems', lines.join('\n'));
+  }
+
+  if (!gems.length) {
+    return `<div class="view view-notab">
+      <div class="nav">
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Wardrobe</button>
+        <span class="nav-title">Hidden Gems</span>
+        <span style="width:72px;"></span>
+      </div>
+      <div style="padding:60px 24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">✨</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">No hidden gems right now</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;">Items show up here when you've paid for them but haven't worn them much yet.</div>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="view view-notab" style="display:flex;flex-direction:column;">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Wardrobe</button>
+      <span class="nav-title">Hidden Gems</span>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();shareGems()" onclick="shareGems()"
+        style="background:none;border:none;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:4px 8px;touch-action:manipulation;">↗ Share</button>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px);">
+
+      <!-- Summary banner -->
+      <div style="margin:14px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:8px;">🔮 Hidden Gems · ${gems.length} items</div>
+        <div style="display:flex;gap:20px;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--text);">$${totalValue.toFixed(0)}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px;">invested</div>
+          </div>
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--text);">${totalWears}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px;">total wears</div>
+          </div>
+          <div style="flex:1;min-width:0;text-align:right;">
+            <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-top:2px;">Items you've paid for<br>but haven't fully worn in</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Item list -->
+      <div style="margin:12px 16px 0;">
+        ${gems.map(w => {
+          const ph = photoBlobUrl(w.photo);
+          const wears = w.wears?.length || 0;
+          const ppw = w.price && wears > 0 ? `$${(parseFloat(w.price)/wears).toFixed(2)}/wear` : null;
+          const wearsNeeded = w.price ? Math.ceil(parseFloat(w.price) / 10) : null;
+          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')" onclick="openWardrobeItem('${w.id}')"
+            style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
+            <div style="width:52px;height:66px;border-radius:10px;overflow:hidden;flex-shrink:0;background:var(--surface-2);">
+              ${ph
+                ? `<img src="${esc(ph)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;">${w.icon||'👕'}</div>`}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
+              ${w.brand ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(w.brand)}</div>` : ''}
+              <div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
+                <span style="font-size:12px;font-weight:700;color:var(--text);">$${parseFloat(w.price).toFixed(0)} paid</span>
+                <span style="font-size:12px;color:var(--text-3);">·</span>
+                <span style="font-size:12px;color:var(--text-3);">worn ${wears}×</span>
+                ${ppw ? `<span style="font-size:12px;color:var(--text-3);">· ${ppw}</span>` : ''}
+              </div>
+              ${wearsNeeded && wears === 0 ? `<div style="font-size:11px;color:rgba(140,80,210,0.8);margin-top:3px;font-style:italic;">Wear it ${wearsNeeded}× to get to $10/wear</div>` : ''}
+            </div>
+            <div style="font-size:16px;color:var(--text-3);flex-shrink:0;">›</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+    </div>
+  </div>`;
+}
+
+/* ================================================================
+   VIEW: VALUE ITEMS
+   ================================================================ */
+function viewValueItems() {
+  const items = S.wardrobe
+    .filter(w => w.paidOff)
+    .sort((a, b) => (b.wears?.length||0) - (a.wears?.length||0));
+
+  const totalWears = items.reduce((s, w) => s + (w.wears?.length||0), 0);
+  const totalValue = items.reduce((s, w) => s + (parseFloat(w.price)||0), 0);
+
+  function shareValue() {
+    const lines = [
+      `💚 My Value Unlocked (${items.length} paid-off pieces · ${totalWears} total wears)\n`,
+      ...items.map(w => {
+        const wears = w.wears?.length || 0;
+        const ppw = w.price && wears > 0 ? ` · $${(w.price/wears).toFixed(2)}/wear` : '';
+        return `${w.icon||'👕'} ${w.name}${w.brand ? ' — ' + w.brand : ''}\n   ${w.price ? `$${parseFloat(w.price).toFixed(0)} paid · ` : ''}worn ${wears}×${ppw}`;
+      })
+    ];
+    shareText('My Value Unlocked', lines.join('\n'));
+  }
+
+  if (!items.length) {
+    return `<div class="view view-notab">
+      <div class="nav">
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Wardrobe</button>
+        <span class="nav-title">Value Unlocked</span>
+        <span style="width:72px;"></span>
+      </div>
+      <div style="padding:60px 24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">💚</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">No paid-off pieces yet</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;">Items show up here once they've been worn enough to earn their keep.</div>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="view view-notab" style="display:flex;flex-direction:column;">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Wardrobe</button>
+      <span class="nav-title">Value Unlocked</span>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();shareValue()" onclick="shareValue()"
+        style="background:none;border:none;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:4px 8px;touch-action:manipulation;">↗ Share</button>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px);">
+
+      <!-- Summary banner -->
+      <div style="margin:14px 16px 0;background:#EAFAF1;border:1px solid rgba(30,132,73,0.25);border-radius:var(--r);padding:14px 16px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#1E8449;margin-bottom:8px;">💚 Paid-off pieces · ${items.length} items</div>
+        <div style="display:flex;gap:20px;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:#1E8449;">${totalWears}</div>
+            <div style="font-size:11px;color:#2ECC71;margin-top:2px;">total wears</div>
+          </div>
+          ${totalValue > 0 ? `<div>
+            <div style="font-size:20px;font-weight:800;color:#1E8449;">$${totalValue.toFixed(0)}</div>
+            <div style="font-size:11px;color:#2ECC71;margin-top:2px;">total invested</div>
+          </div>` : ''}
+          <div style="flex:1;min-width:0;text-align:right;">
+            <div style="font-size:12px;color:#2ECC71;line-height:1.5;margin-top:2px;">These pieces have<br>more than earned their keep</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Item list -->
+      <div style="margin:12px 16px 0;">
+        ${items.map(w => {
+          const ph = photoBlobUrl(w.photo);
+          const wears = w.wears?.length || 0;
+          const ppw = w.price && wears > 0 ? `$${(parseFloat(w.price)/wears).toFixed(2)}/wear` : null;
+          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')" onclick="openWardrobeItem('${w.id}')"
+            style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
+            <div style="width:52px;height:66px;border-radius:10px;overflow:hidden;flex-shrink:0;background:var(--surface-2);position:relative;">
+              ${ph
+                ? `<img src="${esc(ph)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;">${w.icon||'👕'}</div>`}
+              <div style="position:absolute;top:3px;right:3px;font-size:11px;line-height:1;">💚</div>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
+              ${w.brand ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(w.brand)}</div>` : ''}
+              <div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
+                ${w.price ? `<span style="font-size:12px;font-weight:700;color:var(--text);">$${parseFloat(w.price).toFixed(0)} paid</span><span style="font-size:12px;color:var(--text-3);">·</span>` : ''}
+                <span style="font-size:12px;color:var(--text-3);">worn ${wears}×</span>
+                ${ppw ? `<span style="font-size:12px;font-weight:700;color:#1E8449;">· ${ppw}</span>` : ''}
+              </div>
+            </div>
+            <div style="font-size:16px;color:var(--text-3);flex-shrink:0;">›</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+    </div>
+  </div>`;
 }
 
 function viewRIP() {
