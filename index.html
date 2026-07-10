@@ -5919,7 +5919,7 @@ async function doOutfitBuild() {
   const anchor = S.wardrobe.find(i => i.id === ob.wardrobeId);
   if (!anchor) return;
 
-  const pool = S.wardrobe.filter(w => !w.retiredFromCloset && w.id !== anchor.id);
+  const pool = S.wardrobe.filter(w => !w.retiredFromCloset && !w.noOutfits && w.id !== anchor.id);
   if (!pool.length) { toast('Add more pieces to your wardrobe first!'); return; }
 
   S.outfitBuilder.loading = true;
@@ -6791,7 +6791,7 @@ function viewLocal() {
 async function generateRoulette() {
   if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._funRouletteLoading) return;
-  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile && !w.noOutfits);
   if (activeWardrobe.length < 3) { toast('Add more wardrobe items first!'); return; }
   S._funRouletteLoading = true;
   S.funRoulette = null;
@@ -6892,7 +6892,7 @@ function closeDressMe() { navigate('closet'); }
 async function generateDressMe() {
   if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._dressMeLoading) return;
-  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile);
+  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile && !w.noOutfits);
   if (activeWardrobe.length < 3) { toast('Add more wardrobe items first!'); return; }
   S._dressMeLoading = true;
   S._dressMeStage = 'result';
@@ -9652,8 +9652,8 @@ function viewClosetTodo() {
   return `<div class="view view-notab">
     <div class="nav">
       <button class="nav-back"
-        ontouchend="if(_touchMoved)return;event.preventDefault();navigate(-1);"
-        onclick="navigate(-1);"
+        ontouchend="if(_touchMoved)return;event.preventDefault();navigate(S._prevView||'plan');"
+        onclick="navigate(S._prevView||'plan');"
         style="touch-action:manipulation;">‹</button>
       <span class="nav-logo">📋 To-Do</span>
       ${doneCount ? `<button
@@ -16813,6 +16813,21 @@ function viewWardrobeItem() {
       ${w.tailoringNeeded ? `<textarea class="form-input" id="tailoringNoteInput" placeholder="What needs fixing? e.g. hem, replace button, take in waist…" style="margin-top:8px;resize:vertical;min-height:52px;font-size:13px;" onchange="saveTailoringNote('${w.id}',this.value)">${esc(w.tailoringNote||'')}</textarea>` : ''}
     </div>
 
+    <!-- 🚫 No Outfits toggle -->
+    <div style="padding:0 20px;margin-bottom:24px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:var(--r-sm);border:1px solid ${w.noOutfits?'rgba(180,60,60,0.35)':'var(--border)'};background:${w.noOutfits?'rgba(255,240,240,0.6)':'var(--surface)'};">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13.5px;font-weight:700;color:${w.noOutfits?'#B03030':'var(--text-2)'};">🚫 Exclude from Outfits</div>
+          <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;line-height:1.45;">
+            ${w.noOutfits ? 'Won\'t appear in Dress Me, Build Outfit, or Style Roulette suggestions.' : 'Skip AI outfit suggestions for this piece — comfy staples, worn-in faves, etc.'}
+          </div>
+        </div>
+        <button class="toggle ${w.noOutfits?'on':'off'}" style="${w.noOutfits?'background:#C04040;flex-shrink:0;':'flex-shrink:0;'}"
+          ontouchend="if(_touchMoved)return;event.preventDefault();toggleNoOutfits('${w.id}')"
+          onclick="toggleNoOutfits('${w.id}')"></button>
+      </div>
+    </div>
+
     <!-- ── Ownership & Value ── -->
     <div style="padding:0 20px 8px;display:flex;align-items:center;gap:10px;">
       <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">Ownership &amp; Value</div>
@@ -19070,13 +19085,21 @@ function viewSettings() {
           onclick="doExportWardrobeCSV()"
           style="margin:0;width:100%;">📋 Export Wardrobe (CSV)</button>
       </div>
-      <div class="settings-row">
+      <div class="settings-row" style="border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:0;">
         <div class="settings-label" style="margin-bottom:2px;">Full Backup</div>
         <div class="settings-hint" style="margin-bottom:10px;">Download everything — outfits, wardrobe, and photos — as a JSON backup file.</div>
         <button class="btn btn-secondary"
           ontouchend="if(_touchMoved)return;event.preventDefault();doExport()"
           onclick="doExport()"
           style="margin:0;width:100%;">💾 Full Backup (JSON)</button>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label" style="margin-bottom:2px;">Export All Photos</div>
+        <div class="settings-hint" style="margin-bottom:10px;">Save every wardrobe and outfit photo to your iPhone Photos library — or download as a ZIP on other devices.</div>
+        <button class="btn btn-secondary"
+          ontouchend="if(_touchMoved)return;event.preventDefault();doExportPhotos()"
+          onclick="doExportPhotos()"
+          style="margin:0;width:100%;">🖼 Export Photos</button>
       </div>
       ${S.shopBlocked.size > 0 ? `
       <div class="settings-row">
@@ -21275,6 +21298,13 @@ async function toggleTailoring(id) {
   toast(w.tailoringNeeded ? '🧵 Marked as needing tailoring!' : 'Tailoring flag removed.');
 }
 
+async function toggleNoOutfits(id) {
+  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
+  w.noOutfits = !w.noOutfits;
+  await DB.wardrobe.put(w); render();
+  toast(w.noOutfits ? '🚫 Excluded from outfit suggestions' : '✓ Back in outfit suggestions');
+}
+
 async function saveTailoringNote(id, note) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.tailoringNote = note.trim();
@@ -22245,6 +22275,88 @@ function doExport() {
   const blob = new Blob([JSON.stringify({ exportDate:new Date().toISOString(), entries:S.entries, wardrobe:S.wardrobe }, null, 2)], { type:'application/json' });
   const a = Object.assign(document.createElement('a'), { href:URL.createObjectURL(blob), download:`closet-backup-${new Date().toISOString().slice(0,10)}.json` });
   a.click(); URL.revokeObjectURL(a.href);
+}
+
+async function doExportPhotos() {
+  // Collect all photo data URIs
+  const photos = [];
+  S.wardrobe.forEach(w => {
+    const src = w.photo || w.photoThumb;
+    if (src && src.startsWith('data:')) {
+      const label = (w.name || w.id || 'item').replace(/[^a-z0-9]/gi,'_').slice(0,40);
+      photos.push({ data: src, name: `wardrobe-${label}` });
+    }
+  });
+  S.entries.forEach(e => {
+    if (e.photo && e.photo.startsWith('data:')) {
+      const d = (e.createdAt || '').slice(0,10) || 'outfit';
+      photos.push({ data: e.photo, name: `outfit-${d}-${(e.id||'').slice(-6)}` });
+    }
+    (e.rewears || []).forEach((r, j) => {
+      if (r.photo && r.photo.startsWith('data:')) {
+        const d = (e.createdAt || '').slice(0,10) || 'outfit';
+        photos.push({ data: r.photo, name: `outfit-${d}-rewear${j+1}` });
+      }
+    });
+  });
+
+  if (!photos.length) { toast('No photos found to export'); return; }
+
+  // base64 data URI → File
+  function b64ToFile(dataUri, baseName) {
+    try {
+      const [head, b64] = dataUri.split(',');
+      const mime = (head.match(/:(.*?);/) || [])[1] || 'image/jpeg';
+      const ext  = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : mime.includes('webp') ? 'webp' : 'jpg';
+      const bin  = atob(b64);
+      const arr  = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return new File([arr], `${baseName}.${ext}`, { type: mime });
+    } catch(err) { return null; }
+  }
+
+  toast(`Preparing ${photos.length} photos…`);
+  await new Promise(r => setTimeout(r, 80)); // let toast render
+
+  const files = photos.map(p => b64ToFile(p.data, p.name)).filter(Boolean);
+  if (!files.length) { toast('Could not read photos'); return; }
+
+  // iOS / modern browsers: Web Share API with files → native share sheet → "Save to Photos"
+  if (navigator.canShare && navigator.canShare({ files })) {
+    try {
+      await navigator.share({ files, title: 'Closet Photos' });
+      return;
+    } catch(err) {
+      if (err.name === 'AbortError') return; // user cancelled — done
+      // otherwise fall through to ZIP
+    }
+  }
+
+  // Fallback: ZIP download
+  toast('Building ZIP…');
+  try {
+    if (!window.JSZip) {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const zip = new JSZip();
+    files.forEach(f => zip.file(f.name, f));
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {
+      href: url, download: `closet-photos-${new Date().toISOString().slice(0,10)}.zip`
+    });
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+    toast(`📁 ${files.length} photos saved as ZIP`);
+  } catch(err) {
+    console.error('Photo export error:', err);
+    toast('Export failed — try again');
+  }
 }
 
 function doExportWardrobeCSV() {
