@@ -6366,6 +6366,7 @@ function render() {
     case 'incomplete':   html = viewIncomplete();    break;
     case 'hidden-gems':  html = viewHiddenGems();   break;
     case 'value-items':  html = viewValueItems();    break;
+    case 'compliments':  html = viewCompliments();   break;
     case 'looking-back': html = viewLookingBack();   break;
     case 'receipt-add':  html = viewReceiptAdd();   break;
     case 'new-piece':    html = viewNewPiece();     break;
@@ -11062,6 +11063,61 @@ async function doSuggestOutfits() {
   S.plan.loadingSuggest = false; render();
 }
 
+// AI call that powers doSuggestOutfits()
+async function suggestOutfits(eventDesc, _unused) {
+  const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.noOutfits);
+  const itemList = activeWardrobe.slice(0, 80).map(w =>
+    `${w.icon||'👕'} ${w.name}${w.brand?' ('+w.brand+')':''}${w.category?' ['+w.category+']':''}`
+  ).join('\n');
+
+  const goals = (S.styleGoals||[]).length
+    ? `\nStyle goals: ${S.styleGoals.join(', ')}` : '';
+  const weather = S.weatherPin
+    ? `\nCurrent weather: ${S.weatherPin.tempF}°F, ${S.weatherPin.description||''}` : '';
+
+  const wardrobeSection = activeWardrobe.length
+    ? `\nWardrobe:\n${itemList}` : '\n(No wardrobe items yet — suggest generic pieces.)';
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': S.apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: `You are a personal stylist building a complete outfit for this occasion: ${eventDesc}${goals}${weather}${wardrobeSection}
+
+Return ONLY valid JSON, no markdown:
+{
+  "groups": [
+    {"role": "Top", "items": ["exact item name from wardrobe OR generic item if not in wardrobe"]},
+    {"role": "Bottom", "items": ["exact item name"]},
+    {"role": "Shoes", "items": ["exact item name"]},
+    {"role": "Outerwear/Bag", "items": ["optional extra"]}
+  ],
+  "reasoning": "2-3 sentences on why this outfit works for the occasion",
+  "weatherNote": "optional weather-relevant tip or empty string"
+}
+
+Rules:
+- Use exact item names from the wardrobe list when available; otherwise use a clear generic name
+- Each "items" array can have 1 item (pick one) or 2 items (either/or alternatives)
+- Omit "Outerwear/Bag" group if not needed
+- Keep reasoning warm and specific to the event` }],
+    }),
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  const data = await res.json();
+  const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('No JSON in response');
+  return JSON.parse(m[0]);
+}
+
 // Fuzzy-match a plan suggestion item name against S.wardrobe
 function _findWardrobeForPlanItem(name) {
   if (!name || !S.wardrobe.length) return null;
@@ -11771,7 +11827,8 @@ function viewProfile() {
       return `<div style="margin:16px 0 0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 14px;">
           <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">💬 Compliments</div>
-          <div style="font-size:11px;font-weight:700;color:var(--gold-dk);">${total} total</div>
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('compliments')" onclick="navigate('compliments')"
+            style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:2px 0;touch-action:manipulation;">See all →</button>
         </div>
         ${visible.length ? `<div style="display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 14px 4px;">
           ${visible.slice(0,10).map(({w,lastDate,count}) => {
@@ -15884,7 +15941,7 @@ function _wrapCanvasText(ctx, text, x, y, maxW, lineH) {
 async function shareRateModeCard(wId) {
   const w = S.wardrobe.find(i => i.id === wId);
   if (!w) return;
-  toast('Creating story card…');
+  toast('Building your story card…');
 
   const W = 1080, H = 1920;
   const canvas = document.createElement('canvas');
@@ -15892,19 +15949,24 @@ async function shareRateModeCard(wId) {
   const ctx = canvas.getContext('2d');
 
   // Background
-  ctx.fillStyle = '#1a1a1a';
+  ctx.fillStyle = '#111111';
   ctx.fillRect(0, 0, W, H);
 
-  // Photo (cover-fit, top-aligned)
+  // Photo (cover-fit, top ~65% of card)
   const photoSrc = w.photo || w.photoThumb || null;
+  const photoH = Math.round(H * 0.65);
   if (photoSrc) {
     await new Promise(resolve => {
       const img = new Image();
       img.onload = () => {
-        const scale = Math.max(W / img.width, H / img.height);
+        // Cover-fit within the top photo zone
+        const scale = Math.max(W / img.width, photoH / img.height);
         const sw = img.width * scale, sh = img.height * scale;
-        const sx = (W - sw) / 2, sy = 0; // top-aligned
-        ctx.drawImage(img, sx, sy, sw, sh);
+        const dx = (W - sw) / 2, dy = 0;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, 0, W, photoH); ctx.clip();
+        ctx.drawImage(img, dx, dy, sw, sh);
+        ctx.restore();
         resolve();
       };
       img.onerror = resolve;
@@ -15912,84 +15974,126 @@ async function shareRateModeCard(wId) {
     });
   }
 
-  // Dark gradient over bottom half
-  const grad = ctx.createLinearGradient(0, H * 0.42, 0, H);
-  grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(0.45, 'rgba(0,0,0,0.72)');
-  grad.addColorStop(1,   'rgba(0,0,0,0.92)');
+  // Gradient: photo blends into dark bottom panel
+  const grad = ctx.createLinearGradient(0, photoH * 0.55, 0, photoH + 40);
+  grad.addColorStop(0, 'rgba(17,17,17,0)');
+  grad.addColorStop(1, 'rgba(17,17,17,1)');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, photoH * 0.55, W, photoH - photoH * 0.55 + 40);
 
-  // Stars
-  const rating = w.styleRating || 0;
-  const starY = H - 460;
-  const starSize = 88;
-  const starGap = 16;
-  const starsW = 5 * starSize + 4 * starGap;
-  let sx2 = (W - starsW) / 2;
-  for (let i = 1; i <= 5; i++) {
-    ctx.font = `${starSize}px serif`;
-    ctx.fillStyle = i <= rating ? '#FFD060' : 'rgba(255,255,255,0.22)';
-    ctx.fillText('★', sx2, starY);
-    sx2 += starSize + starGap;
-  }
+  // Solid dark panel for text area
+  ctx.fillStyle = '#111111';
+  ctx.fillRect(0, photoH, W, H - photoH);
 
-  // Rating label
-  if (rating) {
-    const labels = ['','Meh','It\'ll do','It\'s fine','Love it','Obsessed'];
-    ctx.fillStyle = 'rgba(255,255,255,0.65)';
-    ctx.font = '600 48px -apple-system, "Helvetica Neue", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(labels[rating] || '', W / 2, starY + 72);
-    ctx.textAlign = 'left';
+  const panelTop = photoH + 60; // start of text area
+
+  // Category / occasion pill
+  const categoryLabel = (w.category || w.subcategory || '').toUpperCase();
+  if (categoryLabel) {
+    const pillPad = 28, pillH = 56, pillR = 28;
+    ctx.font = '700 30px -apple-system, "Helvetica Neue", sans-serif';
+    const pillW = ctx.measureText(categoryLabel).width + pillPad * 2;
+    const pillX = 72, pillY = panelTop;
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    // Rounded rect
+    ctx.beginPath();
+    ctx.moveTo(pillX + pillR, pillY);
+    ctx.lineTo(pillX + pillW - pillR, pillY);
+    ctx.arcTo(pillX + pillW, pillY, pillX + pillW, pillY + pillH, pillR);
+    ctx.lineTo(pillX + pillW, pillY + pillH - pillR);
+    ctx.arcTo(pillX + pillW, pillY + pillH, pillX + pillW - pillR, pillY + pillH, pillR);
+    ctx.lineTo(pillX + pillR, pillY + pillH);
+    ctx.arcTo(pillX, pillY + pillH, pillX, pillY + pillH - pillR, pillR);
+    ctx.lineTo(pillX, pillY + pillR);
+    ctx.arcTo(pillX, pillY, pillX + pillR, pillY, pillR);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillText(categoryLabel, pillX + pillPad, pillY + 38);
   }
 
   // Item name
+  const nameY = panelTop + (categoryLabel ? 120 : 40);
   ctx.fillStyle = '#ffffff';
-  ctx.font = `800 ${w.name.length > 22 ? 72 : 86}px -apple-system, "Helvetica Neue", sans-serif`;
-  _wrapCanvasText(ctx, w.name || '', 72, starY + 170, W - 144, 100);
+  ctx.font = `800 ${(w.name||'').length > 22 ? 74 : 88}px -apple-system, "Helvetica Neue", sans-serif`;
+  _wrapCanvasText(ctx, w.name || '', 72, nameY, W - 144, 106);
 
-  // Brand
-  if (w.brand) {
-    ctx.fillStyle = 'rgba(255,255,255,0.60)';
-    ctx.font = '500 52px -apple-system, "Helvetica Neue", sans-serif';
-    ctx.fillText(w.brand, 72, starY + 310);
+  // Brand · size
+  const metaParts = [w.brand, w.size].filter(Boolean);
+  if (metaParts.length) {
+    ctx.fillStyle = 'rgba(255,255,255,0.50)';
+    ctx.font = '400 48px -apple-system, "Helvetica Neue", sans-serif';
+    ctx.fillText(metaParts.join('  ·  '), 72, nameY + ((w.name||'').length > 22 ? 220 : 190));
   }
 
-  // Top label
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.font = '700 42px -apple-system, "Helvetica Neue", sans-serif';
+  // Stars
+  const rating = w.styleRating || 0;
+  const starY = H - 340;
+  const starSize = 90;
+  const starGap = 14;
+  const starsW = 5 * starSize + 4 * starGap;
+  let stx = (W - starsW) / 2;
+  for (let i = 1; i <= 5; i++) {
+    ctx.font = `${starSize}px serif`;
+    ctx.fillStyle = i <= rating ? '#FFD060' : 'rgba(255,255,255,0.18)';
+    ctx.fillText('★', stx, starY);
+    stx += starSize + starGap;
+  }
+
+  // Rating label
+  const ratingLabel = ['','Meh','It\'ll do','It\'s fine','Love it','Obsessed'][rating] || '';
+  if (ratingLabel) {
+    ctx.fillStyle = rating >= 4 ? '#FFD060' : 'rgba(255,255,255,0.60)';
+    ctx.font = `${rating >= 4 ? '700' : '500'} 52px -apple-system, "Helvetica Neue", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(ratingLabel.toUpperCase(), W / 2, starY + 82);
+    ctx.textAlign = 'left';
+  }
+
+  // Top label — "RATE & REFRESH"
+  ctx.fillStyle = 'rgba(255,255,255,0.40)';
+  ctx.font = '700 38px -apple-system, "Helvetica Neue", sans-serif';
+  ctx.letterSpacing = '4px';
   ctx.textAlign = 'center';
-  ctx.fillText('RATE & REFRESH', W / 2, 96);
+  ctx.fillText('RATE & REFRESH', W / 2, 90);
   ctx.textAlign = 'left';
+  ctx.letterSpacing = '0px';
 
-  // App watermark bottom-left
-  ctx.fillStyle = 'rgba(255,255,255,0.30)';
-  ctx.font = '500 40px -apple-system, "Helvetica Neue", sans-serif';
-  ctx.fillText('✦ Closet', 72, H - 72);
+  // Closet watermark
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.font = '500 36px -apple-system, "Helvetica Neue", sans-serif';
+  ctx.fillText('✦ Closet', 72, H - 60);
 
-  // Share
+  // ── Share / save ──────────────────────────────────────────────────────────
   canvas.toBlob(async blob => {
-    const file = new File([blob], 'my-style-rating.png', { type: 'image/png' });
+    const file = new File([blob], 'closet-style-card.png', { type: 'image/png' });
+
+    // Try Web Share API (iOS: shows "Save Image" + installed apps in sheet)
     if (navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: w.name });
+        await navigator.share({ files: [file], title: `${w.name || 'My pick'} — rated on Closet` });
+        // After the sheet closes, guide them for Instagram
+        toast('In Instagram: tap + → Story or Reel → Photos → pick your card 📸');
       } catch(e) {
-        if (e.name !== 'AbortError') {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href = url; a.download = 'my-style-rating.png'; a.click();
-          setTimeout(() => URL.revokeObjectURL(url), 2000);
-          toast('Saved! Open Instagram → New Story → add the image 📸');
-        }
+        if (e.name === 'AbortError') return; // user cancelled, nothing to do
+        // Web Share failed — fall through to download
+        _saveStyleCardDownload(blob, w);
       }
     } else {
-      // Fallback: download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'my-style-rating.png'; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      toast('Saved to Photos! Open Instagram → New Story → add the image 📸');
+      _saveStyleCardDownload(blob, w);
     }
   }, 'image/png');
+}
+
+function _saveStyleCardDownload(blob, w) {
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), {
+    href: url,
+    download: 'closet-style-card.png',
+  });
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
+  toast('Card saved! In Instagram: tap + → Story or Reel → Photos → pick your card 📸');
 }
 
 async function rateModeGoBack() {
@@ -16096,28 +16200,28 @@ function viewRateMode() {
 
   if (S.rateModeCelebrate) {
     const n = S.rateModeCelebrate;
-    return `<div class="view view-notab" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center;background:#1a1a1a;">
+    return `<div class="view view-notab" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center;background:var(--bg);">
       <div style="font-size:60px;margin-bottom:16px;">🎉✨🎊</div>
-      <div style="font-size:22px;font-weight:900;color:#fff;margin-bottom:8px;">${n} items rated!</div>
-      <div style="font-size:14px;color:rgba(255,255,255,.65);margin-bottom:30px;line-height:1.5;max-width:300px;">You're on a roll — your closet is getting some serious love.</div>
+      <div style="font-size:22px;font-weight:900;color:var(--text);margin-bottom:8px;">${n} items rated!</div>
+      <div style="font-size:14px;color:var(--text-3);margin-bottom:30px;line-height:1.5;max-width:300px;">You're on a roll — your closet is getting some serious love.</div>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissRateModeCelebration();" onclick="dismissRateModeCelebration()"
-        style="padding:14px 30px;background:#fff;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#1a1a1a;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:12px;">
+        style="padding:14px 30px;background:#1a1a1a;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:12px;">
         Keep Going →
       </button>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();exitRateMode();" onclick="exitRateMode()"
-        style="background:none;border:none;color:rgba(255,255,255,.55);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        style="background:none;border:none;color:var(--text-3);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
         I'm done for now
       </button>
     </div>`;
   }
 
   if (rm.idx >= rm.ids.length) {
-    return `<div class="view view-notab" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center;background:#1a1a1a;">
+    return `<div class="view view-notab" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center;background:var(--bg);">
       <div style="font-size:56px;margin-bottom:16px;">🎉</div>
-      <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:8px;">All caught up!</div>
-      <div style="font-size:14px;color:rgba(255,255,255,.6);margin-bottom:28px;line-height:1.5;">You've rated every active piece. Check Purgatory or Shop for what's next.</div>
+      <div style="font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px;">All caught up!</div>
+      <div style="font-size:14px;color:var(--text-3);margin-bottom:28px;line-height:1.5;">You've rated every active piece. Check Purgatory or Shop for what's next.</div>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();exitRateMode();" onclick="exitRateMode()"
-        style="padding:13px 28px;background:#fff;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#1a1a1a;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        style="padding:13px 28px;background:#1a1a1a;border:none;border-radius:100px;font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;">
         ← Back to Closet
       </button>
     </div>`;
@@ -16156,80 +16260,88 @@ function viewRateMode() {
       </div>
     </div>` : '';
 
-  return `<div class="view view-notab" style="background:#1a1a1a;min-height:100vh;display:flex;flex-direction:column;">
+  return `<div class="view view-notab" style="background:var(--bg);height:100dvh;height:100vh;display:flex;flex-direction:column;overflow:hidden;">
     ${helpOverlay}
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 8px;">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 6px;flex-shrink:0;">
       <button ontouchend="if(_touchMoved)return;event.preventDefault();exitRateMode();" onclick="exitRateMode()"
-        style="background:none;border:none;color:rgba(255,255,255,.7);font-size:22px;cursor:pointer;line-height:1;padding:4px;touch-action:manipulation;">✕</button>
-      <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.06em;">${remaining} left</div>
+        style="background:none;border:none;color:var(--text-3);font-size:20px;cursor:pointer;line-height:1;padding:4px;touch-action:manipulation;width:40px;">✕</button>
+      <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;">${remaining} left</div>
       ${rm.history?.length
         ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeGoBack();" onclick="rateModeGoBack()"
-            style="background:none;border:none;color:rgba(255,255,255,.6);font-size:13px;font-weight:700;cursor:pointer;padding:4px 6px;touch-action:manipulation;line-height:1;">← Back</button>`
-        : `<div style="width:44px;"></div>`}
+            style="background:none;border:none;color:var(--text-3);font-size:12px;font-weight:700;cursor:pointer;padding:4px 6px;touch-action:manipulation;width:40px;text-align:right;font-family:inherit;">← Back</button>`
+        : `<div style="width:40px;"></div>`}
     </div>
 
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:4px 18px 10px;position:relative;">
+    <!-- Photo card -->
+    <div style="flex:1;min-height:0;padding:0 16px 8px;display:flex;flex-direction:column;">
       <div id="rate-card"
         onpointerdown="_rateDragStart(event)" onpointermove="_rateDragMove(event)" onpointerup="_rateDragEnd(event)" onpointercancel="_rateDragEnd(event)"
-        style="position:relative;width:100%;max-width:420px;height:min(68vh,620px);border-radius:22px;overflow:hidden;background:#2a2a2a;box-shadow:0 12px 40px rgba(0,0,0,.5);touch-action:none;cursor:grab;">
+        style="position:relative;width:100%;flex:1;min-height:0;max-height:min(52vh,460px);border-radius:20px;overflow:hidden;background:var(--surface);box-shadow:0 4px 20px rgba(0,0,0,.10),0 1px 4px rgba(0,0,0,.06);touch-action:none;cursor:grab;">
         ${photo
           ? `<img src="${esc(photo)}" style="width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;">`
           : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:64px;pointer-events:none;">👕</div>`}
-        <div id="rate-badge-right" style="position:absolute;top:28px;right:24px;opacity:0;padding:8px 16px;border:3px solid #4CD964;border-radius:10px;color:#4CD964;font-size:22px;font-weight:900;transform:rotate(12deg);letter-spacing:.05em;">FIND</div>
-        <div id="rate-badge-left" style="position:absolute;top:28px;left:24px;opacity:0;padding:8px 16px;border:3px solid #FF5252;border-radius:10px;color:#FF5252;font-size:22px;font-weight:900;transform:rotate(-12deg);letter-spacing:.05em;">DONE</div>
-        <div style="position:absolute;bottom:0;left:0;right:0;padding:18px 18px 16px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.82));pointer-events:none;">
-          <div style="font-size:19px;font-weight:800;color:#fff;margin-bottom:3px;">${esc(w.name||'')}</div>
-          <div style="font-size:13px;color:rgba(255,255,255,.7);">${[w.brand, w.size].filter(Boolean).map(esc).join(' · ')}</div>
-          ${goalBadge}
-        </div>
+        <div id="rate-badge-right" style="position:absolute;top:22px;right:18px;opacity:0;padding:6px 14px;border:3px solid #4CD964;border-radius:10px;color:#4CD964;font-size:20px;font-weight:900;transform:rotate(12deg);letter-spacing:.05em;background:rgba(255,255,255,.85);">FIND</div>
+        <div id="rate-badge-left" style="position:absolute;top:22px;left:18px;opacity:0;padding:6px 14px;border:3px solid #FF5252;border-radius:10px;color:#FF5252;font-size:20px;font-weight:900;transform:rotate(-12deg);letter-spacing:.05em;background:rgba(255,255,255,.85);">DONE</div>
       </div>
     </div>
 
-    <div style="text-align:center;padding:0 24px 8px;">
-      <div style="font-size:13.5px;font-weight:700;color:rgba(255,255,255,.88);">💭 How does this make you feel right now?</div>
-      <div style="font-size:11.5px;color:rgba(255,255,255,.5);margin-top:2px;">Does it bring you joy? Do you reach for it?</div>
+    <!-- Item name + brand below the card -->
+    <div style="padding:4px 20px 2px;flex-shrink:0;">
+      <div style="font-size:16px;font-weight:800;color:var(--text);">${esc(w.name||'')}</div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${[w.brand, w.size].filter(Boolean).map(esc).join(' · ')}</div>
+      ${goalBadge}
     </div>
-    <div style="display:flex;justify-content:center;gap:10px;padding:4px 18px 14px;">
-      ${[1,2,3,4,5].map(n => `
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();setStyleRating('${w.id}',${n});" onclick="setStyleRating('${w.id}',${n})"
-          style="background:none;border:none;font-size:30px;cursor:pointer;padding:2px;line-height:1;touch-action:manipulation;filter:${(w.styleRating||0) >= n ? 'none' : 'grayscale(1) opacity(0.35)'};">★</button>
-      `).join('')}
+
+    <!-- Stars — inline with label -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 20px 4px;flex-shrink:0;">
+      <div style="font-size:12.5px;font-weight:700;color:var(--text-2);">💭 How do you feel?</div>
+      <div style="display:flex;gap:4px;">
+        ${[1,2,3,4,5].map(n => `
+          <button ontouchend="if(_touchMoved)return;event.preventDefault();setStyleRating('${w.id}',${n});" onclick="setStyleRating('${w.id}',${n})"
+            style="background:none;border:none;font-size:27px;cursor:pointer;padding:2px 1px;line-height:1;touch-action:manipulation;filter:${(w.styleRating||0) >= n ? 'none' : 'grayscale(1) opacity(0.25)'};">★</button>
+        `).join('')}
+      </div>
     </div>
 
     ${S._sellSuggestId === w.id ? `
-      <div style="margin:0 18px 14px;padding:12px 14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:14px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:20px;flex-shrink:0;">💸</span>
+      <div style="margin:4px 16px 0;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <span style="font-size:18px;flex-shrink:0;">💸</span>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:12.5px;font-weight:700;color:#fff;">Not feeling it? Sell it instead of letting it sit.</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:1px;">Closet can draft a Poshmark/Depop listing and suggest a price.</div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.3;">Not feeling it? Sell instead of letting it sit.</div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+        <div style="display:flex;gap:6px;flex-shrink:0;">
           <button ontouchend="if(_touchMoved)return;event.preventDefault();openSellDraft('${w.id}');" onclick="openSellDraft('${w.id}')"
-            style="background:#fff;border:none;border-radius:100px;padding:6px 13px;font-size:11.5px;font-weight:800;color:#1a1a1a;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">List it →</button>
+            style="background:#1a1a1a;border:none;border-radius:100px;padding:6px 12px;font-size:11px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">List it →</button>
           <button ontouchend="if(_touchMoved)return;event.preventDefault();dismissSellSuggestion();" onclick="dismissSellSuggestion()"
-            style="background:none;border:none;padding:2px 6px;font-size:10.5px;color:rgba(255,255,255,.45);cursor:pointer;font-family:inherit;touch-action:manipulation;">Not now</button>
+            style="background:none;border:none;padding:4px;font-size:18px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;line-height:1;">×</button>
         </div>
       </div>
     ` : ''}
 
-    <div style="display:flex;gap:10px;padding:6px 18px 10px;">
+    <!-- Share -->
+    <div style="padding:8px 16px 4px;flex-shrink:0;">
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();shareRateModeCard('${w.id}');" onclick="shareRateModeCard('${w.id}')"
+        style="width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:100px;padding:10px 0;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;letter-spacing:.02em;">
+        📤 Share to Stories
+      </button>
+      <div style="text-align:center;font-size:10.5px;color:var(--text-3);margin-top:5px;line-height:1.4;">Save to Photos → then add to Instagram Stories or Reels from your library</div>
+    </div>
+
+    <!-- Action buttons -->
+    <div style="display:flex;gap:8px;padding:4px 16px 28px;flex-shrink:0;">
       <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('left');" onclick="rateModeCommit('left')"
-        style="flex:1;padding:15px 0;background:rgba(255,82,82,.12);border:2px solid #FF5252;border-radius:100px;font-size:13px;font-weight:800;color:#FF5252;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        style="flex:1;padding:13px 0;background:rgba(255,82,82,.08);border:2px solid #FF5252;border-radius:100px;font-size:12px;font-weight:800;color:#D93025;cursor:pointer;font-family:inherit;touch-action:manipulation;">
         ← Purgatory
       </button>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('keep');" onclick="rateModeCommit('keep')"
-        style="flex:1;padding:15px 0;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.3);border-radius:100px;font-size:13px;font-weight:800;color:rgba(255,255,255,.85);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-        ✓ Good for now
+        style="flex:1;padding:13px 0;background:var(--surface);border:2px solid var(--border);border-radius:100px;font-size:12px;font-weight:800;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        ✓ Keep
       </button>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();rateModeCommit('right');" onclick="rateModeCommit('right')"
-        style="flex:1;padding:15px 0;background:rgba(76,217,100,.12);border:2px solid #4CD964;border-radius:100px;font-size:13px;font-weight:800;color:#4CD964;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        style="flex:1;padding:13px 0;background:rgba(30,140,80,.08);border:2px solid #2EAA5C;border-radius:100px;font-size:12px;font-weight:800;color:#1E8449;cursor:pointer;font-family:inherit;touch-action:manipulation;">
         Buy Again →
-      </button>
-    </div>
-    <div style="text-align:center;padding:2px 18px 32px;">
-      <button ontouchend="if(_touchMoved)return;event.preventDefault();shareRateModeCard('${w.id}');" onclick="shareRateModeCard('${w.id}')"
-        style="background:none;border:none;color:rgba(255,255,255,0.45);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;padding:6px 16px;letter-spacing:.02em;">
-        📤 Share to Stories
       </button>
     </div>
   </div>`;
@@ -21640,6 +21752,96 @@ function viewHiddenGems() {
 }
 
 /* ================================================================
+   VIEW: COMPLIMENTS
+   ================================================================ */
+function viewCompliments() {
+  const allC = [];
+  S.wardrobe.forEach(w => (w.compliments||[]).forEach(c => allC.push({w, date: c.date})));
+  allC.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const seen = new Set(), items = [];
+  for (const {w, date} of allC) {
+    if (!seen.has(w.id)) {
+      seen.add(w.id);
+      items.push({
+        w,
+        lastDate: date,
+        count: (w.compliments||[]).length,
+        latestFrom: [...(w.compliments||[])].reverse().find(c => c.from)?.from || null,
+      });
+    }
+  }
+  const total = allC.length;
+  const back = S._prevView || 'portfolio';
+  const relDate = iso => {
+    const d = daysSince(iso);
+    return d === 0 ? 'today' : d === 1 ? 'yesterday' : d < 7 ? d + 'd ago' : fmtDate(iso);
+  };
+
+  if (!items.length) {
+    return `<div class="view view-notab">
+      <div class="nav">
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Back</button>
+        <span class="nav-title">Compliments</span>
+        <span style="width:72px;"></span>
+      </div>
+      <div style="padding:60px 24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">💬</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">No compliments yet</div>
+        <div style="font-size:13px;color:var(--text-3);line-height:1.6;">Log a compliment on any wardrobe item to start tracking what gets noticed.</div>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="view view-notab" style="display:flex;flex-direction:column;">
+    <div class="nav">
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Back</button>
+      <span class="nav-title">Compliments</span>
+      <span style="width:72px;"></span>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 24px);">
+
+      <!-- Summary banner -->
+      <div style="background:linear-gradient(135deg,rgba(184,125,42,0.08),rgba(184,125,42,0.04));border:1px solid rgba(184,125,42,0.2);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:rgba(184,125,42,0.6);margin-bottom:8px;">💬 All Compliments</div>
+        <div style="display:flex;gap:24px;">
+          <div>
+            <div style="font-size:22px;font-weight:800;color:var(--gold-dk);">${total}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:1px;">total compliments</div>
+          </div>
+          <div>
+            <div style="font-size:22px;font-weight:800;color:var(--gold-dk);">${items.length}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:1px;">piece${items.length===1?'':'s'} complimented</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        ${items.map(({w, lastDate, count, latestFrom}) => {
+          const ph = photoBlobUrl(w.photo);
+          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();complimentCardTap('${w.id}')" onclick="complimentCardTap('${w.id}')"
+            style="cursor:pointer;touch-action:manipulation;border-radius:10px;overflow:hidden;background:var(--surface);border:1.5px solid rgba(184,125,42,.25);">
+            <div style="width:100%;aspect-ratio:3/4;position:relative;background:var(--surface-2);">
+              ${ph
+                ? `<img src="${esc(ph)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;">${w.icon||'👕'}</div>`}
+              <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 45%,rgba(0,0,0,.65) 100%);pointer-events:none;"></div>
+              <div style="position:absolute;top:5px;right:5px;background:var(--gold);border-radius:100px;padding:2px 6px;font-size:9px;font-weight:800;color:#fff;line-height:1.6;">💬${count}</div>
+              <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;color:rgba(255,255,255,.82);padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${latestFrom ? `from ${esc(latestFrom)}` : relDate(lastDate)}</div>
+            </div>
+            <div style="padding:5px 7px 7px;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
+              ${w.brand ? `<div style="font-size:10px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.brand)}</div>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ================================================================
    VIEW: VALUE ITEMS
    ================================================================ */
 function viewValueItems() {
@@ -21662,10 +21864,12 @@ function viewValueItems() {
     shareText('My Value Unlocked', lines.join('\n'));
   }
 
+  const back = S._prevView || 'portfolio';
+
   if (!items.length) {
     return `<div class="view view-notab">
       <div class="nav">
-        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Wardrobe</button>
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Back</button>
         <span class="nav-title">Value Unlocked</span>
         <span style="width:72px;"></span>
       </div>
@@ -21679,56 +21883,53 @@ function viewValueItems() {
 
   return `<div class="view view-notab" style="display:flex;flex-direction:column;">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Wardrobe</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Back</button>
       <span class="nav-title">Value Unlocked</span>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();shareValue()" onclick="shareValue()"
         style="background:none;border:none;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:4px 8px;touch-action:manipulation;">↗ Share</button>
     </div>
 
-    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px);">
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 24px);">
 
       <!-- Summary banner -->
-      <div style="margin:14px 16px 0;background:#EAFAF1;border:1px solid rgba(30,132,73,0.25);border-radius:var(--r);padding:14px 16px;">
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#1E8449;margin-bottom:8px;">💚 Paid-off pieces · ${items.length} items</div>
-        <div style="display:flex;gap:20px;">
+      <div style="background:#EAFAF1;border:1px solid rgba(30,132,73,0.25);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#1E8449;margin-bottom:8px;">💚 Paid-off pieces</div>
+        <div style="display:flex;gap:24px;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#1E8449;">${totalWears}</div>
-            <div style="font-size:11px;color:#2ECC71;margin-top:2px;">total wears</div>
+            <div style="font-size:22px;font-weight:800;color:#1E8449;">${items.length}</div>
+            <div style="font-size:11px;color:#2ECC71;margin-top:1px;">piece${items.length===1?'':'s'} paid off</div>
+          </div>
+          <div>
+            <div style="font-size:22px;font-weight:800;color:#1E8449;">${totalWears}</div>
+            <div style="font-size:11px;color:#2ECC71;margin-top:1px;">total wears</div>
           </div>
           ${totalValue > 0 ? `<div>
-            <div style="font-size:20px;font-weight:800;color:#1E8449;">$${totalValue.toFixed(0)}</div>
-            <div style="font-size:11px;color:#2ECC71;margin-top:2px;">total invested</div>
+            <div style="font-size:22px;font-weight:800;color:#1E8449;">$${totalValue.toFixed(0)}</div>
+            <div style="font-size:11px;color:#2ECC71;margin-top:1px;">invested</div>
           </div>` : ''}
-          <div style="flex:1;min-width:0;text-align:right;">
-            <div style="font-size:12px;color:#2ECC71;line-height:1.5;margin-top:2px;">These pieces have<br>more than earned their keep</div>
-          </div>
         </div>
       </div>
 
-      <!-- Item list -->
-      <div style="margin:12px 16px 0;">
+      <!-- Grid -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
         ${items.map(w => {
           const ph = photoBlobUrl(w.photo);
           const wears = w.wears?.length || 0;
           const ppw = w.price && wears > 0 ? `$${(parseFloat(w.price)/wears).toFixed(2)}/wear` : null;
           return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')" onclick="openWardrobeItem('${w.id}')"
-            style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
-            <div style="width:52px;height:66px;border-radius:10px;overflow:hidden;flex-shrink:0;background:var(--surface-2);position:relative;">
+            style="cursor:pointer;touch-action:manipulation;border-radius:10px;overflow:hidden;background:var(--surface);border:1.5px solid rgba(30,132,73,.25);">
+            <div style="width:100%;aspect-ratio:3/4;position:relative;background:var(--surface-2);">
               ${ph
                 ? `<img src="${esc(ph)}" style="width:100%;height:100%;object-fit:cover;object-position:top;display:block;">`
-                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;">${w.icon||'👕'}</div>`}
-              <div style="position:absolute;top:3px;right:3px;font-size:11px;line-height:1;">💚</div>
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;">${w.icon||'👕'}</div>`}
+              <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 45%,rgba(0,0,0,.65) 100%);pointer-events:none;"></div>
+              <div style="position:absolute;top:5px;right:5px;background:#1E8449;border-radius:100px;padding:2px 6px;font-size:9px;font-weight:800;color:#fff;line-height:1.6;">💚${wears}×</div>
+              ${ppw ? `<div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;color:rgba(255,255,255,.82);padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ppw}</div>` : ''}
             </div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
-              ${w.brand ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(w.brand)}</div>` : ''}
-              <div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
-                ${w.price ? `<span style="font-size:12px;font-weight:700;color:var(--text);">$${parseFloat(w.price).toFixed(0)} paid</span><span style="font-size:12px;color:var(--text-3);">·</span>` : ''}
-                <span style="font-size:12px;color:var(--text-3);">worn ${wears}×</span>
-                ${ppw ? `<span style="font-size:12px;font-weight:700;color:#1E8449;">· ${ppw}</span>` : ''}
-              </div>
+            <div style="padding:5px 7px 7px;">
+              <div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.name)}</div>
+              ${w.brand ? `<div style="font-size:10px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(w.brand)}</div>` : ''}
             </div>
-            <div style="font-size:16px;color:var(--text-3);flex-shrink:0;">›</div>
           </div>`;
         }).join('')}
       </div>
