@@ -2973,6 +2973,8 @@ const S = {
   eventBoard: JSON.parse(localStorage.getItem('closet-event-board') || '[]'), // [{id, desc, suggestion, tripId, addedAt}]
   eventTrips: JSON.parse(localStorage.getItem('closet-event-trips') || '[]'), // [{id, name, createdAt}]
   savedTripPlans: JSON.parse(localStorage.getItem('closet-trip-plans') || '[]'), // [{id, destination, days, suggestions, gaps, createdAt}] — saved day-by-day wardrobe plans, condensed by default
+  savedBattles: JSON.parse(localStorage.getItem('closet-battles') || '[]'), // [{id, createdAt, photo, person1, person2, winner, verdict}]
+  _replayBattleId: null, // ID into savedBattles for battle-replay view
   _openTripPlanId: null, // which saved trip plan card is expanded (condensed list otherwise)
   returnItems: JSON.parse(localStorage.getItem('closet-return-items') || '[]'),   // [{id,photo,store,channel,deadline,notes,createdAt}]
   _returnForm: null, // active return form state
@@ -7688,25 +7690,17 @@ function viewFun() {
             </button>
 
             ${(()=>{
-              // Battle record — compact W/L stats + mini carousel
-              const bEntries = S.entries.filter(e => e.battleId);
-              if (!bEntries.length) return '';
-              const seen = new Set(); let bWins=0,bLosses=0,bTies=0;
-              bEntries.forEach(e => {
-                if (seen.has(e.battleId)) return; seen.add(e.battleId);
-                const partner = S.entries.find(p => p.battleId===e.battleId && p.id!==e.id);
-                const tie = partner && !e.battleWon && !partner.battleWon;
-                if (tie) bTies++; else if (e.battleWon) bWins++; else bLosses++;
-              });
-              const seenC = new Set(); const pastBattles = [];
-              [...S.entries].filter(e=>e.battleId&&e.photo).reverse().forEach(e=>{
-                if (seenC.has(e.battleId)) return; seenC.add(e.battleId);
-                const partner = S.entries.find(p=>p.battleId===e.battleId&&p.id!==e.id);
-                const tie = partner && !e.battleWon && !partner.battleWon;
-                pastBattles.push({id:e.id,photo:e.photo,won:e.battleWon,tie});
+              // Battle record from savedBattles — newest on left, tappable
+              const battles = S.savedBattles || [];
+              if (!battles.length) return '';
+              let bWins=0, bLosses=0, bTies=0;
+              battles.forEach(b => {
+                if (b.winner === 0) bTies++;
+                else if (b.winner === 1) bWins++;
+                else bLosses++;
               });
               return `<div style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.1);padding-top:14px;">
-                <div style="display:flex;align-items:center;gap:0;margin-bottom:${pastBattles.length?'12px':'0'};">
+                <div style="display:flex;align-items:center;gap:0;margin-bottom:12px;">
                   <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);flex:1;">Battle Record</div>
                   <div style="display:flex;gap:12px;align-items:center;">
                     <span style="font-size:13px;font-weight:900;color:#6BBF8E;">${bWins}W</span>
@@ -7714,14 +7708,19 @@ function viewFun() {
                     ${bTies?`<span style="font-size:13px;font-weight:900;color:var(--gold);">${bTies}T</span>`:''}
                   </div>
                 </div>
-                ${pastBattles.length ? `<div style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px;">
-                  ${pastBattles.slice(0,10).map(b=>`
-                    <div ontouchend="if(_touchMoved)return;event.preventDefault();S.selectedId='${b.id}';navigate('battle-replay')" onclick="S.selectedId='${b.id}';navigate('battle-replay')"
+                <div style="display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px;">
+                  ${battles.slice(0,10).map(b=>{
+                    const tie = b.winner === 0;
+                    const won = b.winner === 1;
+                    const borderCol = tie ? 'var(--gold)' : won ? '#6BBF8E' : '#C07070';
+                    const medal = tie ? '🤝' : won ? '🏆' : '🥈';
+                    return `<div ontouchend="if(_touchMoved)return;event.preventDefault();S._replayBattleId='${b.id}';navigate('battle-replay')" onclick="S._replayBattleId='${b.id}';navigate('battle-replay')"
                       style="flex-shrink:0;width:58px;cursor:pointer;position:relative;touch-action:manipulation;">
-                      <img src="${esc(b.photo)}" style="width:58px;height:78px;object-fit:cover;object-position:top;border-radius:8px;display:block;border:2px solid ${b.tie?'var(--gold)':b.won?'#6BBF8E':'#C07070'};">
-                      <div style="position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:12px;">${b.tie?'🤝':b.won?'🏆':'🥈'}</div>
-                    </div>`).join('')}
-                </div>` : ''}
+                      <img src="${esc(b.photo)}" style="width:58px;height:78px;object-fit:cover;object-position:top;border-radius:8px;display:block;border:2px solid ${borderCol};">
+                      <div style="position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:12px;">${medal}</div>
+                    </div>`;
+                  }).join('')}
+                </div>
               </div>`;
             })()}
           </div>
@@ -13140,66 +13139,189 @@ function viewHome() {
   });
   likedRecs.sort((a,b)=>new Date(b.entry.createdAt)-new Date(a.entry.createdAt));
 
-  // ── ⚡ ACTION SUMMARY — top priority moves (rows are expand triggers) ───────
+  // ── ⚡ ACTION SUMMARY — priority moves with inline expand ───────────────
   const actionSummaryHTML = (() => {
-    const rows = [];
+    const rowParts = [];
+
+    // helper: expand pill
+    const pill = (active, accentBg, accentBorder, accentText) =>
+      `<div style="display:flex;align-items:center;background:${active?accentBg:'var(--surface-2)'};border:1.5px solid ${active?accentBorder:'var(--border)'};border-radius:100px;padding:5px 10px;flex-shrink:0;margin-top:2px;">
+        <span style="font-size:12px;font-weight:700;color:${active?accentText:'var(--text-2)'};">${active ? '▴ Less' : 'Open ▾'}</span>
+      </div>`;
+
+    // ── ROW 1: Style Tips ──
     if (likedRecs.length > 0) {
       const { rec, entry } = likedRecs[0];
       const short = rec.length > 85 ? rec.slice(0, 85).replace(/\s\S*$/, '…') : rec;
       const active = S._tipsExpanded;
-      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();S._tipsExpanded=!S._tipsExpanded;render()" onclick="S._tipsExpanded=!S._tipsExpanded;render()"
-        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
-        <div style="width:28px;height:28px;border-radius:50%;background:${active?'var(--gold)':'rgba(184,125,42,0.18)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">✂️</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:3px;">Top Style Tip${likedRecs.length > 1 ? ` <span style="font-weight:500;color:var(--text-3);">· ${likedRecs.length}</span>` : ''}</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.4;">${esc(short)}</div>
-          <div style="font-size:10px;color:var(--text-3);margin-top:4px;">from your ⭐ ${entry.rating}/10 outfit${entry.occasionTag ? ' · ' + esc(entry.occasionTag) : ''}</div>
+      rowParts.push(`
+        <div ontouchend="if(_touchMoved)return;event.preventDefault();S._tipsExpanded=!S._tipsExpanded;render()" onclick="S._tipsExpanded=!S._tipsExpanded;render()"
+          style="display:flex;align-items:flex-start;gap:11px;padding:12px 0;cursor:pointer;touch-action:manipulation;">
+          <div style="width:32px;height:32px;border-radius:50%;background:${active?'var(--gold)':'rgba(184,125,42,0.18)'};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:1px;">✂️</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:3px;">Top Style Tip${likedRecs.length > 1 ? ` <span style="font-weight:500;color:var(--text-3);">· ${likedRecs.length}</span>` : ''}</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.4;">${esc(short)}</div>
+            <div style="font-size:10px;color:var(--text-3);margin-top:3px;">from your ⭐ ${entry.rating}/10 outfit${entry.occasionTag ? ' · ' + esc(entry.occasionTag) : ''}</div>
+          </div>
+          ${pill(active,'var(--gold-bg)','var(--gold)','var(--gold-dk)')}
         </div>
-        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">${active ? '▲' : '›'}</div>
-      </div>`);
+        ${active ? `
+          <div style="border-top:1px solid var(--border);padding:10px 0 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">✂️ Style Tips</div>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('saved-tips')" onclick="navigate('saved-tips')"
+                style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">All tips →</button>
+            </div>
+            <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+              ${likedRecs.slice(0,10).map(({rec, entry, idx}) => {
+                const tipText = rec.length > 100 ? rec.slice(0, 100).replace(/\s\S*$/, '…') : rec;
+                return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')"
+                  onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:155px;cursor:pointer;border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:2/3;background:#111;">
+                  <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();removeSavedTip('${entry.id}',${idx})" onclick="event.stopPropagation();removeSavedTip('${entry.id}',${idx})"
+                    style="position:absolute;top:7px;right:7px;z-index:2;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.55);border:none;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;backdrop-filter:blur(3px);">✕</button>
+                  ${entry.photo
+                    ? `<img src="${entry.photo}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 15%;" loading="lazy">`
+                    : `<div style="position:absolute;inset:0;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:40px;">👗</div>`}
+                  <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 35%,rgba(0,0,0,0.92) 100%);pointer-events:none;"></div>
+                  <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 10px 12px;">
+                    <div style="font-size:12px;color:#fff;line-height:1.4;font-weight:500;">${esc(tipText)}</div>
+                    <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:5px;">⭐ ${entry.rating}/10${entry.occasionTag ? ' · ' + esc(entry.occasionTag) : ''}</div>
+                  </div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>` : ''}
+      `);
     }
-    const trends = S.hotTrends?.trends;
-    if (trends?.length) {
+
+    // ── ROW 2: Trends ──
+    const trendsData = S.hotTrends?.trends;
+    if (trendsData?.length) {
       const _trendRx = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
-      const t = trends.find(x => _trendRx[x.id] === 'up') || trends[0];
+      const t = trendsData.find(x => _trendRx[x.id] === 'up') || trendsData[0];
       const desc = t.tip || t.description || '';
       const shortDesc = desc.length > 70 ? desc.slice(0, 70).replace(/\s\S*$/, '…') : desc;
       const active = S._trendsExpanded;
-      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();S._trendsExpanded=!S._trendsExpanded;render()" onclick="S._trendsExpanded=!S._trendsExpanded;render()"
-        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;${rows.length ? 'border-bottom:1px solid var(--border);' : ''}cursor:pointer;touch-action:manipulation;">
-        <div style="width:28px;height:28px;border-radius:50%;background:${active?'linear-gradient(135deg,#FF6B35,#FF8C5A)':'rgba(255,107,53,0.12)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">${esc(t.emoji||'🔥')}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">Trending Now <span style="font-weight:500;color:var(--text-3);">· ${trends.length}</span></div>
-          <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(t.name)}</div>
-          ${shortDesc ? `<div style="font-size:12px;color:var(--text-3);margin-top:2px;line-height:1.35;">${esc(shortDesc)}</div>` : ''}
+      rowParts.push(`
+        <div style="border-top:1px solid var(--border);"></div>
+        <div ontouchend="if(_touchMoved)return;event.preventDefault();S._trendsExpanded=!S._trendsExpanded;render()" onclick="S._trendsExpanded=!S._trendsExpanded;render()"
+          style="display:flex;align-items:flex-start;gap:11px;padding:12px 0;cursor:pointer;touch-action:manipulation;">
+          <div style="width:32px;height:32px;border-radius:50%;background:${active?'linear-gradient(135deg,#FF6B35,#FF8C5A)':'rgba(255,107,53,0.12)'};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:1px;">${esc(t.emoji||'🔥')}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">Trending Now <span style="font-weight:500;color:var(--text-3);">· ${trendsData.length}</span></div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(t.name)}</div>
+            ${shortDesc ? `<div style="font-size:12px;color:var(--text-3);margin-top:2px;line-height:1.35;">${esc(shortDesc)}</div>` : ''}
+          </div>
+          ${pill(active,'rgba(255,107,53,0.1)','rgba(255,107,53,0.4)','#C04E1E')}
         </div>
-        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">${active ? '▲' : '›'}</div>
-      </div>`);
-    } else if (!S._trendsLoading) {
-      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
-        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;${rows.length ? 'border-bottom:1px solid var(--border);' : ''}cursor:pointer;touch-action:manipulation;">
-        <div style="width:28px;height:28px;border-radius:50%;background:rgba(255,107,53,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">🔥</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">What's Trending</div>
-          <div style="font-size:13px;color:var(--text-3);line-height:1.4;">Generate this week's trend report</div>
+        ${active ? `
+          <div style="border-top:1px solid var(--border);padding:10px 0 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">🔥 What's Trending</div>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
+                style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
+            </div>
+            <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+              ${(()=>{
+                const reactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
+                return (trendsData||[]).slice(0,10).map(trend => {
+                  const r = reactions[trend.id];
+                  return `<div style="scroll-snap-align:start;flex-shrink:0;width:200px;border-radius:var(--r);background:var(--surface);border:1.5px solid ${r==='up'?'var(--gold)':'var(--border)'};overflow:hidden;display:flex;flex-direction:column;">
+                    <div style="padding:12px 12px 8px;">
+                      <div style="font-size:24px;margin-bottom:6px;line-height:1;">${esc(trend.emoji||'🔥')}</div>
+                      <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(trend.name)}</div>
+                      <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(trend.description)}</div>
+                      ${trend.tip ? `<div style="margin-top:8px;font-size:11px;color:var(--gold-dk);font-weight:600;background:var(--gold-bg);border-radius:6px;padding:5px 8px;line-height:1.4;">💡 ${esc(trend.tip)}</div>` : ''}
+                      <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(trend.name)}" target="_blank" rel="noopener"
+                        style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:11px;font-weight:700;color:var(--gold-dk);text-decoration:none;">🔗 Shop this look</a>
+                    </div>
+                    <div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border);margin-top:auto;">
+                      <button ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(trend.id)}','up')" onclick="setTrendReaction('${esc(trend.id)}','up')"
+                        style="flex:2;background:${r==='up'?'var(--gold-bg)':'var(--surface-2)'};border:1px solid ${r==='up'?'var(--gold)':'var(--border)'};border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">👍${r==='up'?' Saved':''}</button>
+                      <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteTrend('${esc(trend.id)}')" onclick="deleteTrend('${esc(trend.id)}')"
+                        style="flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">✕</button>
+                    </div>
+                  </div>`;
+                }).join('');
+              })()}
+            </div>
+            ${S.hotTrends?.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right;">AI-curated · ${fmtDaysAgo(S.hotTrends.updated)}</div>` : ''}
+          </div>` : ''}
+      `);
+    } else if (S._trendsLoading) {
+      rowParts.push(`
+        <div style="border-top:1px solid var(--border);"></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 0;">
+          <div class="spinner" style="width:18px;height:18px;border-width:2px;"></div>
+          <span style="font-size:13px;color:var(--text-3);">Curating trends…</span>
         </div>
-        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">›</div>
-      </div>`);
+      `);
+    } else {
+      rowParts.push(`
+        <div style="border-top:1px solid var(--border);"></div>
+        <div ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
+          style="display:flex;align-items:flex-start;gap:11px;padding:12px 0;cursor:pointer;touch-action:manipulation;">
+          <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,107,53,0.1);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:1px;">🔥</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#C04E1E;margin-bottom:3px;">What's Trending</div>
+            <div style="font-size:13px;color:var(--text-3);line-height:1.4;">Generate this week's trend report</div>
+          </div>
+          <div style="display:flex;align-items:center;background:var(--surface-2);border:1.5px solid var(--border);border-radius:100px;padding:5px 10px;flex-shrink:0;margin-top:2px;">
+            <span style="font-size:12px;font-weight:700;color:var(--text-2);">Go →</span>
+          </div>
+        </div>
+      `);
     }
+
+    // ── ROW 3: Brands ──
     if (S.brandDiscovery?.suggestions?.length) {
       const s = S.brandDiscovery.suggestions[0];
+      const suggs = S.brandDiscovery.suggestions;
       const active = S._brandsExpanded;
-      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=!S._brandsExpanded;render()" onclick="S._brandsExpanded=!S._brandsExpanded;render()"
-        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;cursor:pointer;touch-action:manipulation;">
-        <div style="width:28px;height:28px;border-radius:50%;background:${active?'rgba(108,62,191,0.25)':'rgba(108,62,191,0.1)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">${esc(s.emoji||'🏷')}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#6C3EBF;margin-bottom:3px;">Brand to Explore <span style="font-weight:500;color:var(--text-3);">· ${S.brandDiscovery.suggestions.length}</span></div>
-          <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(s.name)}</div>
-          <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${esc(s.vibe)}</div>
+      rowParts.push(`
+        <div style="border-top:1px solid var(--border);"></div>
+        <div ontouchend="if(_touchMoved)return;event.preventDefault();S._brandsExpanded=!S._brandsExpanded;render()" onclick="S._brandsExpanded=!S._brandsExpanded;render()"
+          style="display:flex;align-items:flex-start;gap:11px;padding:12px 0;cursor:pointer;touch-action:manipulation;">
+          <div style="width:32px;height:32px;border-radius:50%;background:${active?'rgba(108,62,191,0.25)':'rgba(108,62,191,0.1)'};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:1px;">${esc(s.emoji||'🏷')}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#6C3EBF;margin-bottom:3px;">Brand to Explore <span style="font-weight:500;color:var(--text-3);">· ${suggs.length}</span></div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);">${esc(s.name)}</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${esc(s.vibe)}</div>
+          </div>
+          ${pill(active,'rgba(108,62,191,0.1)','rgba(108,62,191,0.4)','#6C3EBF')}
         </div>
-        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">${active ? '▲' : '›'}</div>
-      </div>`);
-    } else if (!S._brandDiscoveryLoading && goalsArr.length > 0) {
+        ${active ? `
+          <div style="border-top:1px solid var(--border);padding:10px 0 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">✨ You Might Also Love</div>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
+                style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
+            </div>
+            <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+              ${suggs.map(sg=>`
+                <div style="flex-shrink:0;width:148px;scroll-snap-align:start;background:var(--surface);border-radius:12px;border:1.5px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:5px;">
+                  <div style="font-size:20px;line-height:1;">${sg.emoji||'✦'}</div>
+                  <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(sg.name)}</div>
+                  <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 7px;align-self:flex-start;">${esc(sg.vibe)}</div>
+                  <div style="font-size:11px;color:var(--text-3);line-height:1.4;flex:1;">${esc(sg.reason)}</div>
+                  <a href="${brandInstagramUrl(sg.name)}" target="_blank" rel="noopener"
+                    style="margin-top:3px;display:inline-flex;align-items:center;gap:4px;color:var(--text-3);text-decoration:none;font-size:11px;font-weight:600;">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                    Instagram
+                  </a>
+                </div>`).join('')}
+            </div>
+          </div>` : ''}
+      `);
+    } else if (S._brandDiscoveryLoading) {
+      rowParts.push(`
+        <div style="border-top:1px solid var(--border);"></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 0;">
+          <div class="spinner" style="width:18px;height:18px;border-width:2px;"></div>
+          <span style="font-size:13px;color:var(--text-3);">Finding brands that match your aesthetic…</span>
+        </div>
+      `);
+    } else if (goalsArr.length > 0) {
       const _ownedBrands = new Set(S.wardrobe.map(w => (w.brand||'').trim().toLowerCase()));
       let _pick = null;
       for (const goal of goalsArr) {
@@ -13209,97 +13331,27 @@ function viewHome() {
         }
         if (_pick) break;
       }
-      rows.push(`<div ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
-        style="display:flex;align-items:flex-start;gap:11px;padding:10px 0;cursor:pointer;touch-action:manipulation;">
-        <div style="width:28px;height:28px;border-radius:50%;background:rgba(108,62,191,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:1px;">🏷</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#6C3EBF;margin-bottom:3px;">Brand to Explore</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.4;">${_pick ? esc(_pick.brand) : 'Discover your next go-to brand'}</div>
-          <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${_pick ? `Aligns with your ${esc(_pick.goal)} goal · tap to discover more` : 'Tap to find brands that match your aesthetic'}</div>
+      rowParts.push(`
+        <div style="border-top:1px solid var(--border);"></div>
+        <div ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()"
+          style="display:flex;align-items:flex-start;gap:11px;padding:12px 0;cursor:pointer;touch-action:manipulation;">
+          <div style="width:32px;height:32px;border-radius:50%;background:rgba(108,62,191,0.1);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:1px;">🏷</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#6C3EBF;margin-bottom:3px;">Brand to Explore</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.4;">${_pick ? esc(_pick.brand) : 'Discover your next go-to brand'}</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${_pick ? `Aligns with your ${esc(_pick.goal)} goal · tap to discover more` : 'Tap to find brands that match your aesthetic'}</div>
+          </div>
+          <div style="display:flex;align-items:center;background:var(--surface-2);border:1.5px solid var(--border);border-radius:100px;padding:5px 10px;flex-shrink:0;margin-top:2px;">
+            <span style="font-size:12px;font-weight:700;color:var(--text-2);">Go →</span>
+          </div>
         </div>
-        <div style="font-size:13px;color:var(--text-3);flex-shrink:0;padding-top:2px;line-height:1;">›</div>
-      </div>`);
+      `);
     }
-    if (!rows.length) return '';
+
+    if (!rowParts.length) return '';
     return `<div style="margin:12px 16px 0;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:2px 14px;">
       <div style="padding:10px 0 2px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">⚡ Priority Moves</div>
-      ${rows.join('')}
-    </div>`;
-  })();
-
-  const tipsSection = (() => {
-    if (!likedRecs.length || !S._tipsExpanded) return '';
-    return `<div class="home-section">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div class="home-section-label" style="margin-bottom:0;">✂️ Style Tips</div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('saved-tips')" onclick="navigate('saved-tips')"
-            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">All tips →</button>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._tipsExpanded=false;render()" onclick="S._tipsExpanded=false;render()"
-            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">▲</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-        ${likedRecs.slice(0,10).map(({rec, entry, idx}) => {
-          const tipText = rec.length > 100 ? rec.slice(0, 100).replace(/\s\S*$/, '…') : rec;
-          return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${entry.id}')"
-            onclick="openEntry('${entry.id}')" style="scroll-snap-align:start;flex-shrink:0;width:155px;cursor:pointer;border-radius:var(--r);overflow:hidden;position:relative;aspect-ratio:2/3;background:#111;">
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();removeSavedTip('${entry.id}',${idx})" onclick="event.stopPropagation();removeSavedTip('${entry.id}',${idx})"
-              style="position:absolute;top:7px;right:7px;z-index:2;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.55);border:none;color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;font-family:inherit;padding:0;backdrop-filter:blur(3px);">✕</button>
-            ${entry.photo
-              ? `<img src="${entry.photo}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 15%;" loading="lazy">`
-              : `<div style="position:absolute;inset:0;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:40px;">👗</div>`}
-            <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 35%,rgba(0,0,0,0.92) 100%);pointer-events:none;"></div>
-            <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 10px 12px;">
-              <div style="font-size:12px;color:#fff;line-height:1.4;font-weight:500;">${esc(tipText)}</div>
-              <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:5px;">⭐ ${entry.rating}/10${entry.occasionTag ? ' · ' + esc(entry.occasionTag) : ''}</div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  })();
-
-  // ── 🔥 TRENDS — carousel, triggered from Priority Moves ─────────────────
-  const trendsSection = (()=>{
-    if (S._trendsLoading) return `<div class="home-section"><div style="display:flex;align-items:center;gap:10px;padding:4px 0;"><div class="spinner" style="width:18px;height:18px;border-width:2px;"></div><span style="font-size:13px;color:var(--text-3);">Curating trends…</span></div></div>`;
-    const trends = S.hotTrends;
-    if (!trends?.trends?.length || !S._trendsExpanded) return '';
-    const reactions = JSON.parse(localStorage.getItem('closet-hot-reactions') || '{}');
-    return `<div class="home-section">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div class="home-section-label" style="margin-bottom:0;">🔥 What's Trending</div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();generateHotTrends()" onclick="generateHotTrends()"
-            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">↻ Refresh</button>
-          <button ontouchend="if(_touchMoved)return;event.preventDefault();S._trendsExpanded=false;render()" onclick="S._trendsExpanded=false;render()"
-            style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:0;">▲</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-        ${(trends.trends||[]).slice(0,10).map(trend => {
-          const r = reactions[trend.id];
-          return `<div style="scroll-snap-align:start;flex-shrink:0;width:200px;border-radius:var(--r);background:var(--surface);border:1.5px solid ${r==='up'?'var(--gold)':'var(--border)'};overflow:hidden;display:flex;flex-direction:column;">
-            <div style="padding:12px 12px 8px;">
-              <div style="font-size:24px;margin-bottom:6px;line-height:1;">${esc(trend.emoji||'🔥')}</div>
-              <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(trend.name)}</div>
-              <div style="font-size:12px;color:var(--text-3);line-height:1.45;">${esc(trend.description)}</div>
-              ${trend.tip ? `<div style="margin-top:8px;font-size:11px;color:var(--gold-dk);font-weight:600;background:var(--gold-bg);border-radius:6px;padding:5px 8px;line-height:1.4;">💡 ${esc(trend.tip)}</div>` : ''}
-              <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(trend.name)}" target="_blank" rel="noopener"
-                style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:11px;font-weight:700;color:var(--gold-dk);text-decoration:none;">
-                🔗 Shop this look
-              </a>
-            </div>
-            <div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border);margin-top:auto;">
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();setTrendReaction('${esc(trend.id)}','up')" onclick="setTrendReaction('${esc(trend.id)}','up')"
-                style="flex:2;background:${r==='up'?'var(--gold-bg)':'var(--surface-2)'};border:1px solid ${r==='up'?'var(--gold)':'var(--border)'};border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">👍${r==='up'?' Saved':''}</button>
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();deleteTrend('${esc(trend.id)}')" onclick="deleteTrend('${esc(trend.id)}')"
-                style="flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:5px;font-size:14px;cursor:pointer;touch-action:manipulation;">✕</button>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-      ${trends.updated ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:right;">AI-curated · ${fmtDaysAgo(trends.updated)}</div>` : ''}
+      ${rowParts.join('')}
     </div>`;
   })();
 
@@ -13380,9 +13432,6 @@ function viewHome() {
       <h2>Welcome to your Closet!</h2>
       <p>Log your first outfit or add wardrobe items to get started. Your style portrait will come to life as you use the app.</p>
     </div>` : ''}
-    ${tipsSection}
-    ${trendsSection}
-    ${brandDiscoveryHTML()}
     ${pulseSection}
     <div style="height:16px"></div>
   </div>`;
@@ -17510,102 +17559,107 @@ function viewBattle() {
 
     <button class="btn btn-primary"
       ontouchend="if(_touchMoved)return;event.preventDefault();doSaveBattle()"
-      onclick="doSaveBattle()">⚔️ Save Both Outfits</button>
+      onclick="doSaveBattle()">⚔️ Save Battle</button>
     <div style="height:10px"></div>
     <button class="btn btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:7px;"
+      ontouchend="if(_touchMoved)return;event.preventDefault();shareBattleDraft()"
       onclick="shareBattleDraft()">📤 Share Result</button>
     <div style="height:10px"></div>
-    <button class="btn btn-secondary" onclick="S.battleDraft=null;navigate('upload')">Discard Battle</button>
+    <button class="btn btn-secondary"
+      ontouchend="if(_touchMoved)return;event.preventDefault();S.battleDraft=null;navigate('upload')"
+      onclick="S.battleDraft=null;navigate('upload')">Discard Battle</button>
     <div style="height:36px"></div>
   </div>`;
 }
 
 function viewBattleReplay() {
-  // Reconstruct battle from the currently-selected entry + its partner
-  const entry = S.entries.find(e => e.id === S.selectedId);
-  if (!entry?.battleId) return navigate('detail'), '';
-  const partner = S.entries.find(e => e.id === entry.battlePartnerId);
-  if (!partner) return navigate('detail'), '';
+  const b = (S.savedBattles||[]).find(x => x.id === S._replayBattleId);
+  if (!b) { navigate('fun'); return ''; }
 
-  // Determine which entry is person 1 vs 2 (winner first)
-  const winner  = entry.battleWon  ? entry  : partner;
-  const runnerUp = entry.battleWon ? partner : entry;
+  const isTie = b.winner === 0;
+  const p1win = b.winner === 1;
+  const winnerLabel = isTie ? null : (p1win ? b.person1.label : b.person2.label) || 'Winner';
 
-  function sideHTML(e, isWinner) {
+  function sideHTML(p, isWinner) {
+    const isTieSide = isTie;
     return `<div class="battle-side${isWinner ? ' winner' : ''}">
-      <div class="battle-side-crown">${isWinner ? '🏆' : '🥈'}</div>
-      <div class="battle-side-label">${esc(e.battleLabel || 'Contestant')}</div>
-      <div class="battle-rating-big">${e.rating}<span class="battle-rating-denom">/10</span></div>
-      <p class="battle-rating-note">${esc(e.ratingNote || '')}</p>
+      <div class="battle-side-crown">${isWinner ? '🏆' : isTieSide ? '🤝' : '🥈'}</div>
+      <div class="battle-side-label">${esc(p.label || 'Contestant')}</div>
+      <div class="battle-rating-big">${p.rating}<span class="battle-rating-denom">/10</span></div>
+      <p class="battle-rating-note">${esc(p.ratingNote || '')}</p>
       <div class="battle-items-mini">
-        ${(e.items||[]).slice(0,4).map(it=>`
+        ${(p.items||[]).slice(0,4).map(it=>`
           <div class="battle-item-mini">
             <span>${it.icon||'👕'}</span>
             <span>${esc(it.name)}</span>
           </div>`).join('')}
       </div>
-      <button onclick="openEntry('${e.id}')" style="margin-top:10px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);border-radius:100px;padding:6px 14px;font-size:11px;font-weight:700;color:inherit;cursor:pointer;font-family:inherit;">View Outfit →</button>
     </div>`;
   }
 
-  const isTie = !entry.battleWon && !partner.battleWon;
-  const winnerLabel = isTie ? null : winner.battleLabel || 'Winner';
-
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate('detail')">${iconBack()} Back</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('fun')" onclick="navigate('fun')" style="touch-action:manipulation;">${iconBack()} Back</button>
       <span class="nav-title">⚔️ Battle Replay</span>
       <div style="width:72px"></div>
     </div>
 
-    <img style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;display:block;" src="${entry.photo}" alt="Battle photo">
+    <img style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;display:block;" src="${b.photo}" alt="Battle photo">
 
     <div class="battle-banner">
       <div>
         <div class="battle-banner-title">⚔️ Fashion Battle</div>
         <div class="battle-banner-sub">${isTie ? "It's a tie!" : `${esc(winnerLabel)} takes the crown`}</div>
       </div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:4px;">${new Date(entry.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:4px;">${new Date(b.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
     </div>
 
     <div class="battle-vs-row">
-      ${isTie
-        ? sideHTML(entry, false) + sideHTML(partner, false)
-        : sideHTML(winner, true) + sideHTML(runnerUp, false)}
+      ${sideHTML(b.person1, p1win)}
+      ${sideHTML(b.person2, !isTie && !p1win)}
     </div>
 
     <div class="battle-verdict-wrap">
       <div class="battle-verdict-label">👩‍⚖️ Closet's Verdict</div>
-      <div class="battle-verdict-text">"${esc(entry.battleVerdict || '')}"</div>
+      <div class="battle-verdict-text">"${esc(b.verdict || '')}"</div>
     </div>
     <button class="btn btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:7px;"
+      ontouchend="if(_touchMoved)return;event.preventDefault();shareBattleReplay()"
       onclick="shareBattleReplay()">📤 Share Battle</button>
+    <div style="height:10px"></div>
+    <button class="btn btn-secondary"
+      ontouchend="if(_touchMoved)return;event.preventDefault();deleteSavedBattle('${b.id}')"
+      onclick="deleteSavedBattle('${b.id}')">🗑 Delete Battle</button>
     <div style="height:36px"></div>
   </div>`;
 }
 
+function deleteSavedBattle(id) {
+  S.savedBattles = (S.savedBattles||[]).filter(b => b.id !== id);
+  localStorage.setItem('closet-battles', JSON.stringify(S.savedBattles));
+  toast('Battle deleted');
+  navigate('fun');
+}
+
 /* ── Fashion Battle: share result ───────────────────────────────────── */
-// Wrapper for replay view — reads from current selected entry
+// Wrapper for replay view — reads from savedBattles
 function shareBattleReplay() {
-  const entry = S.entries.find(e => e.id === S.selectedId);
-  if (!entry?.battleId) return;
-  const partner = S.entries.find(e => e.id === entry.battlePartnerId);
-  if (!partner) return;
-  const isTie = !entry.battleWon && !partner.battleWon;
-  const winner   = entry.battleWon ? entry   : partner;
-  const runnerUp = entry.battleWon ? partner : entry;
+  const b = (S.savedBattles||[]).find(x => x.id === S._replayBattleId);
+  if (!b) return;
+  const isTie = b.winner === 0;
+  const p1win = b.winner === 1;
   shareBattleResult({
-    photo:   entry.photo,
-    label1:  winner.battleLabel   || 'Winner',
-    label2:  runnerUp.battleLabel || 'Runner-up',
-    rating1: winner.rating,
-    rating2: runnerUp.rating,
-    note1:   winner.ratingNote   || '',
-    note2:   runnerUp.ratingNote || '',
-    items1:  winner.items   || [],
-    items2:  runnerUp.items || [],
+    photo:   b.photo,
+    label1:  (p1win ? b.person1.label : b.person2.label) || 'Winner',
+    label2:  (p1win ? b.person2.label : b.person1.label) || 'Runner-up',
+    rating1: p1win ? b.person1.rating : b.person2.rating,
+    rating2: p1win ? b.person2.rating : b.person1.rating,
+    note1:   (p1win ? b.person1.ratingNote : b.person2.ratingNote) || '',
+    note2:   (p1win ? b.person2.ratingNote : b.person1.ratingNote) || '',
+    items1:  (p1win ? b.person1.items : b.person2.items) || [],
+    items2:  (p1win ? b.person2.items : b.person1.items) || [],
     winner:  isTie ? 0 : 1,
-    verdict: entry.battleVerdict || '',
+    verdict: b.verdict || '',
   });
 }
 // Wrapper for live battle draft view
@@ -17883,53 +17937,23 @@ async function shareBattleResult({ photo, label1, label2, rating1, rating2, note
   }
 }
 
-async function doSaveBattle() {
+function doSaveBattle() {
   const bd = S.battleDraft; if (!bd) return;
-  Object.assign(S, { loading:true, loadingMsg:'Saving both outfits…' }); render();
-
-  const battleId = uid();
-  const now = new Date().toISOString();
-  const id1 = uid(), id2 = uid();
-
-  function makeEntry(p, id, partnerId, won) {
-    return {
-      id, createdAt: now, photo: bd.photo,
-      items: (p.items||[]).map(it=>({ id:uid(), name:it.name||'', description:it.description||'', icon:it.icon||'👕', price:null })),
-      rating: p.rating||7, ratingNote: p.ratingNote||'',
-      stylingTips: p.stylingTips||[],
-      purchaseRecs: (p.purchaseRecs||[]).map(r => typeof r === 'string' ? {item:r,reason:'',query:r} : r),
-      shopQueries: (p.purchaseRecs||[]).map(r => (r.query||r.item||r)).filter(Boolean),
-      notes:'', timesWorn:0,
-      battleId, battlePartnerId: partnerId,
-      battleLabel: p.label||'', battleWon: won,
-      battleVerdict: bd.verdict||'',
-    };
-  }
-
-  const entry1 = makeEntry(bd.person1, id1, id2, bd.winner === 1);
-  const entry2 = makeEntry(bd.person2, id2, id1, bd.winner === 2);
-
-  try {
-    // Run tagging + shopping in parallel for both entries
-    const [tag1, tag2, shop1, shop2] = await Promise.all([
-      tagOccasion(''), tagOccasion(''),
-      fetchShopResults(entry1.shopQueries),
-      fetchShopResults(entry2.shopQueries),
-    ]);
-    if (shop1?.length) entry1.shopResults = shop1;
-    if (shop2?.length) entry2.shopResults = shop2;
-
-    await Promise.all([DB.entries.put(entry1), DB.entries.put(entry2)]);
-    // Update in-memory — both are new entries, add to front
-    S.entries.unshift(entry2, entry1);
-    S.selectedId = entry1.id;
-    S.battleDraft = null;
-    clearPending();
-    Object.assign(S, { loading:false }); navigate('detail');
-    toast('⚔️ Battle saved! Both outfits are in your Closet.');
-  } catch(err) {
-    Object.assign(S, { loading:false, error:err.message }); render();
-  }
+  const battle = {
+    id: uid(),
+    createdAt: new Date().toISOString(),
+    photo: bd.photo,
+    person1: { label: bd.person1.label||'', rating: bd.person1.rating||7, ratingNote: bd.person1.ratingNote||'', items: bd.person1.items||[] },
+    person2: { label: bd.person2.label||'', rating: bd.person2.rating||7, ratingNote: bd.person2.ratingNote||'', items: bd.person2.items||[] },
+    winner: bd.winner,
+    verdict: bd.verdict||'',
+  };
+  S.savedBattles = [battle, ...S.savedBattles].slice(0, 200);
+  localStorage.setItem('closet-battles', JSON.stringify(S.savedBattles));
+  S.battleDraft = null;
+  clearPending();
+  toast('⚔️ Battle saved!');
+  navigate('fun');
 }
 
 /* ================================================================
