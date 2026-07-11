@@ -2975,6 +2975,7 @@ const S = {
   savedTripPlans: JSON.parse(localStorage.getItem('closet-trip-plans') || '[]'), // [{id, destination, days, suggestions, gaps, createdAt}] — saved day-by-day wardrobe plans, condensed by default
   savedBattles: JSON.parse(localStorage.getItem('closet-battles') || '[]'), // [{id, createdAt, photo, person1, person2, winner, verdict}]
   _replayBattleId: null, // ID into savedBattles for battle-replay view
+  _namingEntryId: null, // entry currently getting an AI-generated name
   _openTripPlanId: null, // which saved trip plan card is expanded (condensed list otherwise)
   returnItems: JSON.parse(localStorage.getItem('closet-return-items') || '[]'),   // [{id,photo,store,channel,deadline,notes,createdAt}]
   _returnForm: null, // active return form state
@@ -2994,6 +2995,7 @@ const S = {
   _dressMeVibeFilter: 'all',    // vibe chip filter for saved looks on the Dress Me page
   savedOutfitBuilds: JSON.parse(localStorage.getItem('closet-outfit-builds') || '[]'), // [{id,wardrobeId,wardrobeName,occasion,result,createdAt}]
   _openOutfitBuildId: null,     // which saved outfit build is expanded on Plan page
+  _outfitBuildSaved: false,     // true right after save — shows ✓ state on button
   savedRouletteLooks: JSON.parse(localStorage.getItem('closet-roulette-looks') || '[]'), // [{id,vibe,hype,outfit,createdAt}]
   _openRouletteLookId: null,    // which saved roulette look is expanded on Plan page
   _suggestionLog: JSON.parse(localStorage.getItem('closet-suggestion-log') || '[]'), // [{id,source,title,hype,items,createdAt,savedId}] auto-logged every generation
@@ -4032,31 +4034,26 @@ function openSuggestionFeedback(source) {
 }
 function closeSuggestionFeedback() { S._fbSheet = null; render(); }
 function setFeedbackRating(r) { if (S._fbSheet) { S._fbSheet.rating = S._fbSheet.rating === r ? null : r; render(); } }
-async function submitSuggestionFeedback() {
+function submitSuggestionFeedback() {
   const fb = S._fbSheet;
-  if (!fb || S._fbSending) return;
-  if (!fb.rating && !(S._fbText || '').trim()) { toast('Pick a rating or write a note first'); return; }
-  S._fbSending = true; render();
-  try {
-    await firestore.collection('feedback').add({
-      source: fb.source,
-      rating: fb.rating || null,
-      note: (S._fbText || '').trim() || null,
-      suggestion: fb.payload || null,
-      styleGoals: S.styleGoals || [],
-      build: APP_BUILD,
-      uid: currentUser?.uid || 'anon',
-      createdAt: new Date().toISOString(),
-    });
-    S._fbSheet = null; S._fbSending = false;
-    toast('Feedback sent — thank you! 💛');
-    render();
-  } catch (e) {
-    console.warn('feedback:', e);
-    S._fbSending = false;
-    toast("Couldn't send — check your connection and try again");
-    render();
-  }
+  if (!fb) return;
+  const note = (S._fbText || '').trim();
+  if (!fb.rating && !note) { toast('Pick a rating or write a note first'); return; }
+  const srcLabel = FEEDBACK_SOURCES[fb.source] || fb.source;
+  const items = fb.payload?.items?.length ? fb.payload.items.join(', ') : '';
+  const lines = [
+    'Source: ' + srcLabel,
+    fb.rating ? 'Rating: ' + fb.rating : null,
+    note ? 'Note: ' + note : null,
+    items ? 'Suggestion: ' + items : null,
+    '',
+    '— Sent from Closet App'
+  ].filter(l => l !== null).join('\n');
+  const mailtoUrl = 'mailto:helloclosetapp@gmail.com?subject=' + encodeURIComponent('Closet Feedback — ' + srcLabel) + '&body=' + encodeURIComponent(lines);
+  window.open(mailtoUrl);
+  S._fbSheet = null;
+  toast('Opening mail app — thank you! 💛');
+  render();
 }
 function feedbackSheetHTML() {
   const fb = S._fbSheet;
@@ -4071,7 +4068,7 @@ function feedbackSheetHTML() {
   </button>`;
   return `<div onclick="closeSuggestionFeedback()" ontouchend="if(_touchMoved)return;event.preventDefault();closeSuggestionFeedback()"
     style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);">
-    <div onclick="event.stopPropagation()" ontouchend="event.stopPropagation()"
+    <div id="fb-panel" onclick="event.stopPropagation()" ontouchend="event.stopPropagation()"
       style="width:100%;background:var(--surface);border-radius:24px 24px 0 0;padding:14px 20px calc(20px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 40px rgba(0,0,0,0.2);animation:slideUp .28s cubic-bezier(.22,.68,0,1.2);">
       <div style="width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 16px;"></div>
       <div style="font-size:17px;font-weight:900;color:var(--text);text-align:center;margin-bottom:4px;">How was this suggestion?</div>
@@ -4082,12 +4079,14 @@ function feedbackSheetHTML() {
         ${ratingBtn('off',  '🙅', 'Way off')}
       </div>
       <textarea id="fb-note" rows="3" maxlength="500"
-        placeholder="What worked or didn't? (optional — goes straight to the developer)"
+        placeholder="What worked or didn't? (optional)"
         oninput="S._fbText=this.value"
+        onfocus="(function(ta){if(!window.visualViewport)return;function reposition(){var p=document.getElementById('fb-panel');if(!p)return;var kh=Math.max(0,window.innerHeight-window.visualViewport.height-window.visualViewport.offsetTop);p.style.transform=kh>50?'translateY(-'+kh+'px)':'';p.style.transition='transform .22s ease';}ta._vvFix=reposition;window.visualViewport.addEventListener('resize',reposition);window.visualViewport.addEventListener('scroll',reposition);reposition();})(this)"
+        onblur="(function(ta){if(ta._vvFix&&window.visualViewport){window.visualViewport.removeEventListener('resize',ta._vvFix);window.visualViewport.removeEventListener('scroll',ta._vvFix);}var p=document.getElementById('fb-panel');if(p){p.style.transform='';p.style.transition='transform .22s ease';}})(this)"
         style="width:100%;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);resize:none;font-family:inherit;line-height:1.5;outline:none;margin-bottom:12px;">${esc(S._fbText||'')}</textarea>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();submitSuggestionFeedback();" onclick="submitSuggestionFeedback()"
-        style="width:100%;padding:14px;background:${S._fbSending?'var(--border)':'var(--gold)'};color:#fff;border:none;border-radius:100px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;" ${S._fbSending?'disabled':''}>
-        ${S._fbSending ? 'Sending…' : '📨 Send to the Developer'}
+        style="width:100%;padding:14px;background:var(--gold);color:#fff;border:none;border-radius:100px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+        📨 Send Feedback
       </button>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();closeSuggestionFeedback();" onclick="closeSuggestionFeedback()"
         style="width:100%;padding:12px;background:none;border:none;font-size:14px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-top:2px;">Cancel</button>
@@ -4377,6 +4376,28 @@ async function initNewsFlash() {
 /* ================================================================
    WEATHER PIN
    ================================================================ */
+async function loadBattlePhotos() {
+  if (!S.savedBattles.length) return;
+  let needsResave = false;
+  await Promise.all(S.savedBattles.map(async b => {
+    if (b.photo && b.photo.startsWith('data:')) {
+      // Old format: photo was embedded in localStorage — migrate it to PhotoDB now
+      try { await PhotoDB.put('battle-photo-' + b.id, b.photo); } catch(e) { console.warn('battle photo migrate', e); }
+      needsResave = true;
+    } else if (!b.photo) {
+      // New format: pull photo from PhotoDB
+      const p = await PhotoDB.get('battle-photo-' + b.id);
+      if (p) b.photo = p;
+    }
+  }));
+  if (needsResave) {
+    // Resave localStorage without embedded photos now that they're in PhotoDB
+    const slim = S.savedBattles.map(({photo, ...rest}) => rest);
+    try { localStorage.setItem('closet-battles', JSON.stringify(slim)); } catch(e) {}
+  }
+  render(); // photos are now populated — refresh carousel / replay views
+}
+
 async function initWeatherPin() {
   // Use cached pin if <90 minutes old
   const cached = JSON.parse(localStorage.getItem('closet-weather-pin') || 'null');
@@ -5818,16 +5839,25 @@ function viewOutfitBuilder() {
 
       <!-- Save + Rebuild buttons -->
       <div style="padding:16px 20px 0;display:flex;flex-direction:column;gap:10px;">
-        <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();saveOutfitBuild()"
-          onclick="saveOutfitBuild()"
-          style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
-            border:none;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);
-            color:#fff;font-size:14px;font-weight:800;
-            display:flex;align-items:center;justify-content:center;gap:8px;
-            box-shadow:0 3px 16px rgba(108,62,191,0.32);touch-action:manipulation;">
-          💜 Save to Plan
-        </button>
+        ${S._outfitBuildSaved
+          ? `<button disabled
+              style="width:100%;padding:14px;border-radius:var(--r);cursor:default;font-family:inherit;
+                border:none;background:linear-gradient(135deg,#2a7a4a,#3aaa6a);
+                color:#fff;font-size:14px;font-weight:800;
+                display:flex;align-items:center;justify-content:center;gap:8px;
+                box-shadow:0 3px 16px rgba(42,122,74,0.32);opacity:1;">
+              ✓ Saved to Plan!
+            </button>`
+          : `<button
+              ontouchend="if(_touchMoved)return;event.preventDefault();saveOutfitBuild()"
+              onclick="saveOutfitBuild()"
+              style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
+                border:none;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);
+                color:#fff;font-size:14px;font-weight:800;
+                display:flex;align-items:center;justify-content:center;gap:8px;
+                box-shadow:0 3px 16px rgba(108,62,191,0.32);touch-action:manipulation;">
+              💜 Save to Plan
+            </button>`}
         <button
           ontouchend="if(_touchMoved)return;event.preventDefault();doOutfitBuild()"
           onclick="doOutfitBuild()"
@@ -5925,6 +5955,7 @@ async function doOutfitBuild() {
   if (!pool.length) { toast('Add more pieces to your wardrobe first!'); return; }
 
   S.outfitBuilder.loading = true;
+  S._outfitBuildSaved = false;
   render();
 
   try {
@@ -6023,6 +6054,7 @@ function saveOutfitBuild() {
   };
   S.savedOutfitBuilds = [entry, ...S.savedOutfitBuilds].slice(0, 200);
   localStorage.setItem('closet-outfit-builds', JSON.stringify(S.savedOutfitBuilds));
+  S._outfitBuildSaved = true;
   toast('💜 Saved to Plan!');
   render();
 }
@@ -6030,6 +6062,7 @@ function deleteOutfitBuild(id) {
   S.savedOutfitBuilds = S.savedOutfitBuilds.filter(b => b.id !== id);
   localStorage.setItem('closet-outfit-builds', JSON.stringify(S.savedOutfitBuilds));
   if (S._openOutfitBuildId === id) S._openOutfitBuildId = null;
+  toast('Outfit removed');
   render();
 }
 
@@ -7024,6 +7057,62 @@ function closeSellDraft() {
   render();
 }
 
+async function generateOutfitName(entryId) {
+  const entry = S.entries.find(e => e.id === entryId);
+  if (!entry) return;
+  S._namingEntryId = entryId;
+  render();
+
+  const itemList = (entry.items || []).map(it => it.name || '').filter(Boolean).join(', ') || 'unknown items';
+  const tag = entry.occasionTag || '';
+  const rating = entry.rating || '';
+  const note = entry.ratingNote ? `"${entry.ratingNote}"` : '';
+  const vibe = entry.dressMeVibe ? `Existing vibe: ${entry.dressMeVibe}` : '';
+
+  const prompt = `You are a fashion stylist who gives outfits short, catchy names — like album titles or cocktail names.
+Generate ONE short name (2–4 words, no quotes) for this outfit:
+Items: ${itemList}
+${tag ? 'Occasion: ' + tag : ''}
+${rating ? 'Rating: ' + rating + '/10' : ''}
+${note ? 'Notes: ' + note : ''}
+${vibe}
+
+Rules:
+- 2 to 4 words max
+- Evocative and stylish, not literal
+- No brand names
+- Examples: "Golden Hour Edit", "Sunday Soft Launch", "Coastal Boardroom", "Midnight Errands", "Quiet Luxury Friday"
+Return only the name, nothing else.`;
+
+  try {
+    const key = S.apiKey;
+    if (!key) { toast('Add your API key in Settings first'); S._namingEntryId = null; render(); return; }
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 30,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const raw = data?.content?.[0]?.text?.trim() || '';
+    const name = raw.replace(/^["']|["']$/g, '').trim();
+    if (name) {
+      entry.outfitName = name;
+      await DB.entries.put(entry);
+    }
+  } catch(e) { console.error('generateOutfitName', e); toast('Couldn\'t generate name'); }
+  S._namingEntryId = null;
+  render();
+}
+
 async function generateSellDraft(wardrobeId) {
   const w = S.wardrobe.find(i => i.id === wardrobeId);
   if (!w) return;
@@ -7716,7 +7805,9 @@ function viewFun() {
                     const medal = tie ? '🤝' : won ? '🏆' : '🥈';
                     return `<div ontouchend="if(_touchMoved)return;event.preventDefault();S._replayBattleId='${b.id}';navigate('battle-replay')" onclick="S._replayBattleId='${b.id}';navigate('battle-replay')"
                       style="flex-shrink:0;width:58px;cursor:pointer;position:relative;touch-action:manipulation;">
-                      <img src="${esc(b.photo)}" style="width:58px;height:78px;object-fit:cover;object-position:top;border-radius:8px;display:block;border:2px solid ${borderCol};">
+                      ${b.photo
+                        ? `<img src="${esc(photoBlobUrl(b.photo))}" style="width:58px;height:78px;object-fit:cover;object-position:top;border-radius:8px;display:block;border:2px solid ${borderCol};">`
+                        : `<div style="width:58px;height:78px;border-radius:8px;background:rgba(255,255,255,.08);border:2px solid ${borderCol};display:flex;align-items:center;justify-content:center;font-size:22px;">⚔️</div>`}
                       <div style="position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:12px;">${medal}</div>
                     </div>`;
                   }).join('')}
@@ -15974,6 +16065,7 @@ async function rateModeCommit(dir) {
 }
 
 // ── Rate Mode — Share to Instagram Stories ────────────────────────────────────
+// Returns the y position after the last line drawn
 function _wrapCanvasText(ctx, text, x, y, maxW, lineH) {
   const words = (text||'').split(' ');
   let line = '';
@@ -15985,6 +16077,7 @@ function _wrapCanvasText(ctx, text, x, y, maxW, lineH) {
     } else { line = test; }
   }
   if (line) ctx.fillText(line, x, y);
+  return y; // bottom of last line
 }
 
 async function shareRateModeCard(wId) {
@@ -16034,7 +16127,8 @@ async function shareRateModeCard(wId) {
   ctx.fillStyle = '#111111';
   ctx.fillRect(0, photoH, W, H - photoH);
 
-  const panelTop = photoH + 60; // start of text area
+  const MARGIN = 72;
+  let y = photoH + 56; // flowing y cursor — starts just below photo
 
   // Category / occasion pill
   const categoryLabel = (w.category || w.subcategory || '').toUpperCase();
@@ -16042,9 +16136,8 @@ async function shareRateModeCard(wId) {
     const pillPad = 28, pillH = 56, pillR = 28;
     ctx.font = '700 30px -apple-system, "Helvetica Neue", sans-serif';
     const pillW = ctx.measureText(categoryLabel).width + pillPad * 2;
-    const pillX = 72, pillY = panelTop;
+    const pillX = MARGIN, pillY = y;
     ctx.fillStyle = 'rgba(255,255,255,0.10)';
-    // Rounded rect
     ctx.beginPath();
     ctx.moveTo(pillX + pillR, pillY);
     ctx.lineTo(pillX + pillW - pillR, pillY);
@@ -16059,28 +16152,34 @@ async function shareRateModeCard(wId) {
     ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.fillText(categoryLabel, pillX + pillPad, pillY + 38);
+    y += pillH + 36; // pill height + gap below
+  } else {
+    y += 20;
   }
 
-  // Item name
-  const nameY = panelTop + (categoryLabel ? 120 : 40);
+  // Item name — track where text ends
+  const nameFontSize = (w.name||'').length > 22 ? 74 : 88;
+  const nameLineH = nameFontSize + 20;
   ctx.fillStyle = '#ffffff';
-  ctx.font = `800 ${(w.name||'').length > 22 ? 74 : 88}px -apple-system, "Helvetica Neue", sans-serif`;
-  _wrapCanvasText(ctx, w.name || '', 72, nameY, W - 144, 106);
+  ctx.font = `800 ${nameFontSize}px -apple-system, "Helvetica Neue", sans-serif`;
+  const nameBottomY = _wrapCanvasText(ctx, w.name || '', MARGIN, y + nameFontSize, W - MARGIN * 2, nameLineH);
+  y = nameBottomY + 36; // advance past name
 
   // Brand · size
   const metaParts = [w.brand, w.size].filter(Boolean);
   if (metaParts.length) {
     ctx.fillStyle = 'rgba(255,255,255,0.50)';
-    ctx.font = '400 48px -apple-system, "Helvetica Neue", sans-serif';
-    ctx.fillText(metaParts.join('  ·  '), 72, nameY + ((w.name||'').length > 22 ? 220 : 190));
+    ctx.font = '400 46px -apple-system, "Helvetica Neue", sans-serif';
+    ctx.fillText(metaParts.join('  ·  '), MARGIN, y);
+    y += 64;
   }
 
-  // Stars
+  // Stars — always at least 100px below text, anchored near bottom
   const rating = w.styleRating || 0;
-  const starY = H - 340;
   const starSize = 90;
   const starGap = 14;
   const starsW = 5 * starSize + 4 * starGap;
+  const starY = Math.max(y + 100, H - 320);
   let stx = (W - starsW) / 2;
   for (let i = 1; i <= 5; i++) {
     ctx.font = `${starSize}px serif`;
@@ -16095,7 +16194,7 @@ async function shareRateModeCard(wId) {
     ctx.fillStyle = rating >= 4 ? '#FFD060' : 'rgba(255,255,255,0.60)';
     ctx.font = `${rating >= 4 ? '700' : '500'} 52px -apple-system, "Helvetica Neue", sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(ratingLabel.toUpperCase(), W / 2, starY + 82);
+    ctx.fillText(ratingLabel.toUpperCase(), W / 2, starY + 100);
     ctx.textAlign = 'left';
   }
 
@@ -17636,7 +17735,9 @@ function viewBattleReplay() {
 
 function deleteSavedBattle(id) {
   S.savedBattles = (S.savedBattles||[]).filter(b => b.id !== id);
-  localStorage.setItem('closet-battles', JSON.stringify(S.savedBattles));
+  PhotoDB.del('battle-photo-' + id).catch(e => console.warn('battle photo del', e));
+  const slim = S.savedBattles.map(({photo, ...rest}) => rest);
+  try { localStorage.setItem('closet-battles', JSON.stringify(slim)); } catch(e) {}
   toast('Battle deleted');
   navigate('fun');
 }
@@ -17939,20 +18040,27 @@ async function shareBattleResult({ photo, label1, label2, rating1, rating2, note
 
 function doSaveBattle() {
   const bd = S.battleDraft; if (!bd) return;
+  const id = uid();
+  // Photo goes to PhotoDB (IndexedDB — no quota issues with large images)
+  if (bd.photo) PhotoDB.put('battle-photo-' + id, bd.photo).catch(e => console.warn('battle photo save', e));
   const battle = {
-    id: uid(),
+    id,
     createdAt: new Date().toISOString(),
-    photo: bd.photo,
+    photo: bd.photo, // keep in memory for current session
     person1: { label: bd.person1.label||'', rating: bd.person1.rating||7, ratingNote: bd.person1.ratingNote||'', items: bd.person1.items||[] },
     person2: { label: bd.person2.label||'', rating: bd.person2.rating||7, ratingNote: bd.person2.ratingNote||'', items: bd.person2.items||[] },
     winner: bd.winner,
     verdict: bd.verdict||'',
   };
   S.savedBattles = [battle, ...S.savedBattles].slice(0, 200);
-  localStorage.setItem('closet-battles', JSON.stringify(S.savedBattles));
+  // Persist metadata only (no photo) to localStorage — photos live in PhotoDB
+  const slim = S.savedBattles.map(({photo, ...rest}) => rest);
+  try { localStorage.setItem('closet-battles', JSON.stringify(slim)); } catch(e) { console.warn('battle meta save failed', e); }
   S.battleDraft = null;
+  S.battleMode = false;
   clearPending();
   toast('⚔️ Battle saved!');
+  S.activeTab = 'fun';
   navigate('fun');
 }
 
@@ -18508,6 +18616,22 @@ function viewDetail() {
         <div>
           <div class="detail-date">${fmtDateLong(entry.createdAt)}</div>
           ${entry.claudeRecommended ? `<div style="display:inline-flex;align-items:center;gap:4px;background:var(--gold-bg);color:var(--gold-dk);border-radius:100px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:8px;">✨ Closet's Pick${entry.dressMeVibe ? ' · ' + esc(entry.dressMeVibe) : ''}</div>` : ''}
+          ${(()=>{
+            const naming = S._namingEntryId === entry.id;
+            if (naming) return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+              <div style="font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.3px;opacity:.4;">Naming…</div>
+              <div class="spinner" style="width:16px;height:16px;border-width:2.5px;"></div>
+            </div>`;
+            if (entry.outfitName) return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+              <div style="font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.4px;line-height:1.2;">${esc(entry.outfitName)}</div>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();generateOutfitName('${entry.id}')" onclick="generateOutfitName('${entry.id}')"
+                style="background:none;border:none;font-size:15px;cursor:pointer;padding:2px;touch-action:manipulation;opacity:.55;line-height:1;" title="Regenerate name">✨</button>
+            </div>`;
+            return `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateOutfitName('${entry.id}')" onclick="generateOutfitName('${entry.id}')"
+              style="display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1.5px dashed var(--border);border-radius:100px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:12px;">
+              ✨ Name this outfit
+            </button>`;
+          })()}
           <div ontouchend="if(_touchMoved)return;event.preventDefault();openTagPicker('${entry.id}')" onclick="openTagPicker('${entry.id}')"
             style="display:inline-flex;align-items:center;gap:5px;margin-bottom:8px;cursor:pointer;touch-action:manipulation;">
             ${entry.occasionTag
@@ -21795,7 +21919,7 @@ function viewCompliments() {
     }
   }
   const total = allC.length;
-  const back = S._prevView || 'portfolio';
+  const back = 'profile';
   const relDate = iso => {
     const d = daysSince(iso);
     return d === 0 ? 'today' : d === 1 ? 'yesterday' : d < 7 ? d + 'd ago' : fmtDate(iso);
@@ -21804,7 +21928,7 @@ function viewCompliments() {
   if (!items.length) {
     return `<div class="view view-notab">
       <div class="nav">
-        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Back</button>
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Portfolio</button>
         <span class="nav-title">Compliments</span>
         <span style="width:72px;"></span>
       </div>
@@ -21888,12 +22012,12 @@ function viewValueItems() {
     shareText('My Value Unlocked', lines.join('\n'));
   }
 
-  const back = S._prevView || 'portfolio';
+  const back = 'profile';
 
   if (!items.length) {
     return `<div class="view view-notab">
       <div class="nav">
-        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Back</button>
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Portfolio</button>
         <span class="nav-title">Value Unlocked</span>
         <span style="width:72px;"></span>
       </div>
@@ -21907,7 +22031,7 @@ function viewValueItems() {
 
   return `<div class="view view-notab" style="display:flex;flex-direction:column;">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Back</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Portfolio</button>
       <span class="nav-title">Value Unlocked</span>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();shareValue()" onclick="shareValue()"
         style="background:none;border:none;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:4px 8px;touch-action:manipulation;">↗ Share</button>
@@ -22901,6 +23025,8 @@ auth.onAuthStateChanged(async (user) => {
   initWeatherPin();
   // Migrate any photos still in localStorage → IndexedDB (one-time, silent)
   PhotoDB.migrate();
+  // Load battle photos from IndexedDB (and migrate any still embedded in localStorage)
+  loadBattlePhotos();
   // Word of the Day — show once per calendar day, after a brief settle delay
   setTimeout(() => {
     checkWordOfTheDay();
