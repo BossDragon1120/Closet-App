@@ -2996,6 +2996,8 @@ const S = {
   savedOutfitBuilds: JSON.parse(localStorage.getItem('closet-outfit-builds') || '[]'), // [{id,wardrobeId,wardrobeName,occasion,result,createdAt}]
   _openOutfitBuildId: null,     // which saved outfit build is expanded on Plan page
   _outfitBuildSaved: false,     // true right after save — shows ✓ state on button
+  _estimatingPriceId: null,     // wId currently being price-estimated by AI
+  _bulkEstimateProgress: null,  // null | {current, total} — bulk price estimation in progress
   savedRouletteLooks: JSON.parse(localStorage.getItem('closet-roulette-looks') || '[]'), // [{id,vibe,hype,outfit,createdAt}]
   _openRouletteLookId: null,    // which saved roulette look is expanded on Plan page
   _suggestionLog: JSON.parse(localStorage.getItem('closet-suggestion-log') || '[]'), // [{id,source,title,hype,items,createdAt,savedId}] auto-logged every generation
@@ -5908,9 +5910,9 @@ function viewOutfitBuilder() {
       <div style="display:flex;flex-wrap:wrap;gap:7px;">
         ${occasions.map(occ => {
           const active = ob.occasion === occ;
-          const occEsc = (active ? '' : occ).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          const newOcc = active ? '' : occ;
+          const occEsc = newOcc.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
           return `<button
-            ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder.occasion='${occEsc}';render()"
             onclick="S.outfitBuilder.occasion='${occEsc}';render()"
             style="padding:8px 16px;border-radius:100px;border:1.5px solid ${active ? 'rgba(108,62,191,0.7)' : 'var(--border)'};background:${active ? 'rgba(108,62,191,0.1)' : 'var(--surface)'};color:${active ? '#6C3EBF' : 'var(--text-2)'};font-size:13px;font-weight:${active ? '700' : '500'};cursor:pointer;font-family:inherit;touch-action:manipulation;">
             ${occ}
@@ -13644,7 +13646,8 @@ function viewDashboard() {
   `;
 
   // ── Section: Money Moves ─────────────────────────────────────
-  const hasMoneyData = closetValue > 0 || wastedTotal > 0 || saleItems.length > 0;
+  const unpricedCount = S.wardrobe.filter(w => !w.price && !w.gifted && !w.retiredFromCloset && w.name).length;
+  const hasMoneyData = closetValue > 0 || wastedTotal > 0 || saleItems.length > 0 || (unpricedCount > 0 && S.apiKey);
   const moneySection = hasMoneyData ? `
     ${secHead('💰 Money Moves')}
     ${twoCol(
@@ -13664,6 +13667,23 @@ function viewDashboard() {
           <div style="font-size:11px;color:#15803D;margin-top:1px;">Saved $${Math.max(0,parseFloat(bestDeal.originalPrice)-parseFloat(bestDeal.price)).toFixed(0)} · ${Math.round((1-parseFloat(bestDeal.price)/parseFloat(bestDeal.originalPrice))*100)}% off retail</div>
         </div>
       </div></div>` : ''}
+    ${unpricedCount > 0 && S.apiKey ? `
+    <div style="border:1px solid rgba(108,62,191,0.22);border-radius:var(--r-sm);padding:12px 14px;display:flex;align-items:center;gap:10px;background:rgba(108,62,191,0.04);margin-top:4px;">
+      <div style="flex:1;min-width:0;">
+        ${S._bulkEstimateProgress
+          ? `<div style="font-size:13px;font-weight:700;color:#8B6BBF;">Estimating ${S._bulkEstimateProgress.current} of ${S._bulkEstimateProgress.total}…</div>
+             <div style="margin-top:7px;background:rgba(108,62,191,0.15);border-radius:100px;height:4px;overflow:hidden;">
+               <div style="height:4px;background:#8B6BBF;border-radius:100px;width:${Math.round(S._bulkEstimateProgress.current/S._bulkEstimateProgress.total*100)}%;transition:width .3s;"></div>
+             </div>`
+          : `<div style="font-size:12px;font-weight:700;color:#8B6BBF;">${unpricedCount} item${unpricedCount===1?'':'s'} missing a price</div>
+             <div style="font-size:11px;color:var(--text-3);margin-top:2px;">AI can estimate from name, brand &amp; category</div>`}
+      </div>
+      ${!S._bulkEstimateProgress ? `<button
+        onclick="bulkEstimateItemPrices()"
+        style="flex-shrink:0;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;color:#fff;border-radius:100px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
+        ✨ Estimate all
+      </button>` : ''}
+    </div>` : ''}
   ` : '';
 
   // ── Section: Other ───────────────────────────────────────────
@@ -16773,6 +16793,123 @@ function viewWardrobeItem() {
   // Acquisition mode
   const acqMode = w.gifted ? 'gifted' : w.onSale === true ? 'sale' : w.onSale === false ? 'full' : null;
 
+  // New-piece mode: item has no name yet (just added) or still has AI pending flag
+  const isNewPiece = w._aiPending || !w.name;
+
+  // ── AI Fill Banner (used in two positions depending on isNewPiece) ───────────
+  const aiFillHtml = (w._aiPending || (!w.name && w.photo && S.apiKey)) ? (() => {
+    const isLoading = S._aiItemFillLoading === w.id;
+    return `<div style="margin:0 16px 16px;padding:14px 16px;background:linear-gradient(135deg,rgba(108,62,191,0.15),rgba(155,95,224,0.1));border:1.5px solid rgba(108,62,191,0.35);border-radius:var(--r);display:flex;align-items:center;gap:12px;">
+      <div style="font-size:28px;flex-shrink:0;">${isLoading ? '⏳' : '✨'}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${isLoading ? 'Analyzing your photo…' : 'Use AI to fill in details'}</div>
+        <div style="font-size:11.5px;color:var(--text-3);line-height:1.4;">${isLoading ? 'Closet is identifying the name, category, color, and description.' : 'Closet will identify the name, category, color, and description from your photo.'}</div>
+      </div>
+      ${!isLoading ? `<button
+        ontouchend="if(_touchMoved)return;event.preventDefault();fillItemDetailsWithAI('${w.id}')"
+        onclick="fillItemDetailsWithAI('${w.id}')"
+        style="flex-shrink:0;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;color:#fff;border-radius:100px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
+        Fill In
+      </button>` : ''}
+    </div>`;
+  })() : '';
+
+  // ── Edit Details section (used in two positions depending on isNewPiece) ─────
+  const editDetailsHtml = (() => {
+    const scanRes = S._colorScanResult?.wardrobeId === w.id ? S._colorScanResult : null;
+    const autoDetect = !w.color && !scanRes ? _detectColorFromItem(w) : null;
+    const swatchHex = w.color ? (colorFromItemName(w.color) || '#ccc') : '#ccc';
+    return `
+    <!-- ── EDIT DETAILS ── -->
+    <div id="witem-edit-section" style="padding:0 20px 8px;display:flex;align-items:center;gap:10px;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">✏️ Edit Details</div>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+
+    <div style="padding:0 20px;display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
+      <div>
+        <label class="form-label">Name</label>
+        <input class="form-input" id="witemName" type="text" placeholder="Item name"
+          value="${esc(w.name)}" onchange="updateWardrobeName('${w.id}',this.value)"
+          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+      </div>
+      <div>
+        <label class="form-label">Brand</label>
+        <input class="form-input" id="witemBrand" type="text" placeholder="e.g. Zara, Madewell (optional)"
+          value="${esc(w.brand||'')}" onchange="updateWardrobeBrand('${w.id}',this.value)"
+          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label class="form-label" style="margin-bottom:0;">Colour</label>
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();scanFabricColor('${w.id}');"
+            onclick="scanFabricColor('${w.id}')"
+            style="display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:5px 11px;font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            🎨 Scan fabric
+          </button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${w.color ? `<div style="width:22px;height:22px;border-radius:50%;background:${swatchHex};border:1.5px solid rgba(0,0,0,.08);flex-shrink:0;"></div>` : ''}
+          <input class="form-input" id="witemColor" type="text" placeholder="e.g. navy, cream, burgundy"
+            value="${esc(w.color||'')}" onchange="updateWardrobeColor('${w.id}',this.value)"
+            enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+            style="flex:1;margin-bottom:0;">
+        </div>
+        ${autoDetect ? `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:7px;padding:8px 10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
+          <div style="width:18px;height:18px;border-radius:50%;background:${autoDetect.hex};border:1px solid rgba(0,0,0,.1);flex-shrink:0;"></div>
+          <span style="font-size:12px;color:var(--text-2);flex:1;">Detected: <strong>${autoDetect.name}</strong></span>
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();updateWardrobeColor('${w.id}','${autoDetect.name}');render();"
+            onclick="updateWardrobeColor('${w.id}','${autoDetect.name}');render()"
+            style="font-size:11px;font-weight:700;color:var(--gold-dk);background:none;border:none;cursor:pointer;font-family:inherit;padding:2px 4px;touch-action:manipulation;white-space:nowrap;">Use ✓</button>
+        </div>` : ''}
+        ${scanRes ? `
+        <div style="display:flex;align-items:center;gap:10px;margin-top:7px;padding:10px 12px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:10px;">
+          <div style="width:32px;height:32px;border-radius:8px;background:${scanRes.hex};border:1.5px solid rgba(0,0,0,.12);flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.15);"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1px;">Scan result</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);">${scanRes.name}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();applyScannedColor('${w.id}');"
+              onclick="applyScannedColor('${w.id}')"
+              style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">Use</button>
+            <button
+              ontouchend="if(_touchMoved)return;event.preventDefault();S._colorScanResult=null;render();"
+              onclick="S._colorScanResult=null;render()"
+              style="background:none;color:var(--text-3);border:1px solid var(--border);border-radius:100px;padding:7px 10px;font-size:12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕</button>
+          </div>
+        </div>` : ''}
+      </div>
+      <div>
+        <label class="form-label">Category</label>
+        <select class="form-input" onchange="updateWardrobeCategory('${w.id}',this.value)">
+          ${getAllCategories().filter(c=>c!=='All').map(c=>`<option value="${c}" ${(w.category||'Other')===c?'selected':''}>${c==='Pants'?'Bottoms':c}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Size</label>
+        <input class="form-input" id="witemSize" type="text" placeholder="e.g. XS, 8, 27, EU 38 (optional)"
+          value="${esc(w.size||'')}" onchange="updateWardrobeSize('${w.id}',this.value)"
+          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label class="form-label" style="margin:0;">Description</label>
+          ${S.apiKey ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateWardrobeItemDescription('${w.id}')" onclick="generateWardrobeItemDescription('${w.id}')"
+            style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
+            ${S._genDescLoading===w.id ? '⏳ Generating…' : '✨ Generate'}
+          </button>` : ''}
+        </div>
+        <textarea class="form-textarea" style="min-height:56px;margin:0;" placeholder="Colour, material, style notes…"
+          onchange="updateWardrobeDescription('${w.id}',this.value)">${esc(w.description||'')}</textarea>
+      </div>
+    </div>`;
+  })();
+
   return `<div class="view view-notab">
     <div class="nav">
       <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(wardrobeItemBackTarget())" onclick="navigate(wardrobeItemBackTarget())">${iconBack()} ${(()=>{const _bv=wardrobeItemBackTarget();return {profile:'Portfolio',plan:'Plan',shop:'Shop',closet:'Fits',home:'Home',wardrobe:'Wardrobe'}[_bv]||'Back';})()}</button>
@@ -16890,8 +17027,8 @@ function viewWardrobeItem() {
         `;})()}
       </div>
 
-      <!-- Quick wear + stats -->
-      <div style="margin-top:8px;display:flex;flex-direction:column;align-items:center;gap:8px;">
+      <!-- Quick wear + stats (hidden for new pieces) -->
+      ${!isNewPiece ? `<div style="margin-top:8px;display:flex;flex-direction:column;align-items:center;gap:8px;">
         <div style="display:flex;gap:8px;justify-content:center;">
           <button
             ontouchend="if(_touchMoved)return;event.preventDefault();logQuickWear('${w.id}')"
@@ -16907,35 +17044,24 @@ function viewWardrobeItem() {
           </button>
         </div>
         <div style="font-size:12px;color:var(--text-3);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;">
-          <span>${wears} wear${wears===1?'':'s'}${ppw ? ' · $'+ppw+'/wear' : ''}${w.paidOff ? ' · 💚 paid off' : ''}</span>
+          <span>${wears} wear${wears===1?'':'s'}${ppw ? ' · ' + (w.priceIsEstimate ? '~' : '') + '$'+ppw+'/wear' : ''}${w.paidOff ? ' · 💚 paid off' : ''}</span>
           ${complimentCount > 0 ? `<span>· <span style="color:var(--gold-dk);">${complimentCount} compliment${complimentCount===1?'':'s'}</span></span>` : ''}
         </div>
-      </div>
+      </div>` : ''}
     </div>
 
-    <!-- ✨ AI Fill Banner (shown for new photo items) -->
-    ${(w._aiPending || (!w.name && w.photo && S.apiKey)) ? (() => {
-      const isLoading = S._aiItemFillLoading === w.id;
-      return `<div style="margin:0 16px 16px;padding:14px 16px;background:linear-gradient(135deg,rgba(108,62,191,0.15),rgba(155,95,224,0.1));border:1.5px solid rgba(108,62,191,0.35);border-radius:var(--r);display:flex;align-items:center;gap:12px;">
-        <div style="font-size:28px;flex-shrink:0;">${isLoading ? '⏳' : '✨'}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">${isLoading ? 'Analyzing your photo…' : 'Use AI to fill in details'}</div>
-          <div style="font-size:11.5px;color:var(--text-3);line-height:1.4;">${isLoading ? 'Closet is identifying the name, category, color, and description.' : 'Closet will identify the name, category, color, and description from your photo.'}</div>
-        </div>
-        ${!isLoading ? `<button
-          ontouchend="if(_touchMoved)return;event.preventDefault();fillItemDetailsWithAI('${w.id}')"
-          onclick="fillItemDetailsWithAI('${w.id}')"
-          style="flex-shrink:0;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;color:#fff;border-radius:100px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">
-          Fill In
-        </button>` : ''}
-      </div>`;
-    })() : ''}
+    <!-- New piece: AI fill + Edit details at top -->
+    ${isNewPiece ? aiFillHtml : ''}
+    ${isNewPiece ? editDetailsHtml : ''}
 
-    <!-- ✨ Build an Outfit Around This -->
-    <div style="padding:0 20px;margin-bottom:20px;">
+    <!-- Existing piece: AI fill banner in original position -->
+    ${!isNewPiece ? aiFillHtml : ''}
+
+    <!-- ✨ Build an Outfit Around This (hidden for new pieces) -->
+    ${!isNewPiece ? `<div style="padding:0 20px;margin-bottom:${(()=>{ const _b = S.savedOutfitBuilds.filter(b=>b.wardrobeId===w.id); return _b.length ? '12' : '20'; })()}px;">
       <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};navigate('outfit-builder')"
-        onclick="S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};navigate('outfit-builder')"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};S._outfitBuildSaved=false;navigate('outfit-builder')"
+        onclick="S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};S._outfitBuildSaved=false;navigate('outfit-builder')"
         style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
           border:none;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);
           color:#fff;font-size:14px;font-weight:700;
@@ -16944,8 +17070,31 @@ function viewWardrobeItem() {
         ✨ Build an Outfit Around This
       </button>
     </div>
-
+    <!-- Saved builds for this item -->
     ${(()=>{
+      const builds = S.savedOutfitBuilds.filter(b => b.wardrobeId === w.id);
+      if (!builds.length) return '';
+      return `<div style="padding:0 20px;margin-bottom:20px;">
+        ${builds.map(b => {
+          const picks = (b.result?.picks || []).slice(0, 3);
+          const label = b.result?.occasion || b.occasion || 'Outfit';
+          const note = b.result?.stylistNote || '';
+          return `<div
+            ontouchend="if(_touchMoved)return;event.preventDefault();S._savedLookView={type:'builder',id:'${b.id}',from:'wardrobe-item'};navigate('saved-look')"
+            onclick="S._savedLookView={type:'builder',id:'${b.id}',from:'wardrobe-item'};navigate('saved-look')"
+            style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1.5px solid rgba(108,62,191,0.2);border-radius:var(--r-sm);margin-bottom:8px;cursor:pointer;touch-action:manipulation;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:800;color:#6C3EBF;margin-bottom:3px;">${esc(label)}</div>
+              ${note ? `<div style="font-size:11px;color:var(--text-3);line-height:1.4;margin-bottom:4px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${esc(note)}</div>` : ''}
+              <div style="font-size:11px;color:var(--text-2);">${picks.map(p=>esc(p.name)).join(' · ')}</div>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(108,62,191,0.5)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>`;
+        }).join('')}
+      </div>`;
+    })()}` : ''}
+
+    ${!isNewPiece ? (()=>{
       // ── Outfit linker ──────────────────────────────────────
       const ol = S.outfitLinker?.mode === 'from-wardrobe' && S.outfitLinker?.wardrobeId === w.id ? S.outfitLinker : null;
       if (ol) {
@@ -17004,7 +17153,7 @@ function viewWardrobeItem() {
             No outfits linked yet — tap <b>Link outfits</b> to connect this piece to existing photos.
           </div>
         </div>`;
-    })()}
+    })() : ''}
 
     <!-- ── Item Status ── -->
     <div style="padding:0 20px 8px;display:flex;align-items:center;gap:10px;">
@@ -17125,9 +17274,26 @@ function viewWardrobeItem() {
           <div class="price-wrap">
             <input class="form-input" id="witemPrice" type="number" min="0" step="0.01"
               placeholder="0.00" value="${w.price||''}"
-              oninput="(function(v){const _w=S.wardrobe.find(i=>i.id==='${w.id}');if(_w)_w.price=parseFloat(v)||null;})(this.value)"
+              style="${w.priceIsEstimate ? 'color:var(--text-3);font-style:italic;' : ''}"
+              oninput="(function(v){const _w=S.wardrobe.find(i=>i.id==='${w.id}');if(_w){_w.price=parseFloat(v)||null;_w.priceIsEstimate=false;}})(this.value)"
               onchange="updateWardrobePrice('${w.id}',this.value)">
           </div>
+          ${w.priceIsEstimate
+            ? `<div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+                <span style="font-size:11px;background:rgba(108,62,191,0.1);border:1px solid rgba(108,62,191,0.25);border-radius:100px;padding:2px 8px;color:#8B6BBF;font-weight:700;flex-shrink:0;">~ AI estimate</span>
+                <span style="font-size:11px;color:var(--text-3);">Edit above to set your actual price</span>
+               </div>`
+            : (!w.price && S.apiKey)
+              ? `<div style="margin-top:7px;">
+                  ${S._estimatingPriceId === w.id
+                    ? `<span style="font-size:12px;color:var(--text-3);font-style:italic;">✨ Estimating…</span>`
+                    : `<button
+                        onclick="estimateItemPrice('${w.id}')"
+                        style="background:none;border:1px solid rgba(108,62,191,0.3);border-radius:100px;padding:5px 12px;font-size:12px;font-weight:600;color:#8B6BBF;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                        ✨ Estimate with AI
+                       </button>`}
+                 </div>`
+              : ''}
           ${acqMode==='sale' ? `
           <div style="margin-top:10px;">
             <div style="font-size:11px;font-weight:700;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;">Original Price (optional)</div>
@@ -17161,102 +17327,10 @@ function viewWardrobeItem() {
       </div>
     </div>
 
-    <!-- ── EDIT DETAILS ── -->
-    <div id="witem-edit-section" style="padding:0 20px 8px;display:flex;align-items:center;gap:10px;">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">✏️ Edit Details</div>
-      <div style="flex:1;height:1px;background:var(--border);"></div>
-    </div>
+    <!-- Edit Details: shown here only for existing items; new pieces get it above -->
+    ${!isNewPiece ? editDetailsHtml : ''}
 
-    <div style="padding:0 20px;display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
-      <div>
-        <label class="form-label">Name</label>
-        <input class="form-input" id="witemName" type="text" placeholder="Item name"
-          value="${esc(w.name)}" onchange="updateWardrobeName('${w.id}',this.value)"
-          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-      </div>
-      <div>
-        <label class="form-label">Brand</label>
-        <input class="form-input" id="witemBrand" type="text" placeholder="e.g. Zara, Madewell (optional)"
-          value="${esc(w.brand||'')}" onchange="updateWardrobeBrand('${w.id}',this.value)"
-          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-      </div>
-      <div>
-        ${(() => {
-          const scanRes = S._colorScanResult?.wardrobeId === w.id ? S._colorScanResult : null;
-          const autoDetect = !w.color && !scanRes ? _detectColorFromItem(w) : null;
-          const swatchHex = w.color ? (colorFromItemName(w.color) || '#ccc') : '#ccc';
-          return `
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <label class="form-label" style="margin-bottom:0;">Colour</label>
-          <button
-            ontouchend="if(_touchMoved)return;event.preventDefault();scanFabricColor('${w.id}');"
-            onclick="scanFabricColor('${w.id}')"
-            style="display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:5px 11px;font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-            🎨 Scan fabric
-          </button>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          ${w.color ? `<div style="width:22px;height:22px;border-radius:50%;background:${swatchHex};border:1.5px solid rgba(0,0,0,.08);flex-shrink:0;"></div>` : ''}
-          <input class="form-input" id="witemColor" type="text" placeholder="e.g. navy, cream, burgundy"
-            value="${esc(w.color||'')}" onchange="updateWardrobeColor('${w.id}',this.value)"
-            enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
-            style="flex:1;margin-bottom:0;">
-        </div>
-        ${autoDetect ? `
-        <div style="display:flex;align-items:center;gap:8px;margin-top:7px;padding:8px 10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border);">
-          <div style="width:18px;height:18px;border-radius:50%;background:${autoDetect.hex};border:1px solid rgba(0,0,0,.1);flex-shrink:0;"></div>
-          <span style="font-size:12px;color:var(--text-2);flex:1;">Detected: <strong>${autoDetect.name}</strong></span>
-          <button
-            ontouchend="if(_touchMoved)return;event.preventDefault();updateWardrobeColor('${w.id}','${autoDetect.name}');render();"
-            onclick="updateWardrobeColor('${w.id}','${autoDetect.name}');render()"
-            style="font-size:11px;font-weight:700;color:var(--gold-dk);background:none;border:none;cursor:pointer;font-family:inherit;padding:2px 4px;touch-action:manipulation;white-space:nowrap;">Use ✓</button>
-        </div>` : ''}
-        ${scanRes ? `
-        <div style="display:flex;align-items:center;gap:10px;margin-top:7px;padding:10px 12px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:10px;">
-          <div style="width:32px;height:32px;border-radius:8px;background:${scanRes.hex};border:1.5px solid rgba(0,0,0,.12);flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.15);"></div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:11px;font-weight:700;color:var(--gold-dk);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1px;">Scan result</div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);">${scanRes.name}</div>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0;">
-            <button
-              ontouchend="if(_touchMoved)return;event.preventDefault();applyScannedColor('${w.id}');"
-              onclick="applyScannedColor('${w.id}')"
-              style="background:var(--gold);color:#fff;border:none;border-radius:100px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;">Use</button>
-            <button
-              ontouchend="if(_touchMoved)return;event.preventDefault();S._colorScanResult=null;render();"
-              onclick="S._colorScanResult=null;render()"
-              style="background:none;color:var(--text-3);border:1px solid var(--border);border-radius:100px;padding:7px 10px;font-size:12px;cursor:pointer;font-family:inherit;touch-action:manipulation;">✕</button>
-          </div>
-        </div>` : ''}`;
-        })()}
-      </div>
-      <div>
-        <label class="form-label">Category</label>
-        <select class="form-input" onchange="updateWardrobeCategory('${w.id}',this.value)">
-          ${getAllCategories().filter(c=>c!=='All').map(c=>`<option value="${c}" ${(w.category||'Other')===c?'selected':''}>${c==='Pants'?'Bottoms':c}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <label class="form-label">Size</label>
-        <input class="form-input" id="witemSize" type="text" placeholder="e.g. XS, 8, 27, EU 38 (optional)"
-          value="${esc(w.size||'')}" onchange="updateWardrobeSize('${w.id}',this.value)"
-          enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
-      </div>
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <label class="form-label" style="margin:0;">Description</label>
-          ${S.apiKey ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateWardrobeItemDescription('${w.id}')" onclick="generateWardrobeItemDescription('${w.id}')"
-            style="background:none;border:none;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:0;touch-action:manipulation;">
-            ${S._genDescLoading===w.id ? '⏳ Generating…' : '✨ Generate'}
-          </button>` : ''}
-        </div>
-        <textarea class="form-textarea" style="min-height:56px;margin:0;" placeholder="Colour, material, style notes…"
-          onchange="updateWardrobeDescription('${w.id}',this.value)">${esc(w.description||'')}</textarea>
-      </div>
-    </div>
-
-    ${(()=>{
+    ${!isNewPiece ? (()=>{
       // ── Retire section ───────────────────────────────────────
       if (w.retiredFromCloset) {
         const outcomeLabel = {donated:'Donated',sold:'Sold',tossed:'Tossed'}[w.retireOutcome] || 'Retired';
@@ -17363,7 +17437,7 @@ function viewWardrobeItem() {
           <button onclick="S.retireFlow={id:'${w.id}',step:'reason'};render()" style="width:100%;padding:10px 14px;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;text-align:center;">📦 Retire this item…</button>
         </div>
       </div>`;
-    })()}
+    })() : ''}
 
     <div style="height:8px"></div>
   </div>`;
@@ -19754,7 +19828,12 @@ function saveWardrobeItemPhoto(wId) {
   // Update state immediately so photo sticks and Save/Cancel buttons disappear
   w.photo = pending.data;
   S._pendingWitemPhoto = null;
-  render();
+  const isNewPiece = w._aiPending || !w.name;
+  if (isNewPiece) {
+    render(); // stay on item page so user can fill in details
+  } else {
+    navigate(wardrobeItemBackTarget()); // return to wherever they came from
+  }
   toast('📸 Photo saved ✓');
   // Background sync — never blocks UI
   DB.wardrobe.put(w).catch(e => {
@@ -21076,9 +21155,110 @@ async function logQuickWear(id) {
   toast(`Wear logged! ${w.name} — ${w.wears.length} wear${w.wears.length===1?'':'s'} total 👟`);
 }
 
+async function estimateItemPrice(wId) {
+  const w = S.wardrobe.find(i => i.id === wId);
+  if (!w || !S.apiKey) return;
+  S._estimatingPriceId = wId;
+  render();
+  const parts = [
+    w.name        ? `Item name: ${w.name}`        : null,
+    w.brand       ? `Brand: ${w.brand}`            : null,
+    w.category    ? `Category: ${w.category}`      : null,
+    w.color       ? `Color: ${w.color}`            : null,
+    w.description ? `Description: ${w.description}` : null,
+    w.size        ? `Size: ${w.size}`              : null,
+  ].filter(Boolean).join('\n');
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 15,
+        messages: [{ role: 'user', content:
+          `What is the typical retail price in USD for this clothing item? Reply with ONLY a single number (no $ sign, no text, no range — just digits).\n\n${parts}` }],
+      }),
+    });
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text?.trim() || '';
+    const num = parseFloat(raw.replace(/[^\d.]/g, ''));
+    if (num > 0) {
+      w.price = num;
+      w.priceIsEstimate = true;
+      toast(`✨ Estimated ~$${Math.round(num)}`);
+      DB.wardrobe.put(w).catch(e => console.error('estimateItemPrice save:', e));
+    } else {
+      toast('Couldn\'t estimate price for this item');
+    }
+  } catch(e) {
+    console.error('estimateItemPrice:', e);
+    toast('Couldn\'t estimate price — check your API key');
+  }
+  S._estimatingPriceId = null;
+  render();
+}
+
+async function bulkEstimateItemPrices() {
+  if (!S.apiKey) return;
+  const targets = S.wardrobe.filter(w => !w.price && !w.gifted && !w.retiredFromCloset && w.name);
+  if (!targets.length) { toast('All active items already have prices'); return; }
+  S._bulkEstimateProgress = { current: 0, total: targets.length };
+  render();
+  let estimated = 0;
+  for (const w of targets) {
+    S._bulkEstimateProgress.current++;
+    render();
+    const parts = [
+      w.name        ? `Item name: ${w.name}`           : null,
+      w.brand       ? `Brand: ${w.brand}`               : null,
+      w.category    ? `Category: ${w.category}`         : null,
+      w.color       ? `Color: ${w.color}`               : null,
+      w.description ? `Description: ${w.description}`   : null,
+    ].filter(Boolean).join('\n');
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': S.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 15,
+          messages: [{ role: 'user', content:
+            `What is the typical retail price in USD for this clothing item? Reply with ONLY a single number (no $ sign, no text, no range — just digits).\n\n${parts}` }],
+        }),
+      });
+      const data = await resp.json();
+      const raw = data.content?.[0]?.text?.trim() || '';
+      const num = parseFloat(raw.replace(/[^\d.]/g, ''));
+      if (num > 0) {
+        w.price = num;
+        w.priceIsEstimate = true;
+        estimated++;
+        await DB.wardrobe.put(w);
+      }
+    } catch(e) {
+      console.error('bulkEstimateItemPrices:', w.id, e);
+    }
+    await new Promise(r => setTimeout(r, 350)); // gentle pacing
+  }
+  S._bulkEstimateProgress = null;
+  toast(`✨ Estimated prices for ${estimated} item${estimated === 1 ? '' : 's'}!`);
+  render();
+}
+
 async function updateWardrobePrice(id, val) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
   w.price = parseFloat(val)||null;
+  w.priceIsEstimate = false;
   render(); // optimistic
   await DB.wardrobe.put(w);
 }
