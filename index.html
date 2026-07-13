@@ -3048,7 +3048,7 @@ const S = {
   selectedWardrobeId: null,
   // ui
   loading: false, loadingMsg: '', error: null,
-  filter: 'all', wardrobeSort: 'smart', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeRatingFilter: null, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
+  filter: 'all', fitsSort: 'date', wardrobeSort: 'smart', wardrobeCategory: 'All', wardrobeSubCategory: 'All', _wardrobeHeroFilter: false, _wardrobeMaybePileFilter: false, _wardrobeRatingFilter: null, _wardrobeReorderMode: false, _wardrobeCustomOrder: JSON.parse(localStorage.getItem('closet-custom-order') || '{}'),
   closetExpanded: false, shopExpanded: false, shopGiftMode: false, shopSource: 'wishlist', shopSelectedQuery: null, shopRateModeOnly: false, shopWishShareOpen: false, shopWishOccasion: '', _wishShareItems: [], shoeRackLevels: parseInt(localStorage.getItem('closet-shoe-shelves') || '2', 10), bagRackLevels: parseInt(localStorage.getItem('closet-bag-shelves') || '2', 10), accessoryRackLevels: parseInt(localStorage.getItem('closet-acc-shelves') || '1', 10), sweatRackLevels: parseInt(localStorage.getItem('closet-sweat-shelves') || '2', 10), intRackLevels: parseInt(localStorage.getItem('closet-int-shelves') || '2', 10), showIntimatesShelf: localStorage.getItem('closet-int-shelf-visible') === 'true', wardrobeExpanded: false, wardrobeRetiredExpanded: false, _hiddenGemsDismissed: JSON.parse(localStorage.getItem('closet-gems-dismissed') || '[]'),
   dashExpanded: { calendar: true },
   dashCalOffset: 0,
@@ -3081,6 +3081,7 @@ const S = {
   _addingShelf:           false,
   // Spotted — capture looks while shopping (online URL/screenshot or in-store photo)
   spottedItems:           JSON.parse(localStorage.getItem('closet-spotted') || '[]'),
+  savedShopItems:         JSON.parse(localStorage.getItem('closet-shop-saved') || '[]'), // [{label,query,reason,source,savedAt}]
   _spottedCapture:        null,
   // Should I Buy It? — widget on shop page
   _buyItOpen:    false,
@@ -3089,6 +3090,10 @@ const S = {
   _buyItPrice:   '',
   _buyItLoading: false,
   _buyItResult:  null,   // { verdict, headline, pros, cons, verdict_detail }
+  // Priority Picks — AI-ranked items across all shop lists
+  priorityPicks:         JSON.parse(localStorage.getItem('closet-priority-picks') || 'null'), // [{label,query,reason,sources:[]}] | null
+  _priorityPicksLoading: false,
+  _priorityPicksOpen:    true,
   // Closet To-Do checklist
   closetTodos: (()=>{
     const DEFAULTS = [
@@ -4678,11 +4683,148 @@ function unblockShopItem(query) {
   render();
   toast('Restored to list ✓');
 }
+function saveShopItem(query, label, reason) {
+  const key = query.toLowerCase().trim();
+  if (S.savedShopItems.some(i => i.query.toLowerCase().trim() === key)) return;
+  S.savedShopItems = [...S.savedShopItems, { label: label || query, query, reason: reason || '', source: 'recs', savedAt: new Date().toISOString() }];
+  localStorage.setItem('closet-shop-saved', JSON.stringify(S.savedShopItems));
+  toast('♥ Saved to your list');
+  render();
+}
+function saveShopItemByIdx(idx) {
+  const item = window._shopItems?.[idx];
+  if (!item) return;
+  saveShopItem(item.query, item.label, item.sub || '');
+}
+function unsaveShopItem(query) {
+  const key = query.toLowerCase().trim();
+  S.savedShopItems = S.savedShopItems.filter(i => i.query.toLowerCase().trim() !== key);
+  localStorage.setItem('closet-shop-saved', JSON.stringify(S.savedShopItems));
+  toast('Removed from saved');
+  render();
+}
 function markPurchased(query) {
   S.purchasedQueries.add(query.toLowerCase().trim());
   localStorage.setItem('closet-purchased', JSON.stringify([...S.purchasedQueries])); fsSet('purchased', [...S.purchasedQueries]);
   render();
   toast('Bought it! ✓ Removed from list');
+}
+
+function openPriorityPick(query) {
+  const key = (query || '').toLowerCase().trim();
+  const allRecs = buildShoppingList();
+  const inWishlist = S.entries.some(e => {
+    if (!e.purchaseRecs?.length || !e.purchaseReactions) return false;
+    return e.purchaseRecs.some((r, i) => {
+      if (e.purchaseReactions[String(i)] !== 'liked') return false;
+      return (r.query || r.item || r || '').toLowerCase().trim() === key;
+    });
+  }) || S.savedShopItems.some(i => i.query.toLowerCase().trim() === key);
+  const inBuyAgain = allRecs.some(i => i.restock && !S.shopBlocked.has(i.query.toLowerCase().trim()) && i.query.toLowerCase().trim() === key);
+  const inRecs = allRecs.some(i => !i.restock && !S.shopBlocked.has(i.query.toLowerCase().trim()) && i.query.toLowerCase().trim() === key);
+  if (inWishlist)       { S.shopSource = 'wishlist';  S.shopSelectedQuery = query; }
+  else if (inBuyAgain)  { S.shopSource = 'buyagain';  S.shopSelectedQuery = query; }
+  else if (inRecs)      { S.shopSource = 'recs';      S.shopSelectedQuery = query; }
+  else                  { S.shopSource = 'spotted';   S.shopSelectedQuery = null;  }
+  S.shopExpanded = true;
+  render();
+}
+
+async function generatePriorityPicks() {
+  if (!S.apiKey) { toast('Add your API key in Settings to use Priority Picks'); return; }
+  S._priorityPicksLoading = true;
+  render();
+
+  // Build deduplicated pool from all 4 lists
+  const pool = new Map(); // normalised query → {label, query, sources:[]}
+  function addToPool(query, label, source) {
+    const key = (query || label || '').toLowerCase().trim();
+    if (!key) return;
+    if (pool.has(key)) { pool.get(key).sources.push(source); }
+    else { pool.set(key, { label: label || query, query: query || label, sources: [source] }); }
+  }
+
+  // Saved / wishlist
+  S.entries.forEach(e => {
+    if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
+    e.purchaseRecs.forEach((r, i) => {
+      if (e.purchaseReactions[String(i)] === 'liked') {
+        const name = r.item || r;
+        addToPool(r.query || name, name, 'Saved');
+      }
+    });
+  });
+  S.savedShopItems.forEach(si => addToPool(si.query, si.label, 'Saved'));
+
+  // AI Picks & Buy Again
+  const allRecs = buildShoppingList().filter(i => !S.shopBlocked.has(i.query.toLowerCase().trim()));
+  allRecs.filter(i => !i.restock).forEach(i => addToPool(i.query, i.query, 'AI Picks'));
+  allRecs.filter(i =>  i.restock).forEach(i => addToPool(i.query, i.query, 'Buy Again'));
+
+  // Spotted
+  (S.spottedItems || []).forEach(sp => { if (sp.name) addToPool(sp.name, sp.name, 'Spotted'); });
+
+  const allItems = [...pool.values()];
+  if (!allItems.length) {
+    S._priorityPicksLoading = false;
+    toast('Add items to your shopping lists first');
+    render();
+    return;
+  }
+
+  // Wardrobe context
+  const cats = {};
+  S.wardrobe.filter(w => !w.retiredFromCloset).forEach(w => { if (w.category) cats[w.category] = (cats[w.category] || 0) + 1; });
+  const catSummary = Object.entries(cats).map(([c, n]) => `${c}:${n}`).join(', ') || 'not specified';
+  const occasions = {};
+  S.entries.forEach(e => { if (e.occasionTag) occasions[e.occasionTag] = (occasions[e.occasionTag] || 0) + 1; });
+  const occasionSummary = Object.entries(occasions).sort((a,b) => b[1]-a[1]).slice(0,5).map(([o,n]) => `${o}:${n}`).join(', ') || 'not specified';
+
+  const poolText = allItems.map((item, i) => `${i+1}. "${item.label}" [${item.sources.join('+')}]`).join('\n');
+
+  const prompt = `You are a personal stylist ranking a shopping list by purchase priority.
+
+WARDROBE (owned items by category): ${catSummary}
+MOST-WORN OCCASIONS: ${occasionSummary}
+
+SHOPPING POOL (item name [source lists]):
+${poolText}
+
+Rank the top ${Math.min(10, allItems.length)} items by priority. Prefer: items in multiple lists (stronger signal), wardrobe gaps, occasion versatility, Buy Again favorites.
+
+Respond with ONLY a valid JSON array — no other text:
+[{"label":"exact name from list","query":"exact name from list","reason":"one sentence under 12 words why it's top priority"}]`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': S.apiKey, 'anthropic-version': '2023-06-01',
+        'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 800,
+        messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text?.trim() || '';
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (match) {
+      const picks = JSON.parse(match[0]);
+      const enriched = picks.map(p => {
+        const key = (p.query || p.label || '').toLowerCase().trim();
+        const poolItem = pool.get(key) || [...pool.values()].find(i => i.label.toLowerCase() === key);
+        return { label: p.label, query: p.query, reason: p.reason, sources: poolItem?.sources || [] };
+      });
+      S.priorityPicks = enriched;
+      localStorage.setItem('closet-priority-picks', JSON.stringify(enriched));
+      toast('🎯 Priority Picks ranked!');
+    } else {
+      toast('Couldn\'t parse ranking — try again');
+    }
+  } catch(e) {
+    console.error('generatePriorityPicks:', e);
+    toast('Ranking failed — check your API key');
+  }
+  S._priorityPicksLoading = false;
+  render();
 }
 
 async function fetchShopQuery(query) {
@@ -8602,9 +8744,10 @@ function viewCloset() {
   // Wrapping chip grid — no horizontal scroll, tags flow into as many rows as needed
   const filterHTML = S.entries.length > 1 ? `
     <div style="padding:4px 16px 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-      <div class="filter-chip ${S.filter==='best'?'active':''}"
-        ontouchend="if(_touchMoved)return;event.preventDefault();setFilter(S.filter==='best'?'all':'best')"
-        onclick="setFilter(S.filter==='best'?'all':'best')">⭐ Best Rated</div>
+      <div class="filter-chip ${S.fitsSort==='best'?'active':''}"
+        ontouchend="if(_touchMoved)return;event.preventDefault();S.fitsSort=S.fitsSort==='best'?'date':'best';S.closetExpanded=false;render()"
+        onclick="S.fitsSort=S.fitsSort==='best'?'date':'best';S.closetExpanded=false;render()"
+        style="touch-action:manipulation;">⭐ Best first</div>
       ${tagChips}
       ${dnrCount > 0 ? `<div class="filter-chip ${S.filter==='notagain'?'active':''}"
         ontouchend="if(_touchMoved)return;event.preventDefault();setFilter(S.filter==='notagain'?'all':'notagain')"
@@ -9129,11 +9272,15 @@ function filteredEntries() {
   arr = arr.filter(e => !e.battleId);
   // Hide "Not Again" flagged entries from the default scroll
   arr = arr.filter(e => !e.doNotRepeat);
-  if (S.filter === 'best')   arr.sort((a,b) => b.rating - a.rating);
-  if (S.filter === 'recent') arr.sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
   if (S.filter.startsWith('tag:')) {
     const tag = S.filter.slice(4);
     arr = arr.filter(e => e.occasionTag === tag);
+  }
+  // Sort: 'best' = highest rating first, default = newest first
+  if (S.fitsSort === 'best') {
+    arr.sort((a,b) => b.rating - a.rating || new Date(b.createdAt) - new Date(a.createdAt));
+  } else {
+    arr.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
   return arr;
 }
@@ -9221,6 +9368,14 @@ function viewShop() {
       }
     });
   });
+  // Merge items saved directly from AI Picks / other lists
+  S.savedShopItems.forEach(si => {
+    const key = si.query.toLowerCase().trim();
+    if (!_wishSeen.has(key)) {
+      _wishSeen.add(key);
+      wishItems.push({ label: si.label, query: si.query, reason: si.reason || '', entry: null, recIdx: -1, fromSavedShop: true });
+    }
+  });
 
   // All recs: shopping list from outfit queries, filtered/sorted
   const _allFiltered = [...list]
@@ -9242,8 +9397,9 @@ function viewShop() {
   const showItems = S.shopExpanded ? activeItems : activeItems.slice(0, SHOP_LIMIT);
   const moreCount = activeItems.length - showItems.length;
 
-  // Expose queries by index so _shopTap(idx) can look them up without inline string escaping
-  window._shopQ = activeItems.map(i => i.query);
+  // Expose queries/items by index so _shopTap/saveShopItemByIdx can look them up without inline string escaping
+  window._shopQ     = activeItems.map(i => i.query);
+  window._shopItems = activeItems;
 
   const sel = S.shopSelectedQuery;
   const selItem = activeItems.find(i => i.query === sel);
@@ -9331,18 +9487,37 @@ function viewShop() {
           ✕ Remove
         </button>
       </div>` : ''}
-      ${src === 'recs' ? `
+      ${src === 'wishlist' && item.fromSavedShop ? `
+      <div style="display:flex;gap:0;margin-top:14px;border-top:1px solid rgba(184,125,42,.15);padding-top:12px;">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;">
+          <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#C8A0E8;">♥ Saved from AI Picks</span>
+        </div>
+        <div style="width:1px;background:rgba(184,125,42,.15);flex-shrink:0;"></div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();unsaveShopItem(${JSON.stringify(item.query)});toast('Removed from saved');" onclick="unsaveShopItem(${JSON.stringify(item.query)});toast('Removed from saved');"
+          style="flex:1;background:none;border:none;padding:6px 4px;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
+          ✕ Remove
+        </button>
+      </div>` : ''}
+      ${src === 'recs' ? (()=>{
+        const _isSaved = S.savedShopItems.some(si => si.query.toLowerCase().trim() === item.query.toLowerCase().trim());
+        return `
       <div style="display:flex;gap:0;margin-top:14px;border-top:1px solid rgba(184,125,42,.15);padding-top:12px;">
         <button ontouchend="if(_touchMoved)return;event.preventDefault();markPurchased(window._shopQ[${activeIdx}]);" onclick="markPurchased(window._shopQ[${activeIdx}]);"
           style="flex:1;background:none;border:none;padding:6px 4px;font-size:12px;font-weight:700;color:#2E9E6B;cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
           ✓ Bought it
         </button>
         <div style="width:1px;background:rgba(184,125,42,.15);flex-shrink:0;"></div>
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();${_isSaved ? `unsaveShopItem(window._shopQ[${activeIdx}])` : `saveShopItemByIdx(${activeIdx})`};" onclick="${_isSaved ? `unsaveShopItem(window._shopQ[${activeIdx}])` : `saveShopItemByIdx(${activeIdx})`};"
+          style="flex:1;background:none;border:none;padding:6px 4px;font-size:12px;font-weight:700;color:${_isSaved ? '#C8A0E8' : 'var(--gold-dk)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
+          ${_isSaved ? '♥ Saved' : '♥ Save'}
+        </button>
+        <div style="width:1px;background:rgba(184,125,42,.15);flex-shrink:0;"></div>
         <button ontouchend="if(_touchMoved)return;event.preventDefault();blockShopItem(window._shopQ[${activeIdx}]);" onclick="blockShopItem(window._shopQ[${activeIdx}]);"
           style="flex:1;background:none;border:none;padding:6px 4px;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;">
           ✕ Remove
         </button>
-      </div>` : ''}
+      </div>`;
+      })() : ''}
     </div>`;
 
     return rowHTML + accordionHTML;
@@ -9470,6 +9645,77 @@ function viewShop() {
             </div>
             <div style="margin-top:8px;font-size:11px;color:var(--text-3);text-align:center;">Add a photo or name to get started</div>` : ''}
           </div>`;
+      })()}
+
+      <!-- Priority Picks -->
+      ${(()=>{
+        if (!S.apiKey) return '';
+        const allSourcesAvail = [
+          ...(wishItems.length ? ['Saved'] : []),
+          ...(recsRawAll.length ? ['AI Picks'] : []),
+          ...(buyAgainItems.length ? ['Buy Again'] : []),
+          ...((S.spottedItems||[]).length ? ['Spotted'] : []),
+        ];
+        if (!allSourcesAvail.length) return '';
+
+        const picks = S.priorityPicks;
+        const hasPicks = picks && picks.length > 0;
+        const loading = S._priorityPicksLoading;
+        const isOpen = S._priorityPicksOpen !== false;
+        const sourceColors = { 'Saved':'#B87D2A', 'AI Picks':'#8B6BBF', 'Buy Again':'#2E9E6B', 'Spotted':'#3B5E8C' };
+        const sourceIcons  = { 'Saved':'♥ ', 'AI Picks':'✦ ', 'Buy Again':'🔁 ', 'Spotted':'📌 ' };
+
+        return `<div style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:${isOpen?'10px':'0'};">
+            <div ontouchend="if(_touchMoved)return;event.preventDefault();S._priorityPicksOpen=!S._priorityPicksOpen;render();"
+                 onclick="S._priorityPicksOpen=!S._priorityPicksOpen;render();"
+                 style="display:flex;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;flex:1;">
+              <span style="font-size:15px;">🎯</span>
+              <span style="font-size:13px;font-weight:800;color:var(--text);">Priority Picks</span>
+              ${hasPicks ? `<span style="font-size:10px;font-weight:700;background:rgba(108,62,191,0.1);color:#8B6BBF;padding:1px 7px;border-radius:100px;">Top ${picks.length}</span>` : ''}
+              <span style="font-size:13px;color:var(--text-3);">${isOpen?'▾':'▸'}</span>
+            </div>
+            ${hasPicks && !loading ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generatePriorityPicks();" onclick="generatePriorityPicks();"
+              style="background:none;border:1px solid rgba(108,62,191,0.3);border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;color:#8B6BBF;cursor:pointer;font-family:inherit;touch-action:manipulation;flex-shrink:0;">↺ Re-rank</button>` : ''}
+          </div>
+
+          ${isOpen ? loading ? `
+          <div style="display:flex;align-items:center;gap:10px;padding:14px;background:rgba(108,62,191,0.04);border:1px solid rgba(108,62,191,0.15);border-radius:var(--r);">
+            <div class="spinner" style="width:18px;height:18px;border-width:2px;flex-shrink:0;"></div>
+            <div style="font-size:13px;color:var(--text-3);">Ranking across all your lists…</div>
+          </div>` : hasPicks ? `
+          <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;">
+            ${picks.map((pick, i) => {
+              const badges = (pick.sources||[]).map(s =>
+                `<span style="font-size:9px;font-weight:700;color:${sourceColors[s]||'var(--text-3)'};background:${sourceColors[s]?sourceColors[s]+'18':'var(--bg)'};border:1px solid ${sourceColors[s]||'var(--border)'}33;padding:1px 5px;border-radius:100px;white-space:nowrap;">${sourceIcons[s]||''}${s}</span>`
+              ).join('');
+              const numBg = i===0 ? 'linear-gradient(135deg,#6C3EBF,#9B5FE0)' : i<3 ? 'rgba(108,62,191,0.12)' : 'var(--bg)';
+              const numColor = i===0 ? '#fff' : i<3 ? '#6C3EBF' : 'var(--text-3)';
+              const numBorder = i>=3 ? '1.5px solid var(--border)' : 'none';
+              return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick(${JSON.stringify(pick.query)});"
+                onclick="openPriorityPick(${JSON.stringify(pick.query)});"
+                style="display:flex;align-items:flex-start;gap:11px;padding:11px 14px;${i<picks.length-1?'border-bottom:1px solid var(--border);':''}cursor:pointer;touch-action:manipulation;">
+                <div style="width:24px;height:24px;border-radius:50%;background:${numBg};border:${numBorder};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:${numColor};flex-shrink:0;margin-top:2px;">${i+1}</div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(pick.label)}</div>
+                  ${pick.reason ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;line-height:1.4;">${esc(pick.reason)}</div>` : ''}
+                  ${badges ? `<div style="display:flex;gap:4px;margin-top:5px;flex-wrap:wrap;">${badges}</div>` : ''}
+                </div>
+                <span style="font-size:16px;color:var(--text-3);flex-shrink:0;align-self:center;">›</span>
+              </div>`;
+            }).join('')}
+          </div>` : `
+          <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;background:rgba(108,62,191,0.04);border:1px solid rgba(108,62,191,0.15);border-radius:var(--r);">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:700;color:var(--text);">Let Claude rank your best bets</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Scores ${allSourcesAvail.join(', ')} — ranks by gap-filling &amp; signal strength</div>
+            </div>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();generatePriorityPicks();" onclick="generatePriorityPicks();"
+              style="flex-shrink:0;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);border:none;color:#fff;border-radius:100px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;box-shadow:0 2px 8px rgba(108,62,191,0.28);">
+              ✨ Rank with Claude
+            </button>
+          </div>` : ''}
+        </div>`;
       })()}
 
       <!-- Step 1: Source picker -->
@@ -22807,62 +23053,77 @@ function doExport() {
 }
 
 async function doExportPhotos() {
-  // Collect all photo data URIs
-  const photos = [];
+  toast('Collecting photos…');
+  await new Promise(r => setTimeout(r, 80));
+
+  // folder/filename → base64 data URI
+  const entries = []; // [{path, data}]
+
+  function slug(str, max) {
+    return (str || '').replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_').slice(0, max || 40).replace(/^_|_$/g, '');
+  }
+  function ext(dataUri) {
+    const mime = ((dataUri || '').match(/data:(.*?);/) || [])[1] || 'image/jpeg';
+    return mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : mime.includes('webp') ? 'webp' : 'jpg';
+  }
+
+  // ── Wardrobe items ─────────────────────────────────────────────
   S.wardrobe.forEach(w => {
     const src = w.photo || w.photoThumb;
-    if (src && src.startsWith('data:')) {
-      const label = (w.name || w.id || 'item').replace(/[^a-z0-9]/gi,'_').slice(0,40);
-      photos.push({ data: src, name: `wardrobe-${label}` });
-    }
+    if (!src || !src.startsWith('data:')) return;
+    const parts = [w.category, w.brand, w.name].filter(Boolean).map(s => slug(s, 20));
+    const label = parts.length ? parts.join('_') : slug(w.id, 16) || 'item';
+    entries.push({ path: `wardrobe/${label}.${ext(src)}`, data: src });
   });
+
+  // ── Outfit entries (+ rewears) ────────────────────────────────
   S.entries.forEach(e => {
     if (e.photo && e.photo.startsWith('data:')) {
-      const d = (e.createdAt || '').slice(0,10) || 'outfit';
-      photos.push({ data: e.photo, name: `outfit-${d}-${(e.id||'').slice(-6)}` });
+      const d   = (e.createdAt || '').slice(0, 10) || 'outfit';
+      const tag = e.occasionTag ? `_${slug(e.occasionTag, 12)}` : '';
+      const rating = e.rating ? `_${e.rating}star` : '';
+      entries.push({ path: `outfits/${d}${tag}${rating}_${(e.id||'').slice(-6)}.${ext(e.photo)}`, data: e.photo });
     }
     (e.rewears || []).forEach((r, j) => {
       if (r.photo && r.photo.startsWith('data:')) {
-        const d = (e.createdAt || '').slice(0,10) || 'outfit';
-        photos.push({ data: r.photo, name: `outfit-${d}-rewear${j+1}` });
+        const d = (e.createdAt || '').slice(0, 10) || 'outfit';
+        entries.push({ path: `outfits/${d}_rewear${j+1}_${(e.id||'').slice(-6)}.${ext(r.photo)}`, data: r.photo });
       }
     });
   });
 
-  if (!photos.length) { toast('No photos found to export'); return; }
+  // ── Battle / Saved Looks (photos in PhotoDB) ──────────────────
+  for (const b of (S.savedBattles || [])) {
+    const photo = await PhotoDB.get('battle-photo-' + b.id).catch(() => null);
+    if (!photo || !photo.startsWith('data:')) continue;
+    const d = (b.createdAt || '').slice(0, 10) || 'battle';
+    const w = b.winner ? `_winner_${slug(b.winner, 20)}` : '';
+    entries.push({ path: `saved-looks/${d}${w}_${(b.id||'').slice(-6)}.${ext(photo)}`, data: photo });
+  }
 
-  // base64 data URI → File
-  function b64ToFile(dataUri, baseName) {
+  // ── Spotted items ─────────────────────────────────────────────
+  (S.spottedItems || []).forEach(sp => {
+    if (!sp.photo || !sp.photo.startsWith('data:')) return;
+    const label = slug(sp.name || sp.id || 'item', 40);
+    entries.push({ path: `spotted/${label}.${ext(sp.photo)}`, data: sp.photo });
+  });
+
+  if (!entries.length) { toast('No photos found to export'); return; }
+
+  // data URI → Uint8Array
+  function b64ToBytes(dataUri) {
     try {
-      const [head, b64] = dataUri.split(',');
-      const mime = (head.match(/:(.*?);/) || [])[1] || 'image/jpeg';
-      const ext  = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : mime.includes('webp') ? 'webp' : 'jpg';
-      const bin  = atob(b64);
-      const arr  = new Uint8Array(bin.length);
+      const b64 = dataUri.split(',')[1];
+      const bin = atob(b64);
+      const arr = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-      return new File([arr], `${baseName}.${ext}`, { type: mime });
-    } catch(err) { return null; }
+      return arr;
+    } catch(e) { return null; }
   }
 
-  toast(`Preparing ${photos.length} photos…`);
-  await new Promise(r => setTimeout(r, 80)); // let toast render
+  toast(`Building ZIP with ${entries.length} photos…`);
+  await new Promise(r => setTimeout(r, 80));
 
-  const files = photos.map(p => b64ToFile(p.data, p.name)).filter(Boolean);
-  if (!files.length) { toast('Could not read photos'); return; }
-
-  // iOS / modern browsers: Web Share API with files → native share sheet → "Save to Photos"
-  if (navigator.canShare && navigator.canShare({ files })) {
-    try {
-      await navigator.share({ files, title: 'Closet Photos' });
-      return;
-    } catch(err) {
-      if (err.name === 'AbortError') return; // user cancelled — done
-      // otherwise fall through to ZIP
-    }
-  }
-
-  // Fallback: ZIP download
-  toast('Building ZIP…');
   try {
     if (!window.JSZip) {
       await new Promise((res, rej) => {
@@ -22873,15 +23134,21 @@ async function doExportPhotos() {
       });
     }
     const zip = new JSZip();
-    files.forEach(f => zip.file(f.name, f));
+    let added = 0;
+    entries.forEach(({ path, data }) => {
+      const bytes = b64ToBytes(data);
+      if (bytes) { zip.file(path, bytes); added++; }
+    });
+    if (!added) { toast('Could not read photos'); return; }
+
     const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
     const url  = URL.createObjectURL(blob);
     const a    = Object.assign(document.createElement('a'), {
-      href: url, download: `closet-photos-${new Date().toISOString().slice(0,10)}.zip`
+      href: url, download: `closet-photos-${new Date().toISOString().slice(0, 10)}.zip`
     });
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
-    toast(`📁 ${files.length} photos saved as ZIP`);
+    toast(`📁 ${added} photos exported as ZIP!`);
   } catch(err) {
     console.error('Photo export error:', err);
     toast('Export failed — try again');
