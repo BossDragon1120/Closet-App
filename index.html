@@ -2792,6 +2792,7 @@ async function loadProfileFromFirestore() {
     if (p.shopCache     != null) { S.shopCache       = p.shopCache;                         localStorage.setItem('closet-shop-cache',      JSON.stringify(p.shopCache)); }
     if (p.occasionTags     != null) { localStorage.setItem('closet-occasion-tags', JSON.stringify(p.occasionTags)); }
     if (p.customCategories != null) { S.customCategories = p.customCategories; localStorage.setItem('closet-custom-categories', JSON.stringify(p.customCategories)); }
+    if (p.favoriteBrands   != null) { S.favoriteBrands   = p.favoriteBrands;   localStorage.setItem('closet-fav-brands',         JSON.stringify(p.favoriteBrands)); }
   } catch(e) { console.error('loadProfileFromFirestore:', e); }
 }
 
@@ -3036,6 +3037,7 @@ const S = {
   _pendingWitemPhoto: null, // { wId, data } — preview before explicit save
   _pendingWearPhoto: null,  // { wId, data } — preview before explicit save
   _wearPhotoPicker: null,   // wId when outfit-photo picker is open
+  _witemLightbox: null,     // { ids:[entryId,...], idx:0 } — fullscreen outfit photo viewer
   _savingPhoto: false,      // true while DB.wardrobe.put is running for photo save
   bulkQueue: [], bulkIdx: 0, bulkSaved: 0, bulkAnalyzing: false, bulkSaving: false,
   onboardStep: 0,
@@ -3070,6 +3072,9 @@ const S = {
   // What's Hot trends
   hotTrends:          JSON.parse(localStorage.getItem('closet-hot-trends') || 'null'),
   _trendsLoading:     false,
+  favoriteBrands:         JSON.parse(localStorage.getItem('closet-fav-brands') || '[]'), // up to 3 brand name strings
+  _favBrandPickerSlot:    null, // 0|1|2 — which slot is open for editing
+  _favBrandSearch:        '',
   brandDiscovery:     JSON.parse(localStorage.getItem('closet-brand-discovery') || 'null'),
   _brandDiscoveryLoading: false,
   wardrobePulse:          JSON.parse(localStorage.getItem('closet-wardrobe-pulse') || 'null'),
@@ -4967,7 +4972,7 @@ function aiErrorToast(e, feature) {
 // version a device is actually running.
 const APP_BUILD = '2026-07-06';
 
-function navigate(view) { if (view !== S.view) S._prevView = S.view; S.view = view; S.error = null; render(); window.scrollTo(0,0); }
+function navigate(view) { if (view !== S.view) S._prevView = S.view; S.view = view; S.error = null; S._witemLightbox = null; render(); window.scrollTo(0,0); }
 function switchTab(tab)  {
   S.activeTab = tab;
   S.view = tab;
@@ -6123,9 +6128,9 @@ function viewOutfitBuilder() {
           const score = occScores[occ] || 0;
           const isHighlight = !active && score >= 2 && score >= maxScore * 0.55;
           const isDim = !active && score < maxScore * 0.2 && maxScore > 1;
-          const border = active ? 'rgba(108,62,191,0.7)' : isHighlight ? 'rgba(108,62,191,0.35)' : 'var(--border)';
-          const bg = active ? 'rgba(108,62,191,0.1)' : isHighlight ? 'rgba(108,62,191,0.06)' : 'var(--surface)';
-          const color = active ? '#6C3EBF' : isDim ? 'var(--text-3)' : isHighlight ? '#6C3EBF' : 'var(--text-2)';
+          const border = active ? '#6C3EBF' : isHighlight ? 'rgba(108,62,191,0.5)' : 'var(--border)';
+          const bg = active ? '#6C3EBF' : isHighlight ? 'rgba(108,62,191,0.13)' : 'var(--surface)';
+          const color = active ? '#fff' : isDim ? 'var(--text-3)' : isHighlight ? '#5A31A8' : 'var(--text-2)';
           const weight = active || isHighlight ? '700' : '500';
           const opacity = isDim ? '0.5' : '1';
           return `<button
@@ -6457,6 +6462,29 @@ function brandDiscoveryHTML() {
   </div>`;
 }
 
+/* ── Favorite Brands helpers ──────────────────────────────────────────────── */
+function setFavBrand(slot, name) {
+  const favs = [...(S.favoriteBrands || [])];
+  while (favs.length < 3) favs.push(null);
+  favs[slot] = name || null;
+  // Compact nulls to front, preserve order, cap at 3
+  S.favoriteBrands = favs.slice(0, 3);
+  localStorage.setItem('closet-fav-brands', JSON.stringify(S.favoriteBrands));
+  fsSet('favoriteBrands', S.favoriteBrands);
+  S._favBrandPickerSlot = null;
+  S._favBrandSearch = '';
+  render();
+}
+function removeFavBrand(slot) {
+  const favs = [...(S.favoriteBrands || [])];
+  favs.splice(slot, 1);
+  while (favs.length < 3) favs.push(null);
+  S.favoriteBrands = favs;
+  localStorage.setItem('closet-fav-brands', JSON.stringify(S.favoriteBrands));
+  fsSet('favoriteBrands', S.favoriteBrands);
+  render();
+}
+
 function viewBrands() {
   // Build brand stats from all wardrobe items (including retired)
   const brandMap = {};
@@ -6495,17 +6523,18 @@ function viewBrands() {
     </button>`;
   };
 
-  const rows = brands.length ? brands.map(b => {
-    const catStr = b.cats.map(c => c === 'Pants' ? 'Bottoms' : c).join(' · ');
+  // Brand row helper (shared across sections)
+  const brandRow = (b) => {
+    const catStr = b.cats ? b.cats.map(c => c === 'Pants' ? 'Bottoms' : c).join(' · ') : '';
     return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);">
       <div style="flex:1;min-width:0;">
         <div style="font-size:15px;font-weight:700;color:var(--text);">${esc(b.name)}</div>
         ${catStr ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;">${esc(catStr)}</div>` : ''}
       </div>
-      <div style="text-align:right;flex-shrink:0;">
+      ${b.items != null ? `<div style="text-align:right;flex-shrink:0;">
         <div style="font-size:14px;font-weight:800;color:var(--text);">${b.items} <span style="font-size:11px;font-weight:500;color:var(--text-3);">item${b.items===1?'':'s'}</span></div>
         ${b.wears > 0 ? `<div style="font-size:11px;color:var(--text-3);">${b.wears}× worn</div>` : ''}
-      </div>
+      </div>` : ''}
       <a href="${brandInstagramUrl(b.name)}" target="_blank" rel="noopener"
         ontouchend="event.stopPropagation()"
         style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);border-radius:100px;padding:5px 9px;text-decoration:none;flex-shrink:0;">
@@ -6513,9 +6542,122 @@ function viewBrands() {
         <span style="font-size:10px;font-weight:700;color:#fff;">IG</span>
       </a>
     </div>`;
-  }).join('') : `<div style="padding:40px 24px;text-align:center;color:var(--text-3);font-size:14px;">
+  };
+
+  // ── Favorite Brands section ────────────────────────────────────────────────
+  const favs = (S.favoriteBrands || []).concat([null, null, null]).slice(0, 3);
+  const pickerSlot = S._favBrandPickerSlot;
+  const favSearch = (S._favBrandSearch || '').toLowerCase();
+
+  const favSlots = favs.map((name, i) => {
+    if (name) {
+      // Filled slot
+      const stats = brandMap[name];
+      return `<div style="flex:1;min-width:0;background:var(--surface);border:1.5px solid var(--gold);border-radius:var(--r-sm);padding:10px 12px;position:relative;">
+        <button
+          ontouchend="if(_touchMoved)return;event.preventDefault();removeFavBrand(${i})"
+          onclick="removeFavBrand(${i})"
+          style="position:absolute;top:4px;right:4px;background:none;border:none;font-size:14px;color:var(--text-3);cursor:pointer;padding:2px;touch-action:manipulation;line-height:1;">✕</button>
+        <div style="font-size:13px;font-weight:800;color:var(--text);padding-right:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(name)}</div>
+        ${stats ? `<div style="font-size:10px;color:var(--text-3);margin-top:2px;">${stats.items} item${stats.items===1?'':'s'} in closet</div>` : `<div style="font-size:10px;color:var(--text-3);margin-top:2px;">✦ loved brand</div>`}
+      </div>`;
+    } else {
+      // Empty slot
+      return `<button
+        ontouchend="if(_touchMoved)return;event.preventDefault();S._favBrandPickerSlot=${i};S._favBrandSearch='';render()"
+        onclick="S._favBrandPickerSlot=${i};S._favBrandSearch='';render()"
+        style="flex:1;min-width:0;background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r-sm);padding:10px 12px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;display:flex;align-items:center;gap:6px;">
+        <span style="font-size:18px;color:var(--border);line-height:1;">+</span>
+        <span style="font-size:12px;color:var(--text-3);font-weight:600;">Add brand</span>
+      </button>`;
+    }
+  }).join('');
+
+  // Picker sheet — shown when a slot is being edited
+  const pickerSheet = pickerSlot !== null ? (() => {
+    const allBrandNames = Object.keys(brandMap).sort((a,b)=>brandMap[b].items-brandMap[a].items);
+    const alreadyFaved = new Set(favs.filter(Boolean));
+    const filtered = allBrandNames.filter(n => !alreadyFaved.has(n) && (!favSearch || n.toLowerCase().includes(favSearch)));
+    const customMatch = favSearch && !allBrandNames.some(n => n.toLowerCase() === favSearch);
+    return `<div style="border:1.5px solid var(--border);border-radius:var(--r-sm);overflow:hidden;margin-top:8px;background:var(--bg);">
+      <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;">
+        <input id="favBrandSearchInput" type="text" placeholder="Type a brand name…" value="${esc(S._favBrandSearch||'')}"
+          oninput="S._favBrandSearch=this.value;renderRAF()"
+          style="flex:1;border:none;background:transparent;font-family:inherit;font-size:14px;color:var(--text);outline:none;"
+          enterkeyhint="done"
+          onkeydown="if(event.key==='Enter'&&'${favSearch}'.trim()){setFavBrand(${pickerSlot},'${favSearch}'.trim());event.preventDefault();}">
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S._favBrandPickerSlot=null;S._favBrandSearch='';render()" onclick="S._favBrandPickerSlot=null;S._favBrandSearch='';render()" style="background:none;border:none;font-size:18px;color:var(--text-3);cursor:pointer;padding:0;touch-action:manipulation;">✕</button>
+      </div>
+      ${customMatch ? `<div
+        ontouchend="if(_touchMoved)return;event.preventDefault();setFavBrand(${pickerSlot},${JSON.stringify(S._favBrandSearch.trim())})"
+        onclick="setFavBrand(${pickerSlot},${JSON.stringify(S._favBrandSearch.trim())})"
+        style="padding:11px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;border-bottom:1px solid var(--border);touch-action:manipulation;">
+        <span style="font-size:13px;font-weight:700;color:var(--gold-dk);">+ Add "${esc(S._favBrandSearch.trim())}"</span>
+      </div>` : ''}
+      <div style="max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+        ${filtered.length ? filtered.map(n => `<div
+          ontouchend="if(_touchMoved)return;event.preventDefault();setFavBrand(${pickerSlot},${JSON.stringify(n)})"
+          onclick="setFavBrand(${pickerSlot},${JSON.stringify(n)})"
+          style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation;">
+          <span style="font-size:14px;font-weight:600;color:var(--text);">${esc(n)}</span>
+          <span style="font-size:11px;color:var(--text-3);">${brandMap[n].items} item${brandMap[n].items===1?'':'s'}</span>
+        </div>`).join('') : `<div style="padding:16px 14px;font-size:13px;color:var(--text-3);">No wardrobe brands match — type to add any brand.</div>`}
+      </div>
+    </div>`;
+  })() : '';
+
+  const favSection = `
+    <div style="padding:16px 16px 0;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:10px;">⭐ My Favorites <span style="font-weight:500;opacity:.7;">(up to 3)</span></div>
+      <div style="display:flex;gap:8px;">${favSlots}</div>
+      ${pickerSheet}
+    </div>
+    <div style="height:1px;background:var(--border);margin:16px 0 0;"></div>`;
+
+  // ── Top by count ───────────────────────────────────────────────────────────
+  const rows = brands.length ? brands.map(b => brandRow(b)).join('') : `<div style="padding:40px 24px;text-align:center;color:var(--text-3);font-size:14px;">
     No brands logged yet.<br>Add a brand when editing any wardrobe item.
   </div>`;
+
+  // ── Discovery section ──────────────────────────────────────────────────────
+  const discoverySection = (() => {
+    if (S._brandDiscoveryLoading) {
+      return `<div style="padding:16px;display:flex;align-items:center;gap:10px;">
+        <div class="spinner" style="width:18px;height:18px;border-width:2px;"></div>
+        <span style="font-size:13px;color:var(--text-3);">Finding brands that match your aesthetic…</span>
+      </div>`;
+    }
+    const suggs = S.brandDiscovery?.suggestions;
+    const hasRecs = suggs?.length > 0;
+    const generateBtn = `<button
+      ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()"
+      onclick="generateBrandDiscovery()"
+      style="display:flex;align-items:center;gap:6px;padding:9px 18px;border-radius:100px;border:1.5px solid rgba(108,62,191,0.4);background:rgba(108,62,191,0.07);color:#6C3EBF;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+      ✨ ${hasRecs ? 'Refresh recs' : 'Discover new brands'}
+    </button>`;
+    return `<div style="padding:16px 16px 0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">✨ You Might Also Love</div>
+        ${hasRecs ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generateBrandDiscovery()" onclick="generateBrandDiscovery()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↻ Refresh</button>` : ''}
+      </div>
+      ${hasRecs ? `<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+        ${suggs.map(s=>`<div style="flex-shrink:0;width:148px;scroll-snap-align:start;background:var(--surface);border-radius:12px;border:1.5px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:5px;">
+          <div style="font-size:20px;line-height:1;">${s.emoji||'✦'}</div>
+          <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">${esc(s.name)}</div>
+          <div style="font-size:9px;font-weight:700;color:var(--gold-dk);background:var(--gold-bg);border-radius:100px;padding:2px 7px;align-self:flex-start;">${esc(s.vibe)}</div>
+          <div style="font-size:11px;color:var(--text-3);line-height:1.4;flex:1;">${esc(s.reason)}</div>
+          <a href="${brandInstagramUrl(s.name)}" target="_blank" rel="noopener" style="margin-top:3px;display:inline-flex;align-items:center;gap:4px;color:var(--text-3);text-decoration:none;font-size:11px;font-weight:600;">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            Instagram
+          </a>
+        </div>`).join('')}
+      </div>` : `<div style="padding:12px 0 8px;display:flex;flex-direction:column;align-items:flex-start;gap:8px;">
+        <div style="font-size:13px;color:var(--text-3);line-height:1.5;">Based on what you own and love, Closet can suggest brands worth exploring.</div>
+        ${generateBtn}
+      </div>`}
+    </div>
+    <div style="height:1px;background:var(--border);margin:16px 0 0;"></div>`;
+  })();
 
   return `<div class="view view-notab">
     <div class="nav">
@@ -6523,8 +6665,12 @@ function viewBrands() {
       <span class="nav-title">My Brands</span>
       <div style="width:72px"></div>
     </div>
+
+    ${favSection}
+    ${discoverySection}
+
     <div style="padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="font-size:13px;color:var(--text-3);">${brands.length} brand${brands.length===1?'':'s'}</div>
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">🏆 Top by Count <span style="font-size:10px;font-weight:500;opacity:.7;">(${brands.length} total)</span></div>
       <div style="display:flex;gap:6px;">
         ${sortBtn('# Items', 'count')}
         ${sortBtn('A–Z', 'az')}
@@ -8050,12 +8196,16 @@ function viewFun() {
                     const won = b.winner === 1;
                     const borderCol = tie ? 'var(--gold)' : won ? '#6BBF8E' : '#C07070';
                     const medal = tie ? '🤝' : won ? '🏆' : '🥈';
-                    return `<div ontouchend="if(_touchMoved)return;event.preventDefault();S._replayBattleId='${b.id}';navigate('battle-replay')" onclick="S._replayBattleId='${b.id}';navigate('battle-replay')"
-                      style="flex-shrink:0;width:58px;cursor:pointer;position:relative;touch-action:manipulation;">
-                      ${b.photo
-                        ? `<img src="${esc(photoBlobUrl(b.photo))}" style="width:58px;height:78px;object-fit:cover;object-position:top;border-radius:8px;display:block;border:2px solid ${borderCol};">`
-                        : `<div style="width:58px;height:78px;border-radius:8px;background:rgba(255,255,255,.08);border:2px solid ${borderCol};display:flex;align-items:center;justify-content:center;font-size:22px;">⚔️</div>`}
-                      <div style="position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:12px;">${medal}</div>
+                    return `<div style="flex-shrink:0;width:58px;position:relative;touch-action:manipulation;">
+                      <div ontouchend="if(_touchMoved)return;event.preventDefault();S._replayBattleId='${b.id}';navigate('battle-replay')" onclick="S._replayBattleId='${b.id}';navigate('battle-replay')"
+                        style="cursor:pointer;">
+                        ${b.photo
+                          ? `<img src="${esc(photoBlobUrl(b.photo))}" style="width:58px;height:78px;object-fit:cover;object-position:top;border-radius:8px;display:block;border:2px solid ${borderCol};">`
+                          : `<div style="width:58px;height:78px;border-radius:8px;background:rgba(255,255,255,.08);border:2px solid ${borderCol};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:18px;">⚔️<span style="font-size:8px;color:rgba(255,255,255,.5);">tap</span></div>`}
+                        <div style="position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:12px;">${medal}</div>
+                      </div>
+                      <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteSavedBattle('${b.id}')" onclick="event.stopPropagation();deleteSavedBattle('${b.id}')"
+                        style="position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.65);border:1.5px solid rgba(255,255,255,0.3);color:#fff;font-size:9px;font-weight:900;cursor:pointer;font-family:inherit;touch-action:manipulation;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;">✕</button>
                     </div>`;
                   }).join('')}
                 </div>
@@ -8879,7 +9029,7 @@ function viewCloset() {
         ${selMode ? 'Done' : '☑ Select'}
       </button>` : ''}
     </div>
-    ${selMode ? `<div style="padding:6px 16px 0;font-size:12px;color:var(--text-3);">Tap the fits you want to share — numbers show the order they'll appear.</div>` : ''}` : '';
+    ${selMode ? `<div style="padding:6px 16px 0;font-size:12px;color:var(--text-3);">Tap fits to select — then share or delete them.</div>` : ''}` : '';
 
   const gridHTML = entries.length
     ? `<div class="outfit-grid">${displayEntries.map(outfitCardHTML).join('')}</div>${showMoreBtn}`
@@ -8950,6 +9100,10 @@ function viewCloset() {
       <div style="flex:1;"></div>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();toggleFitsSelectMode();" onclick="toggleFitsSelectMode()"
         style="padding:10px 16px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface);font-size:13px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">Cancel</button>
+      <button ontouchend="if(_touchMoved)return;event.preventDefault();bulkDeleteFits();" onclick="bulkDeleteFits()"
+        style="padding:10px 16px;border-radius:100px;border:1.5px solid ${selCount?'#d93025':'var(--border)'};background:${selCount?'rgba(217,48,37,0.08)':'var(--surface)'};color:${selCount?'#d93025':'var(--text-3)'};font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;" ${selCount?'':'disabled'}>
+        🗑 Delete${selCount?` (${selCount})`:''}
+      </button>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();openFitsShareSheet();" onclick="openFitsShareSheet()"
         style="padding:10px 20px;border-radius:100px;border:none;background:${selCount?'var(--gold)':'var(--border)'};color:${selCount?'#fff':'var(--text-3)'};font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;" ${selCount?'':'disabled'}>
         ↗ Share${selCount?` (${selCount})`:''}
@@ -9156,8 +9310,8 @@ function outfitCardHTML(e) {
         ? `<button
             ontouchend="if(_touchMoved)return;event.stopPropagation();event.preventDefault();toggleDoNotRepeat('${e.id}')"
             onclick="event.stopPropagation();toggleDoNotRepeat('${e.id}')"
-            title="Restore fit"
-            style="position:absolute;top:7px;right:7px;background:rgba(30,140,80,0.88);color:#fff;border:none;border-radius:100px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;font-family:inherit;backdrop-filter:blur(4px);letter-spacing:.01em;">↩ Restore</button>`
+            title="Unhide fit"
+            style="position:absolute;top:7px;right:7px;background:rgba(30,140,80,0.88);color:#fff;border:none;border-radius:100px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;font-family:inherit;backdrop-filter:blur(4px);letter-spacing:.01em;">↩ Unhide</button>`
         : `<button class="outfit-card-dnr-btn${e.doNotRepeat?' active':''}"
             ontouchend="if(_touchMoved)return;event.stopPropagation();event.preventDefault();toggleDoNotRepeat('${e.id}')"
             onclick="event.stopPropagation();toggleDoNotRepeat('${e.id}')"
@@ -12264,7 +12418,7 @@ function viewProfile() {
         ].filter(Boolean).join(' · ');
         return `<div style="margin:16px 0 0;">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0 14px;margin-bottom:4px;">
-            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">💚 Value Unlocked</div>
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);">💚 Worth Every Penny</div>
             <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('value-items')" onclick="navigate('value-items')"
               style="background:none;border:none;font-size:11px;font-weight:700;color:#1E8449;cursor:pointer;font-family:inherit;padding:2px 0;touch-action:manipulation;">See all →</button>
           </div>
@@ -17562,24 +17716,30 @@ function viewWardrobeItem() {
       </div>
 
       <!-- Quick wear + stats (hidden for new pieces) -->
-      ${!isNewPiece ? `<div style="margin-top:8px;display:flex;flex-direction:column;align-items:center;gap:8px;">
-        <div style="display:flex;gap:8px;justify-content:center;">
+      ${!isNewPiece ? `<div style="margin-top:4px;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="font-size:11px;color:var(--text-3);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:3px;">
+          <span>${wears} wear${wears===1?'':'s'}${ppw ? ' · ' + (w.priceIsEstimate ? '~' : '') + '$'+ppw+'/wear' : ''}${w.paidOff ? ' · 💚 paid off' : ''}</span>
+          ${complimentCount > 0 ? `<span>· <span style="color:var(--gold-dk);">${complimentCount} compliment${complimentCount===1?'':'s'}</span></span>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
           <button
             ontouchend="if(_touchMoved)return;event.preventDefault();logQuickWear('${w.id}')"
             onclick="logQuickWear('${w.id}')"
-            style="display:flex;align-items:center;gap:7px;padding:10px 20px;border-radius:100px;border:none;background:linear-gradient(135deg,#2C7A2C,#3DAA3D);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;box-shadow:0 2px 10px rgba(44,122,44,0.28);">
+            style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:100px;border:none;background:linear-gradient(135deg,#2C7A2C,#3DAA3D);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;box-shadow:0 2px 8px rgba(44,122,44,0.25);">
             👟 Wore Today
           </button>
           <button
             ontouchend="if(_touchMoved)return;event.preventDefault();logCompliment('${w.id}')"
             onclick="logCompliment('${w.id}')"
-            style="display:flex;align-items:center;gap:7px;padding:10px 20px;border-radius:100px;border:none;background:var(--surface-2);color:var(--text-2);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid var(--border);">
+            style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:100px;border:none;background:var(--surface-2);color:var(--text-2);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid var(--border);">
             ⭐ Compliment
           </button>
-        </div>
-        <div style="font-size:12px;color:var(--text-3);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;">
-          <span>${wears} wear${wears===1?'':'s'}${ppw ? ' · ' + (w.priceIsEstimate ? '~' : '') + '$'+ppw+'/wear' : ''}${w.paidOff ? ' · 💚 paid off' : ''}</span>
-          ${complimentCount > 0 ? `<span>· <span style="color:var(--gold-dk);">${complimentCount} compliment${complimentCount===1?'':'s'}</span></span>` : ''}
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};S._outfitBuildSaved=false;navigate('outfit-builder')"
+            onclick="S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};S._outfitBuildSaved=false;navigate('outfit-builder')"
+            style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:100px;border:none;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;box-shadow:0 2px 8px rgba(108,62,191,0.22);">
+            ✨ Build Outfit
+          </button>
         </div>
       </div>` : ''}
     </div>
@@ -17591,19 +17751,6 @@ function viewWardrobeItem() {
     <!-- Existing piece: AI fill banner in original position -->
     ${!isNewPiece ? aiFillHtml : ''}
 
-    <!-- ✨ Build an Outfit Around This (hidden for new pieces) -->
-    ${!isNewPiece ? `<div style="padding:0 20px;margin-bottom:${(()=>{ const _b = S.savedOutfitBuilds.filter(b=>b.wardrobeId===w.id); return _b.length ? '12' : '20'; })()}px;">
-      <button
-        ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};S._outfitBuildSaved=false;navigate('outfit-builder')"
-        onclick="S.outfitBuilder={wardrobeId:'${w.id}',occasion:'',loading:false,result:null};S._outfitBuildSaved=false;navigate('outfit-builder')"
-        style="width:100%;padding:14px;border-radius:var(--r);cursor:pointer;font-family:inherit;
-          border:none;background:linear-gradient(135deg,#6C3EBF,#9B5FE0);
-          color:#fff;font-size:14px;font-weight:700;
-          display:flex;align-items:center;justify-content:center;gap:8px;
-          box-shadow:0 2px 14px rgba(108,62,191,0.28);touch-action:manipulation;">
-        ✨ Build an Outfit Around This
-      </button>
-    </div>
     <!-- Saved builds for this item -->
     ${(()=>{
       const builds = S.savedOutfitBuilds.filter(b => b.wardrobeId === w.id);
@@ -17655,11 +17802,11 @@ function viewWardrobeItem() {
               </div>`;
             }).join('')}
           </div>
-          <div style="margin-top:14px;display:flex;gap:8px;">
-            <button onclick="confirmOutfitLinks()" style="flex:1;padding:13px;border-radius:var(--r-sm);background:var(--gold);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
+          <div style="position:sticky;bottom:0;margin:0 -20px;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--border);display:flex;gap:8px;z-index:10;box-shadow:0 -4px 16px rgba(0,0,0,0.07);">
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();confirmOutfitLinks()" onclick="confirmOutfitLinks()" style="flex:1;padding:13px;border-radius:var(--r-sm);background:var(--gold);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
               Save Links (${(() => { const ids = new Set(allEntries.map(e => e.id)); return Object.entries(ol.selected).filter(([id, v]) => v && ids.has(id)).length; })()} selected)
             </button>
-            <button onclick="S.outfitLinker=null;render()" style="padding:13px 16px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border);font-size:14px;cursor:pointer;font-family:inherit;">Cancel</button>
+            <button ontouchend="if(_touchMoved)return;event.preventDefault();S.outfitLinker=null;render()" onclick="S.outfitLinker=null;render()" style="padding:13px 16px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border);font-size:14px;cursor:pointer;font-family:inherit;touch-action:manipulation;">Cancel</button>
           </div>
         </div>`;
       }
@@ -17670,10 +17817,10 @@ function viewWardrobeItem() {
             <button onclick="openWardrobeOutfitLinker('${w.id}')" style="font-size:12px;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer;font-family:inherit;font-weight:600;">✏️ Edit links</button>
           </div>
           <div class="outfit-thumb-grid">
-            ${outfits.map(e => `
+            ${outfits.map((e, i) => `
               <div class="outfit-thumb"
-                ontouchend="if(_touchMoved)return;event.preventDefault();openEntry('${e.id}')"
-                onclick="openEntry('${e.id}')">
+                ontouchend="if(_touchMoved)return;event.preventDefault();openWitemLightbox(${JSON.stringify(outfits.map(x=>x.id))},${i})"
+                onclick="openWitemLightbox(${JSON.stringify(outfits.map(x=>x.id))},${i})">
                 <img src="${e.photo}" alt="Outfit" loading="lazy">
               </div>`).join('')}
           </div>
@@ -17867,8 +18014,8 @@ function viewWardrobeItem() {
     ${!isNewPiece ? (()=>{
       // ── Retire section ───────────────────────────────────────
       if (w.retiredFromCloset) {
-        const outcomeLabel = {donated:'Donated',sold:'Sold',tossed:'Tossed'}[w.retireOutcome] || 'Retired';
-        const reasonLabel = {'worn-out':'Worn out','didnt-suit-me':"Didn't suit me"}[w.retireReason] || '';
+        const outcomeLabel = {donated:'Donated',sold:'Sold',tossed:'Tossed','gifted-lost':'Gone'}[w.retireOutcome] || 'Retired';
+        const reasonLabel = {'worn-out':'Worn out','didnt-suit-me':"Didn't suit me",'gifted-lost':'Gifted / Lost — want it back'}[w.retireReason] || '';
         const mf = S.memorialFlow?.id === w.id ? S.memorialFlow : null;
         const memorialSection = (() => {
           if (mf) {
@@ -17939,6 +18086,10 @@ function viewWardrobeItem() {
                 <div style="font-weight:600;font-size:13px;">🙅 Didn't suit me</div>
                 <div style="font-size:12px;color:var(--text-3);margin-top:2px;">Didn't click after a few tries — money to learn from.</div>
               </button>
+              <button class="retire-reason-btn" ontouchend="if(_touchMoved)return;event.preventDefault();confirmRetireGiftedLost('${w.id}')" onclick="confirmRetireGiftedLost('${w.id}')">
+                <div style="font-weight:600;font-size:13px;">💝 Gifted away or lost — want it again</div>
+                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">It's gone, but you'd love to replace it. Adds it to your Buy Again list.</div>
+              </button>
             </div>
             <button onclick="S.retireFlow=null;render()" style="margin-top:12px;background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;padding:4px 0;font-family:inherit;">Cancel</button>
           </div>
@@ -17974,7 +18125,8 @@ function viewWardrobeItem() {
     })() : ''}
 
     <div style="height:8px"></div>
-  </div>`;
+  </div>
+  ${renderWitemLightbox()}`;
 }
 
 /* ================================================================
@@ -18311,7 +18463,9 @@ function viewBattleReplay() {
       <div style="width:72px"></div>
     </div>
 
-    <img style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;display:block;" src="${b.photo}" alt="Battle photo">
+    ${b.photo
+      ? `<img style="width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;display:block;" src="${b.photo}" alt="Battle photo">`
+      : `<div style="width:100%;aspect-ratio:3/4;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;font-size:52px;">⚔️</div>`}
 
     <div class="battle-banner">
       <div>
@@ -20574,6 +20728,71 @@ function dismissHiddenGem(id) {
   render();
 }
 
+// ── Outfit photo lightbox (wardrobe item → "Worn in X outfits") ──────────────
+function openWitemLightbox(ids, startIdx) {
+  S._witemLightbox = { ids, idx: startIdx };
+  render();
+}
+function witemLightboxNav(delta) {
+  const lb = S._witemLightbox; if (!lb) return;
+  lb.idx = (lb.idx + delta + lb.ids.length) % lb.ids.length;
+  render();
+}
+function renderWitemLightbox() {
+  const lb = S._witemLightbox; if (!lb) return '';
+  const entry = S.entries.find(e => e.id === lb.ids[lb.idx]);
+  if (!entry) return '';
+  const total = lb.ids.length;
+  const idx   = lb.idx;
+  const hasPrev = total > 1;
+  const hasNext = total > 1;
+  const ratingStars = entry.rating ? `${entry.rating}/10` : '';
+  const dateStr = entry.createdAt ? fmtDate(entry.createdAt) : '';
+  const caption = entry.outfitName ? `<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:2px;">${esc(entry.outfitName)}</div>` : '';
+  const meta = [ratingStars, dateStr, entry.occasion].filter(Boolean).join(' · ');
+  return `<div
+    style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.97);display:flex;flex-direction:column;touch-action:none;"
+    ontouchstart="window._lbTX=event.changedTouches[0].clientX;window._lbTY=event.changedTouches[0].clientY;"
+    ontouchend="(function(){const dx=event.changedTouches[0].clientX-window._lbTX;const dy=Math.abs(event.changedTouches[0].clientY-(window._lbTY||0));if(Math.abs(dx)>40&&Math.abs(dx)>dy){if(dx<0)witemLightboxNav(1);else witemLightboxNav(-1);}})()">
+
+    <!-- Top bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;padding-top:calc(16px + env(safe-area-inset-top,0px));flex-shrink:0;">
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();S._witemLightbox=null;render()"
+        onclick="S._witemLightbox=null;render()"
+        style="background:rgba(255,255,255,0.12);border:none;color:#fff;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;flex-shrink:0;">✕</button>
+      <span style="color:rgba(255,255,255,0.6);font-size:13px;font-weight:600;">${idx + 1} of ${total}</span>
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();S._witemLightbox=null;openEntry('${entry.id}')"
+        onclick="S._witemLightbox=null;openEntry('${entry.id}')"
+        style="background:rgba(255,255,255,0.12);border:none;color:#fff;border-radius:100px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;">Details →</button>
+    </div>
+
+    <!-- Photo -->
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;padding:0 ${total > 1 ? '48px' : '0'};">
+      ${hasPrev ? `<button
+        ontouchend="if(_touchMoved)return;event.preventDefault();witemLightboxNav(-1)"
+        onclick="witemLightboxNav(-1)"
+        style="position:absolute;left:4px;top:50%;transform:translateY(-50%);z-index:2;background:rgba(255,255,255,0.14);border:none;color:#fff;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;">‹</button>` : ''}
+      <img src="${esc(entry.photo||'')}" alt="Outfit"
+        style="max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:4px;">
+      ${hasNext ? `<button
+        ontouchend="if(_touchMoved)return;event.preventDefault();witemLightboxNav(1)"
+        onclick="witemLightboxNav(1)"
+        style="position:absolute;right:4px;top:50%;transform:translateY(-50%);z-index:2;background:rgba(255,255,255,0.14);border:none;color:#fff;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;">›</button>` : ''}
+    </div>
+
+    <!-- Caption -->
+    <div style="padding:14px 20px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));text-align:center;flex-shrink:0;">
+      ${caption}
+      ${meta ? `<div style="font-size:12px;color:rgba(255,255,255,0.5);">${esc(meta)}</div>` : ''}
+      ${total > 1 ? `<div style="display:flex;justify-content:center;gap:5px;margin-top:10px;">
+        ${lb.ids.map((_,i) => `<div style="width:${i===idx?'18':'6'}px;height:6px;border-radius:3px;background:${i===idx?'#fff':'rgba(255,255,255,0.3)'};transition:width .2s;"></div>`).join('')}
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
 // ── Outfit ↔ Wardrobe manual linking ────────────────────────────────────────
 
 // From wardrobe item: open picker to select which outfits contain this item
@@ -22425,7 +22644,7 @@ function viewLookingBack() {
             ${retiredItems.map(w => {
               const wears = w.wears?.length || 0;
               const outcomeLabel = {donated:'Donated',sold:'Sold',tossed:'Tossed'}[w.retireOutcome] || '';
-              const reasonLabel = {'worn-out':'Worn out','didnt-suit-me':"Didn't suit me"}[w.retireReason] || '';
+              const reasonLabel = {'worn-out':'Worn out','didnt-suit-me':"Didn't suit me",'gifted-lost':'Gifted / Lost'}[w.retireReason] || '';
               const meta = [outcomeLabel, reasonLabel, w.retiredAt ? fmtDate(w.retiredAt) : ''].filter(Boolean).join(' · ');
               return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openWardrobeItem('${w.id}')" onclick="openWardrobeItem('${w.id}')"
                 style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid rgba(150,80,220,0.1);cursor:pointer;touch-action:manipulation;">
@@ -22878,14 +23097,14 @@ function viewValueItems() {
 
   function shareValue() {
     const lines = [
-      `💚 My Value Unlocked (${items.length} paid-off pieces · ${totalWears} total wears)\n`,
+      `💚 Worth Every Penny (${items.length} paid-off pieces · ${totalWears} total wears)\n`,
       ...items.map(w => {
         const wears = w.wears?.length || 0;
         const ppw = w.price && wears > 0 ? ` · $${(w.price/wears).toFixed(2)}/wear` : '';
         return `${w.icon||'👕'} ${w.name}${w.brand ? ' — ' + w.brand : ''}\n   ${w.price ? `$${parseFloat(w.price).toFixed(0)} paid · ` : ''}worn ${wears}×${ppw}`;
       })
     ];
-    shareText('My Value Unlocked', lines.join('\n'));
+    shareText('Worth Every Penny', lines.join('\n'));
   }
 
   const back = 'profile';
@@ -22894,7 +23113,7 @@ function viewValueItems() {
     return `<div class="view view-notab">
       <div class="nav">
         <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Portfolio</button>
-        <span class="nav-title">Value Unlocked</span>
+        <span class="nav-title">Worth Every Penny</span>
         <span style="width:72px;"></span>
       </div>
       <div style="padding:60px 24px;text-align:center;">
@@ -22908,7 +23127,7 @@ function viewValueItems() {
   return `<div class="view view-notab" style="display:flex;flex-direction:column;">
     <div class="nav">
       <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('${back}')" onclick="navigate('${back}')" style="touch-action:manipulation;">${iconBack()} Portfolio</button>
-      <span class="nav-title">Value Unlocked</span>
+      <span class="nav-title">Worth Every Penny</span>
       <button ontouchend="if(_touchMoved)return;event.preventDefault();shareValue()" onclick="shareValue()"
         style="background:none;border:none;font-size:13px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;padding:4px 8px;touch-action:manipulation;">↗ Share</button>
     </div>
@@ -23316,6 +23535,26 @@ async function confirmRetire(id) {
     ? "Item retired. It's a learning — you'll shop smarter next time. 💜"
     : 'Item retired! Great run 👏';
   toast(msg);
+}
+
+async function confirmRetireGiftedLost(id) {
+  const w = S.wardrobe.find(i => i.id === id); if (!w) return;
+  w.retiredFromCloset = true;
+  w.retireReason  = 'gifted-lost';
+  w.retireOutcome = 'gifted-lost';
+  w.retiredAt = new Date().toISOString();
+  S.retireFlow = null;
+  // Auto-add to Buy Again list
+  if (w.name) {
+    const key = w.name.trim();
+    if (key && !S.restockQueries.has(key)) {
+      S.restockQueries.add(key);
+      localStorage.setItem('closet-restock', JSON.stringify([...S.restockQueries]));
+      fsSet('restockQueries', [...S.restockQueries]);
+    }
+  }
+  await DB.wardrobe.put(w); render();
+  toast('Retired and added to Buy Again 💛');
 }
 
 async function unretireItem(id) {
@@ -23733,6 +23972,29 @@ async function doDeleteEntry(id) {
   await DB.entries.del(id);
   S.entries = S.entries.filter(e => e.id !== id); // in-memory — skip getAll()
   navigate('closet'); toast('Outfit deleted.');
+}
+
+function bulkDeleteFits() {
+  const ids = S._fitsSelected || [];
+  if (!ids.length) { toast('Tap a fit or two first!'); return; }
+  const n = ids.length;
+  const d = document.createElement('div'); d.className = 'dialog-overlay';
+  d.innerHTML = `<div class="dialog-sheet">
+    <div class="dialog-title">Delete ${n} outfit${n===1?'':'s'}?</div>
+    <div class="dialog-msg">This will permanently remove ${n===1?'this outfit':'these outfits'}. This can't be undone.</div>
+    <button class="dialog-btn confirm" id="bdf-ok">Delete</button>
+    <button class="dialog-btn cancel" onclick="this.closest('.dialog-overlay').remove()">Cancel</button>
+  </div>`;
+  document.body.appendChild(d);
+  document.getElementById('bdf-ok').onclick = async () => {
+    d.remove();
+    for (const id of ids) await DB.entries.del(id);
+    S.entries = S.entries.filter(e => !ids.includes(e.id));
+    S._fitsSelectMode = false;
+    S._fitsSelected = [];
+    render();
+    toast(`${n} outfit${n===1?'':'s'} deleted.`);
+  };
 }
 
 function showDeleteWardrobeConfirm(id) {
