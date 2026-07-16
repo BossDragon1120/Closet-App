@@ -9959,28 +9959,53 @@ function viewShop() {
           </button>`;
 
         // ── Expanded ───────────────────────────────────────────────────────────
-        const picksListHTML = hasPicks ? `
-          <div style="background:var(--surface);border:1.5px solid rgba(185,140,50,0.3);border-radius:var(--r);overflow:hidden;margin-top:14px;">
-            ${picks.map((pick, i) => {
-              const badges = (pick.sources||[]).map(s =>
-                `<span style="font-size:9px;font-weight:700;color:${sourceColors[s]||'var(--text-3)'};background:${sourceColors[s]?sourceColors[s]+'18':'var(--bg)'};border:1px solid ${sourceColors[s]||'var(--border)'}33;padding:1px 5px;border-radius:100px;white-space:nowrap;">${sourceIcons[s]||''}${s}</span>`
-              ).join('');
-              const numBg = i===0 ? 'linear-gradient(135deg,#B87D2A,#D4A843)' : i<3 ? 'rgba(185,140,50,0.15)' : 'var(--bg)';
-              const numColor = i===0 ? '#fff' : i<3 ? '#9A6820' : 'var(--text-3)';
-              const numBorder = i>=3 ? '1.5px solid var(--border)' : 'none';
-              return `<div ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick(${JSON.stringify(pick.query)});"
+        const picksListHTML = hasPicks ? (()=>{
+          function mkBadge(s) {
+            return `<span style="font-size:9px;font-weight:700;color:${sourceColors[s]||'var(--text-3)'};background:${sourceColors[s]?sourceColors[s]+'18':'var(--bg)'};border:1px solid ${sourceColors[s]||'var(--border)'}33;padding:1px 5px;border-radius:100px;white-space:nowrap;">${sourceIcons[s]||''}${s}</span>`;
+          }
+          const [hero, ...rest] = picks;
+          // ── Hero card — #1 pick, full width ──────────────────────────
+          const { bg: hBg, border: hBorder } = shopItemBg(hero.query);
+          const hEmoji = shopItemEmoji(hero.query);
+          const hBadges = (hero.sources||[]).map(mkBadge).join('');
+          const heroCard = `<div
+            ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick(${JSON.stringify(hero.query)});"
+            onclick="openPriorityPick(${JSON.stringify(hero.query)});"
+            style="background:${hBg};border:1.5px solid ${hBorder};border-radius:var(--r);padding:16px;margin-bottom:8px;cursor:pointer;touch-action:manipulation;position:relative;">
+            <div style="position:absolute;top:10px;right:10px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);background:rgba(184,125,42,.12);padding:3px 8px;border-radius:100px;">🎯 Top Pick</div>
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:66px;height:66px;border-radius:16px;background:rgba(255,255,255,.65);border:1.5px solid ${hBorder};display:flex;align-items:center;justify-content:center;font-size:36px;flex-shrink:0;">${hEmoji}</div>
+              <div style="flex:1;min-width:0;padding-right:60px;">
+                <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(hero.label)}</div>
+                ${hero.reason ? `<div style="font-size:12px;color:var(--text-2);line-height:1.4;margin-bottom:6px;">${esc(hero.reason)}</div>` : ''}
+                ${hBadges ? `<div style="display:flex;gap:4px;flex-wrap:wrap;">${hBadges}</div>` : ''}
+              </div>
+            </div>
+            <div style="margin-top:12px;padding:9px;background:rgba(255,255,255,.55);border-radius:var(--r-sm);text-align:center;font-size:13px;font-weight:800;color:var(--gold-dk);">Shop it ›</div>
+          </div>`;
+          // ── Grid cards — 2-col for picks #2–5 ────────────────────────
+          const gridCards = rest.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${
+            rest.slice(0,4).map((pick, idx) => {
+              const i = idx + 1;
+              const { bg, border } = shopItemBg(pick.query);
+              const emoji = shopItemEmoji(pick.query);
+              const badges = (pick.sources||[]).map(mkBadge).join('');
+              const numBg = i < 2 ? 'rgba(185,140,50,0.22)' : 'var(--surface-2)';
+              const numColor = i < 2 ? '#9A6820' : 'var(--text-3)';
+              return `<div
+                ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick(${JSON.stringify(pick.query)});"
                 onclick="openPriorityPick(${JSON.stringify(pick.query)});"
-                style="display:flex;align-items:flex-start;gap:11px;padding:11px 14px;${i<picks.length-1?'border-bottom:1px solid var(--border);':''}cursor:pointer;touch-action:manipulation;">
-                <div style="width:24px;height:24px;border-radius:50%;background:${numBg};border:${numBorder};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:${numColor};flex-shrink:0;margin-top:2px;">${i+1}</div>
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(pick.label)}</div>
-                  ${pick.reason ? `<div style="font-size:11px;color:var(--text-3);margin-top:1px;line-height:1.4;">${esc(pick.reason)}</div>` : ''}
-                  ${badges ? `<div style="display:flex;gap:4px;margin-top:5px;flex-wrap:wrap;">${badges}</div>` : ''}
-                </div>
-                <span style="font-size:16px;color:var(--text-3);flex-shrink:0;align-self:center;">›</span>
+                style="background:${bg};border:1.5px solid ${border};border-radius:var(--r);padding:12px 10px 10px;cursor:pointer;touch-action:manipulation;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">
+                <div style="position:absolute;top:7px;left:7px;width:19px;height:19px;border-radius:50%;background:${numBg};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:${numColor};">${i+1}</div>
+                <div style="width:50px;height:50px;border-radius:12px;background:rgba(255,255,255,.65);border:1.5px solid ${border};display:flex;align-items:center;justify-content:center;font-size:28px;margin-top:10px;">${emoji}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;">${esc(pick.label)}</div>
+                ${pick.reason ? `<div style="font-size:10px;color:var(--text-3);line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;">${esc(pick.reason)}</div>` : ''}
+                ${badges ? `<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;">${badges}</div>` : ''}
               </div>`;
-            }).join('')}
-          </div>` : loading ? `
+            }).join('')
+          }</div>` : '';
+          return `<div style="margin-top:14px;">${heroCard}${gridCards}</div>`;
+        })() : loading ? `
           <div style="display:flex;align-items:center;gap:10px;padding:14px;margin-top:14px;background:rgba(185,140,50,0.06);border:1px solid rgba(185,140,50,0.25);border-radius:var(--r);">
             <div class="spinner" style="width:18px;height:18px;border-width:2px;flex-shrink:0;"></div>
             <div style="font-size:13px;color:var(--text-3);">Ranking across all your lists…</div>
@@ -10333,92 +10358,6 @@ function viewClosetTodo() {
 }
 
 /* ================================================================
-   VIEW: PLAN — WFH WEBCAM CHECK helper
-   ================================================================ */
-function wfhWebcamHTML() {
-  const fits = S.entries
-    .filter(e => e.photo && !e.doNotRepeat)
-    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-
-  if (!fits.length) return `<div style="padding:0 16px 12px;">
-    <div style="background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--r);padding:16px;text-align:center;">
-      <div style="font-size:22px;margin-bottom:6px;">💻</div>
-      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">WFH Webcam Check</div>
-      <div style="font-size:11px;color:var(--text-3);line-height:1.4;">Log outfits with photos to see how you'll look on a video call.</div>
-    </div>
-  </div>`;
-
-  const bgColor = S._wfhBgColor || '#1a1a2e';
-  const idx = Math.min(S._wfhCarouselIdx || 0, fits.length - 1);
-  const cur = fits[idx];
-  const hasPrev = idx > 0;
-  const hasNext = idx < fits.length - 1;
-
-  const d = cur.date ? new Date(cur.date) : null;
-  const dateStr = d && !isNaN(d) ? d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
-  const entryLabel = cur.name ? esc(cur.name) : (dateStr || 'Outfit');
-
-  const bgPresets = [
-    {c:'#0d0d1a',n:'Dark'},{c:'#1e293b',n:'Slate'},{c:'#2d4a6b',n:'Navy'},
-    {c:'#3d5a48',n:'Forest'},{c:'#5a3d6b',n:'Purple'},{c:'#6b4535',n:'Mocha'},
-    {c:'#c9bfb4',n:'Stone'},{c:'#f2ede8',n:'Linen'},
-  ];
-
-  return `<div style="padding:0 16px 16px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);">💻 WFH Webcam Check</div>
-      <div style="font-size:10px;color:var(--text-3);">${idx+1} / ${fits.length}</div>
-    </div>
-
-    <div style="position:relative;margin:0 18px 8px;">
-      <button ${hasPrev?'':'disabled'}
-        ontouchend="if(_touchMoved)return;event.preventDefault();S._wfhCarouselIdx=Math.max(0,(S._wfhCarouselIdx||0)-1);renderRAF();"
-        onclick="S._wfhCarouselIdx=Math.max(0,(S._wfhCarouselIdx||0)-1);renderRAF();"
-        style="position:absolute;left:-20px;top:50%;transform:translateY(-50%);z-index:2;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.55);border:1.5px solid rgba(255,255,255,.15);color:#fff;font-size:18px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;touch-action:manipulation;line-height:1;padding:0;opacity:${hasPrev?'1':'.2'};">‹</button>
-
-      <div style="aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:${bgColor};position:relative;box-shadow:0 0 0 2.5px rgba(255,255,255,.07),0 6px 24px rgba(0,0,0,.45);">
-        <img src="${cur.photo}" style="width:100%;height:100%;object-fit:cover;object-position:top;" loading="eager">
-        <div style="position:absolute;top:7px;left:7px;display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.45);padding:3px 7px;border-radius:100px;">
-          <div style="width:5px;height:5px;border-radius:50%;background:#ef4444;flex-shrink:0;"></div>
-          <span style="font-size:8px;font-weight:800;color:#fff;letter-spacing:.06em;">LIVE</span>
-        </div>
-        ${fits.length > 1 ? `<div style="position:absolute;bottom:5px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:3px;">
-          ${fits.slice(0, Math.min(fits.length, 12)).map((_, i) => `<div style="width:${i===idx?10:5}px;height:5px;border-radius:100px;background:${i===idx?'rgba(255,255,255,.95)':'rgba(255,255,255,.35)'};"></div>`).join('')}
-          ${fits.length > 12 ? `<span style="font-size:7px;color:rgba(255,255,255,.5);margin-left:2px;">+${fits.length-12}</span>` : ''}
-        </div>` : ''}
-      </div>
-
-      <button ${hasNext?'':'disabled'}
-        ontouchend="if(_touchMoved)return;event.preventDefault();S._wfhCarouselIdx=Math.min(${fits.length-1},(S._wfhCarouselIdx||0)+1);renderRAF();"
-        onclick="S._wfhCarouselIdx=Math.min(${fits.length-1},(S._wfhCarouselIdx||0)+1);renderRAF();"
-        style="position:absolute;right:-20px;top:50%;transform:translateY(-50%);z-index:2;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.55);border:1.5px solid rgba(255,255,255,.15);color:#fff;font-size:18px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;touch-action:manipulation;line-height:1;padding:0;opacity:${hasNext?'1':'.2'};">›</button>
-    </div>
-
-    <div style="text-align:center;margin-bottom:10px;">
-      <div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.3;">${entryLabel}</div>
-      ${dateStr && cur.name ? `<div style="font-size:10px;color:var(--text-3);margin-top:1px;">${dateStr}</div>` : ''}
-    </div>
-
-    <div style="margin-bottom:12px;">
-      <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;text-align:center;">call background</div>
-      <div style="display:flex;gap:6px;justify-content:center;">
-        ${bgPresets.map(({c,n}) => `<button title="${n}"
-          ontouchend="if(_touchMoved)return;event.preventDefault();S._wfhBgColor='${c}';renderRAF();"
-          onclick="S._wfhBgColor='${c}';renderRAF();"
-          style="width:26px;height:26px;border-radius:50%;background:${c};border:${c===bgColor?'2.5px solid var(--text)':'2px solid rgba(255,255,255,.12)'};cursor:pointer;flex-shrink:0;touch-action:manipulation;${c===bgColor?'box-shadow:0 0 0 1.5px var(--bg),0 0 0 3px var(--text);':''}"></button>`).join('')}
-      </div>
-    </div>
-
-    <button
-      ontouchend="if(_touchMoved)return;event.preventDefault();logRewear('${cur.id}');"
-      onclick="logRewear('${cur.id}');"
-      style="width:100%;padding:12px 0;border-radius:var(--r-sm);border:none;background:var(--accent);font-size:13px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;letter-spacing:.01em;">
-      ✓ Wear this today
-    </button>
-  </div>`;
-}
-
-/* ================================================================
    VIEW: PLAN
    ================================================================ */
 function viewPlan() {
@@ -10437,9 +10376,6 @@ function viewPlan() {
       <div class="plan-hero-title">What's the occasion?</div>
       <div class="plan-hero-sub">Plan what's next.</div>
     </div>
-
-      <!-- WFH WEBCAM CHECK -->
-      ${!p.soloMode ? wfhWebcamHTML() : ''}
 
       <!-- SOLO SUB-MODE PICKER -->
       ${!p.soloMode ? `
