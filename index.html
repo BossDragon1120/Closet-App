@@ -11544,7 +11544,7 @@ function viewStyleRoulette() {
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('plan')" onclick="navigate('plan')">${iconBack()} Plan</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('fun')" onclick="navigate('fun')">${iconBack()} Fun</button>
       <span class="nav-title">🎲 Style Roulette</span>
       <span style="width:60px;"></span>
     </div>
@@ -17429,7 +17429,7 @@ function viewRatingSummary() {
 
   return `<div class="view">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')">${iconBack()} Wardrobe</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(S._prevView||'wardrobe')" onclick="navigate(S._prevView||'wardrobe')">${iconBack()} ${S._prevView==='profile'?'Portfolio':'Wardrobe'}</button>
       <span class="nav-title">Ratings Summary</span>
       <span style="width:30px;"></span>
     </div>
@@ -22884,7 +22884,7 @@ function viewGems() {
   if (!gems.length) {
     return `<div class="view view-notab">
       <div class="nav">
-        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Back</button>
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')" style="touch-action:manipulation;">${iconBack()} Portfolio</button>
         <span class="nav-title">My Gems</span>
         <span style="width:72px;"></span>
       </div>
@@ -22898,7 +22898,7 @@ function viewGems() {
 
   return `<div class="view view-notab" style="display:flex;flex-direction:column;">
     <div class="nav">
-      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')" style="touch-action:manipulation;">${iconBack()} Back</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('profile')" onclick="navigate('profile')" style="touch-action:manipulation;">${iconBack()} Portfolio</button>
       <span class="nav-title">My Gems</span>
       <span style="width:72px;"></span>
     </div>
