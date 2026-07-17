@@ -4963,15 +4963,18 @@ function aiErrorToast(e, feature) {
     text = '⏳ Rate limited — wait a moment and try again';
   } else if (status === 400) {
     text = `🐛 App error [${feature}] — bad request (400)`;
-  } else if (status >= 500) {
+  } else if (status && status >= 500) {
     text = `🌐 Claude API error (${status}) — try again`;
+  } else if (status) {
+    // Unhandled HTTP status (402, 404, 413, etc.) — show actual code so user can report it
+    text = `⚠️ API error (${status}) [${feature}] — try again`;
   } else if (msg.includes('No JSON') || msg.includes('parse') || msg.includes('response format') || msg.includes('Unexpected')) {
     text = `🐛 App error [${feature}] — couldn't read response`;
   } else if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch') || msg.includes('Load failed') || msg.includes('load') || msg.includes('connection') || msg.includes('cancelled') || msg.includes('abort')) {
     text = `📡 Network error — check your connection and try again`;
   } else {
-    // Unknown error — likely a transient connection hiccup or API blip
-    text = `⚠️ Something went wrong [${feature}] — check your connection and try again`;
+    // Unknown error — show raw message so we can diagnose
+    text = `⚠️ Error [${feature}]: ${msg || 'unknown'} — try again`;
   }
   console.error(`aiError [${feature}]:`, e);
   toast(text);
@@ -7254,7 +7257,10 @@ Return ONLY valid JSON with no markdown or extra text:
 {"outfit":[{"item":"exact item name from list","emoji":"emoji","reason":"why this piece"}],"vibe":"2-4 word vibe e.g. Effortlessly Cool","hype":"one punchy sentence hyping this look"}` }],
       }),
     });
-    if (!res.ok) throw new Error(`API ${res.status}`);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(`API ${res.status}: ${errBody?.error?.message || ''}`);
+    }
     const data = await res.json();
     const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
     const m = text.match(/\{[\s\S]*\}/);
@@ -7358,7 +7364,10 @@ Return ONLY valid JSON with no markdown or extra text:
 {"outfit":[{"item":"exact item name from list","emoji":"emoji","reason":"why this piece"}],"vibe":"2-4 word vibe e.g. Effortlessly Cool","hype":"one punchy sentence hyping this look"}` }],
       }),
     });
-    if (!res.ok) throw new Error(`API ${res.status}`);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(`API ${res.status}: ${errBody?.error?.message || ''}`);
+    }
     const data = await res.json();
     const text = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
     const m = text.match(/\{[\s\S]*\}/);
