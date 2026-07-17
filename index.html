@@ -4762,6 +4762,7 @@ function openPriorityPick(query) {
   else if (inBuyAgain)  { S.shopSource = 'buyagain';  S.shopSelectedQuery = query; }
   else if (inRecs)      { S.shopSource = 'recs';      S.shopSelectedQuery = query; }
   else                  { S.shopSource = 'spotted';   S.shopSelectedQuery = null;  }
+  S._priorityPicksOpen = false; // collapse panel so the expanded item accordion is visible
   S.shopExpanded = true;
   render();
 }
@@ -9969,8 +9970,8 @@ function viewShop() {
           const hEmoji = shopItemEmoji(hero.query);
           const hBadges = (hero.sources||[]).map(mkBadge).join('');
           const heroCard = `<div
-            ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick(${JSON.stringify(hero.query)});"
-            onclick="openPriorityPick(${JSON.stringify(hero.query)});"
+            ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick('${esc(hero.query)}');"
+            onclick="openPriorityPick('${esc(hero.query)}');"
             style="background:${hBg};border:1.5px solid ${hBorder};border-radius:var(--r);padding:16px;margin-bottom:8px;cursor:pointer;touch-action:manipulation;position:relative;">
             <div style="position:absolute;top:10px;right:10px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);background:rgba(184,125,42,.12);padding:3px 8px;border-radius:100px;">🎯 Top Pick</div>
             <div style="display:flex;align-items:center;gap:14px;">
@@ -9993,8 +9994,8 @@ function viewShop() {
               const numBg = i < 2 ? 'rgba(185,140,50,0.22)' : 'var(--surface-2)';
               const numColor = i < 2 ? '#9A6820' : 'var(--text-3)';
               return `<div
-                ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick(${JSON.stringify(pick.query)});"
-                onclick="openPriorityPick(${JSON.stringify(pick.query)});"
+                ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick('${esc(pick.query)}');"
+                onclick="openPriorityPick('${esc(pick.query)}');"
                 style="background:${bg};border:1.5px solid ${border};border-radius:var(--r);padding:12px 10px 10px;cursor:pointer;touch-action:manipulation;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">
                 <div style="position:absolute;top:7px;left:7px;width:19px;height:19px;border-radius:50%;background:${numBg};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:${numColor};">${i+1}</div>
                 <div style="width:50px;height:50px;border-radius:12px;background:rgba(255,255,255,.65);border:1.5px solid ${border};display:flex;align-items:center;justify-content:center;font-size:28px;margin-top:10px;">${emoji}</div>
@@ -10026,13 +10027,16 @@ function viewShop() {
                 <span style="font-size:14px;font-weight:800;color:var(--text);">Priority Picks</span>
                 ${hasPicks ? `<span style="font-size:10px;font-weight:700;background:rgba(185,140,50,0.18);color:var(--gold-dk);padding:1px 7px;border-radius:100px;">Top ${picks.length}</span>` : ''}
               </div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                ${hasPicks && !loading ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();sharePriorityPicks();" onclick="sharePriorityPicks();"
-                  style="background:none;border:1px solid var(--gold);border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↑ Share</button>` : ''}
-                ${hasPicks && !loading ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generatePriorityPicks();" onclick="generatePriorityPicks();"
-                  style="background:none;border:1px solid var(--gold);border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">↺ Re-rank</button>` : ''}
-                <button ontouchend="if(_touchMoved)return;event.preventDefault();S._priorityPicksOpen=false;render();" onclick="S._priorityPicksOpen=false;render();"
-                  style="background:none;border:none;font-size:14px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;padding:4px 8px;">✕</button>
+              <div style="display:flex;align-items:center;gap:2px;">
+                ${hasPicks && !loading ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();sharePriorityPicks();" onclick="sharePriorityPicks();" title="Share" style="background:none;border:none;padding:6px;border-radius:8px;cursor:pointer;color:var(--text-3);touch-action:manipulation;display:flex;align-items:center;justify-content:center;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                </button>` : ''}
+                ${hasPicks && !loading ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generatePriorityPicks();" onclick="generatePriorityPicks();" title="Re-rank" style="background:none;border:none;padding:6px;border-radius:8px;cursor:pointer;color:var(--text-3);touch-action:manipulation;display:flex;align-items:center;justify-content:center;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                </button>` : ''}
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();S._priorityPicksOpen=false;render();" onclick="S._priorityPicksOpen=false;render();" title="Close" style="background:none;border:none;padding:6px;border-radius:8px;cursor:pointer;color:var(--text-3);touch-action:manipulation;display:flex;align-items:center;justify-content:center;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
               </div>
             </div>
             ${picksListHTML}
@@ -17763,6 +17767,15 @@ function viewWardrobeItem() {
     <!-- New piece: AI fill + Edit details at top -->
     ${isNewPiece ? aiFillHtml : ''}
     ${isNewPiece ? editDetailsHtml : ''}
+    ${isNewPiece ? `
+    <div style="padding:0 20px 32px;">
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();saveNewWardrobeItem('${w.id}');"
+        onclick="saveNewWardrobeItem('${w.id}')"
+        style="width:100%;padding:16px;background:var(--gold);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;letter-spacing:.01em;">
+        ✓ Save Item
+      </button>
+    </div>` : ''}
 
     <!-- Existing piece: AI fill banner in original position -->
     ${!isNewPiece ? aiFillHtml : ''}
@@ -22110,6 +22123,23 @@ async function updateWardrobeOriginalPrice(id, val) {
   w.originalPrice = parseFloat(val)||null;
   render(); // optimistic
   await DB.wardrobe.put(w);
+}
+async function saveNewWardrobeItem(id) {
+  const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
+  // Flush any still-focused DOM fields before saving
+  const nameEl = document.getElementById('witemName');
+  const brandEl = document.getElementById('witemBrand');
+  const colorEl = document.getElementById('witemColor');
+  const sizeEl = document.getElementById('witemSize');
+  if (nameEl?.value?.trim()) w.name = nameEl.value.trim();
+  if (brandEl) w.brand = brandEl.value.trim() || null;
+  if (colorEl) w.color = colorEl.value.trim() || null;
+  if (sizeEl) w.size = sizeEl.value.trim() || null;
+  if (!w.name) { toast('Add a name first!'); nameEl?.focus(); return; }
+  w._aiPending = false;
+  await DB.wardrobe.put(w);
+  navigate('wardrobe');
+  toast('✓ Item saved!');
 }
 async function updateWardrobeName(id, val) {
   const w = S.wardrobe.find(i=>i.id===id); if (!w) return;
