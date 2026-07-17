@@ -3993,6 +3993,12 @@ function sharePriorityPicks() {
   text += '\n(curated with my Closet App 💛)';
   shareText('Priority Picks', text);
 }
+function removePriorityPick(idx) {
+  if (!S.priorityPicks?.length) return;
+  S.priorityPicks.splice(idx, 1);
+  localStorage.setItem('closet-priority-picks', JSON.stringify(S.priorityPicks));
+  render();
+}
 function removeFromBuyAgain(query) {
   const key = typeof query === 'string' ? query : (query?.query || '');
   if (!key) return;
@@ -9969,39 +9975,50 @@ function viewShop() {
           const { bg: hBg, border: hBorder } = shopItemBg(hero.query);
           const hEmoji = shopItemEmoji(hero.query);
           const hBadges = (hero.sources||[]).map(mkBadge).join('');
-          const heroCard = `<div
-            ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick('${esc(hero.query)}');"
-            onclick="openPriorityPick('${esc(hero.query)}');"
-            style="background:${hBg};border:1.5px solid ${hBorder};border-radius:var(--r);padding:16px;margin-bottom:8px;cursor:pointer;touch-action:manipulation;position:relative;">
-            <div style="position:absolute;top:10px;right:10px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);background:rgba(184,125,42,.12);padding:3px 8px;border-radius:100px;">🎯 Top Pick</div>
+          const heroCard = `<div style="background:${hBg};border:1.5px solid ${hBorder};border-radius:var(--r);padding:16px;margin-bottom:8px;position:relative;">
+            <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:10px;">🎯 Top Pick</div>
             <div style="display:flex;align-items:center;gap:14px;">
-              <div style="width:66px;height:66px;border-radius:16px;background:rgba(255,255,255,.65);border:1.5px solid ${hBorder};display:flex;align-items:center;justify-content:center;font-size:36px;flex-shrink:0;">${hEmoji}</div>
-              <div style="flex:1;min-width:0;padding-right:60px;">
-                <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(hero.label)}</div>
+              <div style="width:60px;height:60px;border-radius:14px;background:rgba(255,255,255,.65);border:1.5px solid ${hBorder};display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;">${hEmoji}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:16px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(hero.label)}</div>
                 ${hero.reason ? `<div style="font-size:12px;color:var(--text-2);line-height:1.4;margin-bottom:6px;">${esc(hero.reason)}</div>` : ''}
                 ${hBadges ? `<div style="display:flex;gap:4px;flex-wrap:wrap;">${hBadges}</div>` : ''}
               </div>
             </div>
-            <div style="margin-top:12px;padding:9px;background:rgba(255,255,255,.55);border-radius:var(--r-sm);text-align:center;font-size:13px;font-weight:800;color:var(--gold-dk);">Shop it ›</div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick('${esc(hero.query)}');" onclick="openPriorityPick('${esc(hero.query)}');"
+                style="flex:1;padding:9px;background:rgba(255,255,255,.7);border:1.5px solid ${hBorder};border-radius:var(--r-sm);font-size:13px;font-weight:800;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                Shop it ›
+              </button>
+              <button ontouchend="if(_touchMoved)return;event.preventDefault();removePriorityPick(0);" onclick="removePriorityPick(0);"
+                style="padding:9px 14px;background:rgba(255,255,255,.5);border:1.5px solid ${hBorder};border-radius:var(--r-sm);font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                ✕
+              </button>
+            </div>
           </div>`;
-          // ── Grid cards — 2-col for picks #2–5 ────────────────────────
+          // ── Grid cards — 2-col for all remaining picks ────────────────
           const gridCards = rest.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${
-            rest.slice(0,4).map((pick, idx) => {
-              const i = idx + 1;
+            rest.map((pick, idx) => {
+              const pickIdx = idx + 1; // index in S.priorityPicks
               const { bg, border } = shopItemBg(pick.query);
               const emoji = shopItemEmoji(pick.query);
               const badges = (pick.sources||[]).map(mkBadge).join('');
-              const numBg = i < 2 ? 'rgba(185,140,50,0.22)' : 'var(--surface-2)';
-              const numColor = i < 2 ? '#9A6820' : 'var(--text-3)';
-              return `<div
-                ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick('${esc(pick.query)}');"
-                onclick="openPriorityPick('${esc(pick.query)}');"
-                style="background:${bg};border:1.5px solid ${border};border-radius:var(--r);padding:12px 10px 10px;cursor:pointer;touch-action:manipulation;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;">
-                <div style="position:absolute;top:7px;left:7px;width:19px;height:19px;border-radius:50%;background:${numBg};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:${numColor};">${i+1}</div>
-                <div style="width:50px;height:50px;border-radius:12px;background:rgba(255,255,255,.65);border:1.5px solid ${border};display:flex;align-items:center;justify-content:center;font-size:28px;margin-top:10px;">${emoji}</div>
+              return `<div style="background:${bg};border:1.5px solid ${border};border-radius:var(--r);padding:12px 10px 10px;position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;">
+                <div style="position:absolute;top:7px;left:7px;width:18px;height:18px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:var(--text-3);">${pickIdx+1}</div>
+                <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,.65);border:1.5px solid ${border};display:flex;align-items:center;justify-content:center;font-size:26px;margin-top:10px;">${emoji}</div>
                 <div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;">${esc(pick.label)}</div>
                 ${pick.reason ? `<div style="font-size:10px;color:var(--text-3);line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;">${esc(pick.reason)}</div>` : ''}
                 ${badges ? `<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;">${badges}</div>` : ''}
+                <div style="display:flex;gap:5px;width:100%;margin-top:4px;">
+                  <button ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick('${esc(pick.query)}');" onclick="openPriorityPick('${esc(pick.query)}');"
+                    style="flex:1;padding:6px 4px;background:rgba(255,255,255,.7);border:1.5px solid ${border};border-radius:6px;font-size:11px;font-weight:800;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                    Shop
+                  </button>
+                  <button ontouchend="if(_touchMoved)return;event.preventDefault();removePriorityPick(${pickIdx});" onclick="removePriorityPick(${pickIdx});"
+                    style="padding:6px 8px;background:rgba(255,255,255,.5);border:1.5px solid ${border};border-radius:6px;font-size:11px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
+                    ✕
+                  </button>
+                </div>
               </div>`;
             }).join('')
           }</div>` : '';
@@ -10021,22 +10038,16 @@ function viewShop() {
 
         return `
           <div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r);padding:14px;margin-bottom:20px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
               <div style="display:flex;align-items:center;gap:8px;">
                 <span style="font-size:18px;">🎯</span>
                 <span style="font-size:14px;font-weight:800;color:var(--text);">Priority Picks</span>
                 ${hasPicks ? `<span style="font-size:10px;font-weight:700;background:rgba(185,140,50,0.18);color:var(--gold-dk);padding:1px 7px;border-radius:100px;">Top ${picks.length}</span>` : ''}
               </div>
-              <div style="display:flex;align-items:center;gap:2px;">
-                ${hasPicks && !loading ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();sharePriorityPicks();" onclick="sharePriorityPicks();" title="Share" style="background:none;border:none;padding:6px;border-radius:8px;cursor:pointer;color:var(--text-3);touch-action:manipulation;display:flex;align-items:center;justify-content:center;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                </button>` : ''}
-                ${hasPicks && !loading ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generatePriorityPicks();" onclick="generatePriorityPicks();" title="Re-rank" style="background:none;border:none;padding:6px;border-radius:8px;cursor:pointer;color:var(--text-3);touch-action:manipulation;display:flex;align-items:center;justify-content:center;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                </button>` : ''}
-                <button ontouchend="if(_touchMoved)return;event.preventDefault();S._priorityPicksOpen=false;render();" onclick="S._priorityPicksOpen=false;render();" title="Close" style="background:none;border:none;padding:6px;border-radius:8px;cursor:pointer;color:var(--text-3);touch-action:manipulation;display:flex;align-items:center;justify-content:center;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
+              <div style="display:flex;align-items:center;gap:6px;">
+                ${hasPicks && !loading ? `<button onclick="sharePriorityPicks();" style="background:none;border:1px solid var(--border);border-radius:100px;padding:4px 11px;font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;">↑ Share</button>` : ''}
+                ${hasPicks && !loading ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generatePriorityPicks();" onclick="generatePriorityPicks();" style="background:none;border:1px solid var(--border);border-radius:100px;padding:4px 11px;font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">↺</button>` : ''}
+                <button ontouchend="if(_touchMoved)return;event.preventDefault();S._priorityPicksOpen=false;render();" onclick="S._priorityPicksOpen=false;render();" style="background:none;border:none;padding:4px 8px;font-size:18px;line-height:1;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-left:2px;">×</button>
               </div>
             </div>
             ${picksListHTML}
@@ -15410,7 +15421,7 @@ function hangerHTML(w, _siblings) {
 function viewNewPiece() {
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate('wardrobe')">${iconBack()} Closet</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('wardrobe')" onclick="navigate('wardrobe')">${iconBack()} Closet</button>
       <span class="nav-title">New Piece</span>
       <span style="width:72px"></span>
     </div>
@@ -15447,8 +15458,8 @@ function viewNewPiece() {
         </button>
 
         <!-- Manual entry -->
-        <button ontouchend="if(_touchMoved)return;event.preventDefault();S.receiptFlow={step:'preview',mode:'manual',imageData:'',imageMime:'',pasteText:'',preview:{name:'',brand:'',price:'',category:'Tops',description:'',icon:'👕',isNew:true}};navigate('receipt-add')"
-          onclick="S.receiptFlow={step:'preview',mode:'manual',imageData:'',imageMime:'',pasteText:'',preview:{name:'',brand:'',price:'',category:'Tops',description:'',icon:'👕',isNew:true}};navigate('receipt-add')"
+        <button ontouchend="if(_touchMoved)return;event.preventDefault();S.receiptFlow={step:'preview',mode:'manual',imageData:'',imageMime:'',pasteText:'',preview:{name:'',brand:'',price:'',category:'Other',description:'',icon:'👕',isNew:true}};navigate('receipt-add')"
+          onclick="S.receiptFlow={step:'preview',mode:'manual',imageData:'',imageMime:'',pasteText:'',preview:{name:'',brand:'',price:'',category:'Other',description:'',icon:'👕',isNew:true}};navigate('receipt-add')"
           style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:18px 16px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;">
           <div style="width:48px;height:48px;border-radius:12px;background:var(--surface-2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;">✏️</div>
           <div style="flex:1;min-width:0;">
@@ -15974,7 +15985,7 @@ function viewBulkAdd() {
           <span style="font-size:10px;color:var(--gold-dk);font-weight:600;">✓ check this is right</span>
         </div>
         <select id="bulk-category" class="form-input" style="margin:0;font-weight:700;font-size:15px;border-color:rgba(185,140,50,0.45);">
-          ${cats.map(c=>`<option value="${c}" ${(p.category||'Tops')===c?'selected':''}>${c==='Pants'?'Bottoms':c}</option>`).join('')}
+          ${cats.map(c=>`<option value="${c}" ${normalizeCat(p.category||'Other')===normalizeCat(c)?'selected':''}>${c}</option>`).join('')}
         </select>
       </div>
 
@@ -16107,7 +16118,7 @@ function viewReceiptAdd() {
   if (isPhoto && rf.step === 'input') {
     return `<div class="view view-notab">
       <div class="nav">
-        <button class="nav-back" onclick="navigate('new-piece')">${iconBack()} Back</button>
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('new-piece')" onclick="navigate('new-piece')">${iconBack()} Back</button>
         <span class="nav-title">From a Photo</span>
         <span style="width:72px"></span>
       </div>
@@ -16152,7 +16163,7 @@ function viewReceiptAdd() {
   if (rf.step === 'parsing') {
     return `<div class="view view-notab">
       <div class="nav">
-        <button class="nav-back" onclick="navigate('new-piece')">${iconBack()} Back</button>
+        <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('new-piece')" onclick="navigate('new-piece')">${iconBack()} Back</button>
         <span class="nav-title">Reading Receipt…</span>
         <span style="width:72px"></span>
       </div>
@@ -16475,7 +16486,7 @@ function viewReceiptAdd() {
   // ── STEP: input — receipt scan ────────────────────────────────
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate('new-piece')">${iconBack()} Back</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('new-piece')" onclick="navigate('new-piece')">${iconBack()} Back</button>
       <span class="nav-title">Scan Receipt</span>
       <span style="width:72px"></span>
     </div>
@@ -17569,7 +17580,7 @@ function viewWardrobeItem() {
       <div>
         <label class="form-label">Category</label>
         <select class="form-input" onchange="updateWardrobeCategory('${w.id}',this.value)">
-          ${getAllCategories().filter(c=>c!=='All').map(c=>`<option value="${c}" ${(w.category||'Other')===c?'selected':''}>${c==='Pants'?'Bottoms':c}</option>`).join('')}
+          ${getAllCategories().filter(c=>c!=='All').map(c=>`<option value="${c}" ${normalizeCat(w.category||'Other')===normalizeCat(c)?'selected':''}>${c}</option>`).join('')}
         </select>
       </div>
       <div>
@@ -18173,7 +18184,7 @@ function viewUpload() {
   // (Battle history now lives on the Fun page)
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="${backAction}">${iconBack()} Back</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();${backAction}" onclick="${backAction}">${iconBack()} Back</button>
       <span class="nav-title">${navTitle}</span>
       <div style="width:72px"></div>
     </div>
@@ -18285,7 +18296,7 @@ function viewCrop() {
   if (!S.pendingPhoto) return viewUpload();
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="exitCrop()">${iconBack()} Back</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();exitCrop()" onclick="exitCrop()">${iconBack()} Back</button>
       <span class="nav-title">Crop Photo</span>
       <div style="width:72px"></div>
     </div>
@@ -18423,7 +18434,7 @@ function viewBattle() {
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate('upload');S.battleDraft=null;clearPending()">${iconBack()} Back</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload');S.battleDraft=null;clearPending()" onclick="navigate('upload');S.battleDraft=null;clearPending()">${iconBack()} Back</button>
       <span class="nav-title">⚔️ Fashion Battle</span>
       <div style="width:72px"></div>
     </div>
@@ -18867,7 +18878,7 @@ function viewFriendRating() {
   const title = fr.friendName ? `${esc(fr.friendName)}'s Fit Check` : "Friend's Fit Check";
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="S.friendRating=null;S.friendRatingMode=false;S.friendName='';clearPending();navigate(S.activeTab);">${iconBack()} Back</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();S.friendRating=null;S.friendRatingMode=false;S.friendName='';clearPending();navigate(S.activeTab);" onclick="S.friendRating=null;S.friendRatingMode=false;S.friendName='';clearPending();navigate(S.activeTab);">${iconBack()} Back</button>
       <span class="nav-title">${title}</span>
       <div style="width:72px"></div>
     </div>
@@ -18921,7 +18932,7 @@ function viewReview() {
   const d = S.draft; if (!d) return viewUpload();
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate('upload')">${iconBack()} Back</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate('upload')" onclick="navigate('upload')">${iconBack()} Back</button>
       <span class="nav-title">Review Outfit</span>
       <div style="width:72px"></div>
     </div>
@@ -19381,7 +19392,7 @@ function viewDetail() {
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="navigate(S.activeTab)">${iconBack()} ${S.activeTab==='closet'?'Fits':'Back'}</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();navigate(S.activeTab)" onclick="navigate(S.activeTab)">${iconBack()} ${S.activeTab==='closet'?'Fits':'Back'}</button>
       <span class="nav-title"></span>
       <button onclick="showDeleteConfirm('${entry.id}')" title="Delete outfit"
         style="background:none;border:none;padding:6px 10px;cursor:pointer;color:var(--text-3);opacity:.55;display:flex;align-items:center;touch-action:manipulation;">
@@ -19865,7 +19876,7 @@ function viewEdit() {
 
   return `<div class="view view-notab">
     <div class="nav">
-      <button class="nav-back" onclick="cancelEdit()">${iconBack()} Cancel</button>
+      <button class="nav-back" ontouchend="if(_touchMoved)return;event.preventDefault();cancelEdit()" onclick="cancelEdit()">${iconBack()} Cancel</button>
       <span class="nav-title">Edit Outfit</span>
       <button style="background:none;border:none;color:var(--gold);font-weight:700;font-size:16px;cursor:pointer;padding:4px 10px;font-family:inherit;" onclick="doSaveEdit()">Save</button>
     </div>
@@ -21492,7 +21503,7 @@ async function confirmReceiptItem() {
   }
   if (rf.preview._nameError) rf.preview._nameError = false;
 
-  const cat = normalizeCat(p.category || 'Tops');
+  const cat = normalizeCat(p.category || 'Other');
   const _today = new Date();
   const _todayMonth = `${_today.getFullYear()}-${String(_today.getMonth()+1).padStart(2,'0')}`;
   const newItem = {
