@@ -4770,7 +4770,7 @@ function openPriorityPick(query) {
   else                  { S.shopSource = 'spotted';   S.shopSelectedQuery = null;  }
   S._priorityPicksOpen = false; // collapse panel so the expanded item accordion is visible
   S.shopExpanded = true;
-  render();
+  switchTab('shop');
 }
 
 async function generatePriorityPicks() {
@@ -4959,6 +4959,8 @@ function aiErrorToast(e, feature) {
   let text;
   if (status === 401 || status === 403) {
     text = `🔑 API key error (${status}) — check Settings`;
+  } else if (status === 402 || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('usage limit') || msg.toLowerCase().includes('billing')) {
+    text = `💳 API quota exceeded — check your Anthropic plan at console.anthropic.com`;
   } else if (status === 429) {
     text = '⏳ Rate limited — wait a moment and try again';
   } else if (status === 400) {
@@ -4966,7 +4968,7 @@ function aiErrorToast(e, feature) {
   } else if (status && status >= 500) {
     text = `🌐 Claude API error (${status}) — try again`;
   } else if (status) {
-    // Unhandled HTTP status (402, 404, 413, etc.) — show actual code so user can report it
+    // Unhandled HTTP status (404, 413, etc.) — show actual code so user can report it
     text = `⚠️ API error (${status}) [${feature}] — try again`;
   } else if (msg.includes('No JSON') || msg.includes('parse') || msg.includes('response format') || msg.includes('Unexpected')) {
     text = `🐛 App error [${feature}] — couldn't read response`;
@@ -5008,6 +5010,7 @@ function featuresMenuHTML() {
         { icon: '✦', text: '<strong>AI Style Portrait</strong> — Closet writes a personal headline and style description based on your outfits, wardrobe, and vibe words. Share or refresh anytime as your taste evolves.' },
         { icon: '📖', text: '<strong>Style Playbook</strong> — A living guide to your personal style: your aesthetic identity, what works, what to build next, and how to shop smarter.' },
         { icon: '✨', text: '<strong>Your Details</strong> — Personal details (height, eye colour, scent, personality type, nail colour, hairstyle) that help Closet give you the most tailored advice possible.' },
+        { icon: '🛋', text: '<strong>Closet Therapy Notes</strong> — Log transcripts from your in-person Closet Therapy sessions. Closet weaves these notes into every AI suggestion for truly personal advice.' },
         { icon: '⭐', text: '<strong>Best Outfits</strong> — All your 8+ rated looks in a swipeable carousel, alongside your 💎 Gem Pieces in a gold-accented showcase.' },
         { icon: '📈', text: '<strong>Score &amp; Confidence History</strong> — Tap your Style Score or Confidence tile to see trend graphs of how your numbers have moved over time.' },
         { icon: '🗓', text: '<strong>Streak Calendar</strong> — Tap your day streak tile to open a full calendar of your outfit logging history.' },
@@ -5058,6 +5061,8 @@ function featuresMenuHTML() {
     {
       title: 'Shop & Wish List',
       items: [
+        { icon: '🎯', text: '<strong>Priority Picks</strong> — Closet reads across everything you\'ve saved and loved, then surfaces your top 10 buys as a visual card layout — one tap to shop.' },
+        { icon: '🤔', text: '<strong>Should I Buy It?</strong> — Snap or describe a piece you\'re considering and Closet gives you an honest verdict based on your wardrobe, budget, and style goals.' },
         { icon: '🛍', text: '<strong>AI Gap Analysis</strong> — Closet studies your wardrobe and surfaces only what\'s missing — pieces that would unlock more of your existing outfits.' },
         { icon: '💛', text: '<strong>Wish List</strong> — Save pieces you\'re considering and share your curated list with friends or gift-givers.' },
         { icon: '🔗', text: '<strong>Live Search Links</strong> — Each recommendation links directly to real product results so you can shop immediately.' },
@@ -9299,6 +9304,33 @@ function viewDressMe() {
   </div>`;
 }
 
+// ── Designer badge helpers ────────────────────────────────────────────────────
+// Returns a static pill for use on cards (non-interactive)
+function designerPillHTML(designer) {
+  if (designer === 'you')    return `<div style="display:inline-flex;align-items:center;gap:3px;background:#EEF7EE;color:#2D6A4F;border:1px solid #9DCB9D;border-radius:100px;padding:2px 9px;font-size:10px;font-weight:700;">👤 You</div>`;
+  if (designer === 'collab') return `<div style="display:inline-flex;align-items:center;gap:3px;background:var(--gold-bg);color:var(--gold-dk);border:1px solid var(--gold);border-radius:100px;padding:2px 9px;font-size:10px;font-weight:700;">🤝 Collab</div>`;
+  if (designer === 'closet') return `<div style="display:inline-flex;align-items:center;gap:3px;background:#F0EFFE;color:#6C3EBF;border:1px solid #C5BAEE;border-radius:100px;padding:2px 9px;font-size:10px;font-weight:700;">✦ Closet</div>`;
+  return '';
+}
+// Returns a tappable chip (used in detail view)
+function designerChipHTML(designer, entryId) {
+  const act = `cycleDesigner('${entryId}')`;
+  if (designer === 'you')    return `<button ontouchend="if(_touchMoved)return;event.preventDefault();${act}" onclick="${act}" style="background:#EEF7EE;color:#2D6A4F;border:1px solid #9DCB9D;border-radius:100px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">👤 You ✎</button>`;
+  if (designer === 'collab') return `<button ontouchend="if(_touchMoved)return;event.preventDefault();${act}" onclick="${act}" style="background:var(--gold-bg);color:var(--gold-dk);border:1px solid var(--gold);border-radius:100px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">🤝 Collab ✎</button>`;
+  if (designer === 'closet') return `<button ontouchend="if(_touchMoved)return;event.preventDefault();${act}" onclick="${act}" style="background:#F0EFFE;color:#6C3EBF;border:1px solid #C5BAEE;border-radius:100px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">✦ Closet ✎</button>`;
+  return `<button ontouchend="if(_touchMoved)return;event.preventDefault();${act}" onclick="${act}" style="background:none;color:var(--text-3);border:1px dashed var(--border);border-radius:100px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation;">＋ Who designed this?</button>`;
+}
+// Cycle: null → you → collab → closet → null
+function cycleDesigner(entryId) {
+  const entry = S.entries.find(e => e.id === entryId);
+  if (!entry) return;
+  const cycle = [null, 'you', 'collab', 'closet'];
+  const cur = cycle.indexOf(entry.designer || null);
+  entry.designer = cycle[(cur + 1) % cycle.length];
+  DB.entries.put(entry).catch(err => console.error('designer save:', err));
+  render();
+}
+
 function outfitCardHTML(e) {
   const retired = isRetiredFit(e);
   const inDnrView = S.filter === 'notagain';
@@ -9342,6 +9374,7 @@ function outfitCardHTML(e) {
       <div class="outfit-card-rating">⭐ ${e.rating}/10</div>
       ${e.occasionTag ? `<div class="occasion-tag" style="margin-top:6px;">${e.occasionTag===WFH_TAG?'🏠':'🏷'} ${esc(e.occasionTag)}</div>` : ''}
       ${e.weather ? `<div class="weather-chip-card">${e.weather.icon} ${e.weather.tempF}°F</div>` : ''}
+      ${e.designer ? `<div style="margin-top:5px;">${designerPillHTML(e.designer)}</div>` : ''}
     </div>
   </div>`;
 }
@@ -10582,10 +10615,12 @@ function viewPlan() {
           <!-- TRIP RESULT — day-by-day -->
           <div style="padding:0 16px;">
             ${tripPlanBodyHTML(p.tripSuggestions, p.tripGaps, `Your ${p.tripDays||p.tripSuggestions.length}-Day Wardrobe Plan`)}
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();saveTripPlan();" onclick="saveTripPlan()"
-              style="width:100%;padding:13px 0;border-radius:var(--r-sm);border:none;background:var(--gold);font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:20px;">
-              💾 Save Trip Plan
-            </button>
+            ${p._tripSaved
+              ? `<button disabled style="width:100%;padding:13px 0;border-radius:var(--r-sm);border:none;background:#22C55E;font-size:14px;font-weight:800;color:#fff;font-family:inherit;margin-bottom:20px;opacity:1;">✓ Trip Saved!</button>`
+              : `<button ontouchend="if(_touchMoved)return;event.preventDefault();saveTripPlan();" onclick="saveTripPlan()"
+                  style="width:100%;padding:13px 0;border-radius:var(--r-sm);border:none;background:var(--gold);font-size:14px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:20px;">
+                  💾 Save Trip Plan
+                </button>`}
           </div>
         ` : ''}
       ` : ''}
@@ -10613,8 +10648,8 @@ function viewPlan() {
                     <div style="font-size:13px;font-weight:800;color:var(--text);line-height:1.2;">✈️ ${esc(tp.destination||'Trip')}</div>
                     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
                       <span style="font-size:10px;color:var(--text-3);">${tp.days}d · ${dateLabel}</span>
-                      <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteTripPlan('${tp.id}');render();" onclick="event.stopPropagation();deleteTripPlan('${tp.id}');render()"
-                        style="background:none;border:none;font-size:12px;color:var(--text-3);cursor:pointer;padding:2px 3px;line-height:1;touch-action:manipulation;">✕</button>
+                      <button ontouchend="if(_touchMoved)return;event.preventDefault();event.stopPropagation();deleteTripPlan('${tp.id}');render();" onclick="event.preventDefault();event.stopPropagation();deleteTripPlan('${tp.id}');render()"
+                        style="background:none;border:none;font-size:14px;color:var(--text-3);cursor:pointer;padding:10px 12px;line-height:1;touch-action:manipulation;margin:-10px -12px -10px 0;">✕</button>
                       <span style="font-size:11px;color:var(--text-3);transition:transform .15s;display:inline-block;transform:rotate(${isOpen?'180deg':'0'});">▾</span>
                     </div>
                   </div>
@@ -11618,7 +11653,7 @@ async function doSuggestTripOutfits() {
   if (!S.apiKey.trim()) { navigate('settings'); toast('Add your API key first!'); return; }
   const numDays = Math.min(14, Math.max(1, S.plan.tripDays || 5));
   const outfitDays = Math.min(numDays, 7);
-  S.plan.loadingTrip = true; S.plan.tripSuggestions = null; S.plan.tripGaps = null; render();
+  S.plan.loadingTrip = true; S.plan.tripSuggestions = null; S.plan.tripGaps = null; S.plan._tripSaved = false; render();
   try {
     const wItems = S.wardrobe.filter(w=>!w.retiredFromCloset).slice(0,50)
       .map(w=>`${w.icon||''}${w.name}${w.brand?' ('+w.brand+')':''}${w.category?' ['+w.category+']':''}`).join(', ');
@@ -11671,6 +11706,7 @@ Return ONLY a valid JSON object (no markdown):
 function saveTripPlan() {
   const p = S.plan;
   if (!p.tripSuggestions?.length) { toast('Nothing to save yet!'); return; }
+  if (p._tripSaved) return; // already saved — block rage-click duplicates
   const entry = {
     id: 'trip-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
     destination: p.tripDestination.trim() || 'Trip',
@@ -11681,7 +11717,8 @@ function saveTripPlan() {
   };
   S.savedTripPlans = [entry, ...S.savedTripPlans];
   localStorage.setItem('closet-trip-plans', JSON.stringify(S.savedTripPlans));
-  S._openTripPlanId = null; // keep new save condensed in the list, like the rest
+  S._openTripPlanId = null;
+  S.plan._tripSaved = true; // flip button to "✓ Saved" state
   toast(`✓ Saved "${entry.destination}" trip plan!`);
   render();
 }
@@ -14176,6 +14213,14 @@ function viewDashboard() {
   const costPerWear = totalWears > 0 && closetValue > 0 ? (closetValue/totalWears).toFixed(2) : null;
   const totalBrands = Object.keys(brandItemCounts).length;
 
+  // Closet-designed outfits: manually tagged 'closet' OR flagged via Dress Me
+  const closetDesignedEntries = S.entries.filter(e => e.designer === 'closet' || e.claudeRecommended);
+  const closetDesignedCount = closetDesignedEntries.length;
+  const closetDesignedPct = S.entries.length > 0 ? Math.round(closetDesignedCount / S.entries.length * 100) : 0;
+  const closetDesignedAvg = closetDesignedCount > 0
+    ? (closetDesignedEntries.reduce((s,e)=>s+(e.rating||0),0) / closetDesignedCount).toFixed(1)
+    : null;
+
   // sale stats
   const saleItems = S.wardrobe.filter(w => w.onSale);
   const totalSaved = saleItems.filter(w=>w.originalPrice&&w.price).reduce((s,w)=>s+Math.max(0,parseFloat(w.originalPrice)-parseFloat(w.price)),0);
@@ -14218,6 +14263,15 @@ function viewDashboard() {
       tile('📊', avgRating || '—', 'Style Score', S.entries.length ? `avg of ${S.entries.length} outfits` : 'no outfits yet', avgRating && avgRating >= 8 ? '#C8A000' : '', `navigate('style-score')`),
       tile('👗', S.entries.length, 'Fits Logged', streak > 0 ? `🔥 ${streak}-day streak` : 'start your streak!')
     )}
+    ${closetDesignedCount > 0 ? `
+    <div style="background:linear-gradient(135deg,#F0EFFE 0%,#FAF7FF 100%);border:1.5px solid #C5BAEE;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+      <div style="font-size:24px;line-height:1;flex-shrink:0;">✦</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#8B6BBF;margin-bottom:2px;">Closet's Designs</div>
+        <div style="font-size:15px;font-weight:800;color:#6C3EBF;">${closetDesignedCount} outfit${closetDesignedCount===1?'':'s'} styled by AI</div>
+        <div style="font-size:11px;color:#8B6BBF;margin-top:1px;">${closetDesignedPct}% of your looks${closetDesignedAvg ? ` · avg ⭐ ${closetDesignedAvg}` : ''}</div>
+      </div>
+    </div>` : ''}
     ${topActivity ? wideTile('🎭', 'Top Occasion', esc(topActivity[0]), `${topActivity[1]} outfit${topActivity[1]===1?'':'s'} logged`) : ''}
   `;
 
@@ -15500,9 +15554,9 @@ function viewNewPiece() {
 function viewOnboarding() {
   const step = S.onboardStep || 0;
 
-  // 8 progress dots (steps 1–7 features, 8 first fit)
+  // 9 progress dots (steps 1–7 features, 8 style setup, 9 first fit)
   const dots = (cur) => `<div style="display:flex;gap:5px;align-items:center;justify-content:center;margin:14px 0 6px;">
-    ${Array.from({length:8},(_,i)=>`<div style="height:5px;border-radius:100px;transition:all .25s;background:${i===cur-1?'var(--gold)':'var(--border)'};width:${i===cur-1?'20':'5'}px;"></div>`).join('')}
+    ${Array.from({length:9},(_,i)=>`<div style="height:5px;border-radius:100px;transition:all .25s;background:${i===cur-1?'var(--gold)':'var(--border)'};width:${i===cur-1?'20':'5'}px;"></div>`).join('')}
   </div>`;
 
   const skipBtn = `<button ontouchend="if(_touchMoved)return;event.preventDefault();finishOnboarding()" onclick="finishOnboarding()" style="background:none;border:none;font-size:12px;font-weight:700;color:var(--text-3);cursor:pointer;font-family:inherit;padding:4px 8px;touch-action:manipulation;white-space:nowrap;">Skip</button>`;
@@ -15574,7 +15628,7 @@ function viewOnboarding() {
     // 2 — Closet
     { label:'Closet', dark:false, img:'onboarding/closet.jpg',
       headline:'Everything you own.\nFinally organised.',
-      sub:'Log your full wardrobe, track wears, flag Hero Pieces, and surface Hidden Gems you\'ve been sleeping on. Hit Dress Me and Closet builds a complete outfit from what you already own.',
+      sub:'Log your full wardrobe, track wears, mark your 💎 Gems, and surface Hidden Gems you\'ve been sleeping on. Hit Dress Me and Closet builds a complete outfit from what you already own.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -15583,16 +15637,14 @@ function viewOnboarding() {
           </div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">
             ${[
-              {icon:'👟',name:'White Sneakers',wears:14,badge:'hero'},
-              {icon:'🧥',name:'Camel Coat',wears:9,badge:'sig'},
-              {icon:'👜',name:'Mini Bag',wears:17,badge:''},
-              {icon:'👗',name:'Midi Dress',wears:2,badge:'gem'},
-              {icon:'👕',name:'Linen Tee',wears:24,badge:''},
-              {icon:'👖',name:'Wide Legs',wears:11,badge:''},
-            ].map(w=>`<div style="background:var(--surface-2);border-radius:9px;padding:8px 6px;border:1px solid var(--border);position:relative;">
-              ${w.badge==='hero'?`<div style="position:absolute;top:3px;right:3px;font-size:9px;">👑</div>`:''}
-              ${w.badge==='sig'?`<div style="position:absolute;top:3px;right:3px;font-size:9px;">💎</div>`:''}
-              ${w.badge==='gem'?`<div style="position:absolute;top:2px;right:3px;font-size:8px;background:#EFF6FF;border-radius:100px;padding:1px 4px;color:#1D4ED8;font-weight:800;">🔮</div>`:''}
+              {icon:'👟',name:'White Sneakers',wears:14,gem:true},
+              {icon:'🧥',name:'Camel Coat',wears:9,gem:false},
+              {icon:'👜',name:'Mini Bag',wears:17,gem:false},
+              {icon:'👗',name:'Midi Dress',wears:2,gem:true},
+              {icon:'👕',name:'Linen Tee',wears:24,gem:false},
+              {icon:'👖',name:'Wide Legs',wears:11,gem:false},
+            ].map(w=>`<div style="background:var(--surface-2);border-radius:9px;padding:8px 6px;border:1px solid ${w.gem?'rgba(184,125,42,.35)':'var(--border)'};position:relative;">
+              ${w.gem?`<div style="position:absolute;top:3px;right:3px;font-size:9px;">💎</div>`:''}
               <div style="font-size:22px;margin-bottom:4px;">${w.icon}</div>
               <div style="font-size:8px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:2px;">${w.name}</div>
               <div style="font-size:7px;color:var(--text-3);">${w.wears} wears</div>
@@ -15649,7 +15701,7 @@ function viewOnboarding() {
     // 5 — Shop
     { label:'Shop', dark:false, img:'onboarding/shop.jpg',
       headline:'Spend with intention.\nClose the gaps.',
-      sub:'Four tabs, one mission. ♥ Saved is your Wish List. ✦ AI Picks surfaces wardrobe gaps. 🔁 Buy Again holds Rate Mode saves — pieces worth re-buying. 📌 Spotted is your in-store and online capture board.',
+      sub:'🎯 Priority Picks leads with your top buys — AI-curated from everything you\'ve saved and loved. Four tabs below: ♥ Saved is your Wish List. ✦ AI Picks surfaces wardrobe gaps. 🔁 Buy Again is for pieces worth repurchasing. 📌 Spotted is your capture board.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
           <div style="display:flex;gap:5px;margin-bottom:12px;">
@@ -15714,7 +15766,7 @@ function viewOnboarding() {
     // 7 — Fun
     { label:'Fun', dark:false, img:'onboarding/fun.jpg',
       headline:'Fashion battles,\ncompliments & more.',
-      sub:'Challenge a friend to a Fashion Battle, get a genuine Closet compliment about your style, pair outfits with drinks or books, and send love to the people who gifted your favourite pieces.',
+      sub:'Challenge a friend to a Fashion Battle, get a friend\'s outfit rated instantly, pair your look with the perfect drink or book, and send love to the people who gifted your favourite pieces.',
       mock:`<div style="padding:0 24px;">
         <div style="display:flex;flex-direction:column;gap:8px;">
           <div style="background:linear-gradient(135deg,#1A1010 0%,#3A1010 100%);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px;">
@@ -15775,7 +15827,7 @@ function viewOnboarding() {
         ${dots(step)}
         <div style="display:flex;gap:8px;margin-top:10px;">
           ${backBtn(step - 1)}
-          ${nextBtn(step === 7 ? 'Almost there →' : 'Next →', step === 7 ? 9 : step + 1)}
+          ${nextBtn(step === 7 ? 'Almost there →' : 'Next →', step + 1)}
         </div>
         <div style="text-align:center;margin-top:10px;">
           ${skipBtn}
@@ -15784,11 +15836,45 @@ function viewOnboarding() {
     </div>`;
   }
 
-  // ── Step 8 (was 9): Log your first fit ──────────────────────
-  if (step === 9) {
+  // ── Step 8: Pick your style vibe ────────────────────────────
+  if (step === 8) {
+    const vibeOptions = ['Minimal','Classic','Feminine','Edgy','Bohemian','Preppy','Streetwear','Vintage','Romantic','Sporty','Quiet Luxury','Eclectic'];
+    const picked = (S.profileStyleWords||'').split(',').map(s=>s.trim()).filter(Boolean);
     return `<div class="view view-notab" style="background:var(--bg);">
       <div class="nav" style="border-bottom:none;">
         ${backBtn(7)}
+        <span class="nav-title"></span>
+        ${skipBtn}
+      </div>
+      <div style="padding:20px 24px 0;">
+        <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:var(--gold-dk);margin-bottom:10px;">Your Style</div>
+        <div style="font-size:24px;font-weight:900;color:var(--text);letter-spacing:-.4px;margin-bottom:8px;line-height:1.2;">What's your vibe?</div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:20px;">Pick a few words that feel like you — Closet uses these to personalise every suggestion from here on.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${vibeOptions.map(w => {
+            const on = picked.includes(w);
+            return `<button
+              ontouchend="if(_touchMoved)return;event.preventDefault();toggleOnboardStyle('${esc(w)}')"
+              onclick="toggleOnboardStyle('${esc(w)}')"
+              style="background:${on?'var(--gold)':'var(--surface-2)'};color:${on?'#fff':'var(--text-2)'};border:1.5px solid ${on?'var(--gold)':'var(--border)'};border-radius:100px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:background .15s,color .15s,border-color .15s;">${esc(w)}</button>`;
+          }).join('')}
+        </div>
+      </div>
+      <div style="padding:0 24px 28px;margin-top:24px;">
+        ${dots(8)}
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          ${backBtn(7)}
+          ${nextBtn(picked.length ? 'Looking good →' : 'Skip for now →', 9)}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ── Step 9: Log your first fit ───────────────────────────────
+  if (step === 9) {
+    return `<div class="view view-notab" style="background:var(--bg);">
+      <div class="nav" style="border-bottom:none;">
+        ${backBtn(8)}
         <span class="nav-title"></span>
         ${skipBtn}
       </div>
@@ -15805,9 +15891,9 @@ function viewOnboarding() {
         </div>
       </div>
       <div style="padding:0 24px 28px;">
-        ${dots(8)}
+        ${dots(9)}
         <div style="display:flex;gap:8px;margin-top:10px;">
-          ${backBtn(7)}
+          ${backBtn(8)}
           <button class="btn btn-secondary"
             ontouchend="if(_touchMoved)return;event.preventDefault();finishOnboarding()"
             onclick="finishOnboarding()"
@@ -19458,11 +19544,14 @@ function viewDetail() {
               ✨ Name this outfit
             </button>`;
           })()}
-          <div ontouchend="if(_touchMoved)return;event.preventDefault();openTagPicker('${entry.id}')" onclick="openTagPicker('${entry.id}')"
-            style="display:inline-flex;align-items:center;gap:5px;margin-bottom:8px;cursor:pointer;touch-action:manipulation;">
-            ${entry.occasionTag
-              ? `<div class="occasion-tag">${entry.occasionTag===WFH_TAG?'🏠':'🏷'} ${esc(entry.occasionTag)}</div><div style="font-size:10px;color:var(--text-3);font-weight:600;">✎</div>`
-              : `<div style="font-size:12px;font-weight:700;color:var(--text-3);border:1px dashed var(--border);border-radius:100px;padding:4px 12px;">＋ Add tag</div>`}
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px;">
+            <div ontouchend="if(_touchMoved)return;event.preventDefault();openTagPicker('${entry.id}')" onclick="openTagPicker('${entry.id}')"
+              style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;touch-action:manipulation;">
+              ${entry.occasionTag
+                ? `<div class="occasion-tag">${entry.occasionTag===WFH_TAG?'🏠':'🏷'} ${esc(entry.occasionTag)}</div><div style="font-size:10px;color:var(--text-3);font-weight:600;">✎</div>`
+                : `<div style="font-size:12px;font-weight:700;color:var(--text-3);border:1px dashed var(--border);border-radius:100px;padding:4px 12px;">＋ Add tag</div>`}
+            </div>
+            ${designerChipHTML(entry.designer, entry.id)}
           </div>
           ${isWFH(entry) ? `<div style="font-size:12px;color:var(--text-3);margin-bottom:6px;">🙈 Comfort first — not counted in your style score</div>` : ''}
           ${entry.weather ? `<div class="weather-chip" style="margin-bottom:8px;">${entry.weather.icon} ${entry.weather.tempF}°F · ${esc(entry.weather.condition)}</div>` : ''}
@@ -19956,6 +20045,23 @@ function viewEdit() {
             value="${customVal}" style="margin:0;font-size:14px;"
             oninput="S.draft.occasionTag=this.value.trim()||null;S.draft._manualTag=true;">`;
       })()}
+    </div>
+    <div class="form-section">
+      <label class="form-label">Who designed this outfit?</label>
+      <p style="font-size:12px;color:var(--text-3);margin-bottom:10px;">Tag who put the look together.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${[
+          { val: null,     label: '✕ None',     bg: d.designer==null?'var(--surface-2)':'var(--surface)', border: d.designer==null?'var(--text-3)':'var(--border)', color: d.designer==null?'var(--text)':'var(--text-2)' },
+          { val: 'you',    label: '👤 You',     bg: d.designer==='you'?'#EEF7EE':'var(--surface)', border: d.designer==='you'?'#9DCB9D':'var(--border)', color: d.designer==='you'?'#2D6A4F':'var(--text-2)' },
+          { val: 'collab', label: '🤝 Collab',  bg: d.designer==='collab'?'var(--gold-bg)':'var(--surface)', border: d.designer==='collab'?'var(--gold)':'var(--border)', color: d.designer==='collab'?'var(--gold-dk)':'var(--text-2)' },
+          { val: 'closet', label: '✦ Closet',   bg: d.designer==='closet'?'#F0EFFE':'var(--surface)', border: d.designer==='closet'?'#C5BAEE':'var(--border)', color: d.designer==='closet'?'#6C3EBF':'var(--text-2)' },
+        ].map(o => `<button
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.draft.designer=${o.val===null?'null':"'"+o.val+"'"};render()"
+          onclick="S.draft.designer=${o.val===null?'null':"'"+o.val+"'"};render()"
+          style="padding:9px 16px;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;border:1.5px solid ${o.border};background:${o.bg};color:${o.color};">
+          ${o.label}
+        </button>`).join('')}
+      </div>
     </div>
     <button class="btn btn-primary" ontouchend="if(_touchMoved)return;event.preventDefault();doSaveEdit()" onclick="doSaveEdit()">Save Changes</button>
     <div style="height:36px"></div>
@@ -21545,7 +21651,7 @@ async function confirmReceiptItem() {
   if (newItem.gifted) {
     S.giftNudge = { entryId: null, items: [newItem] };
   }
-  switchTab('closet');
+  switchTab('wardrobe');
   toast(`${newItem.icon} ${newItem.name} added! Syncing…`);
   // Background save — resolves quickly, Storage upload is async inside put()
   DB.wardrobe.put(newItem)
