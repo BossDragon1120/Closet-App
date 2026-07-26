@@ -4770,7 +4770,7 @@ function openPriorityPick(query) {
   else                  { S.shopSource = 'spotted';   S.shopSelectedQuery = null;  }
   S._priorityPicksOpen = false; // collapse panel so the expanded item accordion is visible
   S.shopExpanded = true;
-  switchTab('shop');
+  renderRAF();
 }
 
 async function generatePriorityPicks() {
@@ -15544,6 +15544,19 @@ function viewNewPiece() {
         </button>
 
       </div>
+
+      <button
+        ontouchend="if(_touchMoved)return;event.preventDefault();navigate('import')"
+        onclick="navigate('import')"
+        style="display:flex;align-items:center;gap:12px;background:none;border:none;padding:14px 4px;cursor:pointer;font-family:inherit;text-align:left;touch-action:manipulation;width:100%;margin-top:4px;">
+        <div style="font-size:20px;flex-shrink:0;">📋</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:var(--text-2);">Have a closet audit spreadsheet?</div>
+          <div style="font-size:12px;color:var(--text-3);line-height:1.4;">Import a whole session log at once — tap here or find it in Menu → Settings</div>
+        </div>
+        <div style="font-size:16px;color:var(--text-3);flex-shrink:0;">›</div>
+      </button>
+
     </div>
   </div>`;
 }
