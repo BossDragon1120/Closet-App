@@ -23952,32 +23952,39 @@ async function doTestApiKey() {
   const key = (document.getElementById('apiKeyInput')?.value || S.apiKey || '').trim();
   if (!key) { toast('Enter an API key first'); return; }
   toast('Testing connection…');
+
+  // Build a realistic Dress Me style prompt using real wardrobe data
+  const sampleItems = (S.wardrobe || []).slice(0, 10).map(w =>
+    `${w.icon||'👕'} ${w.name}${w.category?' ['+w.category+']':''}`
+  ).join('\n') || '👕 Blue jeans [Bottoms]\n👗 White blouse [Tops]\n👟 White sneakers [Shoes]';
+
+  const dressmePrompt = `You are a personal stylist. Pick an outfit from this wardrobe:\n\n${sampleItems}\n\nReturn ONLY valid JSON: {"outfit":[{"item":"name","emoji":"👕","reason":"why"}],"vibe":"Cool Vibe","hype":"You look great!"}`;
+
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // Test 1: mini call (already works)
+    const res1 = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 10,
-        messages: [{ role: 'user', content: 'Hi' }],
-      }),
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] }),
     });
-    const body = await res.json().catch(() => ({}));
-    if (res.ok) {
-      alert('✅ API key works! Connection successful.\n\nModel: claude-haiku-4-5-20251001\nStatus: ' + res.status);
-    } else {
-      const fullMsg = JSON.stringify(body, null, 2);
-      alert('❌ API Error (HTTP ' + res.status + '):\n\n' + fullMsg);
-      console.error('API test failed:', res.status, body);
-    }
+    const body1 = await res1.json().catch(() => ({}));
+
+    // Test 2: Dress Me style call (1024 tokens, real prompt)
+    const res2 = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1024, messages: [{ role: 'user', content: dressmePrompt }] }),
+    });
+    const body2 = await res2.json().catch(() => ({}));
+
+    const r1 = res1.ok ? '✅ Mini test (10 tokens): OK' : `❌ Mini test: HTTP ${res1.status} — ${JSON.stringify(body1)}`;
+    const r2 = res2.ok ? '✅ Dress Me style (1024 tokens): OK' : `❌ Dress Me style: HTTP ${res2.status} — ${JSON.stringify(body2)}`;
+    alert('API Diagnostic Results:\n\n' + r1 + '\n\n' + r2);
+    console.log('Test 1:', res1.status, body1);
+    console.log('Test 2:', res2.status, body2);
   } catch(e) {
-    alert('❌ Network/CORS error:\n\n' + e.message + '\n\nThis may mean browser-based API access is blocked.');
-    console.error('API test network error:', e);
+    alert('❌ Network/CORS error:\n\n' + e.message);
+    console.error('API test error:', e);
   }
 }
 function doSaveGoogleKey() {
