@@ -3494,6 +3494,7 @@ SUGGESTED OCCASION LIST — pick exactly one: ${getOccasionTags().join(', ')}`;
       'Content-Type': 'application/json',
       'x-api-key': key,
       'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
       
       'anthropic-beta': 'prompt-caching-2024-07-31',
     },
@@ -3584,6 +3585,7 @@ async function matchToWardrobe(newItems, wardrobeItems) {
         'Content-Type': 'application/json',
         'x-api-key': key,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -3693,6 +3695,7 @@ async function tagOccasion(notes) {
         'Content-Type': 'application/json',
         'x-api-key': key,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -4555,6 +4558,7 @@ async function fetchNewsFlash() {
       'Content-Type': 'application/json',
       'x-api-key': key,
       'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
       
     },
     body: JSON.stringify({
@@ -4844,6 +4848,7 @@ Respond with ONLY a valid JSON array — no other text:
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': S.apiKey, 'anthropic-version': '2023-06-01',
+ 'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json',  },
       body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 800,
         messages: [{ role: 'user', content: prompt }] })
@@ -6228,6 +6233,7 @@ async function doOutfitBuild() {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey.trim(),
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -6377,6 +6383,7 @@ verdict must be exactly "buy", "pass", or "maybe".`;
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey.trim(),
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -7251,6 +7258,7 @@ async function generateRoulette() {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -7358,6 +7366,7 @@ async function generateDressMe() {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -7512,6 +7521,7 @@ Return only the name, nothing else.`;
       headers: {
         'x-api-key': key,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
         'content-type': 'application/json'
       },
@@ -7560,6 +7570,7 @@ async function generateSellDraft(wardrobeId) {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -7738,6 +7749,7 @@ async function generateBookRec(entryId) {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -7827,6 +7839,7 @@ async function generateDrinkRec(entryId) {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -8501,6 +8514,7 @@ Rules: exactly 10 trends (2 per category). Pick real, current trends that feel r
       headers: {
         'x-api-key': S.apiKey.trim(),
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
         'content-type': 'application/json',
       },
@@ -8593,6 +8607,7 @@ Rules: pick exactly 3 rising and 3 fading. Only reference items from the provide
       headers: {
         'x-api-key': S.apiKey.trim(),
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
         'content-type': 'application/json',
       },
@@ -11809,6 +11824,7 @@ async function suggestOutfits(eventDesc, _unused) {
       'Content-Type': 'application/json',
       'x-api-key': S.apiKey,
       'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
       
     },
     body: JSON.stringify({
@@ -20559,6 +20575,7 @@ async function doStyleWith(entryId, need) {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey.trim(),
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -20621,6 +20638,7 @@ async function doStyleWithDraft(need) {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey.trim(),
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -21207,6 +21225,7 @@ async function bulkAnalyzeCurrent() {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -21313,6 +21332,7 @@ async function _genDescText(name, brand, category) {
       'Content-Type': 'application/json',
       'x-api-key': S.apiKey.trim(),
       'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
       
     },
     body: JSON.stringify({
@@ -21427,6 +21447,7 @@ async function analyzeItemPhoto() {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -21491,6 +21512,7 @@ async function fillItemDetailsWithAI(id) {
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -21586,6 +21608,7 @@ ${rf.pasteText}` }];
         'Content-Type': 'application/json',
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -22170,6 +22193,7 @@ async function estimateItemPrice(wId) {
       headers: {
         'x-api-key': S.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json',
         
       },
@@ -22222,6 +22246,7 @@ async function bulkEstimateItemPrices() {
         headers: {
           'x-api-key': S.apiKey,
           'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
           'content-type': 'application/json',
           
         },
@@ -22388,6 +22413,7 @@ async function generateWardrobeSketchFromPhoto(id, file) {
         'Content-Type': 'application/json',
         'x-api-key': key,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -22675,7 +22701,8 @@ async function analyzeSpottedItem() {
     content.push({ type: 'text', text: prompt });
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json',  },
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01',
+ 'anthropic-dangerous-direct-browser-access': 'true', 'content-type': 'application/json',  },
       body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 200, messages: [{ role: 'user', content }] })
     });
     const data = await resp.json();
@@ -23686,6 +23713,7 @@ async function aiPolishEulogy(id) {
         'Content-Type': 'application/json',
         'x-api-key': key,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
         
       },
       body: JSON.stringify({
@@ -23931,6 +23959,7 @@ async function doTestApiKey() {
         'Content-Type': 'application/json',
         'x-api-key': key,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
