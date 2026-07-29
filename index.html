@@ -7385,6 +7385,7 @@ Return ONLY valid JSON with no markdown or extra text:
     });
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
+      alert('🔍 Dress Me raw error:\nHTTP ' + res.status + '\nKey ends: …' + S.apiKey.slice(-6) + '\n\n' + JSON.stringify(errBody, null, 2));
       throw new Error(`API ${res.status}: ${errBody?.error?.message || ''}`);
     }
     const data = await res.json();
