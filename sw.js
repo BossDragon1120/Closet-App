@@ -1,7 +1,7 @@
 // ── Closet PWA Service Worker ──────────────────────────────────
 // Bump CACHE_VERSION any time you deploy new code — the old cache
 // is automatically deleted and users get the fresh version.
-const CACHE_VERSION = 'closet-v20260605';
+const CACHE_VERSION = 'closet-v20260729';
 
 self.addEventListener('install', e => {
   self.skipWaiting(); // activate immediately, don't wait for old SW to die
