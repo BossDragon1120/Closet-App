@@ -3097,6 +3097,7 @@ const S = {
   _buyItPrice:   '',
   _buyItLoading: false,
   _buyItResult:  null,   // { verdict, headline, pros, cons, verdict_detail }
+  _lastAIError:  null,   // { feature, status, rawMsg, keyTail, ts } — set by aiErrorToast for debug
   // Priority Picks — AI-ranked items across all shop lists
   priorityPicks:         JSON.parse(localStorage.getItem('closet-priority-picks') || 'null'), // [{label,query,reason,sources:[]}] | null
   _priorityPicksLoading: false,
@@ -4482,7 +4483,7 @@ async function initWeatherPin() {
       try {
         const r = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: { 'Content-Type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01', },
+          headers: { 'Content-Type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001', max_tokens: 60,
             messages: [{ role: 'user', content: `Location: ${city}. Current weather: ${condition}, ${tempF}°F. Write ONE witty, fashion-forward caption (max 12 words) that weaves together today's weather and a style tip or observation — ideally with a clever pun or wordplay. Playful, not cheesy. Good examples: "fog advisory: your trench coat's time to shine", "sunshine warning: hats are having a moment", "drizzle forecast: make the umbrella your accessory". Output ONLY the caption text, no quotes, no punctuation at end.` }]
@@ -4847,7 +4848,7 @@ Respond with ONLY a valid JSON array — no other text:
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'x-api-key': S.apiKey, 'anthropic-version': '2023-06-01',
+      headers: { 'x-api-key': getKey(), 'anthropic-version': '2023-06-01',
  'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json',  },
       body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 800,
@@ -4961,39 +4962,42 @@ function aiErrorToast(e, feature) {
   const msg = (e?.message || '');
   const statusMatch = msg.match(/API (\d{3})/);
   const status = statusMatch ? parseInt(statusMatch[1]) : null;
-  // Extract the actual API error text after "API 400: " etc. for display
   const detail = msg.replace(/^API \d+:\s*/, '').trim();
   const msgLow = msg.toLowerCase();
+  const keyTail = (S.apiKey || '').slice(-4) || '????';
+
+  // Always store the full error for the Settings debug panel
+  S._lastAIError = { feature, status, rawMsg: detail || msg, keyTail, ts: Date.now() };
+
   let text;
   if (status === 401 || status === 403) {
-    text = `🔑 API key error (${status}) — check Settings`;
+    text = `🔑 API ${status} [${feature}]: ${detail.slice(0,60) || 'invalid key'} (key …${keyTail})`;
   } else if (status === 402 || msgLow.includes('quota') || msgLow.includes('usage limit') || msgLow.includes('billing') || msgLow.includes('credit') || msgLow.includes('balance') || msgLow.includes('prepaid')) {
-    text = `💳 Credits issue — visit console.anthropic.com/settings/billing to top up`;
+    // Show the REAL error — "billing issue" was hiding the actual message
+    const shortDetail = detail.slice(0, 70) || 'billing/quota error';
+    text = `💳 API ${status||'?'} [${feature}]: ${shortDetail} (key …${keyTail}) → check Settings`;
   } else if (status === 429) {
-    text = '⏳ Rate limited — wait a moment and try again';
+    text = `⏳ Rate limited [${feature}] — wait a moment and try again (key …${keyTail})`;
   } else if (status === 400) {
-    // Show the actual API message so the user knows what went wrong
     const shortDetail = detail.length > 80 ? detail.slice(0, 80) + '…' : detail;
-    text = shortDetail ? `⚠️ API error [${feature}]: ${shortDetail}` : `🐛 App error [${feature}] — bad request (400)`;
+    text = shortDetail ? `⚠️ API 400 [${feature}]: ${shortDetail}` : `🐛 Bad request (400) [${feature}]`;
   } else if (status && status >= 500) {
-    text = `🌐 Claude API error (${status}) — try again`;
+    text = `🌐 API ${status} [${feature}] — Claude server error, try again`;
   } else if (status) {
-    // Unhandled HTTP status (404, 413, etc.) — show actual code so user can report it
-    text = `⚠️ API error (${status}) [${feature}] — try again`;
+    text = `⚠️ API ${status} [${feature}]: ${detail.slice(0,60) || 'unknown'} (key …${keyTail})`;
   } else if (msg.includes('No JSON') || msg.includes('parse') || msg.includes('response format') || msg.includes('Unexpected')) {
     text = `🐛 App error [${feature}] — couldn't read response`;
   } else if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch') || msg.includes('Load failed') || msg.includes('load') || msg.includes('connection') || msg.includes('cancelled') || msg.includes('abort')) {
-    text = `📡 Network error — check your connection and try again`;
+    text = `📡 Network error [${feature}] — check your connection and try again`;
   } else {
-    // Unknown error — show raw message so we can diagnose
-    text = `⚠️ Error [${feature}]: ${msg || 'unknown'} — try again`;
+    text = `⚠️ Error [${feature}]: ${msg.slice(0,80) || 'unknown'} — try again`;
   }
-  console.error(`aiError [${feature}]:`, e);
+  console.error(`aiError [${feature}] HTTP${status||'?'} key…${keyTail}:`, e);
   toast(text);
 }
 // Visible build stamp (Settings footer) — update on deploy to verify which
 // version a device is actually running.
-const APP_BUILD = '2026-07-06';
+const APP_BUILD = '2026-07-29';
 
 function navigate(view) { if (view !== S.view) S._prevView = S.view; S.view = view; S.error = null; S._witemLightbox = null; render(); window.scrollTo(0,0); }
 function switchTab(tab)  {
@@ -6196,7 +6200,7 @@ function viewOutfitBuilder() {
 async function doOutfitBuild() {
   const ob = S.outfitBuilder;
   if (!ob) return;
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
 
   const anchor = S.wardrobe.find(i => i.id === ob.wardrobeId);
   if (!anchor) return;
@@ -6231,7 +6235,7 @@ async function doOutfitBuild() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey.trim(),
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -6326,7 +6330,7 @@ function _readBuyItPhoto(input) {
 }
 
 async function generateBuyItCheck() {
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._buyItLoading) return;
   S._buyItLoading = true;
   S._buyItResult = null;
@@ -6381,7 +6385,7 @@ verdict must be exactly "buy", "pass", or "maybe".`;
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey.trim(),
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -7218,7 +7222,7 @@ function viewLocal() {
    ================================================================ */
 
 async function generateRoulette() {
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._funRouletteLoading) return;
   const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile && !w.noOutfits);
   if (activeWardrobe.length < 3) { toast('Add more wardrobe items first!'); return; }
@@ -7256,7 +7260,7 @@ async function generateRoulette() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -7324,7 +7328,7 @@ function openDressMe() {
 function closeDressMe() { navigate('closet'); }
 
 async function generateDressMe() {
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._dressMeLoading) return;
   const activeWardrobe = S.wardrobe.filter(w => !w.retiredFromCloset && !w.inMaybePile && !w.noOutfits && !w.hidden);
   if (activeWardrobe.length < 3) { toast('Add more wardrobe items first!'); return; }
@@ -7364,7 +7368,7 @@ async function generateDressMe() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -7385,7 +7389,6 @@ Return ONLY valid JSON with no markdown or extra text:
     });
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      alert('🔍 Dress Me raw error:\nHTTP ' + res.status + '\nKey ends: …' + S.apiKey.slice(-6) + '\n\n' + JSON.stringify(errBody, null, 2));
       throw new Error(`API ${res.status}: ${errBody?.error?.message || ''}`);
     }
     const data = await res.json();
@@ -7547,7 +7550,7 @@ Return only the name, nothing else.`;
 async function generateSellDraft(wardrobeId) {
   const w = S.wardrobe.find(i => i.id === wardrobeId);
   if (!w) return;
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); S._sellDraftOpen = false; render(); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); S._sellDraftOpen = false; render(); return; }
   S.sellDraft = { wardrobeId, loading: true };
   render();
 
@@ -7569,7 +7572,7 @@ async function generateSellDraft(wardrobeId) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -7715,7 +7718,7 @@ function _restoreBookCarousel() {
 }
 
 async function generateBookRec(entryId) {
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._funBookLoading) return;
   const entry = S.entries.find(e => e.id === entryId);
   if (!entry) return;
@@ -7748,7 +7751,7 @@ async function generateBookRec(entryId) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -7802,7 +7805,7 @@ function _restoreDrinkCarousel() {
 }
 
 async function generateDrinkRec(entryId) {
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
   if (S._funDrinkLoading) return;
   const entry = S.entries.find(e => e.id === entryId);
   if (!entry) return;
@@ -7838,7 +7841,7 @@ async function generateDrinkRec(entryId) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -8513,7 +8516,7 @@ Rules: exactly 10 trends (2 per category). Pick real, current trends that feel r
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': S.apiKey.trim(),
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -8606,7 +8609,7 @@ Rules: pick exactly 3 rising and 3 fading. Only reference items from the provide
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': S.apiKey.trim(),
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -8707,7 +8710,7 @@ Be specific and thoughtful. Prefer real, discoverable brands. Mix price points s
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST',
-      headers:{'x-api-key':S.apiKey.trim(),'anthropic-version':'2023-06-01','content-type':'application/json'},
+      headers:{'x-api-key':getKey(),'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:800,messages:[{role:'user',content:prompt}]}),
     });
     if (!resp.ok) throw new Error(`API ${resp.status}`);
@@ -11697,9 +11700,10 @@ Return ONLY a valid JSON object (no markdown):
 }`;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST',
-      headers:{'x-api-key':S.apiKey,'anthropic-version':'2023-06-01','content-type':'application/json',},
+      headers:{'x-api-key':getKey(),'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},
       body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:2000, messages:[{role:'user',content:prompt}] })
     });
+    if (!resp.ok) { const eb = await resp.json().catch(()=>({})); throw new Error(`API ${resp.status}: ${eb?.error?.message||''}`); }
     const data = await resp.json();
     const txt = data.content?.[0]?.text || '';
     // Try to parse the JSON object
@@ -11823,7 +11827,7 @@ async function suggestOutfits(eventDesc, _unused) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': S.apiKey,
+      'x-api-key': getKey(),
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
       
@@ -20164,6 +20168,12 @@ function viewSettings() {
           <button class="btn btn-primary" onclick="doSaveApiKey()" style="margin:0;flex:1;">Save Key</button>
           <button class="btn" onclick="doTestApiKey()" style="margin:0;flex:1;background:var(--surface-2);border:1px solid var(--border);">Test Connection</button>
         </div>
+        ${S._lastAIError ? `<div style="margin-top:10px;padding:10px 12px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;font-size:12px;line-height:1.5;">
+          <div style="font-weight:700;margin-bottom:4px;">⚠️ Last AI error (${S._lastAIError.feature})</div>
+          <div style="font-family:monospace;word-break:break-all;">HTTP ${S._lastAIError.status||'?'}: ${S._lastAIError.rawMsg||'(no message)'}</div>
+          <div style="margin-top:4px;color:#666;">Key used: …${S._lastAIError.keyTail} · ${new Date(S._lastAIError.ts).toLocaleTimeString()}</div>
+          <button onclick="S._lastAIError=null;render();" style="margin-top:6px;padding:3px 10px;border:1px solid #ccc;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">Dismiss</button>
+        </div>` : ''}
       </div>
       <div class="settings-row">
         <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -20553,7 +20563,7 @@ function celebrateOutfitSave() {
 // ── Style it with… ───────────────────────────────────────────────────────────
 async function doStyleWith(entryId, need) {
   if (!need?.trim()) return;
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
 
   const entry = S.entries.find(e => e.id === entryId);
   if (!entry) return;
@@ -20574,7 +20584,7 @@ async function doStyleWith(entryId, need) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey.trim(),
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -20622,7 +20632,7 @@ Return ONLY valid JSON (no markdown, no code fences):
 // ── Style it with… (draft / pre-save version) ────────────────────────────────
 async function doStyleWithDraft(need) {
   if (!need?.trim()) return;
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
   const d = S.draft;
   if (!d) return;
   S.styleWith = { entryId: 'draft', need: need.trim(), loading: true, result: null };
@@ -20637,7 +20647,7 @@ async function doStyleWithDraft(need) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey.trim(),
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -21224,7 +21234,7 @@ async function bulkAnalyzeCurrent() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -21324,14 +21334,14 @@ function bulkSkip() { bulkAdvance(); }
 // Read current bulk form field values into preview so re-renders don't wipe typed values
 // ── Description generator — shared by bulk, receipt, and wardrobe-item edit ──
 async function _genDescText(name, brand, category) {
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return null; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return null; }
   if (!name?.trim()) { toast('Add an item name first.'); return null; }
   const context = [name.trim(), brand && `by ${brand}`, category && `(${category})`].filter(Boolean).join(' ');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': S.apiKey.trim(),
+      'x-api-key': getKey(),
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
       
@@ -21437,7 +21447,7 @@ function bulkExitConfirm() {
 async function analyzeItemPhoto() {
   const rf = S.receiptFlow;
   if (!rf?.imageData) { toast('Please add a photo first.'); return; }
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
 
   rf.step = 'parsing'; render();
 
@@ -21446,7 +21456,7 @@ async function analyzeItemPhoto() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -21494,7 +21504,7 @@ async function fillItemDetailsWithAI(id) {
   const w = S.wardrobe.find(i => i.id === id);
   if (!w) return;
   if (!w.photo) { toast('No photo found to analyze.'); return; }
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
 
   S._aiItemFillLoading = id;
   render();
@@ -21511,7 +21521,7 @@ async function fillItemDetailsWithAI(id) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -21570,7 +21580,7 @@ async function parseReceipt() {
   const rf = S.receiptFlow;
   if (!rf) return;
   if (!rf.imageData && !rf.pasteText?.trim()) { toast('Upload a screenshot or paste some text first.'); return; }
-  if (!S.apiKey) { toast('Add your Closet API key in Settings first.'); return; }
+  if (!getKey()) { toast('Add your Closet API key in Settings first.'); return; }
 
   rf.step = 'parsing'; render();
 
@@ -21607,7 +21617,7 @@ ${rf.pasteText}` }];
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         
@@ -22192,7 +22202,7 @@ async function estimateItemPrice(wId) {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': S.apiKey,
+        'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json',
@@ -22245,7 +22255,7 @@ async function bulkEstimateItemPrices() {
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
-          'x-api-key': S.apiKey,
+          'x-api-key': getKey(),
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
           'content-type': 'application/json',
@@ -23946,43 +23956,39 @@ function doSetupSave() {
 }
 function doSaveApiKey() {
   const el = document.getElementById('apiKeyInput'); if (!el) return;
-  localStorage.setItem('closet-api-key', el.value.trim()); S.apiKey = el.value.trim(); fsSet('apiKey', S.apiKey);
+  const k = el.value.trim();
+  localStorage.setItem('closet-api-key', k); S.apiKey = k; try { fsSet('apiKey', k); } catch(e) {}
   toast('API key saved!');
 }
+// Always read the freshest saved key — guards against S.apiKey staleness or Firestore sync overwrite
+function getKey() {
+  const stored = (localStorage.getItem('closet-api-key') || '').trim();
+  if (stored) { S.apiKey = stored; return stored; } // keep S.apiKey in sync
+  return (S.apiKey || '').trim();
+}
 async function doTestApiKey() {
-  const key = (document.getElementById('apiKeyInput')?.value || S.apiKey || '').trim();
+  const inputEl = document.getElementById('apiKeyInput');
+  const key = (inputEl?.value || S.apiKey || '').trim();
   if (!key) { toast('Enter an API key first'); return; }
   toast('Testing connection…');
-
-  // Build a realistic Dress Me style prompt using real wardrobe data
-  const sampleItems = (S.wardrobe || []).slice(0, 10).map(w =>
-    `${w.icon||'👕'} ${w.name}${w.category?' ['+w.category+']':''}`
-  ).join('\n') || '👕 Blue jeans [Bottoms]\n👗 White blouse [Tops]\n👟 White sneakers [Shoes]';
-
-  const dressmePrompt = `You are a personal stylist. Pick an outfit from this wardrobe:\n\n${sampleItems}\n\nReturn ONLY valid JSON: {"outfit":[{"item":"name","emoji":"👕","reason":"why"}],"vibe":"Cool Vibe","hype":"You look great!"}`;
-
   try {
-    // Test 1: mini call (already works)
-    const res1 = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] }),
     });
-    const body1 = await res1.json().catch(() => ({}));
-
-    // Test 2: Dress Me style call (1024 tokens, real prompt)
-    const res2 = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1024, messages: [{ role: 'user', content: dressmePrompt }] }),
-    });
-    const body2 = await res2.json().catch(() => ({}));
-
-    const r1 = res1.ok ? '✅ Mini test (10 tokens): OK' : `❌ Mini test: HTTP ${res1.status} — ${JSON.stringify(body1)}`;
-    const r2 = res2.ok ? '✅ Dress Me style (1024 tokens): OK' : `❌ Dress Me style: HTTP ${res2.status} — ${JSON.stringify(body2)}`;
-    alert('API Diagnostic Results:\n\n' + r1 + '\n\n' + r2);
-    console.log('Test 1:', res1.status, body1);
-    console.log('Test 2:', res2.status, body2);
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) {
+      // Auto-save the tested key — this ensures features always use the same key that just passed
+      localStorage.setItem('closet-api-key', key);
+      S.apiKey = key;
+      try { fsSet('apiKey', key); } catch(e) {}
+      if (inputEl) inputEl.value = key;
+      toast('✅ Connection works! Key saved — all features are ready.');
+    } else {
+      const msg = body?.error?.message || JSON.stringify(body);
+      alert('❌ Connection failed\n\nHTTP ' + res.status + '\n' + msg + '\n\nKey ending: …' + key.slice(-6));
+    }
   } catch(e) {
     alert('❌ Network/CORS error:\n\n' + e.message);
     console.error('API test error:', e);
