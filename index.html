@@ -3003,7 +3003,7 @@ const S = {
   _bulkEstimateProgress: null,  // null | {current, total} — bulk price estimation in progress
   savedRouletteLooks: JSON.parse(localStorage.getItem('closet-roulette-looks') || '[]'), // [{id,vibe,hype,outfit,createdAt}]
   _openRouletteLookId: null,    // which saved roulette look is expanded on Plan page
-  _suggestionLog: JSON.parse(localStorage.getItem('closet-suggestion-log') || '[]'), // [{id,source,title,hype,items,createdAt,savedId}] auto-logged every generation
+  _suggestionLog: [], // deprecated — kept as empty stub so existing references don't crash
   _savedLookView: null, // {type:'dressme'|'builder'|'roulette', id} — which saved look is open in viewSavedLook()
   // Sell It — AI-drafted Poshmark/Depop listing, nudged when a piece scores 2★ or lower in Rate Mode
   sellDraft: null,        // { wardrobeId, loading, title, description, price, priceReasoning }
@@ -3098,10 +3098,9 @@ const S = {
   _buyItLoading: false,
   _buyItResult:  null,   // { verdict, headline, pros, cons, verdict_detail }
   _lastAIError:  null,   // { feature, status, rawMsg, keyTail, ts } — set by aiErrorToast for debug
-  // Priority Picks — AI-ranked items across all shop lists
-  priorityPicks:         JSON.parse(localStorage.getItem('closet-priority-picks') || 'null'), // [{label,query,reason,sources:[]}] | null
-  _priorityPicksLoading: false,
-  _priorityPicksOpen:    false,
+  // Spotlight — one AI-chosen buy-this-next item, refreshed each Shop tab visit
+  spotlightItem:     null,  // { item, reason, searchQuery } | null
+  _spotlightLoading: false,
   // Closet To-Do checklist
   closetTodos: (()=>{
     const DEFAULTS = [
@@ -3984,25 +3983,6 @@ function _buildShareItems(src) {
 function shareShopList() {
   openWishShareSheet();
 }
-function sharePriorityPicks() {
-  const picks = S.priorityPicks || [];
-  if (!picks.length) { toast('No picks to share yet'); return; }
-  const name = S.profileName || 'My';
-  let text = `🎯 ${name}'s Priority Picks\n\n`;
-  picks.forEach((p, i) => {
-    text += `${i + 1}. ${p.label}`;
-    if (p.reason) text += `\n   ${p.reason}`;
-    text += '\n';
-  });
-  text += '\n(curated with my Closet App 💛)';
-  shareText('Priority Picks', text);
-}
-function removePriorityPick(idx) {
-  if (!S.priorityPicks?.length) return;
-  S.priorityPicks.splice(idx, 1);
-  localStorage.setItem('closet-priority-picks', JSON.stringify(S.priorityPicks));
-  render();
-}
 function removeFromBuyAgain(query) {
   const key = typeof query === 'string' ? query : (query?.query || '');
   if (!key) return;
@@ -4757,124 +4737,70 @@ function markPurchased(query) {
   toast('Bought it! ✓ Removed from list');
 }
 
-function openPriorityPick(query) {
-  const key = (query || '').toLowerCase().trim();
-  const allRecs = buildShoppingList();
-  const inWishlist = S.entries.some(e => {
-    if (!e.purchaseRecs?.length || !e.purchaseReactions) return false;
-    return e.purchaseRecs.some((r, i) => {
-      if (e.purchaseReactions[String(i)] !== 'liked') return false;
-      return (r.query || r.item || r || '').toLowerCase().trim() === key;
-    });
-  }) || S.savedShopItems.some(i => i.query.toLowerCase().trim() === key);
-  const inBuyAgain = allRecs.some(i => i.restock && !S.shopBlocked.has(i.query.toLowerCase().trim()) && i.query.toLowerCase().trim() === key);
-  const inRecs = allRecs.some(i => !i.restock && !S.shopBlocked.has(i.query.toLowerCase().trim()) && i.query.toLowerCase().trim() === key);
-  if (inWishlist)       { S.shopSource = 'wishlist';  S.shopSelectedQuery = query; }
-  else if (inBuyAgain)  { S.shopSource = 'buyagain';  S.shopSelectedQuery = query; }
-  else if (inRecs)      { S.shopSource = 'recs';      S.shopSelectedQuery = query; }
-  else                  { S.shopSource = 'spotted';   S.shopSelectedQuery = null;  }
-  S._priorityPicksOpen = false; // collapse panel so the expanded item accordion is visible
-  S.shopExpanded = true;
-  renderRAF();
-}
+async function generateSpotlight() {
+  if (!getKey()) return;
+  const wardrobe = S.wardrobe.filter(w => !w.retiredFromCloset);
+  if (wardrobe.length < 3) return;
 
-async function generatePriorityPicks() {
-  if (!S.apiKey) { toast('Add your API key in Settings to use Priority Picks'); return; }
-  S._priorityPicksLoading = true;
+  S._spotlightLoading = true;
+  S.spotlightItem = null;
   render();
 
-  // Build deduplicated pool from all 4 lists
-  const pool = new Map(); // normalised query → {label, query, sources:[]}
-  function addToPool(query, label, source) {
-    const key = (query || label || '').toLowerCase().trim();
-    if (!key) return;
-    if (pool.has(key)) { pool.get(key).sources.push(source); }
-    else { pool.set(key, { label: label || query, query: query || label, sources: [source] }); }
-  }
-
-  // Saved / wishlist
-  S.entries.forEach(e => {
-    if (!e.purchaseRecs?.length || !e.purchaseReactions) return;
-    e.purchaseRecs.forEach((r, i) => {
-      if (e.purchaseReactions[String(i)] === 'liked') {
-        const name = r.item || r;
-        addToPool(r.query || name, name, 'Saved');
-      }
-    });
-  });
-  S.savedShopItems.forEach(si => addToPool(si.query, si.label, 'Saved'));
-
-  // AI Picks & Buy Again
-  const allRecs = buildShoppingList().filter(i => !S.shopBlocked.has(i.query.toLowerCase().trim()));
-  allRecs.filter(i => !i.restock).forEach(i => addToPool(i.query, i.query, 'AI Picks'));
-  allRecs.filter(i =>  i.restock).forEach(i => addToPool(i.query, i.query, 'Buy Again'));
-
-  // Spotted
-  (S.spottedItems || []).forEach(sp => { if (sp.name) addToPool(sp.name, sp.name, 'Spotted'); });
-
-  const allItems = [...pool.values()];
-  if (!allItems.length) {
-    S._priorityPicksLoading = false;
-    toast('Add items to your shopping lists first');
-    render();
-    return;
-  }
-
-  // Wardrobe context
   const cats = {};
-  S.wardrobe.filter(w => !w.retiredFromCloset).forEach(w => { if (w.category) cats[w.category] = (cats[w.category] || 0) + 1; });
-  const catSummary = Object.entries(cats).map(([c, n]) => `${c}:${n}`).join(', ') || 'not specified';
-  const occasions = {};
-  S.entries.forEach(e => { if (e.occasionTag) occasions[e.occasionTag] = (occasions[e.occasionTag] || 0) + 1; });
-  const occasionSummary = Object.entries(occasions).sort((a,b) => b[1]-a[1]).slice(0,5).map(([o,n]) => `${o}:${n}`).join(', ') || 'not specified';
+  wardrobe.forEach(w => { if (w.category) cats[w.category] = (cats[w.category] || 0) + 1; });
+  const catSummary = Object.entries(cats).map(([c, n]) => `${c}: ${n}`).join(', ') || 'mixed';
+  const goals = (S.styleGoals || []).join(', ') || 'not specified';
+  const season = currentSeason();
+  const weather = S.weatherPin ? `${S.weatherPin.tempF}°F, ${S.weatherPin.description || ''}` : 'not available';
+  const seed = Math.floor(Math.random() * 9000) + 1000;
 
-  const poolText = allItems.map((item, i) => `${i+1}. "${item.label}" [${item.sources.join('+')}]`).join('\n');
-  const _pSeason = currentSeason();
+  const prompt = `You are a sharp personal stylist. Based on this person's wardrobe and style goals, identify the single most valuable item they could buy right now.
 
-  const prompt = `You are a personal stylist ranking a shopping list by purchase priority.
+WARDROBE BY CATEGORY: ${catSummary}
+STYLE GOALS: ${goals}
+CURRENT SEASON: ${season}
+WEATHER: ${weather}
+SEED: ${seed}
 
-WARDROBE (owned items by category): ${catSummary}
-MOST-WORN OCCASIONS: ${occasionSummary}
-CURRENT SEASON: ${_pSeason.charAt(0).toUpperCase()+_pSeason.slice(1)}
+Choose the ONE item that:
+1. Would unlock the most new outfit combinations from what they already own (think about what category or piece is conspicuously missing or thin)
+2. Moves them meaningfully toward their stated style goals
+3. Is appropriate for the current season
 
-SHOPPING POOL (item name [source lists]):
-${poolText}
+Be specific (e.g. "slim-fit dark wash jeans" not just "jeans"). Think about genuine gaps, not popular defaults.
 
-Rank the top ${Math.min(10, allItems.length)} items by priority. Prefer: items in multiple lists (stronger signal), items suited to the current season, wardrobe gaps, occasion versatility, Buy Again favorites.
-
-Respond with ONLY a valid JSON array — no other text:
-[{"label":"exact name from list","query":"exact name from list","reason":"one sentence under 12 words why it's top priority"}]`;
+Return ONLY valid JSON, no markdown:
+{"item":"specific item name","reason":"one punchy sentence — why this unlocks outfits AND serves their goals","searchQuery":"retail-ready search string to shop for this item"}`;
 
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'x-api-key': getKey(), 'anthropic-version': '2023-06-01',
- 'anthropic-dangerous-direct-browser-access': 'true',
-        'content-type': 'application/json',  },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 800,
-        messages: [{ role: 'user', content: prompt }] })
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': getKey(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }],
+      }),
     });
-    const data = await resp.json();
-    const raw = data.content?.[0]?.text?.trim() || '';
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (match) {
-      const picks = JSON.parse(match[0]);
-      const enriched = picks.map(p => {
-        const key = (p.query || p.label || '').toLowerCase().trim();
-        const poolItem = pool.get(key) || [...pool.values()].find(i => i.label.toLowerCase() === key);
-        return { label: p.label, query: p.query, reason: p.reason, sources: poolItem?.sources || [] };
-      });
-      S.priorityPicks = enriched;
-      localStorage.setItem('closet-priority-picks', JSON.stringify(enriched));
-      toast('🎯 Priority Picks ranked!');
-    } else {
-      toast('Couldn\'t parse ranking — try again');
+    if (!res.ok) {
+      const eb = await res.json().catch(() => ({}));
+      throw new Error(`API ${res.status}: ${eb?.error?.message || ''}`);
     }
+    const data = await res.json();
+    const raw = (data.content?.[0]?.text || '').replace(/```[a-z]*\n?/gi,'').replace(/```/g,'').trim();
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('No JSON');
+    S.spotlightItem = JSON.parse(m[0]);
   } catch(e) {
-    console.error('generatePriorityPicks:', e);
-    toast('Ranking failed — check your API key');
+    console.warn('generateSpotlight:', e);
+    // Fail silently — spotlight is a nice-to-have, not core
   }
-  S._priorityPicksLoading = false;
+  S._spotlightLoading = false;
   render();
 }
 
@@ -4970,7 +4896,14 @@ function aiErrorToast(e, feature) {
   S._lastAIError = { feature, status, rawMsg: detail || msg, keyTail, ts: Date.now() };
 
   let text;
-  if (status === 401 || status === 403) {
+  // QuotaExceededError = browser localStorage full — must be caught BEFORE billing keywords
+  // because the error message contains "quota" which otherwise triggers the billing toast.
+  const isStorageError = (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22))
+    || msg.toLowerCase().includes('quotaexceeded')
+    || (msg.toLowerCase().includes('quota') && (msg.toLowerCase().includes('storage') || msg.toLowerCase().includes('exceeded')));
+  if (isStorageError) {
+    text = `💾 Storage full [${feature}] — go to Settings and clear old data to free up space`;
+  } else if (status === 401 || status === 403) {
     text = `🔑 API ${status} [${feature}]: ${detail.slice(0,60) || 'invalid key'} (key …${keyTail})`;
   } else if (status === 402 || msgLow.includes('quota') || msgLow.includes('usage limit') || msgLow.includes('billing') || msgLow.includes('credit') || msgLow.includes('balance') || msgLow.includes('prepaid')) {
     // Show the REAL error — "billing issue" was hiding the actual message
@@ -4997,13 +4930,60 @@ function aiErrorToast(e, feature) {
 }
 // Visible build stamp (Settings footer) — update on deploy to verify which
 // version a device is actually running.
-const APP_BUILD = '2026-07-29';
+const APP_BUILD = '2026-08-15';
+
+// ── Storage management ────────────────────────────────────────────────────────
+// Keys that are purely regenerable AI cache — safe to clear any time
+const CACHE_KEYS = [
+  'closet-shop-cache', 'closet-brand-discovery',
+  'closet-wardrobe-pulse', 'closet-newsflash',
+  'closet-weather-pin', 'closet-dressme-history', 'closet-hot-trends',
+];
+// Keys that are user-curated (saves, logs, plans) — shown with count, not auto-cleared
+const SAVED_KEYS = [
+  'closet-dressme-saves', 'closet-outfit-builds', 'closet-trip-plans',
+  'closet-battles', 'closet-fits', 'closet-occasions', 'closet-todos',
+  'closet-shop-saved', 'closet-therapy-sessions',
+];
+
+function getStorageStats() {
+  let totalBytes = 0, cacheBytes = 0, savedBytes = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const val = localStorage.getItem(key) || '';
+      const b = (key.length + val.length) * 2; // UTF-16 byte estimate
+      totalBytes += b;
+      if (CACHE_KEYS.includes(key)) cacheBytes += b;
+      else if (SAVED_KEYS.includes(key)) savedBytes += b;
+    }
+  } catch(e) {}
+  const fmtKB = b => b < 1024 ? b + ' B' : b < 1024*1024 ? Math.round(b/1024) + ' KB' : (b/1024/1024).toFixed(1) + ' MB';
+  const QUOTA = 5 * 1024 * 1024; // 5 MB — Safari's typical per-origin limit
+  return { totalBytes, cacheBytes, savedBytes, QUOTA, fmtKB,
+    pct: Math.min(100, Math.round(totalBytes / QUOTA * 100)) };
+}
+
+function doFreeUpSpace() {
+  CACHE_KEYS.forEach(k => localStorage.removeItem(k));
+  localStorage.removeItem('closet-suggestion-log'); // clean up old key if present
+  // Reset matching in-memory state
+  S.shopCache = {};
+  S.brandDiscovery = null;
+  S.wardrobePulse = null;
+  S.newsFlash = null;
+  S.weatherPin = null;
+  S._dressMeHistory = [];
+  S.hotTrends = null;
+  toast('✅ Storage cleared — AI caches removed');
+  render();
+}
 
 function navigate(view) { if (view !== S.view) S._prevView = S.view; S.view = view; S.error = null; S._witemLightbox = null; render(); window.scrollTo(0,0); }
 function switchTab(tab)  {
   S.activeTab = tab;
   S.view = tab;
-  if (tab === 'shop') S._priorityPicksOpen = false;
+  if (tab === 'shop') generateSpotlight();
   // Paint the tab-bar active state immediately, then do the heavy render next frame
   requestAnimationFrame(() => { render(); window.scrollTo(0,0); });
 }
@@ -5075,7 +5055,7 @@ function featuresMenuHTML() {
     {
       title: 'Shop & Wish List',
       items: [
-        { icon: '🎯', text: '<strong>Priority Picks</strong> — Closet reads across everything you\'ve saved and loved, then surfaces your top 10 buys as a visual card layout — one tap to shop.' },
+        { icon: '✨', text: '<strong>Spotlight</strong> — Every time you open the Shop tab, Claude picks the one item your wardrobe is missing most — based on outfit gaps and your style goals. Tap to shop it instantly.' },
         { icon: '🤔', text: '<strong>Should I Buy It?</strong> — Snap or describe a piece you\'re considering and Closet gives you an honest verdict based on your wardrobe, budget, and style goals.' },
         { icon: '🛍', text: '<strong>AI Gap Analysis</strong> — Closet studies your wardrobe and surfaces only what\'s missing — pieces that would unlock more of your existing outfits.' },
         { icon: '💛', text: '<strong>Wish List</strong> — Save pieces you\'re considering and share your curated list with friends or gift-givers.' },
@@ -6231,6 +6211,18 @@ async function doOutfitBuild() {
     const budgetLabel = {1:'budget / under $50',2:'mid-range / $50–$200',3:'luxury / $200+'}[S.shopBudget] || 'mid-range';
     const occasionLine = ob.occasion ? `Occasion: ${ob.occasion}` : 'Occasion: everyday / versatile';
 
+    const builderDirectives = [
+      'Go unexpected — pair pieces that wouldn\'t obviously go together but somehow work.',
+      'Choose items that highlight an interesting texture or silhouette contrast.',
+      'Build a look with a clear point of view — it should tell a story.',
+      'Prioritise underused pieces from the wardrobe. Hidden gems deserve a moment.',
+      'Go tonal or monochromatic — pick items in the same colour family for a pulled-together look.',
+      'Layer creatively — think about depth and dimension, not just individual pieces.',
+      'Build around the most statement-making piece in the wardrobe, not the safe choice.',
+    ];
+    const builderDirective = builderDirectives[Math.floor(Math.random() * builderDirectives.length)];
+    const creativeSeed = Math.floor(Math.random() * 9000) + 1000;
+
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -6238,18 +6230,21 @@ async function doOutfitBuild() {
         'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
-        
+
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         messages: [{
           role: 'user',
-          content: `You are a personal stylist. Build a complete outfit around this anchor piece using items from the wardrobe below.
+          content: `You are a creative personal stylist. Build a complete outfit around this anchor piece using items from the wardrobe below.
 
 ANCHOR PIECE: ${anchorDesc}
 ${occasionLine}
 Budget for any gaps: ${budgetLabel}
+
+STYLE DIRECTIVE [seed:${creativeSeed}]: ${builderDirective}
+Be specific and creative. Avoid the most predictable combination.
 
 WARDROBE (use EXACT names from this list for picks):
 ${wardrobeList}
@@ -6286,7 +6281,6 @@ Rules:
     if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Unexpected response format');
 
     S.outfitBuilder = { ...ob, loading: false, result };
-    logSuggestion('builder', result.occasion||'', result.stylistNote||'', (result.picks||[]).map(p=>({emoji:'💜',name:p.name||'',reason:p.reason||''})));
     render();
   } catch(e) {
     S.outfitBuilder = { ...ob, loading: false, result: null };
@@ -6307,8 +6301,8 @@ function saveOutfitBuild() {
     result: ob.result,
     createdAt: new Date().toISOString(),
   };
-  S.savedOutfitBuilds = [entry, ...S.savedOutfitBuilds].slice(0, 200);
-  localStorage.setItem('closet-outfit-builds', JSON.stringify(S.savedOutfitBuilds));
+  S.savedOutfitBuilds = [entry, ...S.savedOutfitBuilds].slice(0, 50);
+  try { localStorage.setItem('closet-outfit-builds', JSON.stringify(S.savedOutfitBuilds)); } catch(e) { console.warn('outfit-builds save: storage full', e); }
   S._outfitBuildSaved = true;
   toast('💜 Saved to Plan!');
   render();
@@ -6413,19 +6407,6 @@ function toggleOutfitBuild(id) {
   render();
 }
 
-function logSuggestion(source, title, hype, items) {
-  const MAX_LOG = 60;
-  const entry = {
-    id: 'sl-' + Date.now() + '-' + Math.random().toString(36).slice(2,5),
-    source, title: title||'', hype: hype||'',
-    items: (items||[]).map(it=>({emoji:it.emoji||'👕',name:it.name||it.item||'',reason:it.reason||''})),
-    createdAt: new Date().toISOString(),
-    savedId: null,
-  };
-  S._suggestionLog = [entry, ...S._suggestionLog].slice(0, MAX_LOG);
-  localStorage.setItem('closet-suggestion-log', JSON.stringify(S._suggestionLog));
-  return entry.id;
-}
 function saveRouletteLook() {
   if (!S.funRoulette) return;
   const entry = {
@@ -6435,8 +6416,8 @@ function saveRouletteLook() {
     outfit: (S.funRoulette.outfit || []).map(p => ({ item: p.item||'', emoji: p.emoji||'👕', reason: p.reason||'' })),
     createdAt: new Date().toISOString(),
   };
-  S.savedRouletteLooks = [entry, ...S.savedRouletteLooks].slice(0, 200);
-  localStorage.setItem('closet-roulette-looks', JSON.stringify(S.savedRouletteLooks));
+  S.savedRouletteLooks = [entry, ...S.savedRouletteLooks].slice(0, 50);
+  try { localStorage.setItem('closet-roulette-looks', JSON.stringify(S.savedRouletteLooks)); } catch(e) { console.warn('roulette-looks save: storage full', e); }
   toast('Saved to your looks 💜');
   navigate('home');
 }
@@ -7253,6 +7234,7 @@ async function generateRoulette() {
     'Build around the most eye-catching item in the wardrobe.',
   ];
   const directive = directions[Math.floor(Math.random() * directions.length)];
+  const rouletteSeed = Math.floor(Math.random() * 9000) + 1000;
 
   const weather = S.weatherPin ? `Current weather: ${S.weatherPin.tempF}°F, ${S.weatherPin.description||''}` : '';
   try {
@@ -7263,14 +7245,14 @@ async function generateRoulette() {
         'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
-        
+
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 600,
         messages: [{ role: 'user', content: `You are a creative personal stylist with a flair for unexpected combinations. Pick a complete outfit from this person's wardrobe. ${weather}
 
-STYLE DIRECTIVE for this spin: ${directive}
+STYLE DIRECTIVE [seed:${rouletteSeed}]: ${directive}
 ${avoidLine}
 Wardrobe:
 ${itemList}
@@ -7291,7 +7273,6 @@ Return ONLY valid JSON with no markdown or extra text:
     if (!Array.isArray(result.outfit)) throw new Error('Bad shape');
     S.funRoulette = result;
     S._rouletteOpen = true;
-    logSuggestion('roulette', result.vibe||'', result.hype||'', (result.outfit||[]).map(p=>({emoji:p.emoji||'🎲',name:p.item||'',reason:p.reason||''})));
     // Add used items to history, keep last 12 to avoid for next few spins
     const usedNames = (result.outfit || []).map(p => p.item).filter(Boolean);
     S._rouletteHistory = [...S._rouletteHistory, ...usedNames].slice(-12);
@@ -7363,6 +7344,17 @@ async function generateDressMe() {
   const contextLine = context ? `What they're getting dressed for today: ${context}` : `No specific plans given — pick a solid, versatile everyday look.`;
   const weather = S.weatherPin ? `Current weather: ${S.weatherPin.tempF}°F, ${S.weatherPin.description||''}` : '';
 
+  const dressMeDirectives = [
+    'Be unexpected — pick pieces that show a point of view, not the obvious safe choice.',
+    'Highlight an underused or underrated piece from the wardrobe.',
+    'Go tonal or play with texture contrast in an interesting way.',
+    'Pick something that feels aspirational but actually wearable.',
+    'Lead with personality — choose the look that\'s most distinctly them.',
+    'Find a combination that feels fresh, not like the default go-to.',
+  ];
+  const dressMeDirective = dressMeDirectives[Math.floor(Math.random() * dressMeDirectives.length)];
+  const dressMeSeed = Math.floor(Math.random() * 9000) + 1000;
+
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -7371,14 +7363,15 @@ async function generateDressMe() {
         'x-api-key': getKey(),
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
-        
+
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
-        messages: [{ role: 'user', content: `You are a thoughtful personal stylist picking a complete outfit for this person to wear today, from their own wardrobe. ${weather}
+        messages: [{ role: 'user', content: `You are a creative personal stylist picking a complete outfit for this person to wear today, from their own wardrobe. ${weather}
 
 ${contextLine}
+STYLE DIRECTIVE [seed:${dressMeSeed}]: ${dressMeDirective}
 ${avoidLine}${avoidCombosBlock}${conflictBlock}
 Wardrobe:
 ${itemList}
@@ -7407,7 +7400,6 @@ Return ONLY valid JSON with no markdown or extra text:
     } else {
       S.dressMeResult = result;
       S._dressMeSessionOutfits = [...prevOutfits, newSorted];
-      logSuggestion('dressme', result.vibe||'', result.hype||'', (result.outfit||[]).map(p=>({emoji:p.emoji||'✨',name:p.item||'',reason:p.reason||''})));
       const usedNames = newSorted;
       S._dressMeHistory = [...S._dressMeHistory, ...usedNames].slice(-12);
     }
@@ -7430,8 +7422,8 @@ function saveDressMe() {
     context: (S._dressMeContext || '').trim(),
     createdAt: new Date().toISOString(),
   };
-  S.savedDressMe = [entry, ...S.savedDressMe].slice(0, 200);
-  localStorage.setItem('closet-dressme-saves', JSON.stringify(S.savedDressMe));
+  S.savedDressMe = [entry, ...S.savedDressMe].slice(0, 50); // capped at 50 to stay within storage budget
+  try { localStorage.setItem('closet-dressme-saves', JSON.stringify(S.savedDressMe)); } catch(e) { console.warn('dressme save: storage full', e); }
   toast('Saved!');
 }
 function deleteDressMeSave(id) {
@@ -9999,124 +9991,33 @@ function viewShop() {
           </div>`;
       })()}
 
-      <!-- Priority Picks -->
+      <!-- Spotlight — buy this next -->
       ${(()=>{
-        if (!S.apiKey) return '';
-        const allSourcesAvail = [
-          ...(wishItems.length ? ['Saved'] : []),
-          ...(recsRawAll.length ? ['AI Picks'] : []),
-          ...(buyAgainItems.length ? ['Buy Again'] : []),
-          ...((S.spottedItems||[]).length ? ['Spotted'] : []),
-        ];
-        if (!allSourcesAvail.length) return '';
-
-        const picks = S.priorityPicks;
-        const hasPicks = picks && picks.length > 0;
-        const loading = S._priorityPicksLoading;
-        const isOpen = S._priorityPicksOpen !== false;
-        const sourceColors = { 'Saved':'#B87D2A', 'AI Picks':'#8B6BBF', 'Buy Again':'#2E9E6B', 'Spotted':'#3B5E8C' };
-        const sourceIcons  = { 'Saved':'♥ ', 'AI Picks':'✦ ', 'Buy Again':'🔁 ', 'Spotted':'📌 ' };
-
-        // ── Collapsed ──────────────────────────────────────────────────────────
-        if (!isOpen) return `
-          <button
-            ontouchend="if(_touchMoved)return;event.preventDefault();S._priorityPicksOpen=true;S.shopSource=null;S.shopSelectedQuery=null;render();"
-            onclick="S._priorityPicksOpen=true;S.shopSource=null;S.shopSelectedQuery=null;render();"
-            style="width:100%;display:flex;align-items:center;gap:12px;padding:13px 16px;margin-bottom:20px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r);cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:left;">
-            <span style="font-size:22px;flex-shrink:0;">🎯</span>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:14px;font-weight:800;color:var(--text);">Priority Picks</div>
-              <div style="font-size:11px;color:var(--text-3);margin-top:1px;">${hasPicks ? `Top ${picks.length} ranked across all your lists` : 'Claude ranks your best bets across Saved, AI Picks, Buy Again & Spotted'}</div>
-            </div>
-            <span style="font-size:20px;color:var(--gold);font-weight:700;">›</span>
-          </button>`;
-
-        // ── Expanded ───────────────────────────────────────────────────────────
-        const picksListHTML = hasPicks ? (()=>{
-          function mkBadge(s) {
-            return `<span style="font-size:9px;font-weight:700;color:${sourceColors[s]||'var(--text-3)'};background:${sourceColors[s]?sourceColors[s]+'18':'var(--bg)'};border:1px solid ${sourceColors[s]||'var(--border)'}33;padding:1px 5px;border-radius:100px;white-space:nowrap;">${sourceIcons[s]||''}${s}</span>`;
-          }
-          const [hero, ...rest] = picks;
-          // ── Hero card — #1 pick, full width ──────────────────────────
-          const { bg: hBg, border: hBorder } = shopItemBg(hero.query);
-          const hEmoji = shopItemEmoji(hero.query);
-          const hBadges = (hero.sources||[]).map(mkBadge).join('');
-          const heroCard = `<div style="background:${hBg};border:1.5px solid ${hBorder};border-radius:var(--r);padding:16px;margin-bottom:8px;position:relative;">
-            <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--gold-dk);margin-bottom:10px;">🎯 Top Pick</div>
-            <div style="display:flex;align-items:center;gap:14px;">
-              <div style="width:60px;height:60px;border-radius:14px;background:rgba(255,255,255,.65);border:1.5px solid ${hBorder};display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;">${hEmoji}</div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:16px;font-weight:800;color:var(--text);line-height:1.25;margin-bottom:4px;">${esc(hero.label)}</div>
-                ${hero.reason ? `<div style="font-size:12px;color:var(--text-2);line-height:1.4;margin-bottom:6px;">${esc(hero.reason)}</div>` : ''}
-                ${hBadges ? `<div style="display:flex;gap:4px;flex-wrap:wrap;">${hBadges}</div>` : ''}
-              </div>
-            </div>
-            <div style="display:flex;gap:8px;margin-top:12px;">
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick('${esc(hero.query)}');" onclick="openPriorityPick('${esc(hero.query)}');"
-                style="flex:1;padding:9px;background:rgba(255,255,255,.7);border:1.5px solid ${hBorder};border-radius:var(--r-sm);font-size:13px;font-weight:800;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                Shop it ›
-              </button>
-              <button ontouchend="if(_touchMoved)return;event.preventDefault();removePriorityPick(0);" onclick="removePriorityPick(0);"
-                style="padding:9px 14px;background:rgba(255,255,255,.5);border:1.5px solid ${hBorder};border-radius:var(--r-sm);font-size:13px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                ✕
-              </button>
-            </div>
+        if (!getKey()) return '';
+        const sp = S.spotlightItem;
+        const loading = S._spotlightLoading;
+        if (loading) return `
+          <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;margin-bottom:20px;background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r);">
+            <div class="spinner" style="width:18px;height:18px;border-width:2px;flex-shrink:0;border-color:var(--gold);border-top-color:transparent;"></div>
+            <div style="font-size:13px;color:var(--text-3);">Finding your spotlight item…</div>
           </div>`;
-          // ── Grid cards — 2-col for all remaining picks ────────────────
-          const gridCards = rest.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${
-            rest.map((pick, idx) => {
-              const pickIdx = idx + 1; // index in S.priorityPicks
-              const { bg, border } = shopItemBg(pick.query);
-              const emoji = shopItemEmoji(pick.query);
-              const badges = (pick.sources||[]).map(mkBadge).join('');
-              return `<div style="background:${bg};border:1.5px solid ${border};border-radius:var(--r);padding:12px 10px 10px;position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;">
-                <div style="position:absolute;top:7px;left:7px;width:18px;height:18px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:var(--text-3);">${pickIdx+1}</div>
-                <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,.65);border:1.5px solid ${border};display:flex;align-items:center;justify-content:center;font-size:26px;margin-top:10px;">${emoji}</div>
-                <div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;">${esc(pick.label)}</div>
-                ${pick.reason ? `<div style="font-size:10px;color:var(--text-3);line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;">${esc(pick.reason)}</div>` : ''}
-                ${badges ? `<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center;">${badges}</div>` : ''}
-                <div style="display:flex;gap:5px;width:100%;margin-top:4px;">
-                  <button ontouchend="if(_touchMoved)return;event.preventDefault();openPriorityPick('${esc(pick.query)}');" onclick="openPriorityPick('${esc(pick.query)}');"
-                    style="flex:1;padding:6px 4px;background:rgba(255,255,255,.7);border:1.5px solid ${border};border-radius:6px;font-size:11px;font-weight:800;color:var(--gold-dk);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                    Shop
-                  </button>
-                  <button ontouchend="if(_touchMoved)return;event.preventDefault();removePriorityPick(${pickIdx});" onclick="removePriorityPick(${pickIdx});"
-                    style="padding:6px 8px;background:rgba(255,255,255,.5);border:1.5px solid ${border};border-radius:6px;font-size:11px;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;">
-                    ✕
-                  </button>
-                </div>
-              </div>`;
-            }).join('')
-          }</div>` : '';
-          return `<div style="margin-top:14px;">${heroCard}${gridCards}</div>`;
-        })() : loading ? `
-          <div style="display:flex;align-items:center;gap:10px;padding:14px;margin-top:14px;background:rgba(185,140,50,0.06);border:1px solid rgba(185,140,50,0.25);border-radius:var(--r);">
-            <div class="spinner" style="width:18px;height:18px;border-width:2px;flex-shrink:0;"></div>
-            <div style="font-size:13px;color:var(--text-3);">Ranking across all your lists…</div>
-          </div>` : `
-          <div style="margin-top:14px;">
-            <div style="font-size:13px;color:var(--text-3);margin-bottom:12px;">Scores ${allSourcesAvail.join(', ')} — ranks by gap-filling &amp; signal strength</div>
-            <button ontouchend="if(_touchMoved)return;event.preventDefault();generatePriorityPicks();" onclick="generatePriorityPicks();"
-              style="width:100%;padding:12px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#B87D2A,#D4A843);color:#fff;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation;box-shadow:0 2px 10px rgba(185,140,50,0.35);">
-              ✨ Rank with Claude
-            </button>
-          </div>`;
-
+        if (!sp) return '';
+        const spEmoji = shopItemEmoji(sp.searchQuery || sp.item || '');
+        const { bg: spBg, border: spBorder } = shopItemBg(sp.searchQuery || sp.item || '');
         return `
-          <div style="background:var(--gold-bg);border:1.5px solid var(--gold);border-radius:var(--r);padding:14px;margin-bottom:20px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:18px;">🎯</span>
-                <span style="font-size:14px;font-weight:800;color:var(--text);">Priority Picks</span>
-                ${hasPicks ? `<span style="font-size:10px;font-weight:700;background:rgba(185,140,50,0.18);color:var(--gold-dk);padding:1px 7px;border-radius:100px;">Top ${picks.length}</span>` : ''}
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                ${hasPicks && !loading ? `<button onclick="sharePriorityPicks();" style="background:none;border:1px solid var(--border);border-radius:100px;padding:4px 11px;font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;">↑ Share</button>` : ''}
-                ${hasPicks && !loading ? `<button ontouchend="if(_touchMoved)return;event.preventDefault();generatePriorityPicks();" onclick="generatePriorityPicks();" style="background:none;border:1px solid var(--border);border-radius:100px;padding:4px 11px;font-size:11px;font-weight:700;color:var(--text-2);cursor:pointer;font-family:inherit;touch-action:manipulation;">↺</button>` : ''}
-                <button ontouchend="if(_touchMoved)return;event.preventDefault();S._priorityPicksOpen=false;render();" onclick="S._priorityPicksOpen=false;render();" style="background:none;border:none;padding:4px 8px;font-size:18px;line-height:1;color:var(--text-3);cursor:pointer;font-family:inherit;touch-action:manipulation;margin-left:2px;">×</button>
+          <div style="background:${spBg};border:1.5px solid ${spBorder};border-radius:var(--r);padding:16px;margin-bottom:20px;">
+            <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold-dk);margin-bottom:10px;">✨ Spotlight — Buy This Next</div>
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+              <div style="width:56px;height:56px;border-radius:14px;background:rgba(255,255,255,.65);border:1.5px solid ${spBorder};display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;">${spEmoji}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.2;margin-bottom:5px;">${esc(sp.item||'')}</div>
+                ${sp.reason ? `<div style="font-size:13px;color:var(--text-2);line-height:1.4;">${esc(sp.reason)}</div>` : ''}
               </div>
             </div>
-            ${picksListHTML}
+            <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(sp.searchQuery||sp.item||'')}" target="_blank" rel="noopener"
+              style="display:block;text-align:center;text-decoration:none;padding:10px;border-radius:var(--r-sm);background:linear-gradient(135deg,#B87D2A,#D4A843);color:#fff;font-size:14px;font-weight:800;font-family:inherit;">
+              Shop it →
+            </a>
           </div>`;
       })()}
 
@@ -10124,32 +10025,32 @@ function viewShop() {
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px;">What are you shopping from?</div>
       <div style="display:flex;gap:6px;margin-bottom:20px;">
         <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;S._priorityPicksOpen=false;renderRAF();"
-          onclick="S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;S._priorityPicksOpen=false;renderRAF()"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
+          onclick="S.shopSource='wishlist';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
           style="flex:1;padding:9px 4px;border-radius:var(--r-sm);border:${src==='wishlist'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='wishlist'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:15px;margin-bottom:3px;">♥</div>
           <div style="font-size:11px;font-weight:${src==='wishlist'?'800':'600'};color:${src==='wishlist'?'var(--gold-dk)':'var(--text-2)'};">Saved</div>
           <div style="font-size:9px;color:${src==='wishlist'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${wishItems.length}</div>
         </button>
         <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;S._priorityPicksOpen=false;renderRAF();"
-          onclick="S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;S._priorityPicksOpen=false;renderRAF()"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
+          onclick="S.shopSource='recs';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
           style="flex:1;padding:9px 4px;border-radius:var(--r-sm);border:${src==='recs'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='recs'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:15px;margin-bottom:3px;">✦</div>
           <div style="font-size:11px;font-weight:${src==='recs'?'800':'600'};color:${src==='recs'?'var(--gold-dk)':'var(--text-2)'};">AI Picks</div>
           <div style="font-size:9px;color:${src==='recs'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${recsRawAll.length}</div>
         </button>
         <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='buyagain';S.shopSelectedQuery=null;S.shopExpanded=false;S._priorityPicksOpen=false;renderRAF();"
-          onclick="S.shopSource='buyagain';S.shopSelectedQuery=null;S.shopExpanded=false;S._priorityPicksOpen=false;renderRAF()"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='buyagain';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
+          onclick="S.shopSource='buyagain';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
           style="flex:1;padding:9px 4px;border-radius:var(--r-sm);border:${src==='buyagain'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='buyagain'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:15px;margin-bottom:3px;">🔁</div>
           <div style="font-size:11px;font-weight:${src==='buyagain'?'800':'600'};color:${src==='buyagain'?'var(--gold-dk)':'var(--text-2)'};">Buy Again</div>
           <div style="font-size:9px;color:${src==='buyagain'?'var(--gold-dk)':'var(--text-3)'};margin-top:1px;">${buyAgainItems.length}</div>
         </button>
         <button
-          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;S._priorityPicksOpen=false;renderRAF();"
-          onclick="S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;S._priorityPicksOpen=false;renderRAF()"
+          ontouchend="if(_touchMoved)return;event.preventDefault();S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF();"
+          onclick="S.shopSource='spotted';S.shopSelectedQuery=null;S.shopExpanded=false;renderRAF()"
           style="flex:1;padding:9px 4px;border-radius:var(--r-sm);border:${src==='spotted'?'2px solid var(--gold)':'1.5px solid var(--border)'};background:${src==='spotted'?'var(--gold-bg)':'var(--surface)'};cursor:pointer;font-family:inherit;touch-action:manipulation;text-align:center;transition:all .15s;">
           <div style="font-size:15px;margin-bottom:3px;">📌</div>
           <div style="font-size:11px;font-weight:${src==='spotted'?'800':'600'};color:${src==='spotted'?'var(--gold-dk)':'var(--text-2)'};">Spotted</div>
@@ -15740,7 +15641,7 @@ function viewOnboarding() {
     // 5 — Shop
     { label:'Shop', dark:false, img:'onboarding/shop.jpg',
       headline:'Spend with intention.\nClose the gaps.',
-      sub:'🎯 Priority Picks leads with your top buys — AI-curated from everything you\'ve saved and loved. Four tabs below: ♥ Saved is your Wish List. ✦ AI Picks surfaces wardrobe gaps. 🔁 Buy Again is for pieces worth repurchasing. 📌 Spotted is your capture board.',
+      sub:'✨ Spotlight surfaces your one best buy every visit — based on wardrobe gaps and your style goals. Four tabs below: ♥ Saved is your Wish List. ✦ AI Picks surfaces wardrobe gaps. 🔁 Buy Again is for pieces worth repurchasing. 📌 Spotted is your capture board.',
       mock:`<div style="padding:0 24px;">
         <div style="background:var(--surface);border-radius:18px;padding:14px;border:1.5px solid var(--border);">
           <div style="display:flex;gap:5px;margin-bottom:12px;">
@@ -20316,6 +20217,39 @@ function viewSettings() {
     <!-- ── DATA & STORAGE ──────────────────────────────── -->
     <div class="settings-group-label">Data &amp; Storage</div>
     <div class="settings-section">
+      ${(()=>{
+        const st = getStorageStats();
+        const barColor = st.pct > 85 ? '#e53935' : st.pct > 60 ? '#fb8c00' : 'var(--accent)';
+        const cacheKB = Math.round(st.cacheBytes / 1024);
+        const savedKB = Math.round(st.savedBytes / 1024);
+        const otherKB = Math.round((st.totalBytes - st.cacheBytes - st.savedBytes) / 1024);
+        return `<div class="settings-row" style="border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div class="settings-label" style="margin:0;">Storage Used</div>
+            <div style="font-size:12px;font-weight:700;color:${barColor};">${st.fmtKB(st.totalBytes)} / 5 MB</div>
+          </div>
+          <div style="height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden;margin-bottom:10px;">
+            <div style="height:100%;width:${st.pct}%;background:${barColor};border-radius:4px;transition:width .4s;"></div>
+          </div>
+          <div style="display:flex;gap:6px;font-size:11px;color:var(--text-3);margin-bottom:12px;flex-wrap:wrap;">
+            <span>🔄 AI cache: <strong>${cacheKB} KB</strong></span>
+            <span>·</span>
+            <span>💾 Saved: <strong>${savedKB} KB</strong></span>
+            <span>·</span>
+            <span>⚙️ Settings: <strong>${otherKB} KB</strong></span>
+          </div>
+          ${st.pct > 60 ? `<div style="font-size:12px;color:${st.pct > 85 ? '#e53935' : '#fb8c00'};background:${st.pct > 85 ? 'rgba(229,57,53,0.08)' : 'rgba(251,140,0,0.08)'};border-radius:8px;padding:8px 10px;margin-bottom:10px;">
+            ${st.pct > 85 ? '⚠️ Storage almost full — this can cause AI features to fail.' : '📊 Storage getting full — consider clearing cache soon.'}
+          </div>` : ''}
+          <button
+            ontouchend="if(_touchMoved)return;event.preventDefault();doFreeUpSpace();"
+            onclick="doFreeUpSpace();"
+            style="width:100%;padding:11px;border-radius:var(--r);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;">
+            🧹 Free Up Space (clears ${cacheKB} KB of AI cache)
+          </button>
+          <div style="font-size:11px;color:var(--text-3);margin-top:6px;text-align:center;">Clears AI suggestions, shopping cache, weather &amp; trends. Your saved looks, wardrobe, and outfit log are never touched.</div>
+        </div>`;
+      })()}
       <div class="settings-row" style="border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:0;">
         <button ontouchend="if(_touchMoved)return;event.preventDefault();navigate('dashboard')" onclick="navigate('dashboard')"
           style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;text-align:left;">
